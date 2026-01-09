@@ -6,5 +6,8 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-distutils \
     build-essential \
-    wget
+    wget \
+    curl
+# Install Claude Code
+RUN curl -fsSL https://claude.ai/install.sh | bash
 USER node

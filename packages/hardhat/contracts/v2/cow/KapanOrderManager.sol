@@ -37,6 +37,9 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     error InvalidOrderState();
     error ZeroAddress();
     error InstructionUserMismatch(address expected, address actual);
+    error PreHookAlreadyExecuted();
+    error PreHookNotExecuted();
+    error CannotCancelMidExecution();
 
     // ============ Enums ============
     enum CompletionType {
@@ -152,6 +155,13 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     
     /// @notice Lookup order hash by (user, salt) - enables pre-computing appData
     mapping(address => mapping(bytes32 => bytes32)) public userSaltToOrderHash;
+    
+    /// @notice Track pre-hook execution per order to prevent re-execution
+    /// @dev Stores (iterationCount + 1) when pre-hook executed, 0 means no pre-hook pending
+    mapping(bytes32 => uint256) public preHookExecutedForIteration;
+    
+    /// @notice Track seed tokens deposited per order for accurate refunds on cancel
+    mapping(bytes32 => uint256) public orderSeedBalance;
 
     // ============ Events ============
     
@@ -250,8 +260,9 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         if (params.user != msg.sender) revert Unauthorized();
         if (orderHandler == address(0)) revert InvalidHandler();
         
-        // TODO: Re-enable after debugging - temporarily disabled to isolate issue
-        // Validate all instructions target the caller (prevents encoding instructions for other users)
+        // TODO: Re-enable instruction validation after fixing encoding mismatch
+        // The frontend encodes LendingInstruction.inputIndex as { index: uint256 } struct
+        // but the contract expects a flat LendingInstruction struct. Need to align encoding.
         // _validateInstructionUsers(params.preInstructionsPerIteration, msg.sender);
         // _validateInstructionUsers(params.postInstructionsPerIteration, msg.sender);
         
@@ -265,6 +276,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         // This ensures OrderManager has balance for CoW API's balance check
         if (seedAmount > 0) {
             IERC20(params.sellToken).safeTransferFrom(msg.sender, address(this), seedAmount);
+            orderSeedBalance[orderHash] = seedAmount;
         }
         
         // Store order context
@@ -318,6 +330,9 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         if (ctx.params.user != msg.sender) revert Unauthorized();
         if (ctx.status != OrderStatus.Active) revert InvalidOrderState();
         
+        // Cannot cancel if pre-hook has executed but post-hook hasn't (mid-execution)
+        if (preHookExecutedForIteration[orderHash] != 0) revert CannotCancelMidExecution();
+        
         ctx.status = OrderStatus.Cancelled;
         
         // Remove from ComposableCoW
@@ -331,21 +346,18 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         );
         composableCoW.remove(cowOrderHash);
         
-        // Refund any remaining tokens to user
-        // This handles cases where:
-        // 1. Seed tokens were provided but order never filled
-        // 2. Partial execution left some sell tokens
-        // 3. A chunk was in-flight and buy tokens arrived but couldn't be processed
-        uint256 sellRemaining = IERC20(ctx.params.sellToken).balanceOf(address(this));
-        if (sellRemaining > 0) {
-            IERC20(ctx.params.sellToken).safeTransfer(ctx.params.user, sellRemaining);
+        // Only refund the tracked seed balance for THIS order
+        // This prevents stealing tokens belonging to other orders
+        uint256 seedToRefund = orderSeedBalance[orderHash];
+        if (seedToRefund > 0) {
+            orderSeedBalance[orderHash] = 0;
+            IERC20(ctx.params.sellToken).safeTransfer(ctx.params.user, seedToRefund);
         }
         
-        // Also refund any buy tokens that might be stuck (from partial chunk execution)
-        uint256 buyRemaining = IERC20(ctx.params.buyToken).balanceOf(address(this));
-        if (buyRemaining > 0) {
-            IERC20(ctx.params.buyToken).safeTransfer(ctx.params.user, buyRemaining);
-        }
+        // Note: We don't refund buyTokens here because:
+        // - If not mid-execution, no buyTokens should be present for this order
+        // - If iterations completed (iterationCount > 0), buyTokens were processed through router
+        // - Any stuck buyTokens can be recovered via owner's recoverTokens()
         
         emit OrderCancelled(orderHash, msg.sender);
     }
@@ -398,6 +410,14 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         OrderContext storage ctx = orders[orderHash];
         if (ctx.status != OrderStatus.Active) revert InvalidOrderState();
         
+        // Guard: Pre-hook can only run once per iteration
+        // Value of 0 means no pre-hook pending, non-zero means pre-hook already executed
+        if (preHookExecutedForIteration[orderHash] != 0) revert PreHookAlreadyExecuted();
+        
+        // Mark pre-hook as executed for current iteration
+        // Store (iterationCount + 1) so that 0 remains the "not executed" sentinel
+        preHookExecutedForIteration[orderHash] = ctx.iterationCount + 1;
+        
         // Get pre-instructions for current iteration
         // If fewer entries than iterations, reuse the last entry
         bytes memory preInstructionsData = _getInstructionsForIteration(
@@ -440,6 +460,13 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         
         OrderContext storage ctx = orders[orderHash];
         if (ctx.status != OrderStatus.Active) revert InvalidOrderState();
+        
+        // Guard: Post-hook requires pre-hook to have executed for this iteration
+        // preHookExecutedForIteration stores (iterationCount + 1) when pre-hook ran
+        if (preHookExecutedForIteration[orderHash] != ctx.iterationCount + 1) revert PreHookNotExecuted();
+        
+        // Reset the pre-hook flag (allows next iteration's pre-hook to run)
+        preHookExecutedForIteration[orderHash] = 0;
         
         // Get post-instructions for current iteration
         bytes memory postInstructionsData = _getInstructionsForIteration(
@@ -519,6 +546,12 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         // Update progress with actual amounts
         ctx.executedAmount += actualSellAmount;
         ctx.iterationCount++;
+        
+        // Clear seed balance after first iteration (seed was consumed by the swap)
+        // This ensures cancel won't try to refund already-used tokens
+        if (orderSeedBalance[orderHash] > 0) {
+            orderSeedBalance[orderHash] = 0;
+        }
         
         // Emit chunk execution event with actual sell/buy amounts for frontend tracking
         emit ChunkExecuted(orderHash, ctx.iterationCount, actualSellAmount, actualBuyAmount);

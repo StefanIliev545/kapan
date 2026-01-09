@@ -25615,7 +25615,7 @@ const contracts = {
       },
     },
     KapanOrderHandler: {
-      address: "0x5F6B301b506aE6a741Eb39F4c9B303E61aD3fB07",
+      address: "0x71cb6A26E820Ae351E2d1Bb93ffBBCF3019e912f",
       abi: [
         {
           inputs: [
@@ -25986,7 +25986,7 @@ const contracts = {
       },
     },
     KapanOrderManager: {
-      address: "0x9A5cA8E27d17eC708Dba13da2cB077DC9352e761",
+      address: "0xD0211dfC5CFCAFe34C7B257265fd56026D0a6E9b",
       abi: [
         {
           inputs: [
@@ -26039,6 +26039,11 @@ const contracts = {
             },
           ],
           name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "CannotCancelMidExecution",
           type: "error",
         },
         {
@@ -26112,6 +26117,16 @@ const contracts = {
             },
           ],
           name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PreHookAlreadyExecuted",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PreHookNotExecuted",
           type: "error",
         },
         {
@@ -26832,6 +26847,25 @@ const contracts = {
               type: "bytes32",
             },
           ],
+          name: "orderSeedBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
           name: "orders",
           outputs: [
             {
@@ -26943,6 +26977,25 @@ const contracts = {
               internalType: "address",
               name: "",
               type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookExecutedForIteration",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",

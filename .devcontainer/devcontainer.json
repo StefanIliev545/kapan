@@ -44,12 +44,13 @@
 				"NomicFoundation.hardhat-solidity",
 				"StarkWare.cairo1",
 				"tamasfe.even-better-toml",
-				"openai.chatgpt"
+				"openai.chatgpt",
+				"anthropic.claude-code"
 			]
 		}
 	},
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo chown -R node:node /home/node/.local/share/opencode /home/node/.config/opencode /home/node/.npm && curl -fsSL https://opencode.ai/install | bash && npm install -g @beads/bd && echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc && echo 'OpenCode + Beads Installed ✅'"
+	"postCreateCommand": "sudo chown -R node:node /home/node/.local/share/opencode /home/node/.config/opencode /home/node/.npm && curl -fsSL https://opencode.ai/install | bash && npm install -g @beads/bd && echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc && echo 'OpenCode + Beads + Claude Code Installed ✅'"
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
 }
