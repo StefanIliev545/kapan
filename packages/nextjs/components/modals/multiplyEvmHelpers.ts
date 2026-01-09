@@ -2,7 +2,7 @@
  * Helper functions for MultiplyEvmModal to reduce cognitive complexity.
  * These functions extract complex logic into reusable, testable units.
  */
-import { Address, formatUnits } from "viem";
+import { Address, formatUnits, parseUnits } from "viem";
 import { SwapAsset } from "./SwapModalShell";
 import {
   FlashLoanProvider,
@@ -296,7 +296,6 @@ export function calculateMinCollateralOut(
   // For limit orders with custom min price
   if (executionType === "limit" && customMinPrice && customMinPrice !== "") {
     try {
-      const { parseUnits } = require("viem");
       const customRaw = parseUnits(customMinPrice, collateral.decimals);
       return { raw: customRaw, formatted: customMinPrice };
     } catch {
