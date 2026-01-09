@@ -7,7 +7,9 @@ RUN apt-get update && apt-get install -y \
     python3-distutils \
     build-essential \
     wget \
-    curl
-# Install Claude Code
-RUN curl -fsSL https://claude.ai/install.sh | bash
+    curl \
+    nodejs \
+    npm
+# Install Claude Code as root
+RUN npm install -g @anthropic-ai/claude-code
 USER node

@@ -1,0 +1,193 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Kapan Finance is a DeFi protocol for optimizing borrowing costs by moving debt positions between lending platforms (Aave, Compound, Venus, Morpho Blue) across multiple chains (Arbitrum, Base, Ethereum, Optimism, Linea). The project also supports Starknet with Nostra and Vesu protocols.
+
+## Monorepo Structure
+
+```
+packages/
+├── hardhat/     # EVM smart contracts (Solidity), deploy scripts, tests
+├── nextjs/      # Frontend (Next.js 16, React 19, TailwindCSS)
+└── snfoundry/   # Starknet contracts (Cairo), deployment scripts
+```
+
+## Common Commands
+
+### Root-level (run from repo root)
+```bash
+yarn install          # Install all dependencies (MUST use yarn, not npm)
+yarn start           # Start Next.js dev server
+yarn build           # Build Next.js for production
+yarn chain           # Run local Hardhat node (no forking)
+yarn fork            # Run Hardhat node forked from mainnet (default: Arbitrum)
+yarn deploy          # Deploy contracts to local network
+yarn test            # Run Hardhat tests (non-fork tests only)
+yarn lint            # Lint both Next.js and Hardhat packages
+```
+
+### Hardhat package
+```bash
+yarn hardhat:compile                    # Compile Solidity contracts
+yarn hardhat:test                       # Run non-fork tests
+yarn hardhat:test:fork                  # Run fork tests
+FORK_CHAIN=base yarn fork               # Fork a specific chain (arbitrum, base, ethereum, optimism, linea)
+npx hardhat test test/v2/MyTest.ts      # Run a single test file
+npx hardhat test --grep "pattern"       # Run tests matching pattern
+```
+
+### Starknet (snfoundry) package
+```bash
+yarn snchain         # Start starknet-devnet (forked from mainnet)
+yarn sndeploy        # Deploy Cairo contracts
+yarn sntest          # Run Cairo tests with snforge
+yarn sncompile       # Compile Cairo contracts
+```
+
+### Next.js package
+```bash
+yarn dev             # Start dev server with Turbo
+yarn next:build      # Production build
+yarn next:check-types # TypeScript type checking
+```
+
+## Architecture
+
+### Smart Contracts (packages/hardhat/contracts/v2/)
+
+**KapanRouter** - Main entry point for all operations. Executes instructions via protocol gateways using flash loans from Balancer V2/V3 or Aave.
+
+**Gateway Pattern** - Each lending protocol has Read (View) and Write gateways:
+- `AaveGatewayView` / `AaveGatewayWrite`
+- `CompoundGatewayView` / `CompoundGatewayWrite`
+- `VenusGatewayView` / `VenusGatewayWrite`
+- `MorphoBlueGatewayView` / `MorphoBlueGatewayWrite`
+
+**CoW Protocol Integration** - For order-based execution:
+- `KapanCowAdapter` - ERC-1271 signature adapter
+- `KapanOrderManager` - Order creation/management
+- `KapanOrderHandler` - Order execution
+
+### Frontend (packages/nextjs/)
+
+**Key directories:**
+- `app/` - Next.js App Router pages
+- `components/` - React components (modals, scaffold-eth, scaffold-stark)
+- `hooks/` - Custom hooks for protocol interactions (useAaveEMode, useMorphoLendingPositions, useVesuAssets, etc.)
+- `utils/` - Utility functions and constants
+
+**Dual-chain support:** The frontend supports both EVM chains (via RainbowKit/wagmi/viem) and Starknet (via starknet-react).
+
+### Starknet (packages/snfoundry/contracts/src/)
+
+**Gateways:**
+- `NostraGateway.cairo` - Nostra protocol
+- `vesu_gateway.cairo` / `VesuGatewayV2.cairo` - Vesu protocol
+- `ekubo_gateway.cairo` - Ekubo DEX
+- `avnu_gateway.cairo` - AVNU aggregator
+
+## Development Patterns
+
+### Fork Testing
+Tests with `.fork.ts` suffix require mainnet forking:
+```bash
+FORK_CHAIN=arbitrum yarn fork  # In terminal 1
+yarn hardhat:test:fork         # In terminal 2
+```
+
+### Deploy Scripts
+Located in `packages/hardhat/deploy/v2/`. Numbered for execution order. Auto-generates TypeScript ABIs after deployment.
+
+### Dependency Management
+- This workspace uses Yarn Berry with `node-modules` linker
+- Never use npm or commit package-lock.json (causes Next.js build issues)
+- Always install with `yarn`
+
+## Key Technical Concepts
+
+### UTXO-Based Instruction System
+The KapanRouter uses a UTXO (Unspent Transaction Output) model for composing operations:
+
+```solidity
+// Instructions reference outputs from previous instructions via InputPtr
+struct LendingInstruction {
+    LendingOp op;           // Deposit, Withdraw, Borrow, Repay, etc.
+    address token;          // underlying token
+    address user;           // user account
+    uint256 amount;         // amount (or 0 to use input)
+    bytes context;          // protocol-specific (e.g., Compound market)
+    InputPtr input;         // pointer to prior output index
+}
+```
+
+Operations: `Deposit`, `DepositCollateral`, `WithdrawCollateral`, `Borrow`, `Repay`, `GetBorrowBalance`, `GetSupplyBalance`, `Swap`, `SwapExactOut`, `SetEMode`
+
+### Flash Loan Providers
+Supported providers in `FlashLoanConsumerBase`:
+- Balancer V2/V3
+- Aave V3
+- ZeroLend
+- Uniswap V3
+- Morpho
+
+### Authorization Flow
+Gateways implement `authorize()` and `deauthorize()` to generate user approval transactions:
+- `authorize()` returns approval targets/data needed before execution
+- `deauthorize()` returns transactions to revoke approvals after execution
+
+## Environment Variables
+
+### Hardhat (`packages/hardhat/.env`)
+```
+ALCHEMY_API_KEY=              # RPC provider
+MAINNET_FORKING_ENABLED=true  # Enable fork testing
+FORK_CHAIN=arbitrum           # Chain to fork (arbitrum, base, ethereum, optimism, linea)
+```
+
+### Next.js (`packages/nextjs/.env.local`)
+```
+NEXT_PUBLIC_ALCHEMY_API_KEY=
+NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=
+NEXT_PUBLIC_ONE_INCH_API_KEY=
+NEXT_PUBLIC_ENABLE_HARDHAT_UI=true  # Show localhost in chain selector
+```
+
+## Testing Conventions
+
+- **Unit tests** (`*.test.ts`): Run without fork, test isolated logic
+- **Fork tests** (`*.fork.ts`): Require `MAINNET_FORKING_ENABLED=true`, test against real protocol state
+- Tests check `network.config.chainId` to skip if wrong chain is forked
+- Use whale addresses for token funding in fork tests
+- Test timeout typically 120s for fork tests
+
+## Key Addresses (Arbitrum)
+
+```
+USDC:            0xaf88d065e77c8cC2239327C5EDb3A432268e5831
+WETH:            0x82aF49447D8a07e3bd95BD0d56f35241523fBab1
+Balancer V3:     0xbA1333333333a1BA1108E8412f11850A5C319bA9
+Aave Provider:   0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb
+Compound USDC:   0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf
+```
+
+## Configuration Files
+
+- `packages/hardhat/hardhat.config.ts` - Networks, compiler settings, fork configuration
+- `packages/nextjs/scaffold.config.ts` - Supported chains, polling, API keys
+- `packages/snfoundry/contracts/Scarb.toml` - Cairo project config
+
+## Issue Tracking
+
+This project uses **bd (beads)** for issue tracking.
+
+```bash
+bd ready                              # Find unblocked work
+bd create "Title" --type task         # Create issue
+bd close <id>                         # Complete work
+bd show <id>                          # View issue details
+bd sync                               # Sync with git (run at session end)
+bd prime                              # Full workflow context
+```
