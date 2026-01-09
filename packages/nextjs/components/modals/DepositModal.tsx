@@ -1,8 +1,9 @@
 import { FC, useCallback } from "react";
+import { BatchingPreference } from "./common/BatchingPreference";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
+import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
-import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { PositionManager } from "~~/utils/position";
 
 interface DepositModalProps {
@@ -65,19 +66,13 @@ export const DepositModal: FC<DepositModalProps> = ({ isOpen, onClose, token, pr
       chainId={chainId}
       position={position}
       onConfirm={handleDeposit}
-      renderExtraContent={() => isPreferenceLoaded ? (
-        <div className="pt-2 pb-1">
-          <label className="label cursor-pointer gap-2 justify-start">
-            <input
-              type="checkbox"
-              checked={preferBatching}
-              onChange={(e) => setPreferBatching(e.target.checked)}
-              className="checkbox checkbox-sm"
-            />
-            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
-          </label>
-        </div>
-      ) : null}
+      renderExtraContent={() => (
+        <BatchingPreference
+          enabled={preferBatching}
+          setEnabled={setPreferBatching}
+          isLoaded={isPreferenceLoaded}
+        />
+      )}
     />
   );
 };

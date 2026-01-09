@@ -1,7 +1,18 @@
 {
-  "extends": ["next/core-web-vitals", "plugin:@typescript-eslint/recommended"],
+  "extends": [
+    "next/core-web-vitals",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:sonarjs/recommended-legacy"
+  ],
+  "plugins": ["sonarjs"],
   "rules": {
     "@typescript-eslint/no-explicit-any": "off",
-    "@typescript-eslint/ban-ts-comment": "off"
+    "@typescript-eslint/ban-ts-comment": "off",
+    "sonarjs/cognitive-complexity": ["warn", 15],
+    "sonarjs/no-duplicate-string": ["warn", { "threshold": 4 }],
+    "sonarjs/no-identical-functions": "warn",
+    "sonarjs/no-collapsible-if": "warn",
+    "sonarjs/prefer-single-boolean-return": "warn",
+    "sonarjs/no-redundant-jump": "warn"
   }
 }

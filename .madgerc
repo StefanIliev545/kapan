@@ -1,0 +1,19 @@
+{
+  "detectiveOptions": {
+    "ts": {
+      "skipTypeImports": true
+    },
+    "tsx": {
+      "skipTypeImports": true
+    }
+  },
+  "fileExtensions": ["ts", "tsx", "js", "jsx"],
+  "excludeRegExp": [
+    "node_modules",
+    "\\.next",
+    "typechain-types",
+    "\\.test\\.",
+    "__tests__"
+  ],
+  "tsConfig": "./packages/nextjs/tsconfig.json"
+}

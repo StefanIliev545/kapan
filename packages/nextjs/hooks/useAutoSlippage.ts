@@ -1,3 +1,4 @@
+// Auto-slippage calculation hook
 import { useEffect, useMemo } from "react";
 import { 
     calculateSuggestedSlippage, 
@@ -121,4 +122,4 @@ export const useAutoSlippage = ({
 export const SLIPPAGE_OPTIONS = [0.01, 0.03, 0.05, 0.1, 0.3, 0.5, 1, 2, 3, 5];
 
 /** Default initial slippage - will be auto-adjusted based on price impact */
-export const DEFAULT_SLIPPAGE = 0.1;
+const DEFAULT_SLIPPAGE = 0.1;

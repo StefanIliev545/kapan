@@ -14,7 +14,7 @@ import { useVesuV2LendingPositions } from "~~/hooks/useVesuV2LendingPositions";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import type { PositionManager } from "~~/utils/position";
 
-import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolNameFromId, getV2PoolNameFromAddress, getV1PoolDisplay, getV2PoolDisplay } from "./pools";
+import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolDisplay, getV2PoolDisplay } from "./pools";
 import { VesuMarketSection } from "./VesuMarketSection";
 import { VesuPositionsSection } from "./VesuPositionsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
@@ -37,6 +37,103 @@ type DepositSelectionState = {
   vesuContext?: VesuContext;
   position?: PositionManager;
 } | null;
+
+type PoolSelectorProps<T extends string> = {
+  pools: Record<T, bigint | string>;
+  selectedValue: string;
+  onChange: (value: string) => void;
+  getPoolDisplay: (rawName: T) => { name: string };
+};
+
+function PoolSelector<T extends string>({ pools, selectedValue, onChange, getPoolDisplay }: PoolSelectorProps<T>) {
+  return (
+    <div className="flex items-center gap-2">
+      <img src="/logos/vesu.svg" alt="Vesu" className="w-4 h-4" />
+      <select
+        className="select select-sm select-bordered"
+        value={selectedValue}
+        onChange={e => onChange(e.target.value)}
+      >
+        {(Object.entries(pools) as [T, bigint | string][]).map(([rawName, value]) => {
+          const disp = getPoolDisplay(rawName);
+          return (
+            <option key={rawName} value={value.toString()}>
+              {disp.name}
+            </option>
+          );
+        })}
+      </select>
+    </div>
+  );
+}
+
+type PoolPositionsListProps<T extends string> = {
+  poolEntries: readonly (readonly [T, ReturnType<typeof useVesuLendingPositions>])[];
+  version: VesuVersionKey;
+  defaultPoolName: T;
+  getPoolDisplay: (rawName: T) => { name: string };
+  computeMetrics: (rows: VesuPositionRow[]) => { netBalanceUsd: number; netYield30d: number; netApyPercent: number | null };
+  userAddress: string | undefined;
+  accountStatus: string;
+  isViewingOtherAddress: boolean;
+  onBorrowRequest: (params: { version: VesuVersionKey; tokens: AssetWithRates[]; collateralAddress: string; vesuContext: VesuContext; position: PositionManager }) => void;
+  openDepositModal: (version: VesuVersionKey, tokens: AssetWithRates[]) => void;
+};
+
+function PoolPositionsList<T extends string>({
+  poolEntries,
+  version,
+  defaultPoolName,
+  getPoolDisplay,
+  computeMetrics,
+  userAddress,
+  accountStatus,
+  isViewingOtherAddress,
+  onBorrowRequest,
+  openDepositModal,
+}: PoolPositionsListProps<T>) {
+  return (
+    <>
+      {poolEntries.map(([rawName, data]) => {
+        const disp = getPoolDisplay(rawName);
+        const name = disp.name;
+        const shouldRender = data.rows.length > 0 || rawName === defaultPoolName;
+        if (!shouldRender) return null;
+        const metrics = computeMetrics(data.rows);
+        return (
+          <div key={`${version}-${name}`} className="space-y-4">
+            <VesuPositionsSection
+              title={`${name} Positions`}
+              rows={data.rows}
+              assetsWithRates={data.assetsWithRates}
+              userAddress={userAddress}
+              accountStatus={accountStatus}
+              hasLoadedOnce={data.hasLoadedOnce}
+              isUpdating={data.isUpdating}
+              onBorrowRequest={({ tokens, collateralAddress, vesuContext, position }) =>
+                onBorrowRequest({ version, tokens, collateralAddress, vesuContext, position })
+              }
+              onDepositRequest={() => {
+                const allow = new Set(data.suppliablePositions.map(p => p.tokenAddress.toLowerCase()));
+                const filtered = data.assetsWithRates.filter(a =>
+                  allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
+                );
+                if (!isViewingOtherAddress) {
+                  openDepositModal(version, filtered);
+                }
+              }}
+              protocolName={version === "v1" ? "Vesu" : "vesu_v2"}
+              netBalanceUsd={metrics.netBalanceUsd}
+              netYield30d={metrics.netYield30d}
+              netApyPercent={metrics.netApyPercent}
+              formatCurrency={formatCurrency}
+            />
+          </div>
+        );
+      })}
+    </>
+  );
+}
 
 export const VesuProtocolView: FC = () => {
   const { viewingAddress, status, isViewingOtherAddress } = useAccount();
@@ -266,23 +363,12 @@ export const VesuProtocolView: FC = () => {
           protocolName="Vesu"
           title="Vesu V1"
           headerExtra={
-            <div className="flex items-center gap-2">
-              <img src="/logos/vesu.svg" alt="Vesu" className="w-4 h-4" />
-              <select
-                className="select select-sm select-bordered"
-                value={selectedV1PoolId.toString()}
-                onChange={e => setSelectedV1PoolId(BigInt(e.target.value))}
-              >
-                {Object.entries(VESU_V1_POOLS).map(([rawName, id]) => {
-                  const disp = getV1PoolDisplay(rawName as any);
-                  return (
-                    <option key={rawName} value={id.toString()}>
-                      {disp.name}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
+            <PoolSelector
+              pools={VESU_V1_POOLS}
+              selectedValue={selectedV1PoolId.toString()}
+              onChange={value => setSelectedV1PoolId(BigInt(value))}
+              getPoolDisplay={getV1PoolDisplay}
+            />
           }
         />
         {!userAddress && (
@@ -294,50 +380,23 @@ export const VesuProtocolView: FC = () => {
           </div>
         )}
         {/* V1 Positions across all pools */}
-        {(
-          [
+        <PoolPositionsList
+          poolEntries={[
             ["Genesis", v1All.Genesis] as const,
             ["CarmineRunes", v1All.CarmineRunes] as const,
             ["Re7StarknetEcosystem", v1All.Re7StarknetEcosystem] as const,
             ["Re7xSTRK", v1All.Re7xSTRK] as const,
-          ]
-        ).map(([rawName, data]) => {
-          const disp = getV1PoolDisplay(rawName as any);
-          const name = disp.name;
-          const shouldRender = data.rows.length > 0 || rawName === "Genesis";
-          if (!shouldRender) return null;
-          const metrics = computeMetrics(data.rows);
-          return (
-            <div key={`v1-${name}`} className="space-y-4">
-              <VesuPositionsSection
-                title={`${name} Positions`}
-                rows={data.rows}
-                assetsWithRates={data.assetsWithRates}
-                userAddress={userAddress}
-                accountStatus={status}
-                hasLoadedOnce={data.hasLoadedOnce}
-                isUpdating={data.isUpdating}
-                onBorrowRequest={({ tokens, collateralAddress, vesuContext, position }) =>
-                  setBorrowSelection({ version: "v1", tokens, collateralAddress, vesuContext, position })
-                }
-                onDepositRequest={() => {
-                  const allow = new Set(data.suppliablePositions.map(p => p.tokenAddress.toLowerCase()));
-                  const filtered = data.assetsWithRates.filter(a =>
-                    allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
-                  );
-                  if (!isViewingOtherAddress) {
-                    openDepositModal("v1", filtered);
-                  }
-                }}
-                protocolName="Vesu"
-                netBalanceUsd={metrics.netBalanceUsd}
-                netYield30d={metrics.netYield30d}
-                netApyPercent={metrics.netApyPercent}
-                formatCurrency={formatCurrency}
-              />
-            </div>
-          );
-        })}
+          ]}
+          version="v1"
+          defaultPoolName="Genesis"
+          getPoolDisplay={getV1PoolDisplay}
+          computeMetrics={computeMetrics}
+          userAddress={userAddress}
+          accountStatus={status}
+          isViewingOtherAddress={isViewingOtherAddress}
+          onBorrowRequest={setBorrowSelection}
+          openDepositModal={openDepositModal}
+        />
       </div>
 
       <div className="space-y-6">
@@ -366,23 +425,12 @@ export const VesuProtocolView: FC = () => {
           protocolName="vesu_v2"
           title="Vesu V2"
           headerExtra={
-            <div className="flex items-center gap-2">
-              <img src="/logos/vesu.svg" alt="Vesu" className="w-4 h-4" />
-              <select
-                className="select select-sm select-bordered"
-                value={selectedV2PoolAddress}
-                onChange={e => setSelectedV2PoolAddress(e.target.value)}
-              >
-                {Object.entries(VESU_V2_POOLS).map(([rawName, addr]) => {
-                  const disp = getV2PoolDisplay(rawName as any);
-                  return (
-                    <option key={rawName} value={addr}>
-                      {disp.name}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
+            <PoolSelector
+              pools={VESU_V2_POOLS}
+              selectedValue={selectedV2PoolAddress}
+              onChange={setSelectedV2PoolAddress}
+              getPoolDisplay={getV2PoolDisplay}
+            />
           }
         />
         {!userAddress && (
@@ -394,51 +442,24 @@ export const VesuProtocolView: FC = () => {
           </div>
         )}
         {/* V2 Positions across all pools */}
-        {(
-          [
+        <PoolPositionsList
+          poolEntries={[
             ["Prime", v2All.Prime] as const,
             ["Re7xBTC", v2All.Re7xBTC] as const,
             ["Re7USDCCore", v2All.Re7USDCCore] as const,
             ["Re7USDCPrime", v2All.Re7USDCPrime] as const,
             ["Re7USDCStableCore", v2All.Re7USDCStableCore] as const,
-          ]
-        ).map(([rawName, data]) => {
-          const disp = getV2PoolDisplay(rawName as any);
-          const name = disp.name;
-          const shouldRender = data.rows.length > 0 || rawName === "Prime";
-          if (!shouldRender) return null;
-          const metrics = computeMetrics(data.rows);
-          return (
-            <div key={`v2-${name}`} className="space-y-4">
-              <VesuPositionsSection
-                title={`${name} Positions`}
-                rows={data.rows}
-                assetsWithRates={data.assetsWithRates}
-                userAddress={userAddress}
-                accountStatus={status}
-                hasLoadedOnce={data.hasLoadedOnce}
-                isUpdating={data.isUpdating}
-                onBorrowRequest={({ tokens, collateralAddress, vesuContext, position }) =>
-                  setBorrowSelection({ version: "v2", tokens, collateralAddress, vesuContext, position })
-                }
-                onDepositRequest={() => {
-                  const allow = new Set(data.suppliablePositions.map(p => p.tokenAddress.toLowerCase()));
-                  const filtered = data.assetsWithRates.filter(a =>
-                    allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
-                  );
-                  if (!isViewingOtherAddress) {
-                    openDepositModal("v2", filtered);
-                  }
-                }}
-                protocolName="vesu_v2"
-                netBalanceUsd={metrics.netBalanceUsd}
-                netYield30d={metrics.netYield30d}
-                netApyPercent={metrics.netApyPercent}
-                formatCurrency={formatCurrency}
-              />
-            </div>
-          );
-        })}
+          ]}
+          version="v2"
+          defaultPoolName="Prime"
+          getPoolDisplay={getV2PoolDisplay}
+          computeMetrics={computeMetrics}
+          userAddress={userAddress}
+          accountStatus={status}
+          isViewingOtherAddress={isViewingOtherAddress}
+          onBorrowRequest={setBorrowSelection}
+          openDepositModal={openDepositModal}
+        />
       </div>
 
       {borrowSelection && (

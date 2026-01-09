@@ -191,3 +191,62 @@ bd show <id>                          # View issue details
 bd sync                               # Sync with git (run at session end)
 bd prime                              # Full workflow context
 ```
+
+## Code Quality Tools
+
+**Run before submitting any code changes:**
+
+```bash
+yarn quality                          # Full quality check suite
+yarn quality:fix                      # Auto-fix what's possible
+yarn quality:report                   # Generate reports in .quality/
+```
+
+**Individual checks:**
+
+```bash
+yarn quality:duplicates               # Find copy-paste code (jscpd)
+yarn quality:circular                 # Find circular imports (madge)
+yarn quality:unused                   # Find dead code (knip)
+yarn quality:complexity               # Find complex functions (sonarjs)
+yarn next:check-types                 # TypeScript strict checking
+yarn lint                             # ESLint with sonarjs rules
+```
+
+**Exit codes for CI/agents:**
+- `0` - All checks passed
+- `1` - Warnings found (non-blocking)
+- `2` - Critical issues (blocking)
+
+## Agent Workflow
+
+### Single Agent Flow
+```bash
+yarn agent:preflight                  # Check starting state
+# ... make changes ...
+yarn agent:postflight                 # Validate changes (warnings OK)
+yarn agent:postflight:strict          # Validate changes (no warnings)
+```
+
+### Parallel Agent Work
+Multiple agents can work simultaneously on different files. Example patterns:
+
+**Parallel fixes**: Fix modals while another agent fixes hooks
+**Parallel analysis**: Analyze duplicates while checking circular deps
+**Parallel refactoring**: Refactor EVM modals while another does Starknet
+
+Agents should:
+1. **Before coding**: Run `yarn agent:preflight`
+2. **Claim work**: Use `bd show <id>` to understand the task
+3. **After changes**: Run `yarn agent:postflight`
+4. **Before PR**: Ensure postflight exit code is 0
+5. **On completion**: Run `bd close <id>` and `bd sync`
+
+### Quality Gates (Exit Codes)
+| Script | 0 | 1 | 2 |
+|--------|---|---|---|
+| `yarn quality` | All pass | Warnings | Errors |
+| `yarn agent:postflight` | Ready | Warnings (OK) | Errors (block) |
+| `yarn agent:postflight:strict` | Ready | Warnings (block) | Errors (block) |
+
+Quality reports are saved to `.quality/` directory when using `--report` flag.
