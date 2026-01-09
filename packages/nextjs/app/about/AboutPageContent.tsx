@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useScroll, useSpring, useTransform } from "framer-motion";
@@ -8,6 +8,35 @@ import { ChevronDownIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
 import { useKapanTheme } from "~~/hooks/useKapanTheme";
 // Note: Header is rendered by ScaffoldEthAppWithProviders (LandingHeader for /about route)
+
+// Static style constants for GlitchImage
+const SCAN_LINES_STYLE = {
+  background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)",
+} as const;
+
+const RED_GLITCH_STYLE = {
+  background: "rgba(255,0,0,0.1)",
+  transform: "translateX(-3px)",
+  mixBlendMode: "screen" as const,
+} as const;
+
+const CYAN_GLITCH_STYLE = {
+  background: "rgba(0,255,255,0.1)",
+  transform: "translateX(3px)",
+  mixBlendMode: "screen" as const,
+} as const;
+
+const NOISE_OVERLAY_STYLE = {
+  backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+} as const;
+
+// Framer-motion animation constants
+const HIDDEN_Y20 = { opacity: 0, y: 20 } as const;
+const VISIBLE_Y0 = { opacity: 1, y: 0 } as const;
+const HIDDEN_OPACITY = { opacity: 0 } as const;
+const VISIBLE_OPACITY = { opacity: 1 } as const;
+const TRANSITION_DURATION_05 = { duration: 0.5 } as const;
+const TRANSITION_DURATION_05_DELAY_02 = { duration: 0.5, delay: 0.2 } as const;
 
 // Character set for scramble effect
 const CHARS = "@#$%&*!?<>[]{}ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -146,45 +175,27 @@ const GlitchImage = ({ src, alt, isActive }: { src: string; alt: string; isActiv
         />
         
         {/* Scan lines overlay */}
-        <div 
+        <div
           className="pointer-events-none absolute inset-0 opacity-30"
-          style={{
-            background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)",
-          }}
+          style={SCAN_LINES_STYLE}
         />
         
         {/* Glitch layers */}
         {glitchActive && (
           <>
-            <div 
-              className="absolute inset-0"
-              style={{
-                background: "rgba(255,0,0,0.1)",
-                transform: "translateX(-3px)",
-                mixBlendMode: "screen",
-              }}
-            >
+            <div className="absolute inset-0" style={RED_GLITCH_STYLE}>
               <Image src={src} alt="" fill className="object-cover grayscale" />
             </div>
-            <div 
-              className="absolute inset-0"
-              style={{
-                background: "rgba(0,255,255,0.1)",
-                transform: "translateX(3px)",
-                mixBlendMode: "screen",
-              }}
-            >
+            <div className="absolute inset-0" style={CYAN_GLITCH_STYLE}>
               <Image src={src} alt="" fill className="object-cover grayscale" />
             </div>
           </>
         )}
         
         {/* Noise overlay */}
-        <div 
+        <div
           className="pointer-events-none absolute inset-0 opacity-10 mix-blend-overlay"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-          }}
+          style={NOISE_OVERLAY_STYLE}
         />
       </div>
       
@@ -354,14 +365,23 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => {
     }
   }, [isActive]);
 
-  const getAppUrl = () => {
+  const getAppUrl = useCallback(() => {
     if (typeof window === "undefined") return "/app";
     const { protocol, hostname, host } = window.location;
     const baseHost = hostname.replace(/^www\./, "");
     if (host.endsWith("localhost:3000")) return `${protocol}//app.localhost:3000`;
     if (hostname.startsWith("app.")) return `${protocol}//${host}`;
     return `${protocol}//app.${baseHost}`;
-  };
+  }, []);
+
+  const handleLaunchAppClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      track("To App conversion", { button: "About Page CTA" });
+      window.location.assign(getAppUrl());
+    },
+    [getAppUrl],
+  );
 
   const socials = [
     { name: "Twitter", icon: TwitterIcon, href: "https://x.com/KapanFinance" },
@@ -370,19 +390,25 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => {
     { name: "GitHub", icon: GitHubIcon, href: "https://github.com/StefanIliev545/kapan" },
   ];
 
+  const buttonsAnimateValue = useMemo(
+    () => (buttonsActive ? VISIBLE_Y0 : HIDDEN_OPACITY),
+    [buttonsActive],
+  );
+
+  const socialsAnimateValue = useMemo(
+    () => (socialsActive ? VISIBLE_OPACITY : HIDDEN_OPACITY),
+    [socialsActive],
+  );
+
   return (
     <div className="flex flex-col items-center gap-10">
       {/* Launch App button */}
       <motion.a
         href="/app"
-        onClick={e => {
-          e.preventDefault();
-          track("To App conversion", { button: "About Page CTA" });
-          window.location.assign(getAppUrl());
-        }}
-        initial={{ opacity: 0, y: 20 }}
-        animate={buttonsActive ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.5 }}
+        onClick={handleLaunchAppClick}
+        initial={HIDDEN_Y20}
+        animate={buttonsAnimateValue}
+        transition={TRANSITION_DURATION_05}
         className="bg-primary text-primary-content group relative flex h-14 items-center justify-center overflow-hidden px-8 text-[11px] font-bold uppercase tracking-[0.2em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.1)] md:h-16 md:px-12 md:text-xs"
       >
         <div className="relative z-10 flex items-center gap-3">
@@ -394,10 +420,10 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => {
       </motion.a>
 
       {/* Social links */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={socialsActive ? { opacity: 1 } : {}}
-        transition={{ duration: 0.5 }}
+      <motion.div
+        initial={HIDDEN_OPACITY}
+        animate={socialsAnimateValue}
+        transition={TRANSITION_DURATION_05}
         className="flex items-center gap-6"
       >
         {socials.map((social) => (
@@ -416,11 +442,11 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => {
 
       {/* Back to home */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={socialsActive ? { opacity: 1 } : {}}
-        transition={{ duration: 0.5, delay: 0.2 }}
+        initial={HIDDEN_OPACITY}
+        animate={socialsAnimateValue}
+        transition={TRANSITION_DURATION_05_DELAY_02}
       >
-        <Link 
+        <Link
           href="/"
           className="text-base-content/30 hover:text-base-content/60 text-xs uppercase tracking-wider transition-colors"
         >
@@ -470,9 +496,14 @@ const StickySection = ({
     return () => unsubscribe();
   }, [opacity, hasBeenActive]);
 
+  const sectionStyle = useMemo(
+    () => ({ opacity, scale, y, zIndex: index, pointerEvents }),
+    [opacity, scale, y, index, pointerEvents],
+  );
+
   return (
     <motion.div
-      style={{ opacity, scale, y, zIndex: index, pointerEvents }}
+      style={sectionStyle}
       className="absolute inset-0 flex items-center justify-center overflow-hidden"
     >
       <div className="flex w-full max-w-4xl flex-col items-center px-6 text-center md:px-8">
@@ -496,31 +527,52 @@ const StickySection = ({
   );
 };
 
+// Spring config constant
+const SPRING_CONFIG = { stiffness: 100, damping: 30 } as const;
+
+// Static progress indicator style (height is static, scaleY is dynamic)
+const PROGRESS_HEIGHT_STYLE = { height: "100%" } as const;
+
+// Sections data - defined outside component since it's static
+const SECTIONS: SectionData[] = [
+  {
+    tag: "01 / MISSION",
+    title: "DEFI SUCKS.",
+    ContentComponent: MissionContent,
+  },
+  {
+    tag: "02 / FOUNDER",
+    title: "WHO'S BUILDING.",
+    ContentComponent: FounderContent,
+  },
+  {
+    tag: "03 / CONNECT",
+    title: "JOIN US.",
+    ContentComponent: CTAContent,
+  },
+];
+
+// Scroll container height style for 3 sections
+const SCROLL_CONTAINER_HEIGHT_STYLE = { height: `${SECTIONS.length * 100}vh` } as const;
+
 const AboutPageContent = () => {
   useKapanTheme();
-  
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  const sections: SectionData[] = [
-    {
-      tag: "01 / MISSION",
-      title: "DEFI SUCKS.",
-      ContentComponent: MissionContent,
-    },
-    {
-      tag: "02 / FOUNDER",
-      title: "WHO'S BUILDING.",
-      ContentComponent: FounderContent,
-    },
-    {
-      tag: "03 / CONNECT",
-      title: "JOIN US.",
-      ContentComponent: CTAContent,
-    },
-  ];
 
-  const { scrollYProgress } = useScroll({ container: containerRef });
-  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const scrollOptions = useMemo(() => ({ container: containerRef }), []);
+  const { scrollYProgress } = useScroll(scrollOptions);
+  const smoothProgress = useSpring(scrollYProgress, SPRING_CONFIG);
+
+  // Scroll hint opacity
+  const scrollHintOpacity = useTransform(smoothProgress, [0, 0.15], [1, 0]);
+  const scrollHintStyle = useMemo(() => ({ opacity: scrollHintOpacity }), [scrollHintOpacity]);
+
+  // Progress indicator style
+  const progressIndicatorStyle = useMemo(
+    () => ({ ...PROGRESS_HEIGHT_STYLE, scaleY: smoothProgress }),
+    [smoothProgress],
+  );
 
   return (
     <div className="bg-base-100 text-base-content fixed inset-0 overflow-hidden">
@@ -534,10 +586,10 @@ const AboutPageContent = () => {
         ref={containerRef}
         className="hide-scrollbar relative z-10 size-full snap-y snap-mandatory overflow-y-auto scroll-smooth"
       >
-        <div style={{ height: `${sections.length * 100}vh` }} className="relative">
+        <div style={SCROLL_CONTAINER_HEIGHT_STYLE} className="relative">
           {/* Snap targets */}
           <div className="pointer-events-none absolute inset-0 flex flex-col">
-            {sections.map((_, i) => (
+            {SECTIONS.map((_, i) => (
               <div key={i} className="h-screen w-full snap-start" />
             ))}
           </div>
@@ -546,26 +598,23 @@ const AboutPageContent = () => {
           <div className="sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden">
             {/* Progress indicator */}
             <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
-              <motion.div
-                className="bg-base-content/40 w-full origin-top"
-                style={{ height: "100%", scaleY: smoothProgress }}
-              />
+              <motion.div className="bg-base-content/40 w-full origin-top" style={progressIndicatorStyle} />
             </div>
 
             {/* Sections */}
-            {sections.map((section, i) => (
+            {SECTIONS.map((section, i) => (
               <StickySection
                 key={i}
                 section={section}
                 index={i}
-                total={sections.length}
+                total={SECTIONS.length}
                 scrollYProgress={smoothProgress}
               />
             ))}
 
             {/* Scroll hint */}
             <motion.div
-              style={{ opacity: useTransform(smoothProgress, [0, 0.15], [1, 0]) }}
+              style={scrollHintStyle}
               className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>

@@ -65,7 +65,8 @@ export const AmountInput: FC<AmountInputProps> = ({
   inputClassName = "",
   resetTrigger,
   insufficientFunds = false,
-  tokenSymbol,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  tokenSymbol: _tokenSymbol,
 }) => {
   const [activePercent, setActivePercent] = useState<number | null>(null);
 
@@ -172,6 +173,7 @@ export const AmountInput: FC<AmountInputProps> = ({
  */
 export const SimpleAmountInput: FC<{
   value: string;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onChange: (value: string) => void;
   onMax: () => void;
   balance: bigint;
@@ -185,8 +187,10 @@ export const SimpleAmountInput: FC<{
   value,
   onChange,
   onMax,
-  balance,
-  decimals,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  balance: _balance,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  decimals: _decimals,
   usdPrice,
   disabled = false,
   placeholder = "0.00",

@@ -1,5 +1,5 @@
 import { FC, ReactNode } from "react";
-import { ExclamationTriangleIcon, InformationCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { ExclamationTriangleIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
 
 /**
  * Variant types for different error display styles

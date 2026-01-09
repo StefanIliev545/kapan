@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
-import { Chain } from "viem/chains";
 import { useAccount, useSwitchChain } from "wagmi";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
@@ -27,8 +26,7 @@ export const NetworkSwitcher = () => {
   useOutsideClick(dropdownRef, () => setIsOpen(false));
   
   if (!chain) return null;
-  
-  const networkColor = getNetworkColor(chain as Chain, isDarkMode);
+
   const networkLogo = getNetworkLogo(chain, isDarkMode);
   
   return (

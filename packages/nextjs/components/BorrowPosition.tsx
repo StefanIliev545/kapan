@@ -19,7 +19,287 @@ import { useModal } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { PositionManager } from "~~/utils/position";
 import { normalizeProtocolName } from "~~/utils/protocol";
-import { isVesuContextV1, isVesuContextV2 } from "~~/utils/vesu";
+import { isVesuContextV1, isVesuContextV2, VesuContext } from "~~/utils/vesu";
+
+// --- Helper Functions ---
+
+/**
+ * Extracts pool ID from a VesuContext for use in RefinanceModal
+ */
+function extractPoolIdFromVesuContext(context: VesuContext | undefined): bigint | undefined {
+  if (!context) return undefined;
+  if (isVesuContextV1(context)) return context.poolId;
+  if (isVesuContextV2(context)) return BigInt(context.poolAddress);
+  return undefined;
+}
+
+/**
+ * Maps protocol name to the protocol type expected by RefinanceModal
+ */
+function getMoveFromProtocol(protocolName: string): "Vesu" | "Nostra" | "VesuV2" {
+  const normalized = protocolName.toLowerCase();
+  if (normalized === "vesu") return "Vesu";
+  if (normalized === "vesu_v2") return "VesuV2";
+  if (normalized === "nostra") return "Nostra";
+  return "Vesu";
+}
+
+/**
+ * Determines if a better rate is available on another protocol
+ */
+function checkHasBetterRate(params: {
+  hasBalance: boolean;
+  displayedOptimalProtocol: string | undefined;
+  displayedOptimalRate: number;
+  currentRate: number;
+  protocolName: string;
+}): boolean {
+  const { hasBalance, displayedOptimalProtocol, displayedOptimalRate, currentRate, protocolName } = params;
+  const ratesAreSame = Math.abs(currentRate - displayedOptimalRate) < 0.000001;
+  return (
+    hasBalance &&
+    Boolean(displayedOptimalProtocol) &&
+    !ratesAreSame &&
+    normalizeProtocolName(displayedOptimalProtocol!) !== normalizeProtocolName(protocolName) &&
+    displayedOptimalRate < currentRate
+  );
+}
+
+/**
+ * Gets the tooltip/title text for action buttons based on state
+ */
+function getActionTitle(params: {
+  isWalletConnected: boolean | undefined;
+  actionsDisabled: boolean;
+  disabledMessage: string;
+  disconnectedMessage: string;
+  enabledMessage: string;
+}): string {
+  const { isWalletConnected, actionsDisabled, disabledMessage, disconnectedMessage, enabledMessage } = params;
+  if (!isWalletConnected) return disconnectedMessage;
+  if (actionsDisabled) return disabledMessage;
+  return enabledMessage;
+}
+
+interface ActionBuilderParams {
+  showRepayButton: boolean;
+  showBorrowButton: boolean;
+  showSwapButton: boolean;
+  showMoveButton: boolean;
+  showCloseButton: boolean;
+  hasBalance: boolean;
+  isWalletConnected: boolean | undefined;
+  actionsDisabled: boolean;
+  disabledMessage: string;
+  borrowCtaLabel?: string;
+  repayModalOpen: () => void;
+  handleBorrowClick: () => void;
+  handleSwapClick: () => void;
+  moveModalOpen: () => void;
+  handleCloseClick: () => void;
+}
+
+/**
+ * Calculates displayed optimal protocol and rate considering demo override
+ */
+function getDisplayedOptimalValues(params: {
+  demoOptimalOverride?: { protocol: string; rate: number };
+  optimalProtocol: string | undefined;
+  optimalRateDisplay: number;
+  currentRate: number;
+  protocolName: string;
+}): { displayedOptimalProtocol: string | undefined; displayedOptimalRate: number } {
+  const { demoOptimalOverride, optimalProtocol, optimalRateDisplay, currentRate, protocolName } = params;
+  const hasOptimalProtocol = Boolean(optimalProtocol);
+  return {
+    displayedOptimalProtocol: demoOptimalOverride?.protocol ?? (hasOptimalProtocol ? optimalProtocol : protocolName),
+    displayedOptimalRate: demoOptimalOverride?.rate ?? (hasOptimalProtocol ? optimalRateDisplay : currentRate),
+  };
+}
+
+interface ButtonVisibilityConfig {
+  availableActions?: {
+    borrow?: boolean;
+    repay?: boolean;
+    move?: boolean;
+    close?: boolean;
+    swap?: boolean;
+  };
+  showNoDebtLabel: boolean;
+  canInitiateBorrow: boolean;
+  hasBalance: boolean;
+  networkType: "evm" | "starknet";
+  onClosePosition?: () => void;
+  onSwap?: () => void;
+}
+
+/**
+ * Calculates which action buttons should be visible
+ */
+function getButtonVisibility(config: ButtonVisibilityConfig) {
+  const { availableActions, showNoDebtLabel, canInitiateBorrow, hasBalance, networkType, onClosePosition, onSwap } =
+    config;
+
+  const actionConfig = {
+    borrow: availableActions?.borrow !== false,
+    repay: availableActions?.repay !== false,
+    move: availableActions?.move !== false,
+    close: availableActions?.close !== false,
+    swap: availableActions?.swap !== false,
+  };
+
+  const supportsClose = networkType === "evm" || Boolean(onClosePosition);
+  const supportsSwap = networkType === "evm" || Boolean(onSwap);
+
+  return {
+    showBorrowButton: actionConfig.borrow || (showNoDebtLabel && canInitiateBorrow),
+    showRepayButton: actionConfig.repay,
+    showMoveButton: actionConfig.move && hasBalance,
+    showCloseButton: supportsClose && actionConfig.close && hasBalance,
+    showSwapButton: supportsSwap && actionConfig.swap && hasBalance,
+  };
+}
+
+interface ClickHandlers {
+  networkType: "evm" | "starknet";
+  onBorrow?: () => void;
+  onClosePosition?: () => void;
+  onSwap?: () => void;
+  borrowModalOpen: () => void;
+  closeWithCollateralModalOpen: () => void;
+  debtSwapModalOpen: () => void;
+}
+
+/**
+ * Returns appropriate click handlers based on network type
+ */
+function getClickHandlers(config: ClickHandlers) {
+  const { networkType, onBorrow, onClosePosition, onSwap, borrowModalOpen, closeWithCollateralModalOpen, debtSwapModalOpen } = config;
+  const noop = () => { return; };
+
+  return {
+    handleBorrowClick: onBorrow ?? borrowModalOpen,
+    handleCloseClick: networkType === "evm" ? closeWithCollateralModalOpen : (onClosePosition ?? noop),
+    handleSwapClick: networkType === "evm" ? debtSwapModalOpen : (onSwap ?? noop),
+  };
+}
+
+function buildActions(params: ActionBuilderParams): SegmentedAction[] {
+  const {
+    showRepayButton,
+    showBorrowButton,
+    showSwapButton,
+    showMoveButton,
+    showCloseButton,
+    hasBalance,
+    isWalletConnected,
+    actionsDisabled,
+    disabledMessage,
+    borrowCtaLabel,
+    repayModalOpen,
+    handleBorrowClick,
+    handleSwapClick,
+    moveModalOpen,
+    handleCloseClick,
+  } = params;
+
+  const actions: SegmentedAction[] = [];
+
+  if (showRepayButton) {
+    actions.push({
+      key: "repay",
+      label: "Repay",
+      icon: <MinusIcon className="size-4" />,
+      onClick: repayModalOpen,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      title: getActionTitle({
+        isWalletConnected,
+        actionsDisabled,
+        disabledMessage,
+        disconnectedMessage: "Connect wallet to repay",
+        enabledMessage: "Repay debt",
+      }),
+      variant: "ghost",
+    });
+  }
+
+  if (showBorrowButton) {
+    actions.push({
+      key: "borrow",
+      label: borrowCtaLabel ?? "Borrow",
+      icon: <PlusIcon className="size-4" />,
+      onClick: handleBorrowClick,
+      disabled: !isWalletConnected || actionsDisabled,
+      title: getActionTitle({
+        isWalletConnected,
+        actionsDisabled,
+        disabledMessage,
+        disconnectedMessage: "Connect wallet to borrow",
+        enabledMessage: "Borrow more tokens",
+      }),
+      variant: "ghost",
+    });
+  }
+
+  if (showSwapButton) {
+    actions.push({
+      key: "swap",
+      label: "Swap",
+      icon: <ArrowPathIcon className="size-4" />,
+      onClick: handleSwapClick,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      title: getActionTitle({
+        isWalletConnected,
+        actionsDisabled,
+        disabledMessage,
+        disconnectedMessage: "Connect wallet to switch debt",
+        enabledMessage: "Switch debt token",
+      }),
+      variant: "ghost",
+      compactOnHover: true,
+    });
+  }
+
+  if (showMoveButton) {
+    actions.push({
+      key: "move",
+      label: "Move",
+      icon: <ArrowRightIcon className="size-4" />,
+      onClick: moveModalOpen,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      title: getActionTitle({
+        isWalletConnected,
+        actionsDisabled,
+        disabledMessage,
+        disconnectedMessage: "Connect wallet to move debt",
+        enabledMessage: "Move debt to another protocol",
+      }),
+      variant: "ghost",
+      compactOnHover: true,
+    });
+  }
+
+  if (showCloseButton) {
+    actions.push({
+      key: "close",
+      label: "Close",
+      icon: <XMarkIcon className="size-4" />,
+      onClick: handleCloseClick,
+      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
+      title: getActionTitle({
+        isWalletConnected,
+        actionsDisabled,
+        disabledMessage,
+        disconnectedMessage: "Connect wallet to close position",
+        enabledMessage: "Close position with collateral",
+      }),
+      variant: "ghost",
+      compactOnHover: true,
+    });
+  }
+
+  return actions;
+}
 
 // BorrowPositionProps extends ProtocolPosition but can add borrow-specific props
 export type BorrowPositionProps = ProtocolPosition & {
@@ -66,7 +346,6 @@ export type BorrowPositionProps = ProtocolPosition & {
 export const BorrowPosition: FC<BorrowPositionProps> = ({
   icon,
   name,
-  balance,
   tokenBalance,
   currentRate,
   protocolName,
@@ -159,67 +438,52 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     type: "borrow",
   });
 
-  const hasOptimalProtocol = Boolean(optimalProtocol);
-  const displayedOptimalProtocol =
-    demoOptimalOverride?.protocol ??
-    (hasOptimalProtocol ? optimalProtocol : protocolName);
-  const displayedOptimalRate =
-    demoOptimalOverride?.rate ??
-    (hasOptimalProtocol ? optimalRateDisplay : currentRate);
+  // Calculate displayed optimal values for "better rate" badge
+  const { displayedOptimalProtocol, displayedOptimalRate } = getDisplayedOptimalValues({
+    demoOptimalOverride,
+    optimalProtocol,
+    optimalRateDisplay,
+    currentRate,
+    protocolName,
+  });
 
   // Determine if there's a better rate available on another protocol
-  const ratesAreSame = Math.abs(currentRate - displayedOptimalRate) < 0.000001;
-  const hasBetterRate =
-    hasBalance &&
-    displayedOptimalProtocol &&
-    !ratesAreSame &&
-    normalizeProtocolName(displayedOptimalProtocol) !== normalizeProtocolName(protocolName) &&
-    displayedOptimalRate < currentRate;
+  const hasBetterRate = checkHasBetterRate({
+    hasBalance,
+    displayedOptimalProtocol,
+    displayedOptimalRate,
+    currentRate,
+    protocolName,
+  });
 
-  const actionConfig = {
-    borrow: availableActions?.borrow !== false,
-    repay: availableActions?.repay !== false,
-    move: availableActions?.move !== false,
-    close: availableActions?.close !== false,
-    swap: availableActions?.swap !== false,
-  };
+  // Calculate which buttons to show
+  const canInitiateBorrow = networkType === "evm" || Boolean(vesuContext?.borrow || onBorrow);
+  const { showBorrowButton, showRepayButton, showMoveButton, showCloseButton, showSwapButton } = getButtonVisibility({
+    availableActions,
+    showNoDebtLabel,
+    canInitiateBorrow,
+    hasBalance,
+    networkType,
+    onClosePosition,
+    onSwap,
+  });
 
-  const canInitiateBorrow =
-    networkType === "evm" ? true : Boolean(vesuContext?.borrow || onBorrow);
+  // Get click handlers based on network type
+  const { handleBorrowClick, handleCloseClick, handleSwapClick } = getClickHandlers({
+    networkType,
+    onBorrow,
+    onClosePosition,
+    onSwap,
+    borrowModalOpen: borrowModal.open,
+    closeWithCollateralModalOpen: closeWithCollateralModal.open,
+    debtSwapModalOpen: debtSwapModal.open,
+  });
 
-  const showBorrowButton = actionConfig.borrow || (showNoDebtLabel && canInitiateBorrow);
-  const showRepayButton = actionConfig.repay;
-  const showMoveButton = actionConfig.move && hasBalance;
-  const showCloseButton =
-    (networkType === "evm" ? true : Boolean(onClosePosition)) && actionConfig.close && hasBalance;
-  const showSwapButton =
-    (networkType === "evm" ? true : Boolean(onSwap)) && actionConfig.swap && hasBalance;
-
-  const handleBorrowClick = onBorrow ?? borrowModal.open;
-  const handleCloseClick = networkType === "evm" ? closeWithCollateralModal.open : (onClosePosition ?? (() => { return; }));
-  const handleSwapClick = networkType === "evm" ? debtSwapModal.open : (onSwap ?? (() => { return; }));
-
-  const borrowPoolId = (() => {
-    if (!vesuContext?.borrow) return undefined;
-    if (isVesuContextV1(vesuContext.borrow)) return vesuContext.borrow.poolId;
-    if (isVesuContextV2(vesuContext.borrow)) return BigInt(vesuContext.borrow.poolAddress);
-    return undefined;
-  })();
-  const repayPoolId = (() => {
-    if (!vesuContext?.repay) return undefined;
-    if (isVesuContextV1(vesuContext.repay)) return vesuContext.repay.poolId;
-    if (isVesuContextV2(vesuContext.repay)) return BigInt(vesuContext.repay.poolAddress);
-    return undefined;
-  })();
+  // Extract pool IDs from Vesu context for RefinanceModal
+  const borrowPoolId = extractPoolIdFromVesuContext(vesuContext?.borrow);
+  const repayPoolId = extractPoolIdFromVesuContext(vesuContext?.repay);
   const movePoolId = borrowPoolId ?? repayPoolId;
-
-  const moveFromProtocol: "Vesu" | "Nostra" | "VesuV2" = (() => {
-    const normalized = protocolName.toLowerCase();
-    if (normalized === "vesu") return "Vesu";
-    if (normalized === "vesu_v2") return "VesuV2";
-    if (normalized === "nostra") return "Nostra";
-    return "Vesu";
-  })();
+  const moveFromProtocol = getMoveFromProtocol(protocolName);
 
   // Get the collateral view with isVisible prop
   const collateralViewWithVisibility = collateralView
@@ -232,115 +496,50 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
       )
     : null;
 
-  // Build actions array for SegmentedActionBar
-  const actions: SegmentedAction[] = [];
-
-  if (showRepayButton) {
-    actions.push({
-      key: "repay",
-      label: "Repay",
-      icon: <MinusIcon className="size-4" />,
-      onClick: repayModal.open,
-      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
-      title: !isWalletConnected
-        ? "Connect wallet to repay"
-        : actionsDisabled
-          ? disabledMessage
-          : "Repay debt",
-      variant: "ghost",
-    });
-  }
-
-  if (showBorrowButton) {
-    actions.push({
-      key: "borrow",
-      label: borrowCtaLabel ?? "Borrow",
-      icon: <PlusIcon className="size-4" />,
-      onClick: handleBorrowClick,
-      disabled: !isWalletConnected || actionsDisabled,
-      title: !isWalletConnected
-        ? "Connect wallet to borrow"
-        : actionsDisabled
-          ? disabledMessage
-          : "Borrow more tokens",
-      variant: "ghost",
-    });
-  }
-
-  if (showSwapButton) {
-    actions.push({
-      key: "swap",
-      label: "Swap",
-      icon: <ArrowPathIcon className="size-4" />,
-      onClick: handleSwapClick,
-      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
-      title: !isWalletConnected
-        ? "Connect wallet to switch debt"
-        : actionsDisabled
-          ? disabledMessage
-          : "Switch debt token",
-      variant: "ghost",
-      compactOnHover: true,
-    });
-  }
-
-  if (showMoveButton) {
-    actions.push({
-      key: "move",
-      label: "Move",
-      icon: <ArrowRightIcon className="size-4" />,
-      onClick: moveModal.open,
-      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
-      title: !isWalletConnected
-        ? "Connect wallet to move debt"
-        : actionsDisabled
-          ? disabledMessage
-          : "Move debt to another protocol",
-      variant: "ghost",
-      compactOnHover: true,
-    });
-  }
-
-  if (showCloseButton) {
-    actions.push({
-      key: "close",
-      label: "Close",
-      icon: <XMarkIcon className="size-4" />,
-      onClick: handleCloseClick,
-      disabled: !hasBalance || !isWalletConnected || actionsDisabled,
-      title: !isWalletConnected
-        ? "Connect wallet to close position"
-        : actionsDisabled
-          ? disabledMessage
-          : "Close position with collateral",
-      variant: "ghost",
-      compactOnHover: true,
-    });
-  }
+  // Build actions array using helper function
+  const actions = buildActions({
+    showRepayButton,
+    showBorrowButton,
+    showSwapButton,
+    showMoveButton,
+    showCloseButton,
+    hasBalance,
+    isWalletConnected,
+    actionsDisabled,
+    disabledMessage,
+    borrowCtaLabel,
+    repayModalOpen: repayModal.open,
+    handleBorrowClick,
+    handleSwapClick,
+    moveModalOpen: moveModal.open,
+    handleCloseClick,
+  });
 
   // Quick "Move" badge shown in header when better rate available
+  const isQuickMoveDisabled = !isWalletConnected || actionsDisabled;
+  const quickMoveTitle = getActionTitle({
+    isWalletConnected,
+    actionsDisabled,
+    disabledMessage,
+    disconnectedMessage: "Connect wallet to move debt",
+    enabledMessage: "Move debt to another protocol",
+  });
   const headerQuickAction = hasBetterRate && showMoveButton ? (
     <button
       className={`flex-shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
-        !isWalletConnected || actionsDisabled
+        isQuickMoveDisabled
           ? "bg-base-300 text-base-content/50 cursor-not-allowed"
           : "bg-primary text-primary-content hover:bg-primary/80 animate-pulse"
       }`}
       onClick={e => {
         e.stopPropagation();
-        if (isWalletConnected && !actionsDisabled) {
+        if (!isQuickMoveDisabled) {
           moveModal.open();
         }
       }}
-      disabled={!isWalletConnected || actionsDisabled}
+      disabled={isQuickMoveDisabled}
       aria-label="Move"
-      title={
-        !isWalletConnected
-          ? "Connect wallet to move debt"
-          : actionsDisabled
-            ? disabledMessage
-            : "Move debt to another protocol"
-      }
+      title={quickMoveTitle}
     >
       Move
     </button>

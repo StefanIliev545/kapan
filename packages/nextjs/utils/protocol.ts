@@ -6,6 +6,13 @@ export const getDisplayRate = (protocolName: string, rate: number) => {
 };
 
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+
+// Protocol logo constants to avoid duplication
+const AAVE_LOGO = "/logos/aave.svg";
+const COMPOUND_LOGO = "/logos/compound.svg";
+const MORPHO_LOGO = "/logos/morpho.svg";
+const VESU_LOGO = "/logos/vesu.svg";
+
 /**
  * Get the logo URL for a specific protocol
  * Used in move modals to display protocol logos
@@ -13,15 +20,15 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 export const getProtocolLogo = (protocolName: string): string => {
   const protocolLogos: Record<string, string> = {
     // Aave variants
-    "Aave V3": "/logos/aave.svg",
-    "Aave": "/logos/aave.svg",
-    "aave": "/logos/aave.svg",
-    "aave-v3": "/logos/aave.svg",
+    "Aave V3": AAVE_LOGO,
+    "Aave": AAVE_LOGO,
+    "aave": AAVE_LOGO,
+    "aave-v3": AAVE_LOGO,
     // Compound variants
-    "Compound V3": "/logos/compound.svg",
-    "Compound": "/logos/compound.svg",
-    "compound": "/logos/compound.svg",
-    "compound-v3": "/logos/compound.svg",
+    "Compound V3": COMPOUND_LOGO,
+    "Compound": COMPOUND_LOGO,
+    "compound": COMPOUND_LOGO,
+    "compound-v3": COMPOUND_LOGO,
     // Venus variants
     "Venus": "/logos/venus.svg",
     "venus": "/logos/venus.svg",
@@ -29,18 +36,18 @@ export const getProtocolLogo = (protocolName: string): string => {
     "ZeroLend": "/logos/zerolend.svg",
     "zerolend": "/logos/zerolend.svg",
     // Morpho variants
-    "Morpho Blue": "/logos/morpho.svg",
-    "Morpho": "/logos/morpho.svg",
-    "morpho-blue": "/logos/morpho.svg",
-    "morpho": "/logos/morpho.svg",
+    "Morpho Blue": MORPHO_LOGO,
+    "Morpho": MORPHO_LOGO,
+    "morpho-blue": MORPHO_LOGO,
+    "morpho": MORPHO_LOGO,
     // Spark variants
     "Spark": "/logos/spark.svg",
     "spark": "/logos/spark.svg",
     // Vesu variants
-    "Vesu": "/logos/vesu.svg",
-    "VesuV2": "/logos/vesu.svg",
-    "vesu_v2": "/logos/vesu.svg",
-    "vesu": "/logos/vesu.svg",
+    "Vesu": VESU_LOGO,
+    "VesuV2": VESU_LOGO,
+    "vesu_v2": VESU_LOGO,
+    "vesu": VESU_LOGO,
     // Nostra variants
     "Nostra": "/logos/nostra.svg",
     "nostra": "/logos/nostra.svg",

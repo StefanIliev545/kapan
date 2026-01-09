@@ -56,11 +56,12 @@ const getLtBps = (c: any): number => {
 };
 
 /* --------------------------- Price Probe ----------------------------- */
+type PriceCallback = (addressLower: string, priceIn8Decimals: bigint) => void;
 const CollatPriceProbe: FC<{
   symbol?: string;
   address: string;
   enabled: boolean;
-  onPrice: (addressLower: string, p8: bigint) => void;
+  onPrice: PriceCallback;
 }> = memo(({ symbol, address, enabled, onPrice }) => {
   const sym = (symbol || "").trim();
   const { isSuccess, price } = useTokenPriceApi(sym) as {
@@ -171,15 +172,12 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     setActiveTab,
     selectedProtocol,
     setSelectedProtocol,
-    selectedProvider: _stateSelectedProvider,
-    setSelectedProvider: _stateSetSelectedProvider,
     selectedVersion,
     setSelectedVersion,
     expandedCollateral,
     setExpandedCollateral,
     tempAmount,
     setTempAmount,
-    tempIsMax,
     setTempIsMax,
     addedCollaterals,
     collateralIsMaxMap,

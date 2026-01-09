@@ -12,7 +12,7 @@ interface TransactionToastProps {
   secondaryLinkText?: string;
 }
 
-export function TransactionToast({ step, txHash, message, blockExplorerLink, secondaryLink, secondaryLinkText }: TransactionToastProps) {
+export function TransactionToast({ step, message, blockExplorerLink, secondaryLink, secondaryLinkText }: TransactionToastProps) {
   const getStepConfig = () => {
     switch (step) {
       case "pending":

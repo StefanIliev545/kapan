@@ -139,10 +139,30 @@ def handle_cairo(file_path):
 
     return actions
 
+def handle_json(file_path):
+    """Validate JSON files"""
+    actions = []
+    try:
+        with open(file_path, 'r') as f:
+            json.load(f)
+        actions.append("✓ Valid JSON")
+    except json.JSONDecodeError as e:
+        actions.append(f"❌ Invalid JSON: {e.msg} at line {e.lineno}")
+    except Exception as e:
+        actions.append(f"⚠️  Could not validate JSON: {str(e)[:50]}")
+    return actions
+
 def main():
     try:
-        hook_input = json.load(sys.stdin)
-    except:
+        raw_input = sys.stdin.read()
+        if not raw_input.strip():
+            return
+        hook_input = json.loads(raw_input)
+    except json.JSONDecodeError as e:
+        print(f"⚠️  Hook input parse error: {e.msg}")
+        return
+    except Exception as e:
+        print(f"⚠️  Hook error: {str(e)[:50]}")
         return
 
     tool_input = hook_input.get("tool_input", {})
@@ -154,8 +174,22 @@ def main():
     path = Path(file_path)
     suffix = path.suffix.lower()
 
-    # Skip non-code files
+    # Handle JSON/config files with simple validation
+    if suffix == ".json":
+        print(f"📋 Validating {path.name}...")
+        actions = handle_json(file_path)
+        if actions:
+            print("\n".join(actions))
+        return
+
+    # Handle markdown files - just acknowledge
+    if suffix in [".md", ".mdx"]:
+        print(f"📝 Updated {path.name}")
+        return
+
+    # Handle config/other files silently - no output, no error
     if suffix not in [".sol", ".ts", ".tsx", ".js", ".jsx", ".cairo"]:
+        # Silently skip unknown file types - this is expected behavior
         return
 
     # Skip generated/vendor files

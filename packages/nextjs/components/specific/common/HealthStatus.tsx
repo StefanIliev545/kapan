@@ -17,7 +17,7 @@ export interface HealthStatusProps {
  * - Yellow (warning): 50-70%
  * - Red (error): >= 70%
  */
-export const HealthStatus: FC<HealthStatusProps> = ({ utilizationPercentage, mobileLabel = "LTV" }) => {
+export const HealthStatus: FC<HealthStatusProps> = ({ utilizationPercentage }) => {
   // Determine color based on utilization percentage
   const getColorClasses = () => {
     if (utilizationPercentage < 50) return { bar: "bg-success", text: "text-success", glow: "shadow-success/30" };

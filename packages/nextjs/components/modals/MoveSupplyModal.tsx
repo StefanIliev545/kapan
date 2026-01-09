@@ -101,15 +101,6 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     }
   }, [isEditingAmount, transferAmount, formatInputValue]);
 
-  const parseInputValue = (value: string): bigint => {
-    try {
-      const decimals = token.decimals || 18;
-      return parseUnits(value || "0", decimals);
-    } catch {
-      return 0n;
-    }
-  };
-
   // Move these handlers out of the render function and memoize them
   const handleAmountChangeCallback = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     // Allow free text editing without validation

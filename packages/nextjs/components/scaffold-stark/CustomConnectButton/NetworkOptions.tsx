@@ -1,11 +1,10 @@
 import { useTheme } from "next-themes";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/solid";
-import { getNetworkColor, useSwitchNetwork } from "~~/hooks/scaffold-stark";
+import { getNetworkColor } from "~~/hooks/scaffold-stark";
 import { getTargetNetworks } from "~~/utils/scaffold-stark";
 import { useSwitchChain } from "@starknet-react/core";
 import { useAccount } from "~~/hooks/useAccount";
 import { useEffect, useMemo } from "react";
-import { constants } from "starknet";
 import { track } from "@vercel/analytics";
 
 type NetworkOptionsProps = {

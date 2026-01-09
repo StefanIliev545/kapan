@@ -40,7 +40,6 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
   collaterals,
   isLoading,
   selectedProtocol,
-  marketToken,
   onCollateralSelectionChange,
   onMaxClick,
   hideAmounts = false,

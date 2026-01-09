@@ -54,7 +54,7 @@ export const StickySection = ({
   const pointerEvents = useTransform(opacity, (v) => (v > 0.5 ? "auto" : "none"));
   
   // Track if this section is active (opacity > 0.8)
-  const [isActive, setIsActive] = useState(false);
+  const [, setIsActive] = useState(false);
   const [hasBeenActive, setHasBeenActive] = useState(false);
   
   useEffect(() => {

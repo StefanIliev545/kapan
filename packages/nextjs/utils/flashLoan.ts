@@ -6,7 +6,6 @@
  *
  * Previously this logic was duplicated across:
  * - hooks/useMovePositionData.ts
- * - components/modals/MovePositionModal.tsx
  * - hooks/useFlashLoanSelection.ts
  * - utils/cow/addresses.ts
  */

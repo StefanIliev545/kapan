@@ -260,12 +260,15 @@ export function getOperationColorClass(type: OperationType): string {
  * - collateral_swap: KIND_SELL, both tokens are collateral-like
  */
 export function deriveOperationType(
+  // Parameters intentionally unused - derivation is complex and needs position context
+  // In the future, we could use on-chain position data to infer the operation
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _sellToken: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _buyToken: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _isKindBuy: boolean
 ): OperationType {
-  // For now, return unknown - derivation is complex and needs position context
-  // In the future, we could use on-chain position data to infer the operation
   return "unknown";
 }
 

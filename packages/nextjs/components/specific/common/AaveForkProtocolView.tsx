@@ -32,7 +32,7 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, e
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Use the shared gateway hook to get contract info and risk parameters
-  const { ltvBps, lltvBps, effectiveLltvBps } = useGatewayWithRiskParams(
+  const { ltvBps, effectiveLltvBps } = useGatewayWithRiskParams(
     viewContractName as ViewGatewayContractName,
     chainId
   );

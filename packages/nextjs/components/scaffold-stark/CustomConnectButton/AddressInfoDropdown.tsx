@@ -1,25 +1,17 @@
 import { useRef, useState } from "react";
-import { default as NextImage } from "next/image";
 import { NetworkOptions } from "./NetworkOptions";
 import { Address } from "@starknet-react/chains";
-import { useConnect, useDisconnect, useNetwork } from "@starknet-react/core";
-import { useTheme } from "next-themes";
-import { createPortal } from "react-dom";
+import { useDisconnect, useNetwork } from "@starknet-react/core";
 import {
   ArrowLeftEndOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
-  ArrowsRightLeftIcon,
   CheckCircleIcon,
   ChevronDownIcon,
   DocumentDuplicateIcon,
-  QrCodeIcon,
-  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { BlockieAvatar, isENS } from "~~/components/scaffold-stark";
 import { useOutsideClick, useCopyToClipboard } from "~~/hooks/scaffold-stark";
 import { useScaffoldStarkProfile } from "~~/hooks/scaffold-stark/useScaffoldStarkProfile";
-import { getStarknetPFPIfExists } from "~~/utils/profile";
-import { getTargetNetworks } from "~~/utils/scaffold-stark";
 import { truncateAddress } from "~~/utils/address";
 
 type AddressInfoDropdownProps = {
@@ -40,9 +32,6 @@ export const AddressInfoDropdown = ({
   const { data: profile } = useScaffoldStarkProfile(address);
   const { chain } = useNetwork();
   const [selectingNetwork, setSelectingNetwork] = useState(false);
-  const { connectors, connect } = useConnect();
-  const { resolvedTheme } = useTheme();
-  const isDarkMode = resolvedTheme === "dark";
   const dropdownRef = useRef<HTMLDetailsElement>(null);
   const closeDropdown = () => {
     setSelectingNetwork(false);

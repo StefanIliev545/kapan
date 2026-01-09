@@ -6,11 +6,10 @@
  * the appData with the CoW API to surface the actual error.
  */
 
-import { AbiCoder, Interface, keccak256, toUtf8Bytes } from "ethers";
-import stringify from "json-stringify-deterministic";
+import { AbiCoder, Interface } from "ethers";
 import { PublicClient } from "viem";
 import { buildKapanAppData, AppDataDocument, registerAppData, computeAppDataHash } from "./appData";
-import { COW_FLASH_LOAN_PROVIDERS, getKapanCowAdapter } from "./addresses";
+import { COW_FLASH_LOAN_PROVIDERS } from "./addresses";
 
 // ABI for decoding
 const orderManagerAbi = [
@@ -197,7 +196,6 @@ export async function recoverOrderFromTx(
     
     // 5. Try to reconstruct appData with different providers
     const providers = COW_FLASH_LOAN_PROVIDERS[chainId] || [];
-    const kapanAdapter = getKapanCowAdapter(chainId);
     
     let matchingAppData: AppDataDocument | undefined;
     let matchingProvider: string | undefined;

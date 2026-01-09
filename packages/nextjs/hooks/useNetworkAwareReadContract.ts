@@ -1,11 +1,10 @@
-import { Abi, useReadContract } from "@starknet-react/core";
+import { useReadContract } from "@starknet-react/core";
 import { useScaffoldReadContract as useScaffoldReadContractEth } from "./scaffold-eth/useScaffoldReadContract";
 import { useScaffoldReadContract as useScaffoldReadContractStark } from "./scaffold-stark/useScaffoldReadContract";
 import { ContractName } from "~~/utils/scaffold-eth/contract";
 import { ContractName as ContractNameStark } from "~~/utils/scaffold-stark/contract";
 import { AbiFunctionReturnType, ContractAbi as ContractAbiEth } from "~~/utils/scaffold-eth/contract";
-import { AbiFunctionOutputs, ContractAbi as ContractAbiStark, ExtractAbiFunctionNamesScaffold } from "~~/utils/scaffold-stark/contract";
-import { ExtractAbiFunctionNames } from "abitype";
+import { AbiFunctionOutputs, ContractAbi as ContractAbiStark } from "~~/utils/scaffold-stark/contract";
 
 type NetworkType = "evm" | "starknet";
 

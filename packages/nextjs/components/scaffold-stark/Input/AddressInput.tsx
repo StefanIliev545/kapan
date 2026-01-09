@@ -17,7 +17,7 @@ export const AddressInput = ({
   disabled,
 }: CommonInputProps<Address | string>) => {
   // TODO : Add Starkname functionality here with cached profile, check ENS on scaffold-eth
-  const [_debouncedValue] = useDebounceValue(value, 500);
+  useDebounceValue(value, 500);
 
   const handleChange = useCallback(
     (newValue: Address) => {

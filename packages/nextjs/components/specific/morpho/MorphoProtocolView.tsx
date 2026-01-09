@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState, useMemo, useEffect, ReactNode } from "react";
+import { FC, useState, useMemo, useEffect, ReactNode, useCallback } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
@@ -8,6 +8,7 @@ import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import {
   useMorphoLendingPositions,
   useMorphoMarkets,
+  MorphoPositionRow,
 } from "~~/hooks/useMorphoLendingPositions";
 import { useMorphoPositionsRefresh } from "~~/hooks/useMorphoPositionsRefresh";
 import { MorphoPositionsSection } from "./MorphoPositionsSection";
@@ -15,7 +16,7 @@ import { MorphoMarketsSection } from "./MorphoMarketsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useGlobalState } from "~~/services/store/store";
-import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
+import { usePendlePTYields, isPTToken, PTYield } from "~~/hooks/usePendlePTYields";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { HealthStatus } from "../common/HealthStatus";
 import { formatSignedPercent } from "../utils";
@@ -30,14 +31,155 @@ interface CollapsibleSectionProps {
   children: ReactNode;
 }
 
+// Static image error handler at module level
+const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  (e.target as HTMLImageElement).src = "/logos/default.svg";
+};
+
+// Static animation transition object
+const COLLAPSE_TRANSITION = { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const };
+const COLLAPSE_INITIAL = { opacity: 0, height: 0 };
+const COLLAPSE_ANIMATE = { opacity: 1, height: "auto" };
+
+// CSS class constants to avoid duplicate string warnings
+const TEXT_SUCCESS = "text-success";
+const TEXT_ERROR = "text-error";
+const TEXT_MUTED = "text-base-content/40";
+
+/** Metrics computed from user positions */
+interface PositionMetrics {
+  netBalance: number;
+  netYield30d: number;
+  netApyPercent: number | null;
+  avgUtilization: number;
+}
+
+/** Default metrics when no positions exist */
+const EMPTY_METRICS: PositionMetrics = {
+  netBalance: 0,
+  netYield30d: 0,
+  netApyPercent: null,
+  avgUtilization: 0,
+};
+
+/**
+ * Get the PT token yield for a given collateral asset.
+ * Returns 0 if the collateral is not a PT token or has no yield data.
+ */
+function getPTTokenYield(
+  collateralSymbol: string,
+  collateralAddress: string,
+  yieldsByAddress: Map<string, PTYield>,
+  yieldsBySymbol: Map<string, PTYield>
+): number {
+  if (!isPTToken(collateralSymbol)) {
+    return 0;
+  }
+  const ptYield = yieldsByAddress.get(collateralAddress) || yieldsBySymbol.get(collateralSymbol.toLowerCase());
+  return ptYield?.fixedApy ?? 0;
+}
+
+/**
+ * Build supplied positions array from rows.
+ * Collateral in Morpho doesn't earn yield (0% APY) UNLESS it's a PT token.
+ */
+function buildSuppliedPositions(
+  rows: MorphoPositionRow[],
+  yieldsByAddress: Map<string, PTYield>,
+  yieldsBySymbol: Map<string, PTYield>
+): Array<{ balance: number; currentRate: number }> {
+  return rows.map((row) => {
+    const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
+    const currentRate = getPTTokenYield(row.collateralSymbol, collateralAddr, yieldsByAddress, yieldsBySymbol);
+    return {
+      balance: row.collateralBalanceUsd,
+      currentRate,
+    };
+  });
+}
+
+/**
+ * Build borrowed positions array from rows.
+ * Only includes rows with active debt.
+ */
+function buildBorrowedPositions(
+  rows: MorphoPositionRow[]
+): Array<{ balance: number; currentRate: number }> {
+  return rows
+    .filter((row) => row.hasDebt)
+    .map((row) => ({
+      balance: row.borrowBalanceUsd,
+      currentRate: row.borrowApy,
+    }));
+}
+
+/**
+ * Calculate position metrics from supplied and borrowed positions.
+ */
+function calculatePositionMetrics(
+  rows: MorphoPositionRow[],
+  yieldsByAddress: Map<string, PTYield>,
+  yieldsBySymbol: Map<string, PTYield>
+): PositionMetrics {
+  if (!rows || rows.length === 0) {
+    return EMPTY_METRICS;
+  }
+
+  const suppliedPositions = buildSuppliedPositions(rows, yieldsByAddress, yieldsBySymbol);
+  const borrowedPositions = buildBorrowedPositions(rows);
+  const yieldMetrics = calculateNetYieldMetrics(suppliedPositions, borrowedPositions);
+
+  const avgUtilization = yieldMetrics.totalSupplied > 0
+    ? (yieldMetrics.totalBorrowed / yieldMetrics.totalSupplied) * 100
+    : 0;
+
+  return {
+    netBalance: yieldMetrics.netBalance,
+    netYield30d: yieldMetrics.netYield30d,
+    netApyPercent: yieldMetrics.netApyPercent,
+    avgUtilization,
+  };
+}
+
+/**
+ * Get the appropriate text color class for a numeric value.
+ */
+function getValueColorClass(hasPositions: boolean, value: number): string {
+  if (!hasPositions) return TEXT_MUTED;
+  return value >= 0 ? TEXT_SUCCESS : TEXT_ERROR;
+}
+
+/**
+ * Get the appropriate text color class for the APY value.
+ */
+function getApyColorClass(hasPositions: boolean, apyValue: number | null): string {
+  if (!hasPositions || apyValue == null) return TEXT_MUTED;
+  return apyValue >= 0 ? TEXT_SUCCESS : TEXT_ERROR;
+}
+
+/**
+ * Format a metric value for display, or return placeholder if no positions.
+ */
+function formatMetricValue(hasPositions: boolean, value: number): string {
+  return hasPositions ? formatCurrencyCompact(value) : "—";
+}
+
+/**
+ * Format APY value for display, or return placeholder if no positions or null APY.
+ */
+function formatApyValue(hasPositions: boolean, apyValue: number | null): string {
+  if (!hasPositions || apyValue == null) return "—";
+  return formatSignedPercent(apyValue);
+}
+
 const CollapsibleSection: FC<CollapsibleSectionProps> = ({ isOpen, children }) => (
   <AnimatePresence initial={false}>
     {isOpen && (
       <motion.div
-        initial={{ opacity: 0, height: 0 }}
-        animate={{ opacity: 1, height: "auto" }}
-        exit={{ opacity: 0, height: 0 }}
-        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        initial={COLLAPSE_INITIAL}
+        animate={COLLAPSE_ANIMATE}
+        exit={COLLAPSE_INITIAL}
+        transition={COLLAPSE_TRANSITION}
         className="overflow-hidden"
       >
         <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-md">
@@ -114,59 +256,11 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     return apiRows;
   }, [refreshedRows, apiRows, isRefreshing]);
 
-  // Compute totals and metrics
-  const metrics = useMemo(() => {
-    // Guard against undefined/empty rows
-    if (!rows || rows.length === 0) {
-      return {
-        netBalance: 0,
-        netYield30d: 0,
-        netApyPercent: null,
-        avgUtilization: 0,
-      };
-    }
-
-    // Build position arrays for the yield calculation utility
-    // Note: Collateral in Morpho doesn't earn yield (0% APY) UNLESS it's a PT token
-    // PT tokens have a fixed yield to maturity from Pendle
-    const suppliedPositions = rows.map((row) => {
-      // Check if collateral is a PT token and get its fixed yield
-      let currentRate = 0;
-      if (isPTToken(row.collateralSymbol)) {
-        const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
-        const ptYield = yieldsByAddress.get(collateralAddr) || yieldsBySymbol.get(row.collateralSymbol.toLowerCase());
-        if (ptYield) {
-          currentRate = ptYield.fixedApy;
-        }
-      }
-      return {
-        balance: row.collateralBalanceUsd,
-        currentRate,
-      };
-    });
-
-    const borrowedPositions = rows
-      .filter((row) => row.hasDebt)
-      .map((row) => ({
-        balance: row.borrowBalanceUsd,
-        currentRate: row.borrowApy,
-      }));
-
-    // Calculate net APY and 30D yield using the shared utility
-    const yieldMetrics = calculateNetYieldMetrics(suppliedPositions, borrowedPositions);
-    
-    // Calculate average utilization (LTV across all positions)
-    const avgUtilization = yieldMetrics.totalSupplied > 0 
-      ? (yieldMetrics.totalBorrowed / yieldMetrics.totalSupplied) * 100 
-      : 0;
-
-    return {
-      netBalance: yieldMetrics.netBalance,
-      netYield30d: yieldMetrics.netYield30d,
-      netApyPercent: yieldMetrics.netApyPercent,
-      avgUtilization,
-    };
-  }, [rows, yieldsByAddress, yieldsBySymbol]);
+  // Compute totals and metrics using extracted helper
+  const metrics = useMemo(
+    () => calculatePositionMetrics(rows, yieldsByAddress, yieldsBySymbol),
+    [rows, yieldsByAddress, yieldsBySymbol]
+  );
 
   // Report totals to global state for dashboard metrics
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
@@ -185,7 +279,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   // Auto-expand when positions are found, stay collapsed when empty
   useEffect(() => {
     if (!hasLoadedOnce) return; // Wait for initial load to complete
-    
+
     if (hasPositions) {
       setIsCollapsed(false); // Expand when positions exist
     } else {
@@ -193,12 +287,23 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     }
   }, [hasLoadedOnce, hasPositions]);
 
+  // Toggle collapsed state handler
+  const toggleCollapsed = useCallback(() => {
+    setIsCollapsed(prev => !prev);
+  }, []);
+
+  // Toggle markets open handler (with event propagation stop)
+  const toggleMarketsOpen = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMarketsOpen(prev => !prev);
+  }, []);
+
   return (
     <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 p-3'}`}>
       {/* Protocol Header Card - matching ProtocolView exactly */}
       <div
         className="card-surface-interactive shadow-lg"
-        onClick={() => setIsCollapsed(!isCollapsed)}
+        onClick={toggleCollapsed}
       >
         <div className="card-body p-3 sm:px-5">
           {/* Mobile Layout (< sm) */}
@@ -213,9 +318,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
                     width={20}
                     height={20}
                     className="object-contain drop-shadow-sm"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/logos/default.svg";
-                    }}
+                    onError={handleImageError}
                   />
                 </div>
                 <span className="text-sm font-bold tracking-tight">Morpho Blue</span>
@@ -224,7 +327,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
                 <button
                   className="btn btn-xs btn-ghost gap-1"
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
+                  onClick={toggleMarketsOpen}
                 >
                   <span className="text-[9px] font-semibold uppercase tracking-wider">Markets</span>
                   {isMarketsOpen ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />}
@@ -238,20 +341,20 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
             <div className="grid grid-cols-4 gap-1">
               <div className="flex flex-col items-center py-1">
                 <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Balance</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${hasPositions ? (metrics.netBalance >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
-                  {hasPositions ? formatCurrencyCompact(metrics.netBalance) : "—"}
+                <span className={`font-mono text-xs font-bold tabular-nums ${getValueColorClass(hasPositions, metrics.netBalance)}`}>
+                  {formatMetricValue(hasPositions, metrics.netBalance)}
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
                 <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">30D</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
-                  {hasPositions ? formatCurrencyCompact(metrics.netYield30d) : "—"}
+                <span className={`font-mono text-xs font-bold tabular-nums ${getValueColorClass(hasPositions, metrics.netYield30d)}`}>
+                  {formatMetricValue(hasPositions, metrics.netYield30d)}
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
                 <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Net APY</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
-                  {hasPositions && metrics.netApyPercent != null ? formatSignedPercent(metrics.netApyPercent) : "—"}
+                <span className={`font-mono text-xs font-bold tabular-nums ${getApyColorClass(hasPositions, metrics.netApyPercent)}`}>
+                  {formatApyValue(hasPositions, metrics.netApyPercent)}
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
@@ -276,9 +379,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
                   width={24}
                   height={24}
                   className="object-contain drop-shadow-sm"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "/logos/default.svg";
-                  }}
+                  onError={handleImageError}
                 />
               </div>
               <div className="flex flex-col gap-0.5">
@@ -295,24 +396,24 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
               {/* Net Balance */}
               <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">Balance</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netBalance >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
-                  {hasPositions ? formatCurrencyCompact(metrics.netBalance) : "—"}
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${getValueColorClass(hasPositions, metrics.netBalance)}`}>
+                  {formatMetricValue(hasPositions, metrics.netBalance)}
                 </span>
               </div>
 
               {/* 30D Yield */}
               <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">30D Yield</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${hasPositions ? (metrics.netYield30d >= 0 ? "text-success" : "text-error") : "text-base-content/40"}`}>
-                  {hasPositions ? formatCurrencyCompact(metrics.netYield30d) : "—"}
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${getValueColorClass(hasPositions, metrics.netYield30d)}`}>
+                  {formatMetricValue(hasPositions, metrics.netYield30d)}
                 </span>
               </div>
 
               {/* Net APY */}
               <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
                 <span className="label-text-xs-semibold">Net APY</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${!hasPositions || metrics.netApyPercent == null ? "text-base-content/40" : metrics.netApyPercent >= 0 ? "text-success" : "text-error"}`}>
-                  {hasPositions && metrics.netApyPercent != null ? formatSignedPercent(metrics.netApyPercent) : "—"}
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${getApyColorClass(hasPositions, metrics.netApyPercent)}`}>
+                  {formatApyValue(hasPositions, metrics.netApyPercent)}
                 </span>
               </div>
 
@@ -332,7 +433,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
               <button
                 className="btn btn-sm btn-ghost gap-1.5"
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setIsMarketsOpen(!isMarketsOpen); }}
+                onClick={toggleMarketsOpen}
               >
                 <span className="text-[10px] font-semibold uppercase tracking-widest">Markets</span>
                 {isMarketsOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}

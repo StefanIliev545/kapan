@@ -1,12 +1,17 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 // Note: Header is rendered by ScaffoldEthAppWithProviders (LandingHeader for /info route)
 import { ChevronDownIcon, ArrowRightIcon, ShieldCheckIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
 import { useKapanTheme } from "~~/hooks/useKapanTheme";
+
+// Static animation variants - extracted to module level to avoid recreation
+const ACCORDION_ANIMATE_OPEN = { height: "auto", opacity: 1 };
+const ACCORDION_ANIMATE_CLOSED = { height: 0, opacity: 0 };
+const ACCORDION_TRANSITION = { duration: 0.3, ease: "easeInOut" as const };
 
 // Character set for scramble effect
 const CHARS = "@#$%&*!?<>[]{}ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -137,52 +142,27 @@ interface SectionData {
   ContentComponent?: React.FC<{ isActive: boolean }>;
 }
 
-// FAQ Accordion item
-const FAQAccordion = ({ item, isOpen, onToggle }: { item: FAQItem; isOpen: boolean; onToggle: () => void }) => (
-  <div className="border-base-content/10 border-b">
-    <button
-      onClick={onToggle}
-      className="group flex w-full items-center justify-between py-5 text-left"
-    >
-      <span className="text-base-content/70 group-hover:text-base-content pr-4 text-sm font-medium transition-colors md:text-base">
-        {item.question}
-      </span>
-      <ChevronDownIcon 
-        className={`text-base-content/40 size-4 flex-shrink-0 transition-transform duration-300${isOpen ? "rotate-180" : ""}`} 
-      />
-    </button>
-    <motion.div
-      initial={false}
-      animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
-      transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="overflow-hidden"
-    >
-      <p className="text-base-content/40 pb-5 text-sm leading-relaxed">
-        {item.answer}
-      </p>
-    </motion.div>
-  </div>
-);
-
 // Launch App Button
 const LaunchAppButton = () => {
-  const getAppUrl = () => {
+  const getAppUrl = useCallback(() => {
     if (typeof window === "undefined") return "/app";
     const { protocol, hostname, host } = window.location;
     const baseHost = hostname.replace(/^www\./, "");
     if (host.endsWith("localhost:3000")) return `${protocol}//app.localhost:3000`;
     if (hostname.startsWith("app.")) return `${protocol}//${host}`;
     return `${protocol}//app.${baseHost}`;
-  };
+  }, []);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    track("To App conversion", { button: "Info Page CTA" });
+    window.location.assign(getAppUrl());
+  }, [getAppUrl]);
 
   return (
     <a
       href="/app"
-      onClick={e => {
-        e.preventDefault();
-        track("To App conversion", { button: "Info Page CTA" });
-        window.location.assign(getAppUrl());
-      }}
+      onClick={handleClick}
       className="bg-primary text-primary-content group relative flex h-14 items-center justify-center overflow-hidden px-8 text-[11px] font-bold uppercase tracking-[0.2em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.1)] md:h-16 md:px-12 md:text-xs"
     >
       <div className="relative z-10 flex items-center gap-3">
@@ -244,9 +224,18 @@ const StickySection = ({
     return () => unsubscribe();
   }, [opacity, hasBeenActive]);
 
+  // Memoize style object for motion.div to avoid recreation
+  const motionStyle = useMemo(() => ({
+    opacity,
+    scale,
+    y,
+    zIndex: index,
+    pointerEvents
+  }), [opacity, scale, y, index, pointerEvents]);
+
   return (
     <motion.div
-      style={{ opacity, scale, y, zIndex: index, pointerEvents }}
+      style={motionStyle}
       className="absolute inset-0 flex items-center justify-center overflow-hidden"
     >
       <div className="flex w-full max-w-4xl flex-col items-center px-6 text-center md:px-8">
@@ -364,7 +353,17 @@ const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
 // FAQ content
 const FAQContent = ({ faqItems, isActive }: { faqItems: FAQItem[]; isActive: boolean }) => {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
-  
+
+  const handleToggle = useCallback((index: number) => {
+    setOpenFAQ(prev => prev === index ? null : index);
+  }, []);
+
+  // Create memoized toggle handlers for each FAQ item
+  const toggleHandlers = useMemo(() =>
+    faqItems.map((_, i) => () => handleToggle(i)),
+    [faqItems, handleToggle]
+  );
+
   return (
     <div className="mx-auto max-w-xl text-left">
       {faqItems.map((item, i) => (
@@ -372,7 +371,7 @@ const FAQContent = ({ faqItems, isActive }: { faqItems: FAQItem[]; isActive: boo
           key={i}
           item={item}
           isOpen={openFAQ === i}
-          onToggle={() => setOpenFAQ(openFAQ === i ? null : i)}
+          onToggle={toggleHandlers[i]}
           isActive={isActive}
           delay={i * 150}
         />
@@ -382,21 +381,21 @@ const FAQContent = ({ faqItems, isActive }: { faqItems: FAQItem[]; isActive: boo
 };
 
 // FAQ Accordion with scramble effect
-const FAQAccordionScramble = ({ 
-  item, 
-  isOpen, 
-  onToggle, 
+const FAQAccordionScramble = ({
+  item,
+  isOpen,
+  onToggle,
   isActive,
-  delay 
-}: { 
-  item: FAQItem; 
-  isOpen: boolean; 
+  delay
+}: {
+  item: FAQItem;
+  isOpen: boolean;
   onToggle: () => void;
   isActive: boolean;
   delay: number;
 }) => {
   const [itemActive, setItemActive] = useState(false);
-  
+
   useEffect(() => {
     if (isActive) {
       const t = setTimeout(() => setItemActive(true), delay);
@@ -413,14 +412,14 @@ const FAQAccordionScramble = ({
         <span className="text-base-content/70 group-hover:text-base-content pr-4 text-sm font-medium transition-colors md:text-base">
           <ScrambleText text={item.question} isActive={itemActive} duration={500} />
         </span>
-        <ChevronDownIcon 
-          className={`text-base-content/40 size-4 flex-shrink-0 transition-transform duration-300${isOpen ? "rotate-180" : ""}`} 
+        <ChevronDownIcon
+          className={`text-base-content/40 size-4 flex-shrink-0 transition-transform duration-300${isOpen ? "rotate-180" : ""}`}
         />
       </button>
       <motion.div
         initial={false}
-        animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
+        animate={isOpen ? ACCORDION_ANIMATE_OPEN : ACCORDION_ANIMATE_CLOSED}
+        transition={ACCORDION_TRANSITION}
         className="overflow-hidden"
       >
         <p className="text-base-content/40 pb-5 text-sm leading-relaxed">
@@ -478,12 +477,27 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => (
   </div>
 );
 
+// Static spring config - extracted to module level
+const SMOOTH_PROGRESS_CONFIG = { stiffness: 100, damping: 30 };
+
+// Progress indicator style - extracted to module level
+const PROGRESS_STYLE = { height: "100%" };
+
 const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
   useKapanTheme();
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  const sections: SectionData[] = [
+
+  // Memoize FAQContent wrapper component to avoid recreation
+  const FAQContentWrapper = useMemo(() => {
+    const Component: React.FC<{ isActive: boolean }> = ({ isActive }) => (
+      <FAQContent faqItems={faqItems} isActive={isActive} />
+    );
+    Component.displayName = "FAQContentWrapper";
+    return Component;
+  }, [faqItems]);
+
+  const sections: SectionData[] = useMemo(() => [
     {
       tag: "01 / MISSION",
       title: "ONE TRANSACTION.",
@@ -506,7 +520,7 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
       tag: "04 / FAQ",
       title: "QUESTIONS.",
       content: null,
-      ContentComponent: ({ isActive }) => <FAQContent faqItems={faqItems} isActive={isActive} />,
+      ContentComponent: FAQContentWrapper,
     },
     {
       tag: "05 / SECURITY",
@@ -520,10 +534,29 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
       content: null,
       ContentComponent: CTAContent,
     },
-  ];
+  ], [FAQContentWrapper]);
 
   const { scrollYProgress } = useScroll({ container: containerRef });
-  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+  const smoothProgress = useSpring(scrollYProgress, SMOOTH_PROGRESS_CONFIG);
+
+  // Memoize scroll container height style
+  const scrollContainerStyle = useMemo(() => ({
+    height: `${sections.length * 100}vh`
+  }), [sections.length]);
+
+  // Memoize scroll hint opacity transform
+  const scrollHintOpacity = useTransform(smoothProgress, [0, 0.1], [1, 0]);
+
+  // Memoize scroll hint style object
+  const scrollHintStyle = useMemo(() => ({
+    opacity: scrollHintOpacity
+  }), [scrollHintOpacity]);
+
+  // Memoize progress indicator style with scaleY
+  const progressIndicatorStyle = useMemo(() => ({
+    ...PROGRESS_STYLE,
+    scaleY: smoothProgress
+  }), [smoothProgress]);
 
   return (
     <div className="bg-base-100 text-base-content fixed inset-0 overflow-hidden">
@@ -537,7 +570,7 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
         ref={containerRef}
         className="hide-scrollbar relative z-10 size-full snap-y snap-mandatory overflow-y-auto scroll-smooth"
       >
-        <div style={{ height: `${sections.length * 100}vh` }} className="relative">
+        <div style={scrollContainerStyle} className="relative">
           {/* Snap targets */}
           <div className="pointer-events-none absolute inset-0 flex flex-col">
             {sections.map((_, i) => (
@@ -551,7 +584,7 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
             <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
               <motion.div
                 className="bg-base-content/40 w-full origin-top"
-                style={{ height: "100%", scaleY: smoothProgress }}
+                style={progressIndicatorStyle}
               />
             </div>
 
@@ -568,7 +601,7 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
 
             {/* Scroll hint */}
             <motion.div
-              style={{ opacity: useTransform(smoothProgress, [0, 0.1], [1, 0]) }}
+              style={scrollHintStyle}
               className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>

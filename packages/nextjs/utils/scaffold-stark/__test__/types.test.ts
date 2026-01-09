@@ -1,17 +1,10 @@
+/* eslint-disable sonarjs/no-duplicate-string */
 import { describe, it, expect } from "vitest";
 import {
   isCairoInt,
   isCairoBigInt,
   isCairoU256,
   isCairoContractAddress,
-  isCairoEthAddress,
-  isCairoClassHash,
-  isCairoFunction,
-  isCairoVoid,
-  isCairoBool,
-  isCairoBytes31,
-  isCairoByteArray,
-  isCairoSecp256k1Point,
   isCairoFelt,
   isCairoTuple,
   isCairoType,

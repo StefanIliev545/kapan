@@ -31,6 +31,7 @@ export type EtherInputCoreProps = CommonInputProps & {
     name?: string;
     value: string;
     placeholder?: string;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onChange: (value: string) => void;
     disabled?: boolean;
     prefix?: ReactNode;

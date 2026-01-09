@@ -1,14 +1,118 @@
 "use client";
 
-import React, { useRef, useMemo, useState, useEffect } from "react";
+import React, { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { motion, AnimatePresence, useScroll, useSpring, useTransform, useMotionValue } from "framer-motion";
-import { ChevronDownIcon, ChevronUpIcon, ArrowRightIcon, ArrowPathIcon, ShieldCheckIcon, BoltIcon, CurrencyDollarIcon, SparklesIcon, CubeTransparentIcon, PuzzlePieceIcon, RocketLaunchIcon, PlusIcon, MinusIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { motion, AnimatePresence, useScroll, useSpring, useTransform, useMotionValue, MotionValue } from "framer-motion";
+import { ChevronDownIcon, ChevronUpIcon, ArrowRightIcon, ShieldCheckIcon, BoltIcon, CurrencyDollarIcon, SparklesIcon, PlusIcon, MinusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@radix-ui/themes";
 import { track } from "@vercel/analytics";
 import { StickySection, SectionData } from "./StickySection";
 import { useKapanTheme } from "~~/hooks/useKapanTheme";
 import { useLandingSection } from "~~/contexts/LandingSectionContext";
+
+// ================================
+// Static Animation Constants
+// ================================
+
+// ProtocolMarquee animations
+const MARQUEE_ANIMATE = { x: ["0%", "-50%"] as [string, string] };
+const MARQUEE_TRANSITION = {
+  x: {
+    duration: 20,
+    repeat: Infinity,
+    ease: "linear" as const,
+  },
+};
+
+// MarqueeRow animations
+const MARQUEE_ROW_TRANSITION = {
+  x: {
+    duration: 25,
+    repeat: Infinity,
+    ease: "linear" as const,
+  },
+};
+
+// NeonLetter animations
+const NEON_LETTER_INITIAL = { opacity: 0 };
+const NEON_LETTER_ANIMATE = {
+  opacity: [0, 0, 0.8, 0, 0.6, 0.1, 0.9, 0.2, 1, 0.7, 1],
+};
+const NEON_LETTER_ANIMATE_INACTIVE = { opacity: 0 };
+const NEON_LETTER_TIMES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+
+// FinalCTA animations
+const LOGO_INITIAL = { opacity: 0 };
+const LOGO_ANIMATE = {
+  opacity: [0, 0, 0.7, 0, 0, 0.5, 0.1, 0.8, 0, 0.9, 0.3, 1, 0.8, 1],
+};
+const LOGO_ANIMATE_INACTIVE = { opacity: 0 };
+const LOGO_TRANSITION_TIMES = [0, 0.05, 0.1, 0.18, 0.28, 0.35, 0.4, 0.5, 0.58, 0.68, 0.78, 0.88, 0.94, 1];
+
+const BUTTON_FLICKER_INITIAL = { opacity: 0 };
+const BUTTON_FLICKER_ANIMATE = {
+  opacity: [0, 0, 1, 0, 0.8, 0, 1, 0.3, 1, 0.6, 1, 1],
+};
+const BUTTON_FLICKER_ANIMATE_INACTIVE = { opacity: 0 };
+const BUTTON_FLICKER_TIMES = [0, 0.1, 0.15, 0.22, 0.3, 0.38, 0.5, 0.6, 0.72, 0.82, 0.92, 1];
+
+const LINKS_INITIAL = { opacity: 0, y: 20 };
+const LINKS_ANIMATE_ACTIVE = { opacity: 1, y: 0 };
+const LINKS_ANIMATE_INACTIVE = { opacity: 0, y: 20 };
+const LINKS_TRANSITION = { delay: 4.2, duration: 0.6, ease: "easeOut" as const };
+
+// HowItWorks animations
+const SPRING_SCALE_INITIAL = { scale: 0 };
+const SPRING_SCALE_ANIMATE = { scale: 1 };
+const SPRING_SCALE_TRANSITION = { type: "spring" as const, bounce: 0.4, duration: 0.8 };
+
+const LINE_INITIAL = { pathLength: 0 };
+const LINE_ANIMATE = { pathLength: 1 };
+
+const FADE_UP_INITIAL = { opacity: 0, scale: 0 };
+const FADE_UP_ANIMATE = { opacity: 1, scale: 1 };
+
+const STEP_01_INITIAL = { opacity: 0, y: 10 };
+const STEP_01_ANIMATE = { opacity: 1, y: 0 };
+const STEP_01_TRANSITION = { delay: 0.8 };
+
+const STEP_02_TRANSITION = { delay: 0.95 };
+const STEP_03_TRANSITION = { delay: 1.1 };
+
+// FlowStep animations
+const FLOW_STEP_INITIAL = { opacity: 0, y: 10 };
+const FLOW_STEP_ANIMATE_ACTIVE = { opacity: 1, y: 0 };
+const FLOW_STEP_ANIMATE_INACTIVE = { opacity: 0.3, y: 0 };
+
+// HFlowStep animations
+const HFLOW_STEP_INITIAL = { opacity: 0, x: -10 };
+const HFLOW_STEP_ANIMATE = { opacity: 1, x: 0 };
+
+// FlowArrow animations
+const FLOW_ARROW_INITIAL = { opacity: 0 };
+const FLOW_ARROW_ANIMATE = { opacity: 1 };
+const FLOW_ARROW_HORIZONTAL = { x: [0, 3, 0] };
+const FLOW_ARROW_VERTICAL = { y: [0, 3, 0] };
+const FLOW_ARROW_TRANSITION = { duration: 1.2, repeat: Infinity };
+
+// ActionContent animations
+const ACTION_CONTENT_INITIAL = { opacity: 0 };
+const ACTION_CONTENT_ANIMATE = { opacity: 1 };
+
+// ActionTabs animations
+const ACTION_TAB_UNDERLINE_TRANSITION = { type: "spring" as const, bounce: 0.15, duration: 0.5 };
+const ACTION_TAB_CONTENT_INITIAL = { opacity: 0, y: 8 };
+const ACTION_TAB_CONTENT_ANIMATE = { opacity: 1, y: 0 };
+const ACTION_TAB_CONTENT_EXIT = { opacity: 0, y: -8 };
+const ACTION_TAB_CONTENT_TRANSITION = { duration: 0.25, ease: "easeOut" as const };
+
+// Swap card arrow animation
+const SWAP_ARROW_ANIMATE = { x: [0, 4, 0] };
+const SWAP_ARROW_TRANSITION = { duration: 1.2, repeat: Infinity };
+
+// ================================
+// Protocol and Network Data
+// ================================
 
 const protocols = [
   { name: "Aave", logo: "/logos/aave.svg" },
@@ -27,14 +131,8 @@ const ProtocolMarquee = () => {
     <div className="relative w-full max-w-md overflow-hidden">
       <motion.div
         className="flex gap-6"
-        animate={{ x: ["0%", "-50%"] }}
-        transition={{
-          x: {
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          },
-        }}
+        animate={MARQUEE_ANIMATE}
+        transition={MARQUEE_TRANSITION}
       >
         {duplicatedProtocols.map((protocol, index) => (
           <div
@@ -73,14 +171,16 @@ const LaunchAppButton = () => {
     return `${protocol}//app.${baseHost}`;
   }, []);
 
+  const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    track("To App conversion", { button: "Landing Hero" });
+    window.location.assign(appUrl);
+  }, [appUrl]);
+
   return (
     <a
       href="/app"
-      onClick={e => {
-        e.preventDefault();
-        track("To App conversion", { button: "Landing Hero" });
-        window.location.assign(appUrl);
-      }}
+      onClick={handleClick}
       className="bg-primary text-primary-content group relative flex h-16 items-center justify-center overflow-hidden px-10 text-[11px] font-black uppercase tracking-[0.3em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] md:h-20 md:px-14 md:text-xs"
     >
       <div className="relative z-10 flex items-center gap-4">
@@ -134,44 +234,45 @@ const duplicatedSupportedProtocols = [...supportedProtocols, ...supportedProtoco
 const duplicatedIntegrations = [...integrations, ...integrations];
 
 // Marquee row component
-const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; logo: string }[]; label: string; reverse?: boolean }) => (
-  <div className="flex w-full items-center gap-4">
-    <span className="text-base-content/30 w-20 flex-shrink-0 text-right text-[10px] uppercase tracking-wider">{label}</span>
-    <div className="relative flex-1 overflow-hidden">
-      <motion.div
-        className="flex gap-6"
-        animate={{ x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] }}
-        transition={{
-          x: {
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear",
-          },
-        }}
-      >
-        {items.map((item, index) => (
-          <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
-            <div className="relative size-5">
-              <Image src={item.logo} alt={item.name} fill className="object-contain" />
+const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; logo: string }[]; label: string; reverse?: boolean }) => {
+  const animate = useMemo(() =>
+    ({ x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] as [string, string] }),
+    [reverse]
+  );
+
+  return (
+    <div className="flex w-full items-center gap-4">
+      <span className="text-base-content/30 w-20 flex-shrink-0 text-right text-[10px] uppercase tracking-wider">{label}</span>
+      <div className="relative flex-1 overflow-hidden">
+        <motion.div
+          className="flex gap-6"
+          animate={animate}
+          transition={MARQUEE_ROW_TRANSITION}
+        >
+          {items.map((item, index) => (
+            <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
+              <div className="relative size-5">
+                <Image src={item.logo} alt={item.name} fill className="object-contain" />
+              </div>
+              <span className="text-base-content/40 text-xs">{item.name}</span>
             </div>
-            <span className="text-base-content/40 text-xs">{item.name}</span>
-          </div>
-        ))}
-      </motion.div>
-      {/* Fade edges */}
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
+          ))}
+        </motion.div>
+        {/* Fade edges */}
+        <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
+        <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const FeatureList = () => {
-  const features = [
+  const features = useMemo(() => [
     { icon: ShieldCheckIcon, title: "Non-Custodial", desc: "Your assets stay yours. Verify on any protocol's frontend." },
     { icon: BoltIcon, title: "Atomic Transactions", desc: "All operations execute in a single transaction using flash loans." },
     { icon: CurrencyDollarIcon, title: "Zero Protocol Fees", desc: "You only pay network gas and swap fees. No Kapan fees." },
     { icon: SparklesIcon, title: "Any Gas Token", desc: "Pay gas in any token with AVNU Paymaster integration." },
-  ];
+  ], []);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-10 px-4">
@@ -201,49 +302,78 @@ const FeatureList = () => {
 };
 
 // Neon letter flicker - each letter flickers on individually
-const NeonLetter = ({ letter, delay, animate }: { letter: string; delay: number; animate: boolean }) => (
-  <motion.span
-    className="inline-block"
-    initial={{ opacity: 0 }}
-    animate={animate ? { 
-      opacity: [0, 0, 0.8, 0, 0.6, 0.1, 0.9, 0.2, 1, 0.7, 1],
-    } : { opacity: 0 }}
-    transition={{ 
-      delay,
-      duration: 0.8,
-      times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
-      ease: "linear" as const,
-    }}
-  >
-    {letter}
-  </motion.span>
-);
+const NeonLetter = ({ letter, delay, animate }: { letter: string; delay: number; animate: boolean }) => {
+  const animateValue = useMemo(() =>
+    animate ? NEON_LETTER_ANIMATE : NEON_LETTER_ANIMATE_INACTIVE,
+    [animate]
+  );
+
+  const transition = useMemo(() => ({
+    delay,
+    duration: 0.8,
+    times: NEON_LETTER_TIMES,
+    ease: "linear" as const,
+  }), [delay]);
+
+  return (
+    <motion.span
+      className="inline-block"
+      initial={NEON_LETTER_INITIAL}
+      animate={animateValue}
+      transition={transition}
+    >
+      {letter}
+    </motion.span>
+  );
+};
 
 // Final CTA section with Fallout neon sign effect
 const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
-  const letters = "KAPAN".split("");
-  
+  const letters = useMemo(() => "KAPAN".split(""), []);
+
+  const logoAnimate = useMemo(() =>
+    isActive ? LOGO_ANIMATE : LOGO_ANIMATE_INACTIVE,
+    [isActive]
+  );
+
+  const logoTransition = useMemo(() => ({
+    delay: 0.3,
+    duration: 1.2,
+    times: LOGO_TRANSITION_TIMES,
+    ease: "linear" as const,
+  }), []);
+
+  const buttonAnimate = useMemo(() =>
+    isActive ? BUTTON_FLICKER_ANIMATE : BUTTON_FLICKER_ANIMATE_INACTIVE,
+    [isActive]
+  );
+
+  const buttonTransition = useMemo(() => ({
+    delay: 3.0,
+    duration: 1.0,
+    times: BUTTON_FLICKER_TIMES,
+    ease: "linear" as const,
+  }), []);
+
+  const linksAnimate = useMemo(() =>
+    isActive ? LINKS_ANIMATE_ACTIVE : LINKS_ANIMATE_INACTIVE,
+    [isActive]
+  );
+
   return (
     <div className="flex flex-col items-center gap-10 px-4 text-center">
       {/* Logo + KAPAN text - Fallout sign style */}
       <div className="flex flex-col items-center gap-4">
         {/* Logo flickers first */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={isActive ? { 
-            opacity: [0, 0, 0.7, 0, 0, 0.5, 0.1, 0.8, 0, 0.9, 0.3, 1, 0.8, 1],
-          } : { opacity: 0 }}
-          transition={{ 
-            delay: 0.3,
-            duration: 1.2,
-            times: [0, 0.05, 0.1, 0.18, 0.28, 0.35, 0.4, 0.5, 0.58, 0.68, 0.78, 0.88, 0.94, 1],
-            ease: "linear" as const,
-          }}
+          initial={LOGO_INITIAL}
+          animate={logoAnimate}
+          transition={logoTransition}
           className="relative size-16 md:size-20"
         >
           <Image src="/seal-logo.png" alt="Kapan" fill className="object-contain" />
         </motion.div>
-        
+
         {/* Letters flicker on one by one */}
         <div className="text-4xl font-black uppercase tracking-[0.3em] md:text-5xl">
           {letters.map((letter, i) => (
@@ -254,26 +384,19 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
 
       {/* Button flickers on after letters - big dramatic flicker */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={isActive ? { 
-          opacity: [0, 0, 1, 0, 0.8, 0, 1, 0.3, 1, 0.6, 1, 1],
-        } : { opacity: 0 }}
-        transition={{ 
-          delay: 3.0,
-          duration: 1.0,
-          times: [0, 0.1, 0.15, 0.22, 0.3, 0.38, 0.5, 0.6, 0.72, 0.82, 0.92, 1],
-          ease: "linear" as const,
-        }}
+        initial={BUTTON_FLICKER_INITIAL}
+        animate={buttonAnimate}
+        transition={buttonTransition}
       >
         <LaunchAppButton />
       </motion.div>
-      
+
       {/* Links slide up and fade in after button */}
-      <motion.div 
+      <motion.div
         className="flex flex-col items-center gap-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={isActive ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-        transition={{ delay: 4.2, duration: 0.6, ease: "easeOut" }}
+        initial={LINKS_INITIAL}
+        animate={linksAnimate}
+        transition={LINKS_TRANSITION}
       >
         <div className="text-base-content/30 flex items-center gap-6 text-xs">
           <a href="https://discord.gg/Vjk6NhkxGv" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Discord</a>
@@ -281,10 +404,10 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
           <a href="https://x.com/KapanFinance" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Twitter</a>
           <a href="https://github.com/StefanIliev545/kapan" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">GitHub</a>
         </div>
-        <a 
-          href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf" 
-          target="_blank" 
-          rel="noopener noreferrer" 
+        <a
+          href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
           className="text-base-content/20 hover:text-base-content/40 text-[10px] uppercase tracking-wider transition-colors"
         >
           Starknet Audit by Codespect
@@ -296,65 +419,114 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
 
 // How it Works section - Kapan as orchestrator visualization
 const HowItWorks = () => {
-  // Protocols positioned around Kapan - using consistent percentage-based positioning
-  // Angles: 0=top, 45=top-right, 90=right, 135=bottom-right, 180=bottom, 225=bottom-left, 270=left, 315=top-left
-  const connectedProtocols = [
-    { name: "Aave", logo: "/logos/aave.svg", angle: 0 },
-    { name: "Morpho", logo: "/logos/morpho.svg", angle: 45 },
-    { name: "Compound", logo: "/logos/compound.svg", angle: 90 },
-    { name: "1inch", logo: "/logos/1inch.png", angle: 135 },
-    { name: "Pendle", logo: "/logos/pendle.png", angle: 180 },
-    { name: "Venus", logo: "/logos/venus.svg", angle: 225 },
-    { name: "ZeroLend", logo: "/logos/zerolend.svg", angle: 270 },
-    { name: "Nostra", logo: "/logos/nostra.svg", angle: 315 },
-  ];
-
-  // Instructions that travel to specific protocols
-  // deposit->Aave(0), borrow->Morpho(45), swap->1inch(135), swap PT->Pendle(180), repay->Venus(225), move->Nostra(315)
-  const travelingInstructions = [
-    { instruction: "deposit", angle: 0, delay: 0, color: "bg-success/20 text-success border-success/30" },
-    { instruction: "borrow", angle: 45, delay: 1.5, color: "bg-error/20 text-error border-error/30" },
-    { instruction: "swap", angle: 135, delay: 3, color: "bg-primary/20 text-primary border-primary/30" },
-    { instruction: "swap PT", angle: 180, delay: 4.5, color: "bg-warning/20 text-warning border-warning/30" },
-    { instruction: "repay", angle: 225, delay: 6, color: "bg-info/20 text-info border-info/30" },
-    { instruction: "move", angle: 315, delay: 7.5, color: "bg-secondary/20 text-secondary border-secondary/30" },
-  ];
-
   // Shared radius values - X is larger since container is wider than tall
   const radiusX = 42; // percentage from center horizontally
   const radiusY = 38; // percentage from center vertically
-  
+
   // Helper to calculate position from angle
-  const getPosition = (angle: number, radius = 1) => {
+  const getPosition = useCallback((angle: number, radius = 1) => {
     const radians = ((angle - 90) * Math.PI) / 180;
     return {
       x: 50 + Math.cos(radians) * radiusX * radius,
       y: 50 + Math.sin(radians) * radiusY * radius,
     };
-  };
+  }, []);
+
+  // Pre-compute all protocol data with positions, styles, and transitions
+  const protocolData = useMemo(() => {
+    const protocols = [
+      { name: "Aave", logo: "/logos/aave.svg", angle: 0 },
+      { name: "Morpho", logo: "/logos/morpho.svg", angle: 45 },
+      { name: "Compound", logo: "/logos/compound.svg", angle: 90 },
+      { name: "1inch", logo: "/logos/1inch.png", angle: 135 },
+      { name: "Pendle", logo: "/logos/pendle.png", angle: 180 },
+      { name: "Venus", logo: "/logos/venus.svg", angle: 225 },
+      { name: "ZeroLend", logo: "/logos/zerolend.svg", angle: 270 },
+      { name: "Nostra", logo: "/logos/nostra.svg", angle: 315 },
+    ];
+
+    return protocols.map((protocol, i) => {
+      const pos = getPosition(protocol.angle);
+      return {
+        ...protocol,
+        pos,
+        style: { left: `${pos.x}%`, top: `${pos.y}%` },
+        mobileTransition: { delay: 0.2 + i * 0.05 },
+        lineTransition: { delay: i * 0.1, duration: 0.5 },
+        desktopTransition: { delay: 0.3 + i * 0.08, duration: 0.4 },
+      };
+    });
+  }, [getPosition]);
+
+  // Pre-compute all traveling instruction animation data
+  const instructionAnimations = useMemo(() => {
+    const instructions = [
+      { instruction: "deposit", angle: 0, delay: 0, color: "bg-success/20 text-success border-success/30" },
+      { instruction: "borrow", angle: 45, delay: 1.5, color: "bg-error/20 text-error border-error/30" },
+      { instruction: "swap", angle: 135, delay: 3, color: "bg-primary/20 text-primary border-primary/30" },
+      { instruction: "swap PT", angle: 180, delay: 4.5, color: "bg-warning/20 text-warning border-warning/30" },
+      { instruction: "repay", angle: 225, delay: 6, color: "bg-info/20 text-info border-info/30" },
+      { instruction: "move", angle: 315, delay: 7.5, color: "bg-secondary/20 text-secondary border-secondary/30" },
+    ];
+
+    return instructions.map((item) => {
+      const endPos = getPosition(item.angle, 0.65);
+      return {
+        ...item,
+        outboundInitial: { left: "50%", top: "50%", opacity: 0 },
+        outboundAnimate: {
+          left: ["50%", "50%", `${endPos.x}%`, `${endPos.x}%`],
+          top: ["50%", "50%", `${endPos.y}%`, `${endPos.y}%`],
+          opacity: [0, 1, 1, 0],
+        },
+        outboundTransition: {
+          delay: item.delay,
+          duration: 2.5,
+          repeat: Infinity,
+          repeatDelay: 3.5,
+          times: [0, 0.1, 0.7, 1],
+          ease: "easeInOut" as const,
+        },
+        returnInitial: { left: `${endPos.x}%`, top: `${endPos.y}%`, opacity: 0 },
+        returnAnimate: {
+          left: [`${endPos.x}%`, `${endPos.x}%`, "50%", "50%"],
+          top: [`${endPos.y}%`, `${endPos.y}%`, "50%", "50%"],
+          opacity: [0, 1, 1, 0],
+        },
+        returnTransition: {
+          delay: item.delay + 2.8,
+          duration: 2.5,
+          repeat: Infinity,
+          repeatDelay: 3.5,
+          times: [0, 0.1, 0.7, 1],
+          ease: "easeInOut" as const,
+        },
+      };
+    });
+  }, [getPosition]);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 px-4">
       {/* Mobile: Just Kapan logo centered */}
       <div className="flex flex-col items-center gap-6 md:hidden">
         <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", bounce: 0.4, duration: 0.8 }}
+          initial={SPRING_SCALE_INITIAL}
+          animate={SPRING_SCALE_ANIMATE}
+          transition={SPRING_SCALE_TRANSITION}
         >
           <div className="bg-base-200/80 border-base-content/20 flex size-20 items-center justify-center rounded-2xl border shadow-lg">
             <Image src="/seal-logo.png" alt="Kapan" width={48} height={48} />
           </div>
         </motion.div>
-        
+
         {/* Protocol logos in a row */}
         <div className="flex max-w-xs flex-wrap items-center justify-center gap-3">
-          {connectedProtocols.map((protocol, i) => (
+          {protocolData.map((protocol) => (
             <motion.div
               key={protocol.name}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 + i * 0.05 }}
+              initial={FADE_UP_INITIAL}
+              animate={FADE_UP_ANIMATE}
+              transition={protocol.mobileTransition}
             >
               <div className="bg-base-200/60 border-base-content/10 flex size-8 items-center justify-center rounded-lg border">
                 <Image src={protocol.logo} alt={protocol.name} width={18} height={18} />
@@ -369,86 +541,58 @@ const HowItWorks = () => {
         <div className="relative h-[350px] w-full max-w-2xl">
           {/* Connection lines using same percentage system */}
           <svg className="absolute inset-0 size-full overflow-visible">
-            {connectedProtocols.map((protocol, i) => {
-              const pos = getPosition(protocol.angle);
-              return (
-                <motion.line
-                  key={i}
-                  x1="50%"
-                  y1="50%"
-                  x2={`${pos.x}%`}
-                  y2={`${pos.y}%`}
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  className="text-base-content/10"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ delay: i * 0.1, duration: 0.5 }}
-                />
-              );
-            })}
+            {protocolData.map((protocol, i) => (
+              <motion.line
+                key={i}
+                x1="50%"
+                y1="50%"
+                x2={`${protocol.pos.x}%`}
+                y2={`${protocol.pos.y}%`}
+                stroke="currentColor"
+                strokeWidth="1"
+                className="text-base-content/10"
+                initial={LINE_INITIAL}
+                animate={LINE_ANIMATE}
+                transition={protocol.lineTransition}
+              />
+            ))}
           </svg>
 
           {/* Traveling instructions */}
-          {travelingInstructions.map((item, i) => {
-            const endPos = getPosition(item.angle, 0.65); // Stop at 65% of the way
-            return (
-              <React.Fragment key={i}>
-                {/* Outbound: instruction travels TO protocol */}
-                <motion.div
-                  className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-                  initial={{ left: "50%", top: "50%", opacity: 0 }}
-                  animate={{ 
-                    left: ["50%", "50%", `${endPos.x}%`, `${endPos.x}%`],
-                    top: ["50%", "50%", `${endPos.y}%`, `${endPos.y}%`],
-                    opacity: [0, 1, 1, 0],
-                  }}
-                  transition={{ 
-                    delay: item.delay,
-                    duration: 2.5,
-                    repeat: Infinity,
-                    repeatDelay: 3.5,
-                    times: [0, 0.1, 0.7, 1],
-                    ease: "easeInOut",
-                  }}
-                >
-                  <span className={`rounded border px-2 py-0.5 font-mono text-[10px] font-medium ${item.color} whitespace-nowrap`}>
-                    {item.instruction}
-                  </span>
-                </motion.div>
-                
-                {/* Return: UTXO travels back FROM protocol */}
-                <motion.div
-                  className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-                  initial={{ left: `${endPos.x}%`, top: `${endPos.y}%`, opacity: 0 }}
-                  animate={{ 
-                    left: [`${endPos.x}%`, `${endPos.x}%`, "50%", "50%"],
-                    top: [`${endPos.y}%`, `${endPos.y}%`, "50%", "50%"],
-                    opacity: [0, 1, 1, 0],
-                  }}
-                  transition={{ 
-                    delay: item.delay + 2.8,
-                    duration: 2.5,
-                    repeat: Infinity,
-                    repeatDelay: 3.5,
-                    times: [0, 0.1, 0.7, 1],
-                    ease: "easeInOut",
-                  }}
-                >
-                  <span className="bg-base-content/10 text-base-content/60 border-base-content/20 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] font-medium">
-                    UTXO
-                  </span>
-                </motion.div>
-              </React.Fragment>
-            );
-          })}
+          {instructionAnimations.map((item, i) => (
+            <React.Fragment key={i}>
+              {/* Outbound: instruction travels TO protocol */}
+              <motion.div
+                className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                initial={item.outboundInitial}
+                animate={item.outboundAnimate}
+                transition={item.outboundTransition}
+              >
+                <span className={`rounded border px-2 py-0.5 font-mono text-[10px] font-medium ${item.color} whitespace-nowrap`}>
+                  {item.instruction}
+                </span>
+              </motion.div>
+
+              {/* Return: UTXO travels back FROM protocol */}
+              <motion.div
+                className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                initial={item.returnInitial}
+                animate={item.returnAnimate}
+                transition={item.returnTransition}
+              >
+                <span className="bg-base-content/10 text-base-content/60 border-base-content/20 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] font-medium">
+                  UTXO
+                </span>
+              </motion.div>
+            </React.Fragment>
+          ))}
 
           {/* Center - Kapan Router */}
-          <motion.div 
+          <motion.div
             className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", bounce: 0.4, duration: 0.8 }}
+            initial={SPRING_SCALE_INITIAL}
+            animate={SPRING_SCALE_ANIMATE}
+            transition={SPRING_SCALE_TRANSITION}
           >
             <div className="bg-base-100 border-base-content/20 flex items-center gap-2 rounded-lg border px-4 py-2 shadow-lg">
               <Image src="/seal-logo.png" alt="Kapan" width={24} height={24} />
@@ -457,56 +601,53 @@ const HowItWorks = () => {
           </motion.div>
 
           {/* Surrounding protocols */}
-          {connectedProtocols.map((protocol, i) => {
-            const pos = getPosition(protocol.angle);
-            return (
-              <motion.div
-                key={protocol.name}
-                className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 + i * 0.08, duration: 0.4 }}
-              >
-                <div className="flex flex-col items-center gap-1">
-                  <div className="bg-base-100 border-base-content/10 flex size-12 items-center justify-center rounded-xl border shadow-md">
-                    <Image src={protocol.logo} alt={protocol.name} width={28} height={28} />
-                  </div>
-                  <span className="text-base-content/40 text-[10px] font-medium">{protocol.name}</span>
+          {protocolData.map((protocol) => (
+            <motion.div
+              key={protocol.name}
+              className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
+              style={protocol.style}
+              initial={FADE_UP_INITIAL}
+              animate={FADE_UP_ANIMATE}
+              transition={protocol.desktopTransition}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <div className="bg-base-100 border-base-content/10 flex size-12 items-center justify-center rounded-xl border shadow-md">
+                  <Image src={protocol.logo} alt={protocol.name} width={28} height={28} />
                 </div>
-              </motion.div>
-            );
-          })}
+                <span className="text-base-content/40 text-[10px] font-medium">{protocol.name}</span>
+              </div>
+            </motion.div>
+          ))}
         </div>
       </div>
 
       {/* Explanation text */}
       <div className="flex flex-col items-center justify-center gap-8 text-center md:flex-row md:gap-16">
-        <motion.div 
+        <motion.div
           className="max-w-[200px]"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
+          initial={STEP_01_INITIAL}
+          animate={STEP_01_ANIMATE}
+          transition={STEP_01_TRANSITION}
         >
           <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">01</div>
           <div className="mb-1 text-sm font-medium">Bundle Instructions</div>
           <div className="text-base-content/40 text-xs">Combine deposit, borrow, swap, and repay into one bundle.</div>
         </motion.div>
-        <motion.div 
+        <motion.div
           className="max-w-[200px]"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.95 }}
+          initial={STEP_01_INITIAL}
+          animate={STEP_01_ANIMATE}
+          transition={STEP_02_TRANSITION}
         >
           <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">02</div>
           <div className="mb-1 text-sm font-medium">Flash Loan Powered</div>
           <div className="text-base-content/40 text-xs">No upfront capital needed. Borrow, execute, repay atomically.</div>
         </motion.div>
-        <motion.div 
+        <motion.div
           className="max-w-[200px]"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1 }}
+          initial={STEP_01_INITIAL}
+          animate={STEP_01_ANIMATE}
+          transition={STEP_03_TRANSITION}
         >
           <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">03</div>
           <div className="mb-1 text-sm font-medium">All or Nothing</div>
@@ -517,20 +658,6 @@ const HowItWorks = () => {
   );
 };
 
-// Wrapper to add fade effect to real components
-const FadedPreview = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <div className={`relative mx-auto w-full max-w-6xl px-4 ${className}`}>
-    <div className="pointer-events-none">
-      {children}
-    </div>
-    {/* Fade overlay on bottom */}
-    <div className="from-base-100 pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t to-transparent" />
-    {/* Fade overlay on sides */}
-    <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
-    <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
-  </div>
-);
-
 // Tooltip wrapper using Radix UI for professional look
 const MockTooltip = ({ children, tip }: { children: React.ReactNode; tip: string }) => (
   <Tooltip content={tip} delayDuration={100}>
@@ -538,13 +665,31 @@ const MockTooltip = ({ children, tip }: { children: React.ReactNode; tip: string
   </Tooltip>
 );
 
+// Icon components for MockActionButton
+type MockActionIconType = "plus" | "minus" | "arrow-right" | "x-mark";
+
+const MockActionIcon = ({ type }: { type: MockActionIconType }) => {
+  switch (type) {
+    case "plus":
+      return <PlusIcon className="size-3.5" />;
+    case "minus":
+      return <MinusIcon className="size-3.5" />;
+    case "arrow-right":
+      return <ArrowRightIcon className="size-3.5" />;
+    case "x-mark":
+      return <XMarkIcon className="size-3.5" />;
+    default:
+      return null;
+  }
+};
+
 // Mock action button matching real SegmentedActionBar style
-const MockActionButton = ({ icon, label, tip }: { icon: React.ReactNode; label: string; tip: string }) => (
+const MockActionButton = ({ iconType, label, tip }: { iconType: MockActionIconType; label: string; tip: string }) => (
   <Tooltip content={tip} delayDuration={100}>
-    <button 
+    <button
       className="text-base-content/50 hover:text-base-content/70 hover:bg-base-content/5 flex flex-1 cursor-help items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors"
     >
-      {icon}
+      <MockActionIcon type={iconType} />
       <span>{label}</span>
     </button>
   </Tooltip>
@@ -810,9 +955,9 @@ const MockMorphoView = () => (
                 </div>
               </div>
               <div className="divide-base-300/30 flex items-stretch divide-x">
-                <MockActionButton icon={<PlusIcon className="size-3.5" />} label="Deposit" tip="Add more collateral to reduce liquidation risk" />
-                <MockActionButton icon={<MinusIcon className="size-3.5" />} label="Withdraw" tip="Remove collateral from your position" />
-                <MockActionButton icon={<ArrowRightIcon className="size-3.5" />} label="Move" tip="Move collateral to another protocol" />
+                <MockActionButton iconType="plus" label="Deposit" tip="Add more collateral to reduce liquidation risk" />
+                <MockActionButton iconType="minus" label="Withdraw" tip="Remove collateral from your position" />
+                <MockActionButton iconType="arrow-right" label="Move" tip="Move collateral to another protocol" />
               </div>
             </div>
 
@@ -863,10 +1008,10 @@ const MockMorphoView = () => (
                 </div>
               </div>
               <div className="divide-base-300/30 flex items-stretch divide-x">
-                <MockActionButton icon={<MinusIcon className="size-3.5" />} label="Repay" tip="Pay back debt to reduce interest costs" />
-                <MockActionButton icon={<PlusIcon className="size-3.5" />} label="Borrow" tip="Borrow more against your collateral" />
-                <MockActionButton icon={<ArrowRightIcon className="size-3.5" />} label="Move" tip="Move debt to another protocol" />
-                <MockActionButton icon={<XMarkIcon className="size-3.5" />} label="Close" tip="Close entire position" />
+                <MockActionButton iconType="minus" label="Repay" tip="Pay back debt to reduce interest costs" />
+                <MockActionButton iconType="plus" label="Borrow" tip="Borrow more against your collateral" />
+                <MockActionButton iconType="arrow-right" label="Move" tip="Move debt to another protocol" />
+                <MockActionButton iconType="x-mark" label="Close" tip="Close entire position" />
               </div>
             </div>
           </div>
@@ -953,64 +1098,83 @@ const DashboardPreview = () => (
 );
 
 // Animated flow component - shows the transaction being built
-const FlowStep = ({ 
-  children, 
+const FlowStep = ({
+  children,
   delay = 0,
-  isActive = true 
-}: { 
-  children: React.ReactNode; 
+  isActive = true
+}: {
+  children: React.ReactNode;
   delay?: number;
   isActive?: boolean;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={isActive ? { opacity: 1, y: 0 } : { opacity: 0.3, y: 0 }}
-    transition={{ delay, duration: 0.4, ease: "easeOut" }}
-    className="flex-shrink-0"
-  >
-    {children}
-  </motion.div>
-);
+}) => {
+  const animate = useMemo(() =>
+    isActive ? FLOW_STEP_ANIMATE_ACTIVE : FLOW_STEP_ANIMATE_INACTIVE,
+    [isActive]
+  );
+
+  const transition = useMemo(() =>
+    ({ delay, duration: 0.4, ease: "easeOut" as const }),
+    [delay]
+  );
+
+  return (
+    <motion.div
+      initial={FLOW_STEP_INITIAL}
+      animate={animate}
+      transition={transition}
+      className="flex-shrink-0"
+    >
+      {children}
+    </motion.div>
+  );
+};
 
 // Horizontal flow step for desktop
-const HFlowStep = ({ 
-  children, 
+const HFlowStep = ({
+  children,
   delay = 0,
-}: { 
-  children: React.ReactNode; 
+}: {
+  children: React.ReactNode;
   delay?: number;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, x: -10 }}
-    animate={{ opacity: 1, x: 0 }}
-    transition={{ delay, duration: 0.4, ease: "easeOut" }}
-    className="flex-shrink-0"
-  >
-    {children}
-  </motion.div>
-);
+}) => {
+  const transition = useMemo(() =>
+    ({ delay, duration: 0.4, ease: "easeOut" as const }),
+    [delay]
+  );
+
+  return (
+    <motion.div
+      initial={HFLOW_STEP_INITIAL}
+      animate={HFLOW_STEP_ANIMATE}
+      transition={transition}
+      className="flex-shrink-0"
+    >
+      {children}
+    </motion.div>
+  );
+};
 
 // Token display - minimal, elegant
-const TokenDisplay = ({ 
-  logo, 
-  symbol, 
-  amount, 
+const TokenDisplay = ({
+  logo,
+  symbol,
+  amount,
   label,
   variant = "default",
   size = "md"
-}: { 
-  logo: string; 
-  symbol: string; 
+}: {
+  logo: string;
+  symbol: string;
   amount?: string;
   label?: string;
   variant?: "default" | "success" | "error";
   size?: "sm" | "md" | "lg";
 }) => {
-  const sizes = {
+  const sizes = useMemo(() => ({
     sm: { img: 24, amount: "text-base", symbol: "text-xs" },
     md: { img: 32, amount: "text-lg", symbol: "text-sm" },
     lg: { img: 40, amount: "text-xl", symbol: "text-base" },
-  };
+  }), []);
   const s = sizes[size];
   return (
     <div className="flex items-center gap-3">
@@ -1019,8 +1183,8 @@ const TokenDisplay = ({
         {label && <div className="text-base-content/30 text-[10px] uppercase tracking-wider">{label}</div>}
         <div className="flex items-baseline gap-2">
           <span className={`font-mono ${s.amount} ${
-            variant === "success" ? "text-success" : 
-            variant === "error" ? "text-error" : 
+            variant === "success" ? "text-success" :
+            variant === "error" ? "text-error" :
             "text-base-content"
           }`}>
             {amount}
@@ -1034,11 +1198,11 @@ const TokenDisplay = ({
 
 // Protocol badge - clean, minimal
 const ProtocolBadge = ({ logo, name, size = "md" }: { logo: string; name: string; size?: "sm" | "md" | "lg" }) => {
-  const sizes = {
+  const sizes = useMemo(() => ({
     sm: { img: 20, text: "text-xs" },
     md: { img: 28, text: "text-sm" },
     lg: { img: 36, text: "text-base" },
-  };
+  }), []);
   const s = sizes[size];
   return (
     <div className="flex items-center gap-2">
@@ -1049,14 +1213,14 @@ const ProtocolBadge = ({ logo, name, size = "md" }: { logo: string; name: string
 };
 
 // Rate comparison - dramatic
-const RateDisplay = ({ 
-  oldRate, 
-  newRate, 
+const RateDisplay = ({
+  oldRate,
+  newRate,
   label = "APR",
   size = "lg"
-}: { 
-  oldRate?: string; 
-  newRate: string; 
+}: {
+  oldRate?: string;
+  newRate: string;
   label?: string;
   size?: "md" | "lg";
 }) => (
@@ -1070,28 +1234,36 @@ const RateDisplay = ({
 );
 
 // Animated arrow for horizontal flow
-const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?: boolean }) => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ delay, duration: 0.3 }}
-    className={`flex items-center justify-center ${vertical ? "py-2" : "px-4"}`}
-  >
+const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?: boolean }) => {
+  const transition = useMemo(() => ({ delay, duration: 0.3 }), [delay]);
+  const arrowAnimate = useMemo(() =>
+    vertical ? FLOW_ARROW_VERTICAL : FLOW_ARROW_HORIZONTAL,
+    [vertical]
+  );
+
+  return (
     <motion.div
-      animate={vertical ? { y: [0, 3, 0] } : { x: [0, 3, 0] }}
-      transition={{ duration: 1.2, repeat: Infinity }}
+      initial={FLOW_ARROW_INITIAL}
+      animate={FLOW_ARROW_ANIMATE}
+      transition={transition}
+      className={`flex items-center justify-center ${vertical ? "py-2" : "px-4"}`}
     >
-      <ArrowRightIcon className={`text-base-content/20 size-5${vertical ? "rotate-90" : ""}`} />
+      <motion.div
+        animate={arrowAnimate}
+        transition={FLOW_ARROW_TRANSITION}
+      >
+        <ArrowRightIcon className={`text-base-content/20 size-5${vertical ? "rotate-90" : ""}`} />
+      </motion.div>
     </motion.div>
-  </motion.div>
-);
+  );
+};
 
 // Action content wrapper - horizontal on desktop, vertical on mobile
 const ActionContent = ({ children, description }: { children: React.ReactNode; description: string }) => (
   <div className="mx-auto w-full max-w-4xl">
-    <motion.p 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+    <motion.p
+      initial={ACTION_CONTENT_INITIAL}
+      animate={ACTION_CONTENT_ANIMATE}
       className="text-base-content/40 mb-8 text-center text-sm sm:mb-10 sm:text-base"
     >
       {description}
@@ -1227,7 +1399,7 @@ const SwapCard = () => (
       </HFlowStep>
       <HFlowStep delay={0.15}>
         <div className="flex flex-col items-center px-8">
-          <motion.div animate={{ x: [0, 4, 0] }} transition={{ duration: 1.2, repeat: Infinity }}>
+          <motion.div animate={SWAP_ARROW_ANIMATE} transition={SWAP_ARROW_TRANSITION}>
             <ArrowRightIcon className="text-primary size-6" />
           </motion.div>
           <span className="text-base-content/20 mt-1 text-[9px] uppercase tracking-widest">swap</span>
@@ -1443,10 +1615,10 @@ const RefinanceCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.2}>
-        <motion.div 
+        <motion.div
           className="px-4"
-          animate={{ x: [0, 4, 0] }} 
-          transition={{ duration: 1.2, repeat: Infinity }}
+          animate={SWAP_ARROW_ANIMATE}
+          transition={SWAP_ARROW_TRANSITION}
         >
           <ArrowRightIcon className="text-primary size-6" />
         </motion.div>
@@ -1479,8 +1651,13 @@ const actionTabs = [
 const ActionTabs = () => {
   const [activeTab, setActiveTab] = useState("lend");
 
+  // Create stable callbacks for each tab
+  const handleTabClick = useCallback((tabId: string) => {
+    setActiveTab(tabId);
+  }, []);
+
   // Render card based on active tab
-  const renderCard = () => {
+  const renderCard = useCallback(() => {
     switch (activeTab) {
       case "lend": return <LendCard />;
       case "borrow": return <BorrowCard />;
@@ -1490,7 +1667,7 @@ const ActionTabs = () => {
       case "pendle": return <PendleCard />;
       default: return <LendCard />;
     }
-  };
+  }, [activeTab]);
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4">
@@ -1498,25 +1675,12 @@ const ActionTabs = () => {
       <div className="mb-8 flex items-center justify-center">
         <div className="border-base-content/10 inline-flex items-center gap-0 border-b">
           {actionTabs.map((tab) => (
-            <button
+            <TabButton
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                relative p-3 text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors sm:px-5 sm:text-xs
-                ${activeTab === tab.id 
-                  ? "text-base-content" 
-                  : "text-base-content/30 hover:text-base-content/60"}
-              `}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <motion.div
-                  layoutId="action-underline"
-                  className="bg-base-content absolute inset-x-0 bottom-0 h-[2px]"
-                  transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                />
-              )}
-            </button>
+              tab={tab}
+              isActive={activeTab === tab.id}
+              onClick={handleTabClick}
+            />
           ))}
         </div>
       </div>
@@ -1526,10 +1690,10 @@ const ActionTabs = () => {
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
+            initial={ACTION_TAB_CONTENT_INITIAL}
+            animate={ACTION_TAB_CONTENT_ANIMATE}
+            exit={ACTION_TAB_CONTENT_EXIT}
+            transition={ACTION_TAB_CONTENT_TRANSITION}
             className="w-full"
           >
             {renderCard()}
@@ -1540,22 +1704,64 @@ const ActionTabs = () => {
   );
 };
 
+// Separate tab button component for performance
+const TabButton = ({
+  tab,
+  isActive,
+  onClick
+}: {
+  tab: { id: string; label: string };
+  isActive: boolean;
+  onClick: (id: string) => void;
+}) => {
+  const handleClick = useCallback(() => {
+    onClick(tab.id);
+  }, [onClick, tab.id]);
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`
+        relative p-3 text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors sm:px-5 sm:text-xs
+        ${isActive
+          ? "text-base-content"
+          : "text-base-content/30 hover:text-base-content/60"}
+      `}
+    >
+      {tab.label}
+      {isActive && (
+        <motion.div
+          layoutId="action-underline"
+          className="bg-base-content absolute inset-x-0 bottom-0 h-[2px]"
+          transition={ACTION_TAB_UNDERLINE_TRANSITION}
+        />
+      )}
+    </button>
+  );
+};
+
+// Scroll hint opacity hook
+const useScrollHintOpacity = (smoothProgress: MotionValue<number>) => {
+  return useTransform(smoothProgress, [0, 0.1], [1, 0]);
+};
+
 export const StickyLanding = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { setCurrentSection, setTotalSections } = useLandingSection();
-  
+
   // Force kapan dark theme on landing page
   useKapanTheme();
 
   // Parallax grid effect - mouse tracking
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  
+
   // Smooth spring animation for mouse movement (inverse parallax)
-  const gridX = useSpring(mouseX, { stiffness: 50, damping: 20 });
-  const gridY = useSpring(mouseY, { stiffness: 50, damping: 20 });
-  
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const springConfig = useMemo(() => ({ stiffness: 50, damping: 20 }), []);
+  const gridX = useSpring(mouseX, springConfig);
+  const gridY = useSpring(mouseY, springConfig);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const { clientX, clientY } = e;
     const { innerWidth, innerHeight } = window;
     // Map mouse position to -40px to 40px range (inverse: subtract from center)
@@ -1563,9 +1769,9 @@ export const StickyLanding = () => {
     const yOffset = ((clientY / innerHeight) - 0.5) * -80;
     mouseX.set(xOffset);
     mouseY.set(yOffset);
-  };
+  }, [mouseX, mouseY]);
 
-  const sections: SectionData[] = [
+  const sections: SectionData[] = useMemo(() => [
     {
       tag: "00 / KAPAN",
       title: "ONE DASHBOARD.",
@@ -1607,48 +1813,61 @@ export const StickyLanding = () => {
       description: "Start optimizing your DeFi lending today.",
       content: <FinalCTA />,
     },
-  ];
+  ], []);
 
   const { scrollYProgress } = useScroll({ container: containerRef });
-  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
-  
+  const scrollSpringConfig = useMemo(() => ({ stiffness: 100, damping: 30 }), []);
+  const smoothProgress = useSpring(scrollYProgress, scrollSpringConfig);
+
   // Scroll-based parallax: grid shifts up as you scroll down
   const scrollGridY = useTransform(scrollYProgress, [0, 1], [0, -100]);
-  const smoothScrollGridY = useSpring(scrollGridY, { stiffness: 50, damping: 20 });
+  const smoothScrollGridY = useSpring(scrollGridY, springConfig);
 
   // Track current section for header CTA visibility
   useEffect(() => {
     setTotalSections(sections.length);
-    
+
     const unsubscribe = scrollYProgress.on("change", (progress) => {
       const sectionIndex = Math.round(progress * (sections.length - 1));
       setCurrentSection(sectionIndex);
     });
-    
+
     return () => unsubscribe();
   }, [scrollYProgress, sections.length, setCurrentSection, setTotalSections]);
 
+  const gridStyle = useMemo(() => ({
+    x: gridX,
+    y: smoothScrollGridY,
+  }), [gridX, smoothScrollGridY]);
+
+  const innerGridStyle = useMemo(() => ({ y: gridY }), [gridY]);
+
+  const scrollProgressStyle = useMemo(() => ({ height: "100%", scaleY: smoothProgress }), [smoothProgress]);
+
+  const containerHeight = useMemo(() => ({ height: `${sections.length * 100}vh` }), [sections.length]);
+
+  const scrollHintOpacity = useScrollHintOpacity(smoothProgress);
+
+  const scrollHintStyle = useMemo(() => ({ opacity: scrollHintOpacity }), [scrollHintOpacity]);
+
   return (
-    <div 
+    <div
       className="bg-base-100 text-base-content fixed inset-0 overflow-hidden"
       onMouseMove={handleMouseMove}
     >
       {/* Background grid with parallax effect */}
-      <motion.div 
+      <motion.div
         className="absolute inset-0"
-        style={{ 
-          x: gridX, 
-          y: smoothScrollGridY,
-        }}
+        style={gridStyle}
       >
         {/* eslint-disable tailwindcss/no-contradicting-classname -- bg-[linear-gradient] and bg-[size] are different CSS properties */}
         <motion.div
           className="absolute -inset-24 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem]"
-          style={{ y: gridY }}
+          style={innerGridStyle}
         />
         {/* eslint-enable tailwindcss/no-contradicting-classname */}
       </motion.div>
-      
+
       {/* Radial glow - fixed position, no parallax */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
 
@@ -1658,7 +1877,7 @@ export const StickyLanding = () => {
         className="hide-scrollbar relative z-10 size-full snap-y snap-mandatory overflow-y-auto scroll-smooth"
       >
         {/* Total height based on sections */}
-        <div style={{ height: `${sections.length * 100}vh` }} className="relative">
+        <div style={containerHeight} className="relative">
           {/* Snap targets */}
           <div className="pointer-events-none absolute inset-0 flex flex-col">
             {sections.map((_, i) => (
@@ -1672,7 +1891,7 @@ export const StickyLanding = () => {
             <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
               <motion.div
                 className="bg-base-content/40 w-full origin-top"
-                style={{ height: "100%", scaleY: smoothProgress }}
+                style={scrollProgressStyle}
               />
             </div>
 
@@ -1689,7 +1908,7 @@ export const StickyLanding = () => {
 
             {/* Scroll hint on first section */}
             <motion.div
-              style={{ opacity: useTransform(smoothProgress, [0, 0.1], [1, 0]) }}
+              style={scrollHintStyle}
               className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="landing-tag">Scroll to explore</span>

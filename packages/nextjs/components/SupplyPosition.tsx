@@ -1,4 +1,4 @@
-import { FC, ReactNode, useMemo } from "react";
+import { FC, ReactNode, useCallback, useMemo } from "react";
 import { PlusIcon, MinusIcon, ArrowPathIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import { ProtocolPosition } from "./ProtocolView";
 import { DepositModal } from "./modals/DepositModal";
@@ -16,6 +16,9 @@ type ExtraStat = {
   label: string;
   value: ReactNode;
 };
+
+// Module-level empty array to avoid recreating on each render
+const EMPTY_EXTRA_STATS: ExtraStat[] = [];
 
 export type SupplyPositionProps = ProtocolPosition & {
   protocolName: string;
@@ -84,7 +87,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   showInfoDropdown = false,
   extraActions,
   suppressDisabledMessage = false,
-  extraStats = [],
+  extraStats = EMPTY_EXTRA_STATS,
   showExpandIndicator = true,
   defaultExpanded = false,
 }) => {
@@ -109,6 +112,20 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
 
   // Normalized balance as bigint for modals
   const normalizedBalance = typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0);
+
+  // Memoize the token object for MoveSupplyModal to avoid inline object creation
+  const moveSupplyToken = useMemo(
+    () => ({
+      name,
+      icon,
+      address: tokenAddress,
+      currentRate,
+      rawBalance: normalizedBalance,
+      decimals: tokenDecimals,
+      price: tokenPrice,
+    }),
+    [name, icon, tokenAddress, currentRate, normalizedBalance, tokenDecimals, tokenPrice],
+  );
 
   // Use shared position state hook
   const { isWalletConnected, hasBalance, disabledMessage } = usePositionState({
@@ -135,92 +152,116 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const handleMoveClick = onMove ?? moveModal.open;
   const handleSwapClick = onSwap;
 
-  // Build actions array for SegmentedActionBar
-  const actions: SegmentedAction[] = [];
+  // Memoized event handlers to avoid inline functions in JSX
+  const handleStopPropagation = useCallback((e: React.MouseEvent) => e.stopPropagation(), []);
+  const handleQuickDepositClick = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      if (!actionsDisabled) {
+        handleDepositClick();
+      }
+    },
+    [actionsDisabled, handleDepositClick],
+  );
 
-  if (showDepositButton) {
-    actions.push({
-      key: "deposit",
-      label: "Deposit",
-      icon: <PlusIcon className="size-4" />,
-      onClick: handleDepositClick,
-      disabled: !isWalletConnected || actionsDisabled,
-      title: !isWalletConnected
-        ? "Connect wallet to deposit"
-        : actionsDisabled
-          ? disabledMessage
-          : "Deposit tokens",
-      variant: "ghost",
-    });
-  }
+  // Build actions array for SegmentedActionBar (memoized to avoid recreating on each render)
+  const actions = useMemo(() => {
+    const result: SegmentedAction[] = [];
 
-  if (showWithdrawButton) {
-    actions.push({
-      key: "withdraw",
-      label: "Withdraw",
-      icon: <MinusIcon className="size-4" />,
-      onClick: handleWithdrawClick,
-      disabled: !isWalletConnected || !hasBalance || actionsDisabled,
-      title: !isWalletConnected
-        ? "Connect wallet to withdraw"
-        : actionsDisabled
-          ? disabledMessage
-          : !hasBalance
-            ? "No balance to withdraw"
-            : "Withdraw tokens",
-      variant: "ghost",
-    });
-  }
+    if (showDepositButton) {
+      result.push({
+        key: "deposit",
+        label: "Deposit",
+        icon: <PlusIcon className="size-4" />,
+        onClick: handleDepositClick,
+        disabled: !isWalletConnected || actionsDisabled,
+        title: !isWalletConnected
+          ? "Connect wallet to deposit"
+          : actionsDisabled
+            ? disabledMessage
+            : "Deposit tokens",
+        variant: "ghost",
+      });
+    }
 
-  if (showMoveButton) {
-    actions.push({
-      key: "move",
-      label: "Move",
-      icon: <ArrowRightIcon className="size-4" />,
-      onClick: handleMoveClick,
-      disabled: !isWalletConnected || !hasBalance || actionsDisabled,
-      title: !isWalletConnected
-        ? "Connect wallet to move supply"
-        : actionsDisabled
-          ? disabledMessage
-          : !hasBalance
-            ? "No balance to move"
-            : "Move supply to another protocol",
-      variant: "ghost",
-      compactOnHover: true,
-    });
-  }
+    if (showWithdrawButton) {
+      result.push({
+        key: "withdraw",
+        label: "Withdraw",
+        icon: <MinusIcon className="size-4" />,
+        onClick: handleWithdrawClick,
+        disabled: !isWalletConnected || !hasBalance || actionsDisabled,
+        title: !isWalletConnected
+          ? "Connect wallet to withdraw"
+          : actionsDisabled
+            ? disabledMessage
+            : !hasBalance
+              ? "No balance to withdraw"
+              : "Withdraw tokens",
+        variant: "ghost",
+      });
+    }
 
-  if (showSwapButton) {
-    actions.push({
-      key: "swap",
-      label: "Swap",
-      icon: <ArrowPathIcon className="size-4" />,
-      onClick: handleSwapClick ?? (() => { return; }),
-      disabled: !isWalletConnected || actionsDisabled || !hasBalance,
-      title: !isWalletConnected
-        ? "Connect wallet to swap collateral"
-        : actionsDisabled
-          ? disabledMessage
-          : !hasBalance
-            ? "No collateral to swap"
-            : "Switch collateral token",
-      variant: "ghost",
-      compactOnHover: true,
-    });
-  }
+    if (showMoveButton) {
+      result.push({
+        key: "move",
+        label: "Move",
+        icon: <ArrowRightIcon className="size-4" />,
+        onClick: handleMoveClick,
+        disabled: !isWalletConnected || !hasBalance || actionsDisabled,
+        title: !isWalletConnected
+          ? "Connect wallet to move supply"
+          : actionsDisabled
+            ? disabledMessage
+            : !hasBalance
+              ? "No balance to move"
+              : "Move supply to another protocol",
+        variant: "ghost",
+        compactOnHover: true,
+      });
+    }
+
+    if (showSwapButton && handleSwapClick) {
+      result.push({
+        key: "swap",
+        label: "Swap",
+        icon: <ArrowPathIcon className="size-4" />,
+        onClick: handleSwapClick,
+        disabled: !isWalletConnected || actionsDisabled || !hasBalance,
+        title: !isWalletConnected
+          ? "Connect wallet to swap collateral"
+          : actionsDisabled
+            ? disabledMessage
+            : !hasBalance
+              ? "No collateral to swap"
+              : "Switch collateral token",
+        variant: "ghost",
+        compactOnHover: true,
+      });
+    }
+
+    return result;
+  }, [
+    showDepositButton,
+    showWithdrawButton,
+    showMoveButton,
+    showSwapButton,
+    handleDepositClick,
+    handleWithdrawClick,
+    handleMoveClick,
+    handleSwapClick,
+    isWalletConnected,
+    hasBalance,
+    actionsDisabled,
+    disabledMessage,
+  ]);
 
   // Quick deposit button rendered outside BasePosition
   const quickDepositButton = showQuickDepositButton ? (
-    <div className="mt-2" onClick={e => e.stopPropagation()}>
+    <div className="mt-2" onClick={handleStopPropagation}>
       <button
         className="border-base-300 text-primary hover:border-primary/70 hover:text-primary flex w-full items-center justify-center gap-2 rounded-md border border-dashed py-2 text-sm"
-        onClick={event => {
-          event.stopPropagation();
-          if (!actionsDisabled) {
-            handleDepositClick();
-          }
-        }}
+        onClick={handleQuickDepositClick}
         disabled={!isWalletConnected || actionsDisabled}
         title={
           !isWalletConnected
@@ -331,15 +372,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         <MoveSupplyModal
           isOpen={moveModal.isOpen}
           onClose={moveModal.close}
-          token={{
-            name,
-            icon,
-            address: tokenAddress,
-            currentRate,
-            rawBalance: normalizedBalance,
-            decimals: tokenDecimals,
-            price: tokenPrice,
-          }}
+          token={moveSupplyToken}
           fromProtocol={protocolName}
           chainId={chainId}
         />

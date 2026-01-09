@@ -7,6 +7,11 @@ import { motion } from "framer-motion";
 import { ArrowLeftIcon, CalendarIcon, ClockIcon, ShareIcon } from "@heroicons/react/24/outline";
 import { BlogPost } from "~~/utils/blog";
 
+// Animation constants - extracted to avoid inline object creation
+const FADE_IN_INITIAL = { opacity: 0, y: 20 };
+const FADE_IN_ANIMATE = { opacity: 1, y: 0 };
+const FADE_IN_TRANSITION = { duration: 0.5 };
+
 // Helper function to get image src from coverImage field
 const getImageSrc = (coverImage: BlogPost['coverImage']): string => {
   if (typeof coverImage === 'string') {
@@ -23,6 +28,47 @@ const getImageAlt = (coverImage: BlogPost['coverImage'], title: string): string 
   return coverImage.alt;
 };
 
+// Related post card component to avoid inline objects
+const RelatedPostCard = React.memo(function RelatedPostCard({
+  post,
+  index,
+}: {
+  post: BlogPost;
+  index: number;
+}) {
+  const transition = React.useMemo(() => ({ duration: 0.5, delay: index * 0.1 }), [index]);
+
+  return (
+    <Link href={`/blog/${post.slug}`} className="block h-full">
+      <motion.div
+        initial={FADE_IN_INITIAL}
+        animate={FADE_IN_ANIMATE}
+        transition={transition}
+        className="card bg-base-200/80 dark:bg-base-300/30 group h-full overflow-hidden shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+      >
+        <figure className="relative h-48 w-full">
+          <Image
+            src={getImageSrc(post.coverImage)}
+            alt={getImageAlt(post.coverImage, post.title)}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 25vw"
+          />
+        </figure>
+        <div className="card-body p-4">
+          <h3 className="card-title group-hover:text-primary dark:group-hover:text-accent text-lg transition-colors">
+            {post.title}
+          </h3>
+          <div className="text-base-content/70 mt-2 flex items-center gap-2 text-xs">
+            <CalendarIcon className="size-3" />
+            <span>{post.date}</span>
+          </div>
+        </div>
+      </motion.div>
+    </Link>
+  );
+});
+
 // Related posts component
 const RelatedPosts = ({ relatedPosts }: { relatedPosts: BlogPost[] }) => {
   return (
@@ -35,33 +81,7 @@ const RelatedPosts = ({ relatedPosts }: { relatedPosts: BlogPost[] }) => {
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {relatedPosts.map((post, index) => (
-          <Link href={`/blog/${post.slug}`} key={post.slug} className="block h-full">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="card bg-base-200/80 dark:bg-base-300/30 group h-full overflow-hidden shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
-            >
-              <figure className="relative h-48 w-full">
-                <Image
-                  src={getImageSrc(post.coverImage)}
-                  alt={getImageAlt(post.coverImage, post.title)}
-                  fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 25vw"
-                />
-              </figure>
-              <div className="card-body p-4">
-                <h3 className="card-title group-hover:text-primary dark:group-hover:text-accent text-lg transition-colors">
-                  {post.title}
-                </h3>
-                <div className="text-base-content/70 mt-2 flex items-center gap-2 text-xs">
-                  <CalendarIcon className="size-3" />
-                  <span>{post.date}</span>
-                </div>
-              </div>
-            </motion.div>
-          </Link>
+          <RelatedPostCard key={post.slug} post={post} index={index} />
         ))}
       </div>
     </div>
@@ -96,9 +116,9 @@ export default function BlogPostContent({ post, relatedPosts, content }: BlogPos
 
         <div className="container relative mx-auto -mt-40 px-4 md:-mt-56">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            initial={FADE_IN_INITIAL}
+            animate={FADE_IN_ANIMATE}
+            transition={FADE_IN_TRANSITION}
             className="card bg-base-100/95 dark:bg-base-200/95 p-6 shadow-xl backdrop-blur-md md:p-8"
           >
             <div className="mx-auto max-w-3xl">

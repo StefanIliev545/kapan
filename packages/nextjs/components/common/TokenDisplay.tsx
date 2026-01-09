@@ -67,7 +67,6 @@ export const TokenIcon: FC<TokenIconProps> = ({
   const altText = alt || symbol || "token";
 
   const sizeConfig = TOKEN_SIZE_MAP[size];
-  const iconSize = customSize || sizeConfig.icon;
 
   const roundedClass = rounded === true
     ? "rounded-full"

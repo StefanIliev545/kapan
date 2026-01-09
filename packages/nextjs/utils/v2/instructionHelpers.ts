@@ -1,5 +1,8 @@
 import { AbiCoder } from "ethers";
 
+// Zero address constant to avoid duplication
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
 // Router instruction types enum (matches Solidity)
 export enum RouterInstructionType {
   FlashLoan = 0,
@@ -45,6 +48,7 @@ const coder = AbiCoder.defaultAbiCoder();
 
 // Router instruction encoding
 const ROUTER_INSTRUCTION_TYPE = "tuple(uint256 amount,address token,address user,uint8 instructionType)";
+const INPUT_PTR_TYPE = "tuple(uint256 index)";
 
 /**
  * Encode a FlashLoan router instruction
@@ -55,13 +59,13 @@ const ROUTER_INSTRUCTION_TYPE = "tuple(uint256 amount,address token,address user
 export function encodeFlashLoan(
   provider: FlashLoanProvider,
   inputIndex: number,
-  pool = "0x0000000000000000000000000000000000000000"
+  pool = ZERO_ADDRESS
 ): string {
   // instruction.data encodes: (RouterInstruction, FlashLoanProvider, InputPtr, address pool)
   // pool is only used for UniswapV3
   return coder.encode(
-    [ROUTER_INSTRUCTION_TYPE, "uint8", "tuple(uint256 index)", "address"],
-    [[0n, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", RouterInstructionType.FlashLoan], provider, { index: inputIndex }, pool]
+    [ROUTER_INSTRUCTION_TYPE, "uint8", INPUT_PTR_TYPE, "address"],
+    [[0n, ZERO_ADDRESS, ZERO_ADDRESS, RouterInstructionType.FlashLoan], provider, { index: inputIndex }, pool]
   );
 }
 
@@ -104,8 +108,8 @@ export function encodePullToken(amount: bigint, token: string, user: string): st
  */
 export function encodeApprove(inputIndex: number, targetProtocol: string): string {
   return coder.encode(
-    [ROUTER_INSTRUCTION_TYPE, "string", "tuple(uint256 index)"],
-    [[0n, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", RouterInstructionType.Approve], targetProtocol, { index: inputIndex }]
+    [ROUTER_INSTRUCTION_TYPE, "string", INPUT_PTR_TYPE],
+    [[0n, ZERO_ADDRESS, ZERO_ADDRESS, RouterInstructionType.Approve], targetProtocol, { index: inputIndex }]
   );
 }
 
@@ -115,7 +119,7 @@ export function encodeApprove(inputIndex: number, targetProtocol: string): strin
 export function encodeToOutput(amount: bigint, token: string): string {
   return coder.encode(
     [ROUTER_INSTRUCTION_TYPE],
-    [[amount, token, "0x0000000000000000000000000000000000000000", RouterInstructionType.ToOutput]]
+    [[amount, token, ZERO_ADDRESS, RouterInstructionType.ToOutput]]
   );
 }
 
@@ -131,7 +135,7 @@ export function encodePushToken(inputIndex: number, user: string): string {
   const ROUTER_INSTRUCTION_WITH_INPUT_TYPE = "tuple(tuple(uint256 amount,address token,address user,uint8 instructionType),tuple(uint256 index))";
   return coder.encode(
     [ROUTER_INSTRUCTION_WITH_INPUT_TYPE],
-    [[[0n, "0x0000000000000000000000000000000000000000", user, RouterInstructionType.PushToken], { index: inputIndex }]]
+    [[[0n, ZERO_ADDRESS, user, RouterInstructionType.PushToken], { index: inputIndex }]]
   );
 }
 
@@ -313,9 +317,9 @@ export function createGetBorrowBalanceInstruction(
  */
 export function encodeSplit(inputIndex: number, basisPoints: number): string {
   return coder.encode(
-    [ROUTER_INSTRUCTION_TYPE, "tuple(uint256 index)", "uint256"],
+    [ROUTER_INSTRUCTION_TYPE, INPUT_PTR_TYPE, "uint256"],
     [
-      [0n, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", RouterInstructionType.Split],
+      [0n, ZERO_ADDRESS, ZERO_ADDRESS, RouterInstructionType.Split],
       { index: inputIndex },
       basisPoints,
     ]
@@ -330,9 +334,9 @@ export function encodeSplit(inputIndex: number, basisPoints: number): string {
  */
 export function encodeAdd(indexA: number, indexB: number): string {
   return coder.encode(
-    [ROUTER_INSTRUCTION_TYPE, "tuple(uint256 index)", "tuple(uint256 index)"],
+    [ROUTER_INSTRUCTION_TYPE, INPUT_PTR_TYPE, INPUT_PTR_TYPE],
     [
-      [0n, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", RouterInstructionType.Add],
+      [0n, ZERO_ADDRESS, ZERO_ADDRESS, RouterInstructionType.Add],
       { index: indexA },
       { index: indexB },
     ]
@@ -348,9 +352,9 @@ export function encodeAdd(indexA: number, indexB: number): string {
  */
 export function encodeSubtract(minuendIndex: number, subtrahendIndex: number): string {
   return coder.encode(
-    [ROUTER_INSTRUCTION_TYPE, "tuple(uint256 index)", "tuple(uint256 index)"],
+    [ROUTER_INSTRUCTION_TYPE, INPUT_PTR_TYPE, INPUT_PTR_TYPE],
     [
-      [0n, "0x0000000000000000000000000000000000000000", "0x0000000000000000000000000000000000000000", RouterInstructionType.Subtract],
+      [0n, ZERO_ADDRESS, ZERO_ADDRESS, RouterInstructionType.Subtract],
       { index: minuendIndex },
       { index: subtrahendIndex },
     ]

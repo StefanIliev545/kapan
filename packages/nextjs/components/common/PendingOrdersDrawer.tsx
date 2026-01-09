@@ -20,7 +20,6 @@ import {
   getOperationColorClass,
   ORDER_CREATED_EVENT,
   type OrderNote,
-  type OperationType,
 } from "~~/utils/orderNotes";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { timeAgo } from "~~/utils/deadline";
@@ -272,7 +271,7 @@ export function PendingOrdersDrawer() {
               <div className="divide-base-200 divide-y">
                 {recentOrders.map((order) => {
                   const { orderHash, context } = order;
-                  const { params, status, executedAmount, iterationCount, createdAt } = context;
+                  const { params, status, iterationCount, createdAt } = context;
                   const isActive = status === OrderStatus.Active;
                   const isCompleted = status === OrderStatus.Completed;
                   const isCancellingThis = cancellingHash === orderHash;

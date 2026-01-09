@@ -14,7 +14,6 @@ interface CollateralAmountsProps {
 export const CollateralAmounts: FC<CollateralAmountsProps> = ({
   collaterals,
   onChange,
-  selectedProtocol,
   onMaxClick,
 }) => {
   const handleAmountChange = (token: string, amountStr: string, decimals: number) => {

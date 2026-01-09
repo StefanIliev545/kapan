@@ -1,8 +1,18 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
+
+// Static animation variants - extracted to module level to avoid recreation
+const BACKDROP_INITIAL = { opacity: 0 };
+const BACKDROP_ANIMATE = { opacity: 1 };
+const BACKDROP_EXIT = { opacity: 0 };
+
+const DRAWER_INITIAL = { opacity: 0, x: -20 };
+const DRAWER_ANIMATE = { opacity: 1, x: 0 };
+const DRAWER_EXIT = { opacity: 0, x: -20 };
+const DRAWER_TRANSITION = { duration: 0.2 };
 
 interface MobileNavigationDrawerProps {
   isOpen: boolean;
@@ -21,23 +31,28 @@ export const MobileNavigationDrawer = ({
   menuLinks,
   walletButtons,
 }: MobileNavigationDrawerProps) => {
+  // Memoized event handler to stop propagation
+  const handleDrawerClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          initial={BACKDROP_INITIAL}
+          animate={BACKDROP_ANIMATE}
+          exit={BACKDROP_EXIT}
           className="fixed inset-0 z-40 bg-black/30 lg:hidden"
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
+            initial={DRAWER_INITIAL}
+            animate={DRAWER_ANIMATE}
+            exit={DRAWER_EXIT}
+            transition={DRAWER_TRANSITION}
             className="fixed left-4 top-16 z-50 w-72 rounded-lg shadow-2xl"
-            onClick={e => e.stopPropagation()}
+            onClick={handleDrawerClick}
           >
             <div className="bg-base-200/95 border-base-content/10 rounded-xl border p-6 shadow-lg backdrop-blur-md">
               {/* Logo header */}

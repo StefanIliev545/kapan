@@ -1,5 +1,9 @@
 // @ts-check
 
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
+});
+
 /**
  * Common, prod and dev configs are defined separately to keep Vercel from
  * conflating different host rules. We export exactly one based on NODE_ENV.
@@ -77,4 +81,4 @@ const devConfig = {
 
 const finalConfig = process.env.NODE_ENV === "production" ? prodConfig : devConfig;
 
-module.exports = finalConfig;
+module.exports = withBundleAnalyzer(finalConfig);

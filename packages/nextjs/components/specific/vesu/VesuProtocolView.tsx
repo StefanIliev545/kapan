@@ -47,13 +47,17 @@ type PoolSelectorProps<T extends string> = {
 };
 
 function PoolSelector<T extends string>({ pools, selectedValue, onChange, getPoolDisplay }: PoolSelectorProps<T>) {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
+
   return (
     <div className="flex items-center gap-2">
       <img src="/logos/vesu.svg" alt="Vesu" className="size-4" />
       <select
         className="select select-sm select-bordered"
         value={selectedValue}
-        onChange={e => onChange(e.target.value)}
+        onChange={handleChange}
       >
         {(Object.entries(pools) as [T, bigint | string][]).map(([rawName, value]) => {
           const disp = getPoolDisplay(rawName);
@@ -81,6 +85,80 @@ type PoolPositionsListProps<T extends string> = {
   openDepositModal: (version: VesuVersionKey, tokens: AssetWithRates[]) => void;
 };
 
+// Memoized row component for PoolPositionsList
+type PoolPositionRowProps<T extends string> = {
+  rawName: T;
+  data: ReturnType<typeof useVesuLendingPositions>;
+  version: VesuVersionKey;
+  defaultPoolName: T;
+  getPoolDisplay: (rawName: T) => { name: string };
+  computeMetrics: (rows: VesuPositionRow[]) => { netBalanceUsd: number; netYield30d: number; netApyPercent: number | null };
+  userAddress: string | undefined;
+  accountStatus: string;
+  isViewingOtherAddress: boolean;
+  onBorrowRequest: (params: { version: VesuVersionKey; tokens: AssetWithRates[]; collateralAddress: string; vesuContext: VesuContext; position: PositionManager }) => void;
+  openDepositModal: (version: VesuVersionKey, tokens: AssetWithRates[]) => void;
+};
+
+function PoolPositionRow<T extends string>({
+  rawName,
+  data,
+  version,
+  defaultPoolName,
+  getPoolDisplay,
+  computeMetrics,
+  userAddress,
+  accountStatus,
+  isViewingOtherAddress,
+  onBorrowRequest,
+  openDepositModal,
+}: PoolPositionRowProps<T>) {
+  const disp = getPoolDisplay(rawName);
+  const name = disp.name;
+  const shouldRender = data.rows.length > 0 || rawName === defaultPoolName;
+
+  const metrics = useMemo(() => computeMetrics(data.rows), [computeMetrics, data.rows]);
+
+  const handleBorrowRequest = useCallback(({ tokens, collateralAddress, vesuContext, position }: { tokens: AssetWithRates[]; collateralAddress: string; vesuContext: VesuContext; position: PositionManager }) => {
+    onBorrowRequest({ version, tokens, collateralAddress, vesuContext, position });
+  }, [onBorrowRequest, version]);
+
+  const handleDepositRequest = useCallback(() => {
+    const allow = new Set(data.suppliablePositions.map(p => p.tokenAddress.toLowerCase()));
+    const filtered = data.assetsWithRates.filter(a =>
+      allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
+    );
+    if (!isViewingOtherAddress) {
+      openDepositModal(version, filtered);
+    }
+  }, [data.suppliablePositions, data.assetsWithRates, isViewingOtherAddress, openDepositModal, version]);
+
+  const protocolName = version === "v1" ? "Vesu" : "vesu_v2";
+
+  if (!shouldRender) return null;
+
+  return (
+    <div key={`${version}-${name}`} className="space-y-4">
+      <VesuPositionsSection
+        title={`${name} Positions`}
+        rows={data.rows}
+        assetsWithRates={data.assetsWithRates}
+        userAddress={userAddress}
+        accountStatus={accountStatus}
+        hasLoadedOnce={data.hasLoadedOnce}
+        isUpdating={data.isUpdating}
+        onBorrowRequest={handleBorrowRequest}
+        onDepositRequest={handleDepositRequest}
+        protocolName={protocolName}
+        netBalanceUsd={metrics.netBalanceUsd}
+        netYield30d={metrics.netYield30d}
+        netApyPercent={metrics.netApyPercent}
+        formatCurrency={formatCurrency}
+      />
+    </div>
+  );
+}
+
 function PoolPositionsList<T extends string>({
   poolEntries,
   version,
@@ -95,43 +173,22 @@ function PoolPositionsList<T extends string>({
 }: PoolPositionsListProps<T>) {
   return (
     <>
-      {poolEntries.map(([rawName, data]) => {
-        const disp = getPoolDisplay(rawName);
-        const name = disp.name;
-        const shouldRender = data.rows.length > 0 || rawName === defaultPoolName;
-        if (!shouldRender) return null;
-        const metrics = computeMetrics(data.rows);
-        return (
-          <div key={`${version}-${name}`} className="space-y-4">
-            <VesuPositionsSection
-              title={`${name} Positions`}
-              rows={data.rows}
-              assetsWithRates={data.assetsWithRates}
-              userAddress={userAddress}
-              accountStatus={accountStatus}
-              hasLoadedOnce={data.hasLoadedOnce}
-              isUpdating={data.isUpdating}
-              onBorrowRequest={({ tokens, collateralAddress, vesuContext, position }) =>
-                onBorrowRequest({ version, tokens, collateralAddress, vesuContext, position })
-              }
-              onDepositRequest={() => {
-                const allow = new Set(data.suppliablePositions.map(p => p.tokenAddress.toLowerCase()));
-                const filtered = data.assetsWithRates.filter(a =>
-                  allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
-                );
-                if (!isViewingOtherAddress) {
-                  openDepositModal(version, filtered);
-                }
-              }}
-              protocolName={version === "v1" ? "Vesu" : "vesu_v2"}
-              netBalanceUsd={metrics.netBalanceUsd}
-              netYield30d={metrics.netYield30d}
-              netApyPercent={metrics.netApyPercent}
-              formatCurrency={formatCurrency}
-            />
-          </div>
-        );
-      })}
+      {poolEntries.map(([rawName, data]) => (
+        <PoolPositionRow
+          key={`${version}-${rawName}`}
+          rawName={rawName}
+          data={data}
+          version={version}
+          defaultPoolName={defaultPoolName}
+          getPoolDisplay={getPoolDisplay}
+          computeMetrics={computeMetrics}
+          userAddress={userAddress}
+          accountStatus={accountStatus}
+          isViewingOtherAddress={isViewingOtherAddress}
+          onBorrowRequest={onBorrowRequest}
+          openDepositModal={openDepositModal}
+        />
+      ))}
     </>
   );
 }
@@ -151,8 +208,6 @@ export const VesuProtocolView: FC = () => {
     suppliablePositions: suppliablePositionsV1,
     borrowablePositions: borrowablePositionsV1,
     rows: rowsV1,
-    isUpdating: _isUpdatingV1,
-    hasLoadedOnce: _hasLoadedOnceV1,
     isLoadingAssets: isLoadingAssetsV1,
     refetchPositions: refetchPositionsV1,
     assetsError: assetsErrorV1,
@@ -163,8 +218,6 @@ export const VesuProtocolView: FC = () => {
     suppliablePositions: suppliablePositionsV2,
     borrowablePositions: borrowablePositionsV2,
     rows: rowsV2,
-    isUpdating: _isUpdatingV2,
-    hasLoadedOnce: _hasLoadedOnceV2,
     isLoadingAssets: isLoadingAssetsV2,
     refetchPositions: refetchPositionsV2,
     assetsError: assetsErrorV2,
@@ -179,7 +232,7 @@ export const VesuProtocolView: FC = () => {
 
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
-  const computeMetrics = (rows: VesuPositionRow[]) => {
+  const computeMetrics = useCallback((rows: VesuPositionRow[]) => {
     if (rows.length === 0) {
       return { netBalanceUsd: 0, netYield30d: 0, netApyPercent: null as number | null };
     }
@@ -203,7 +256,7 @@ export const VesuProtocolView: FC = () => {
     });
 
     return { netBalanceUsd, netYield30d, netApyPercent };
-  };
+  }, []);
 
   const hasPositionsV1 = rowsV1.length > 0;
   const hasPositionsV2 = rowsV2.length > 0;
@@ -234,6 +287,7 @@ export const VesuProtocolView: FC = () => {
     ];
     return computeMetrics(allRows);
   }, [
+    computeMetrics,
     v1All.Genesis.rows,
     v1All.CarmineRunes.rows,
     v1All.Re7StarknetEcosystem.rows,
@@ -249,6 +303,7 @@ export const VesuProtocolView: FC = () => {
     ];
     return computeMetrics(allRows);
   }, [
+    computeMetrics,
     v2All.Prime.rows,
     v2All.Re7xBTC.rows,
     v2All.Re7USDCCore.rows,
@@ -312,11 +367,11 @@ export const VesuProtocolView: FC = () => {
     v2All.Re7xBTC.rows,
   ]);
 
-  const handleToggleMarkets = (version: VesuVersionKey) => {
+  const handleToggleMarkets = useCallback((version: VesuVersionKey) => {
     setIsMarketsOpen(previous => ({ ...previous, [version]: !previous[version] }));
-  };
+  }, []);
 
-  const openDepositModal = (
+  const openDepositModal = useCallback((
     version: VesuVersionKey,
     tokens: AssetWithRates[],
     options?: { vesuContext?: VesuContext; position?: PositionManager },
@@ -329,7 +384,69 @@ export const VesuProtocolView: FC = () => {
         ? createVesuContextV1(selectedV1PoolId, zeroCounterpart)
         : createVesuContextV2(normalizedPoolAddress, zeroCounterpart));
     setDepositSelection({ version, tokens, vesuContext: inferredContext, position: options?.position });
-  };
+  }, [isViewingOtherAddress, selectedV1PoolId, normalizedPoolAddress]);
+
+  // Memoized handlers for V1/V2 sections
+  const handleToggleMarketsV1 = useCallback(() => handleToggleMarkets("v1"), [handleToggleMarkets]);
+  const handleToggleMarketsV2 = useCallback(() => handleToggleMarkets("v2"), [handleToggleMarkets]);
+
+  const handleDepositV1 = useCallback(() => {
+    if (isViewingOtherAddress) return;
+    const allow = new Set(suppliablePositionsV1.map(p => p.tokenAddress.toLowerCase()));
+    const filtered = assetsWithRatesV1.filter(a =>
+      allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
+    );
+    openDepositModal("v1", filtered);
+  }, [isViewingOtherAddress, suppliablePositionsV1, assetsWithRatesV1, openDepositModal]);
+
+  const handleDepositV2 = useCallback(() => {
+    if (isViewingOtherAddress) return;
+    const allow = new Set(suppliablePositionsV2.map(p => p.tokenAddress.toLowerCase()));
+    const filtered = assetsWithRatesV2.filter(a =>
+      allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
+    );
+    openDepositModal("v2", filtered);
+  }, [isViewingOtherAddress, suppliablePositionsV2, assetsWithRatesV2, openDepositModal]);
+
+  const handleV1PoolChange = useCallback((value: string) => setSelectedV1PoolId(BigInt(value)), []);
+
+  const handleCloseBorrowSelection = useCallback(() => setBorrowSelection(null), []);
+  const handleCloseDepositSelection = useCallback(() => setDepositSelection(null), []);
+
+  // Memoized headerExtra elements
+  const v1HeaderExtra = useMemo(() => (
+    <PoolSelector
+      pools={VESU_V1_POOLS}
+      selectedValue={selectedV1PoolId.toString()}
+      onChange={handleV1PoolChange}
+      getPoolDisplay={getV1PoolDisplay}
+    />
+  ), [selectedV1PoolId, handleV1PoolChange]);
+
+  const v2HeaderExtra = useMemo(() => (
+    <PoolSelector
+      pools={VESU_V2_POOLS}
+      selectedValue={selectedV2PoolAddress}
+      onChange={setSelectedV2PoolAddress}
+      getPoolDisplay={getV2PoolDisplay}
+    />
+  ), [selectedV2PoolAddress]);
+
+  // Memoized poolEntries arrays
+  const v1PoolEntries = useMemo(() => [
+    ["Genesis", v1All.Genesis] as const,
+    ["CarmineRunes", v1All.CarmineRunes] as const,
+    ["Re7StarknetEcosystem", v1All.Re7StarknetEcosystem] as const,
+    ["Re7xSTRK", v1All.Re7xSTRK] as const,
+  ], [v1All.Genesis, v1All.CarmineRunes, v1All.Re7StarknetEcosystem, v1All.Re7xSTRK]);
+
+  const v2PoolEntries = useMemo(() => [
+    ["Prime", v2All.Prime] as const,
+    ["Re7xBTC", v2All.Re7xBTC] as const,
+    ["Re7USDCCore", v2All.Re7USDCCore] as const,
+    ["Re7USDCPrime", v2All.Re7USDCPrime] as const,
+    ["Re7USDCStableCore", v2All.Re7USDCStableCore] as const,
+  ], [v2All.Prime, v2All.Re7xBTC, v2All.Re7USDCCore, v2All.Re7USDCPrime, v2All.Re7USDCStableCore]);
 
 
   return (
@@ -337,7 +454,7 @@ export const VesuProtocolView: FC = () => {
       <div className="space-y-6">
         <VesuMarketSection
           isOpen={isMarketsOpen.v1}
-          onToggle={() => handleToggleMarkets("v1")}
+          onToggle={handleToggleMarketsV1}
           isLoadingAssets={isLoadingAssetsV1}
           assetsError={assetsErrorV1}
           suppliablePositions={suppliablePositionsV1}
@@ -347,26 +464,12 @@ export const VesuProtocolView: FC = () => {
           netBalanceUsd={netBalanceUsdV1}
           netYield30d={netYield30dV1}
           netApyPercent={netApyPercentV1}
-          onDeposit={() => {
-            if (isViewingOtherAddress) return;
-            const allow = new Set(suppliablePositionsV1.map(p => p.tokenAddress.toLowerCase()));
-            const filtered = assetsWithRatesV1.filter(a =>
-              allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
-            );
-            openDepositModal("v1", filtered);
-          }}
+          onDeposit={handleDepositV1}
           canDeposit={!isViewingOtherAddress && assetsWithRatesV1.length > 0}
           formatCurrency={formatCurrency}
           protocolName="Vesu"
           title="Vesu V1"
-          headerExtra={
-            <PoolSelector
-              pools={VESU_V1_POOLS}
-              selectedValue={selectedV1PoolId.toString()}
-              onChange={value => setSelectedV1PoolId(BigInt(value))}
-              getPoolDisplay={getV1PoolDisplay}
-            />
-          }
+          headerExtra={v1HeaderExtra}
         />
         {!userAddress && (
           <div className="border-base-300 bg-base-100 text-base-content/80 rounded-xl border p-6 text-center">
@@ -378,12 +481,7 @@ export const VesuProtocolView: FC = () => {
         )}
         {/* V1 Positions across all pools */}
         <PoolPositionsList
-          poolEntries={[
-            ["Genesis", v1All.Genesis] as const,
-            ["CarmineRunes", v1All.CarmineRunes] as const,
-            ["Re7StarknetEcosystem", v1All.Re7StarknetEcosystem] as const,
-            ["Re7xSTRK", v1All.Re7xSTRK] as const,
-          ]}
+          poolEntries={v1PoolEntries}
           version="v1"
           defaultPoolName="Genesis"
           getPoolDisplay={getV1PoolDisplay}
@@ -399,7 +497,7 @@ export const VesuProtocolView: FC = () => {
       <div className="space-y-6">
         <VesuMarketSection
           isOpen={isMarketsOpen.v2}
-          onToggle={() => handleToggleMarkets("v2")}
+          onToggle={handleToggleMarketsV2}
           isLoadingAssets={isLoadingAssetsV2}
           assetsError={assetsErrorV2}
           suppliablePositions={suppliablePositionsV2}
@@ -409,26 +507,12 @@ export const VesuProtocolView: FC = () => {
           netBalanceUsd={netBalanceUsdV2}
           netYield30d={netYield30dV2}
           netApyPercent={netApyPercentV2}
-          onDeposit={() => {
-            if (isViewingOtherAddress) return;
-            const allow = new Set(suppliablePositionsV2.map(p => p.tokenAddress.toLowerCase()));
-            const filtered = assetsWithRatesV2.filter(a =>
-              allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
-            );
-            openDepositModal("v2", filtered);
-          }}
+          onDeposit={handleDepositV2}
           canDeposit={!isViewingOtherAddress && assetsWithRatesV2.length > 0}
           formatCurrency={formatCurrency}
           protocolName="vesu_v2"
           title="Vesu V2"
-          headerExtra={
-            <PoolSelector
-              pools={VESU_V2_POOLS}
-              selectedValue={selectedV2PoolAddress}
-              onChange={setSelectedV2PoolAddress}
-              getPoolDisplay={getV2PoolDisplay}
-            />
-          }
+          headerExtra={v2HeaderExtra}
         />
         {!userAddress && (
           <div className="border-base-300 bg-base-100 text-base-content/80 rounded-xl border p-6 text-center">
@@ -440,13 +524,7 @@ export const VesuProtocolView: FC = () => {
         )}
         {/* V2 Positions across all pools */}
         <PoolPositionsList
-          poolEntries={[
-            ["Prime", v2All.Prime] as const,
-            ["Re7xBTC", v2All.Re7xBTC] as const,
-            ["Re7USDCCore", v2All.Re7USDCCore] as const,
-            ["Re7USDCPrime", v2All.Re7USDCPrime] as const,
-            ["Re7USDCStableCore", v2All.Re7USDCStableCore] as const,
-          ]}
+          poolEntries={v2PoolEntries}
           version="v2"
           defaultPoolName="Prime"
           getPoolDisplay={getV2PoolDisplay}
@@ -462,7 +540,7 @@ export const VesuProtocolView: FC = () => {
       {borrowSelection && (
         <TokenSelectModalStark
           isOpen={borrowSelection !== null}
-          onClose={() => setBorrowSelection(null)}
+          onClose={handleCloseBorrowSelection}
           tokens={borrowSelection.tokens}
           protocolName={borrowSelection.version === "v1" ? "Vesu" : "vesu_v2"}
           collateralAsset={borrowSelection.collateralAddress}
@@ -473,7 +551,7 @@ export const VesuProtocolView: FC = () => {
       {depositSelection && (
         <TokenSelectModalStark
           isOpen={depositSelection !== null}
-          onClose={() => setDepositSelection(null)}
+          onClose={handleCloseDepositSelection}
           tokens={depositSelection.tokens}
           protocolName={depositSelection.version === "v1" ? "Vesu" : "vesu_v2"}
           vesuContext={depositSelection.vesuContext}

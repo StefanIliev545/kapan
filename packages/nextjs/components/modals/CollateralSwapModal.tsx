@@ -1,14 +1,14 @@
 import { FC, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { track } from "@vercel/analytics";
-import { formatUnits, parseUnits, Address, encodeFunctionData, type Hex } from "viem";
+import { formatUnits, parseUnits, Address, PublicClient, WalletClient } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { parseAmount } from "~~/utils/validation";
 
-import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
+import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { usePendleConvert } from "~~/hooks/usePendleConvert";
-import { useCowQuote, getCowQuoteBuyAmount } from "~~/hooks/useCowQuote";
-import { useCowLimitOrder, type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
+import { useCowQuote } from "~~/hooks/useCowQuote";
+import { useCowLimitOrder, type ChunkInstructions, type BuildOrderResult } from "~~/hooks/useCowLimitOrder";
 
 // Aave flash loan fee buffer: 9 bps (0.09%)
 // When using Aave with isMax, we need to quote for a reduced amount
@@ -19,7 +19,7 @@ import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { BasicCollateral, useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
-import { 
+import {
   FlashLoanProvider,
   ProtocolInstruction,
   createRouterInstruction,
@@ -32,7 +32,7 @@ import {
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { CompletionType, getCowExplorerAddressUrl, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
-import { ExclamationTriangleIcon, InformationCircleIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 import {
     ExecutionTypeToggle,
@@ -46,6 +46,342 @@ import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { useSendCalls } from "wagmi/experimental";
 import { saveOrderNote, createCollateralSwapNote } from "~~/utils/orderNotes";
+
+// ============================================================================
+// Types & Interfaces
+// ============================================================================
+
+interface LimitOrderParams {
+    selectedFrom: SwapAsset;
+    selectedTo: SwapAsset;
+    userAddress: Address;
+    orderManagerAddress: Address;
+    amountInBigInt: bigint;
+    minBuyAmount: { raw: bigint; formatted: string };
+    cowFlashLoanInfo: { lender: Address; provider: string; fee: bigint };
+    buildCowInstructions: ChunkInstructions[];
+    limitOrderConfig: LimitOrderResult | null;
+    protocolName: string;
+    chainId: number;
+    buildLimitOrderCalls: ReturnType<typeof useCowLimitOrder>["buildOrderCalls"];
+}
+
+interface OrderExecutionParams {
+    limitOrderResult: BuildOrderResult;
+    userAddress: Address;
+    chainId: number;
+    orderManagerAddress: Address | undefined;
+    sendCallsAsync: ReturnType<typeof useSendCalls>["sendCallsAsync"] | undefined;
+    walletClient: WalletClient | undefined;
+    publicClient: PublicClient | undefined;
+}
+
+// ============================================================================
+// Helper Functions (outside component to reduce complexity)
+// ============================================================================
+
+/**
+ * Builds limit order result by calling the order builder hook.
+ */
+async function buildLimitOrder(params: LimitOrderParams): Promise<BuildOrderResult> {
+    const {
+        selectedFrom, selectedTo, amountInBigInt, minBuyAmount,
+        cowFlashLoanInfo, buildCowInstructions, limitOrderConfig, buildLimitOrderCalls
+    } = params;
+
+    console.log("[Limit Order] Building collateral swap order:", {
+        sellToken: selectedFrom.address,
+        buyToken: selectedTo.address,
+        amount: formatUnits(amountInBigInt, selectedFrom.decimals),
+        minBuy: formatUnits(minBuyAmount.raw, selectedTo.decimals),
+        flashLoanLender: cowFlashLoanInfo.lender,
+    });
+
+    const numChunks = limitOrderConfig?.numChunks ?? 1;
+    const chunkSellAmount = amountInBigInt / BigInt(numChunks);
+    const chunkMinBuyAmount = minBuyAmount.raw / BigInt(numChunks);
+    const chunkFlashLoanAmount = chunkSellAmount;
+
+    const result = await buildLimitOrderCalls({
+        sellToken: selectedFrom.address as Address,
+        buyToken: selectedTo.address as Address,
+        chunkSize: chunkSellAmount,
+        minBuyPerChunk: chunkMinBuyAmount,
+        totalAmount: amountInBigInt,
+        chunks: buildCowInstructions,
+        completion: CompletionType.Iterations,
+        targetValue: numChunks,
+        minHealthFactor: "1.1",
+        seedAmount: 0n,
+        flashLoan: {
+            lender: cowFlashLoanInfo.lender,
+            token: selectedFrom.address as Address,
+            amount: chunkFlashLoanAmount,
+        },
+        preOrderInstructions: buildCowInstructions[0]?.postInstructions || [],
+        isKindBuy: false,
+    });
+
+    if (!result) {
+        throw new Error("Failed to build CoW order calls");
+    }
+
+    return result;
+}
+
+/**
+ * Validates the limit order result and throws if there are errors.
+ */
+function validateLimitOrderResult(result: BuildOrderResult): void {
+    if (result.success) return;
+
+    const errorMsg = result.error || "Unknown error building order";
+    const fullError = result.errorDetails?.apiResponse
+        ? `${errorMsg}\n\nAPI Response: ${result.errorDetails.apiResponse}`
+        : errorMsg;
+
+    console.error("[Limit Order] Build failed:", fullError, result.errorDetails);
+
+    notification.error(
+        <TransactionToast step="failed" message={`CoW API Error: ${errorMsg}`} />
+    );
+
+    throw new Error(errorMsg);
+}
+
+/**
+ * Executes the limit order using batched calls (EIP-5792).
+ */
+async function executeBatchedOrder(
+    params: OrderExecutionParams,
+    notificationId: string,
+    onClose: () => void,
+    txBeginProps: Record<string, string | number | boolean | null>
+): Promise<void> {
+    const { limitOrderResult, chainId, orderManagerAddress, sendCallsAsync } = params;
+
+    if (!sendCallsAsync) {
+        throw new Error("sendCallsAsync not available");
+    }
+
+    const { id: batchId } = await sendCallsAsync({
+        calls: limitOrderResult.calls,
+        experimental_fallback: true,
+    });
+
+    notification.remove(notificationId);
+
+    const explorerUrl = orderManagerAddress
+        ? getCowExplorerAddressUrl(chainId, orderManagerAddress)
+        : undefined;
+
+    notification.success(
+        <TransactionToast
+            step="confirmed"
+            message="Limit order created!"
+            secondaryLink={explorerUrl}
+            secondaryLinkText="View on CoW Explorer"
+        />
+    );
+
+    track("collateral_swap_limit_order_complete", { ...txBeginProps, status: "success", batchId });
+    onClose();
+}
+
+/**
+ * Executes the limit order sequentially (fallback for non-batching wallets).
+ */
+async function executeSequentialOrder(
+    params: OrderExecutionParams,
+    notificationId: string,
+    onClose: () => void,
+    txBeginProps: Record<string, string | number | boolean | null>
+): Promise<void> {
+    const { limitOrderResult, userAddress, chainId, walletClient, publicClient } = params;
+
+    if (!walletClient || !publicClient) {
+        throw new Error("Wallet not connected");
+    }
+
+    for (let i = 0; i < limitOrderResult.calls.length; i++) {
+        const call = limitOrderResult.calls[i];
+        notification.remove(notificationId);
+
+        const stepNotificationId = notification.loading(
+            <TransactionToast step="pending" message={`Executing step ${i + 1}/${limitOrderResult.calls.length}...`} />
+        );
+
+        const txHash = await walletClient.sendTransaction({
+            account: userAddress,
+            to: call.to,
+            data: call.data,
+            chain: null,
+        });
+
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        notification.remove(stepNotificationId);
+    }
+
+    const explorerUrl = getCowExplorerAddressUrl(chainId, userAddress);
+    notification.success(
+        <TransactionToast
+            step="confirmed"
+            message="Limit order created!"
+            blockExplorerLink={explorerUrl}
+        />
+    );
+
+    track("collateral_swap_limit_order_complete", { ...txBeginProps, status: "success", mode: "sequential" });
+    onClose();
+}
+
+/**
+ * Saves order note for display on orders page.
+ */
+function saveOrderNoteIfNeeded(
+    salt: string | undefined,
+    protocolName: string,
+    fromSymbol: string,
+    toSymbol: string,
+    chainId: number
+): void {
+    if (!salt) return;
+
+    saveOrderNote(createCollateralSwapNote(
+        salt,
+        protocolName,
+        fromSymbol,
+        toSymbol,
+        chainId
+    ));
+}
+
+// ============================================================================
+// Quote Calculation Helpers
+// ============================================================================
+
+interface QuoteSource {
+    source: string;
+    amount: bigint;
+}
+
+/**
+ * Calculates the quote amount, accounting for Aave fee buffer when using max.
+ */
+function calculateQuoteAmount(
+    amountIn: string,
+    selectedFrom: SwapAsset | null,
+    isMax: boolean,
+    providerEnum: FlashLoanProvider | undefined
+): string {
+    const decimals = selectedFrom?.decimals || 18;
+    const baseAmount = isMax && selectedFrom?.rawBalance
+        ? selectedFrom.rawBalance
+        : parseUnits(amountIn || "0", decimals);
+
+    const isAaveWithMax = isMax && (
+        providerEnum === FlashLoanProvider.Aave ||
+        providerEnum === FlashLoanProvider.ZeroLend
+    );
+
+    if (!isAaveWithMax || baseAmount === 0n) {
+        return baseAmount.toString();
+    }
+
+    // Match on-chain Split rounding exactly
+    const feeAmount = (baseAmount * AAVE_FEE_BUFFER_BPS + 10000n - 1n) / 10000n;
+    const principal = baseAmount - feeAmount;
+    const safetyBuffer = principal / 10000n;
+    return (principal - safetyBuffer).toString();
+}
+
+/**
+ * Finds the best quote from available sources.
+ */
+function findBestQuote(
+    oneInchQuote: { dstAmount: string } | undefined,
+    pendleQuote: { data: { amountPtOut?: string; amountTokenOut?: string } } | undefined,
+    cowQuote: { quote?: { buyAmount: string } } | undefined
+): QuoteSource | null {
+    const quotes: QuoteSource[] = [];
+
+    if (oneInchQuote?.dstAmount) {
+        quotes.push({ source: "1inch", amount: BigInt(oneInchQuote.dstAmount) });
+    }
+
+    if (pendleQuote?.data) {
+        const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";
+        if (outAmount !== "0") {
+            quotes.push({ source: "Pendle", amount: BigInt(outAmount) });
+        }
+    }
+
+    if (cowQuote?.quote?.buyAmount) {
+        quotes.push({ source: "CoW", amount: BigInt(cowQuote.quote.buyAmount) });
+    }
+
+    if (quotes.length === 0) return null;
+    return quotes.reduce((best, current) => current.amount > best.amount ? current : best);
+}
+
+/**
+ * Calculates the output amount based on execution type and quotes.
+ */
+function calculateAmountOut(
+    executionType: ExecutionType,
+    bestQuote: QuoteSource | null,
+    swapRouter: SwapRouter,
+    oneInchQuote: { dstAmount: string } | undefined,
+    pendleQuote: { data: { amountPtOut?: string; amountTokenOut?: string } } | undefined,
+    decimals: number
+): string {
+    if (executionType === "limit" && bestQuote) {
+        return formatUnits(bestQuote.amount, decimals);
+    }
+
+    if (swapRouter === "1inch" && oneInchQuote) {
+        return formatUnits(BigInt(oneInchQuote.dstAmount), decimals);
+    }
+
+    if (swapRouter === "pendle" && pendleQuote) {
+        const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";
+        return formatUnits(BigInt(outAmount), decimals);
+    }
+
+    return "0";
+}
+
+/**
+ * Calculates price impact from quote data.
+ */
+function calculateQuotesPriceImpact(
+    swapRouter: SwapRouter,
+    pendleQuote: { data: { priceImpact?: number } } | undefined,
+    oneInchQuote: { srcUSD?: string; dstUSD?: string } | undefined
+): number | null {
+    if (swapRouter === "pendle" && pendleQuote?.data?.priceImpact !== undefined) {
+        return Math.abs(pendleQuote.data.priceImpact * 100);
+    }
+
+    if (swapRouter === "1inch" && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
+        const srcUSD = parseFloat(oneInchQuote.srcUSD);
+        const dstUSD = parseFloat(oneInchQuote.dstUSD);
+        if (srcUSD > 0) {
+            return Math.max(0, ((srcUSD - dstUSD) / srcUSD) * 100);
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Determines the deposit operation based on protocol.
+ */
+function getDepositOperation(protocolName: string): LendingOp {
+    const normalized = normalizeProtocolName(protocolName);
+    const useCollateralOp = normalized === "morpho-blue" || normalized === "compound";
+    return useCollateralOp ? LendingOp.DepositCollateral : LendingOp.Deposit;
+}
 
 // Extended type to include price info passed from parent
 interface ExtendedCollateral extends BasicCollateral {
@@ -163,7 +499,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const { sendCallsAsync } = useSendCalls();
     
     // CoW order hooks
-    const { buildOrderCalls: buildLimitOrderCalls, buildRouterCall, isReady: limitOrderReady, orderManagerAddress } = useCowLimitOrder();
+    const { buildOrderCalls: buildLimitOrderCalls, isReady: limitOrderReady, orderManagerAddress } = useCowLimitOrder();
 
     // Limit order config from LimitOrderConfig component
     const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
@@ -174,13 +510,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     }, []);
 
     // Memoize sellToken for LimitOrderConfig to prevent infinite re-renders
-    const limitOrderSellToken = useMemo(() => 
+    const limitOrderSellToken = useMemo(() =>
         selectedFrom ? {
             symbol: selectedFrom.symbol,
             decimals: selectedFrom.decimals,
             address: selectedFrom.address,
         } : null,
-    [selectedFrom?.symbol, selectedFrom?.decimals, selectedFrom?.address]);
+    [selectedFrom]);
 
     // Filter "To" assets (exclude selected "From")
     const targetAssets = useMemo(() =>
@@ -212,35 +548,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         chainId,
     });
 
-    const quoteAmount = useMemo(() => {
-        // When isMax=true, use the ACTUAL raw balance from the asset, not parsed amountIn
-        // This ensures we match what GetSupplyBalance will return on-chain
-        const baseAmount = isMax && selectedFrom?.rawBalance 
-            ? selectedFrom.rawBalance 
-            : parseUnits(amountIn || "0", selectedFrom?.decimals || 18);
-        
-        // If using Aave flash loan with isMax, reduce the quote amount by fee buffer
-        // This ensures the 1inch swap data matches the actual amount we'll swap
-        const isAaveWithMax = isMax && (selectedProvider?.providerEnum === FlashLoanProvider.Aave || selectedProvider?.providerEnum === FlashLoanProvider.ZeroLend);
-        if (isAaveWithMax && baseAmount > 0n) {
-            // IMPORTANT: Must match on-chain Split rounding exactly!
-            // On-chain: feeAmount = (amount * bp + 10000 - 1) / 10000  (rounds UP)
-            // On-chain: principal = amount - feeAmount
-            // We must use the same formula here to avoid rounding mismatches
-            const feeAmount = (baseAmount * AAVE_FEE_BUFFER_BPS + 10000n - 1n) / 10000n;
-            const principal = baseAmount - feeAmount;
-            
-            // Add a tiny safety buffer (0.01%) to ensure quote is always <= on-chain amount
-            // This handles any timing differences between UI load and tx execution
-            // 1inch will swap whatever we send, and any extra stays as refund
-            const safetyBuffer = principal / 10000n; // 0.01%
-            const safeQuoteAmount = principal - safetyBuffer;
-            
-            return safeQuoteAmount.toString();
-        }
-        
-        return baseAmount.toString();
-    }, [amountIn, selectedFrom?.decimals, selectedFrom?.rawBalance, isMax, selectedProvider?.providerEnum]);
+    const quoteAmount = useMemo(
+        () => calculateQuoteAmount(amountIn, selectedFrom, isMax, selectedProvider?.providerEnum),
+        [amountIn, selectedFrom, isMax, selectedProvider?.providerEnum]
+    );
 
     // 1inch Quote - uses reduced amount when Aave + isMax
     const { data: oneInchQuote, isLoading: is1inchLoading, error: oneInchError } = use1inchQuote({
@@ -280,41 +591,15 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const quoteError = swapRouter === "1inch" ? oneInchError : pendleError;
     
     // Get best quote from available sources (for limit orders, use CoW quote)
-    const bestQuote = useMemo(() => {
-        const quotes: { source: string; amount: bigint }[] = [];
-        
-        if (oneInchQuote?.dstAmount) {
-            quotes.push({ source: "1inch", amount: BigInt(oneInchQuote.dstAmount) });
-        }
-        if (pendleQuote?.data) {
-            const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";
-            if (outAmount !== "0") {
-                quotes.push({ source: "Pendle", amount: BigInt(outAmount) });
-            }
-        }
-        if (cowQuote?.quote?.buyAmount) {
-            quotes.push({ source: "CoW", amount: BigInt(cowQuote.quote.buyAmount) });
-        }
-        
-        if (quotes.length === 0) return null;
-        return quotes.reduce((best, current) => 
-            current.amount > best.amount ? current : best
-        );
-    }, [oneInchQuote, pendleQuote, cowQuote]);
+    const bestQuote = useMemo(
+        () => findBestQuote(oneInchQuote, pendleQuote, cowQuote ?? undefined),
+        [oneInchQuote, pendleQuote, cowQuote]
+    );
 
-    const amountOut = useMemo(() => {
-        if (executionType === "limit" && bestQuote) {
-            return formatUnits(bestQuote.amount, selectedTo?.decimals || 18);
-        }
-        if (swapRouter === "1inch" && oneInchQuote) {
-            return formatUnits(BigInt(oneInchQuote.dstAmount), selectedTo?.decimals || 18);
-        }
-        if (swapRouter === "pendle" && pendleQuote) {
-            const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";
-            return formatUnits(BigInt(outAmount), selectedTo?.decimals || 18);
-        }
-        return "0";
-    }, [executionType, bestQuote, swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals]);
+    const amountOut = useMemo(
+        () => calculateAmountOut(executionType, bestQuote, swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals || 18),
+        [executionType, bestQuote, swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals]
+    );
 
     // Market rate from best quote
     const marketRate = useMemo(() => {
@@ -326,19 +611,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     }, [bestQuote, selectedFrom, selectedTo, amountInBigInt]);
 
     // Calculate price impact from available quote data (for limit order slippage estimation)
-    const quotesPriceImpact = useMemo(() => {
-        if (swapRouter === "pendle" && pendleQuote?.data?.priceImpact !== undefined) {
-            return Math.abs(pendleQuote.data.priceImpact * 100);
-        }
-        if (swapRouter === "1inch" && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
-            const srcUSD = parseFloat(oneInchQuote.srcUSD);
-            const dstUSD = parseFloat(oneInchQuote.dstUSD);
-            if (srcUSD > 0) {
-                return Math.max(0, ((srcUSD - dstUSD) / srcUSD) * 100);
-            }
-        }
-        return null;
-    }, [swapRouter, pendleQuote, oneInchQuote]);
+    const quotesPriceImpact = useMemo(
+        () => calculateQuotesPriceImpact(swapRouter, pendleQuote, oneInchQuote),
+        [swapRouter, pendleQuote, oneInchQuote]
+    );
 
     // Auto-estimate limit order slippage based on price impact (only on first quote)
     useEffect(() => {
@@ -412,11 +688,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         }
 
         const normalizedProtocol = normalizeProtocolName(protocolName);
-        const isMorpho = normalizedProtocol === "morpho-blue";
-        const isCompound = normalizedProtocol === "compound";
-        
-        // Morpho and Compound use DepositCollateral, others use Deposit
-        const depositOp = (isMorpho || isCompound) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+        const depositOp = getDepositOperation(protocolName);
         
         const numChunks = limitOrderConfig?.numChunks ?? 1;
         
@@ -515,6 +787,84 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         simulateWhenBatching: true,
     });
 
+    /**
+     * Executes the limit order flow (build, validate, execute).
+     */
+    const executeLimitOrder = async (txBeginProps: Record<string, string | number | boolean | null>): Promise<void> => {
+        track("collateral_swap_limit_order_begin", txBeginProps);
+
+        // Validate required data with early return
+        if (!selectedFrom || !selectedTo || !userAddress || !orderManagerAddress || !cowFlashLoanInfo) {
+            throw new Error("Missing required data for limit order");
+        }
+
+        // Build the limit order (types are now narrowed after the guard above)
+        const limitOrderResult = await buildLimitOrder({
+            selectedFrom,
+            selectedTo,
+            userAddress,
+            orderManagerAddress,
+            amountInBigInt,
+            minBuyAmount,
+            cowFlashLoanInfo,
+            buildCowInstructions,
+            limitOrderConfig,
+            protocolName,
+            chainId,
+            buildLimitOrderCalls,
+        });
+
+        // Validate the result
+        validateLimitOrderResult(limitOrderResult);
+
+        console.log("[Limit Order] Order calls built:", limitOrderResult.calls.length);
+
+        // Save order note
+        saveOrderNoteIfNeeded(limitOrderResult.salt, protocolName, selectedFrom.symbol, selectedTo.symbol, chainId);
+
+        // Execute via wallet
+        const notificationId = notification.loading(
+            <TransactionToast step="pending" message={`Creating limit order (${limitOrderResult.calls.length} operations)...`} />
+        );
+
+        const executionParams: OrderExecutionParams = {
+            limitOrderResult,
+            userAddress,
+            chainId,
+            orderManagerAddress,
+            sendCallsAsync,
+            walletClient,
+            publicClient,
+        };
+
+        try {
+            // Prefer batched execution (EIP-5792) if available, otherwise fall back to sequential
+            const canUseBatchedExecution = typeof sendCallsAsync === "function";
+            if (canUseBatchedExecution) {
+                await executeBatchedOrder(executionParams, notificationId as string, onClose, txBeginProps);
+            } else if (walletClient && publicClient) {
+                await executeSequentialOrder(executionParams, notificationId as string, onClose, txBeginProps);
+            } else {
+                throw new Error("Wallet not connected");
+            }
+        } catch (batchError) {
+            notification.remove(notificationId);
+            throw batchError;
+        }
+    };
+
+    /**
+     * Executes the market order flow (flash loan based).
+     */
+    const executeMarketOrder = async (txBeginProps: Record<string, string | number | boolean | null>): Promise<void> => {
+        track("collateral_swap_tx_begin", txBeginProps);
+        await handleSwap(amountIn, isMax);
+        track("collateral_swap_tx_complete", { ...txBeginProps, status: "success" });
+    };
+
+    /**
+     * Main handler that routes to limit or market order execution.
+     */
     const handleSwapWrapper = async () => {
         const txBeginProps = {
             network: "evm",
@@ -536,159 +886,11 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
         try {
             setIsSubmitting(true);
-            
+
             if (executionType === "limit") {
-                // CoW Limit Order
-                track("collateral_swap_limit_order_begin", txBeginProps);
-                
-                if (!selectedFrom || !selectedTo || !userAddress || !orderManagerAddress || !cowFlashLoanInfo) {
-                    throw new Error("Missing required data for limit order");
-                }
-
-                console.log("[Limit Order] Building collateral swap order:", {
-                    sellToken: selectedFrom.address,
-                    buyToken: selectedTo.address,
-                    amount: formatUnits(amountInBigInt, selectedFrom.decimals),
-                    minBuy: formatUnits(minBuyAmount.raw, selectedTo.decimals),
-                    flashLoanLender: cowFlashLoanInfo.lender,
-                });
-
-                // Build CoW order calls
-                const numChunks = limitOrderConfig?.numChunks ?? 1;
-                const chunkSellAmount = amountInBigInt / BigInt(numChunks);
-                const chunkMinBuyAmount = minBuyAmount.raw / BigInt(numChunks);
-                const chunkFlashLoanFee = cowFlashLoanInfo.fee / BigInt(numChunks);
-                // Flash loan amount = sellAmount (what gets swapped)
-                // The fee is covered by withdrawing chunkSellAmount + chunkFlashLoanFee from protocol
-                const chunkFlashLoanAmount = chunkSellAmount;
-
-                const limitOrderResult = await buildLimitOrderCalls({
-                    sellToken: selectedFrom.address as Address,
-                    buyToken: selectedTo.address as Address,
-                    chunkSize: chunkSellAmount,
-                    minBuyPerChunk: chunkMinBuyAmount,
-                    totalAmount: amountInBigInt,
-                    chunks: buildCowInstructions,
-                    completion: CompletionType.Iterations,
-                    targetValue: numChunks,
-                    minHealthFactor: "1.1",
-                    seedAmount: 0n, // Flash loan mode
-                    flashLoan: {
-                        lender: cowFlashLoanInfo.lender,
-                        token: selectedFrom.address as Address,
-                        amount: chunkFlashLoanAmount,
-                    },
-                    // Include withdraw instruction for auth check
-                    preOrderInstructions: buildCowInstructions[0]?.postInstructions || [],
-                    isKindBuy: false, // KIND_SELL: exact sell amount, min buy amount
-                });
-
-                if (!limitOrderResult) {
-                    throw new Error("Failed to build CoW order calls");
-                }
-
-                // Check for AppData registration errors
-                if (!limitOrderResult.success) {
-                    const errorMsg = limitOrderResult.error || "Unknown error building order";
-                    const fullError = limitOrderResult.errorDetails?.apiResponse 
-                        ? `${errorMsg}\n\nAPI Response: ${limitOrderResult.errorDetails.apiResponse}`
-                        : errorMsg;
-                    console.error("[Limit Order] Build failed:", fullError, limitOrderResult.errorDetails);
-                    notification.error(
-                        <TransactionToast 
-                            step="failed" 
-                            message={`CoW API Error: ${errorMsg}`}
-                        />
-                    );
-                    throw new Error(errorMsg);
-                }
-
-                console.log("[Limit Order] Order calls built:", limitOrderResult.calls.length);
-
-                // Save order note for display on orders page
-                if (limitOrderResult.salt) {
-                    saveOrderNote(createCollateralSwapNote(
-                        limitOrderResult.salt,
-                        protocolName,
-                        selectedFrom.symbol, // old collateral
-                        selectedTo.symbol,   // new collateral
-                        chainId
-                    ));
-                }
-
-                // Execute via wallet
-                const notificationId = notification.loading(
-                    <TransactionToast step="pending" message={`Creating limit order (${limitOrderResult.calls.length} operations)...`} />
-                );
-
-                try {
-                    if (sendCallsAsync) {
-                        // EIP-5792 Batched execution
-                        const { id: batchId } = await sendCallsAsync({
-                            calls: limitOrderResult.calls,
-                            experimental_fallback: true,
-                        });
-
-                        notification.remove(notificationId);
-                        
-                        // Show success notification with CoW Explorer link
-                        const explorerUrl = orderManagerAddress 
-                            ? getCowExplorerAddressUrl(chainId, orderManagerAddress)
-                            : undefined;
-                        
-                        notification.success(
-                            <TransactionToast
-                                step="confirmed"
-                                message="Limit order created!"
-                                secondaryLink={explorerUrl}
-                                secondaryLinkText="View on CoW Explorer"
-                            />
-                        );
-
-                        track("collateral_swap_limit_order_complete", { ...txBeginProps, status: "success", batchId });
-                        onClose();
-                    } else if (walletClient && publicClient) {
-                        // Sequential execution fallback
-                        for (let i = 0; i < limitOrderResult.calls.length; i++) {
-                            const call = limitOrderResult.calls[i];
-                            notification.remove(notificationId);
-                            const stepNotificationId = notification.loading(
-                                <TransactionToast step="pending" message={`Executing step ${i + 1}/${limitOrderResult.calls.length}...`} />
-                            );
-
-                            const txHash = await walletClient.sendTransaction({
-                                account: userAddress,
-                                to: call.to as `0x${string}`,
-                                data: call.data as `0x${string}`,
-                            });
-
-                            await publicClient.waitForTransactionReceipt({ hash: txHash });
-                            notification.remove(stepNotificationId);
-                        }
-
-                        const explorerUrl = getCowExplorerAddressUrl(chainId, userAddress);
-                        notification.success(
-                            <TransactionToast
-                                step="confirmed"
-                                message="Limit order created!"
-                                blockExplorerLink={explorerUrl}
-                            />
-                        );
-
-                        track("collateral_swap_limit_order_complete", { ...txBeginProps, status: "success", mode: "sequential" });
-                        onClose();
-                    } else {
-                        throw new Error("Wallet not connected");
-                    }
-                } catch (batchError) {
-                    notification.remove(notificationId);
-                    throw batchError;
-                }
+                await executeLimitOrder(txBeginProps);
             } else {
-                // Market Order (existing flash loan flow)
-                track("collateral_swap_tx_begin", txBeginProps);
-                await handleSwap(amountIn, isMax);
-                track("collateral_swap_tx_complete", { ...txBeginProps, status: "success" });
+                await executeMarketOrder(txBeginProps);
             }
         } catch (e) {
             const eventName = executionType === "limit" ? "collateral_swap_limit_order_complete" : "collateral_swap_tx_complete";

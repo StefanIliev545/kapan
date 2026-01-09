@@ -7,7 +7,6 @@ import {
   CairoOptionVariant,
   CairoResult,
   CairoResultVariant,
-  getChecksumAddress,
   uint256,
   validateAndParseAddress,
 } from "starknet";
@@ -17,7 +16,7 @@ import configExternalContracts from "~~/contracts/configExternalContracts";
 import deployedContractsData from "~~/contracts/snfoundry/deployedContracts";
 import predeployedContracts from "~~/contracts/predeployedContracts";
 import scaffoldConfig from "~~/scaffold.config";
-import { feltToHex, isJsonString } from "~~/utils/scaffold-stark/common";
+import { feltToHex } from "~~/utils/scaffold-stark/common";
 import {
   isCairoArray,
   isCairoBigInt,
@@ -30,7 +29,6 @@ import {
   isCairoOption,
   isCairoResult,
   isCairoTuple,
-  isCairoType,
   isCairoU256,
   parseGenericType,
 } from "~~/utils/scaffold-stark/types";
@@ -96,9 +94,7 @@ const mergedPredeployedContracts = deepMergeContracts(predeployedContracts, conf
 
 const contractsData = deepMergeContracts(deployedContractsData, mergedPredeployedContracts);
 
-type IsContractDeclarationMissing<TYes, TNo> = typeof contractsData extends {
-  [key in ConfiguredChainId]: any;
-}
+type IsContractDeclarationMissing<TYes, TNo> = typeof contractsData extends Record<ConfiguredChainId, any>
   ? TNo
   : TYes;
 
@@ -115,21 +111,6 @@ export type AbiOutput = {
   type: string;
 };
 type AbiStateMutability = "view" | "external";
-type AbiImpl = {
-  type: "impl";
-  name: string;
-  interface_name: string;
-};
-type AbiInterface = {
-  type: "interface";
-  name: string;
-  items: readonly AbiFunction[];
-};
-type AbiConstructor = {
-  type: "constructor";
-  name: "constructor";
-  inputs: readonly AbiParameter[];
-};
 export type AbiFunction = {
   type: "function";
   name: string;
@@ -185,6 +166,7 @@ export type FunctionNamesWithInputs<TContractName extends ContractName> = Exclud
 >["name"];
 
 type OptionalTupple<T> = T extends readonly [infer H, ...infer R] ? readonly [H | undefined, ...OptionalTupple<R>] : T;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type UnionToIntersection<U> = Expand<(U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never>;
 type Expand<T> = T extends object ? (T extends infer O ? { [K in keyof O]: O[K] } : never) : T;
 

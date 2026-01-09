@@ -1,6 +1,6 @@
 import { FC, useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { track } from "@vercel/analytics";
-import { formatUnits, parseUnits, Address, type Hex, encodeFunctionData } from "viem";
+import { formatUnits, parseUnits, Address } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { parseAmount } from "~~/utils/validation";
 
@@ -11,7 +11,7 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
-import { useAutoSlippage, SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
+import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { useCowLimitOrder, type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
 import { useCowQuote, getCowQuoteBuyAmount, getCowQuoteSellAmount } from "~~/hooks/useCowQuote";
 import { 
@@ -21,28 +21,24 @@ import {
     createProtocolInstruction,
     encodeApprove,
     encodePullToken,
-    encodePushToken,
-    encodeToOutput,
-    encodeSubtract,
     encodeAdd,
     encodeLendingInstruction,
     LendingOp,
     normalizeProtocolName,
 } from "~~/utils/v2/instructionHelpers";
-import { CompletionType, getPreferredFlashLoanLender, calculateFlashLoanFee, getCowExplorerAddressUrl, getKapanCowAdapter } from "~~/utils/cow";
-import { is1inchSupported, isPendleSupported, getBestSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
-import { ExclamationTriangleIcon, InformationCircleIcon, Cog6ToothIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { CompletionType, getPreferredFlashLoanLender, calculateFlashLoanFee, getCowExplorerAddressUrl } from "~~/utils/cow";
+import { is1inchSupported, isPendleSupported, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
+import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
-import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
+import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import {
     ExecutionTypeToggle,
     type ExecutionType,
     MarketSwapStats,
     LimitOrderSection,
-    BatchedTxToggle,
     hasEnoughCollateral as checkCollateralSufficiency,
 } from "./common";
-import { WarningDisplay, InfoDisplay } from "~~/components/common/ErrorDisplay";
+import { WarningDisplay } from "~~/components/common/ErrorDisplay";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { useSendCalls } from "wagmi/experimental";
@@ -130,13 +126,21 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         wasOpenRef.current = isOpen;
     }, [availableCollaterals?.length, chainId, debtName, debtToken, isOpen, context, protocolName]);
 
+    // Memoize position object for useMovePositionData to avoid recreation
+    const positionForFlashLoan = useMemo(() => ({
+        name: debtName,
+        tokenAddress: debtToken,
+        decimals: debtDecimals,
+        type: "borrow" as const,
+    }), [debtName, debtToken, debtDecimals]);
+
     // Flash Loan Providers
     const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
         isOpen,
         networkType: "evm",
         fromProtocol: protocolName,
         chainId,
-        position: { name: debtName, tokenAddress: debtToken, decimals: debtDecimals, type: "borrow" },
+        position: positionForFlashLoan,
     });
 
     // "From" is fixed (debt to repay) - user inputs how much debt to repay
@@ -177,17 +181,23 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const { sendCallsAsync } = useSendCalls();
     
     // CoW limit order hook
-    const { 
-        buildOrderCalls: buildLimitOrderCalls, 
-        buildRouterCall, 
-        isReady: limitOrderReady, 
-        orderManagerAddress 
+    const {
+        buildOrderCalls: buildLimitOrderCalls,
+        isReady: limitOrderReady,
+        orderManagerAddress
     } = useCowLimitOrder();
     
     // Callback for LimitOrderConfig
     const handleLimitOrderConfigChange = useCallback((config: LimitOrderResult) => {
         setLimitOrderConfig(config);
     }, []);
+
+    // Callback for ExecutionTypeToggle onChange
+    const handleExecutionTypeChange = useCallback((type: ExecutionType) => {
+        setExecutionType(type);
+        // Set higher default slippage for limit orders (1% minimum for better fill rates)
+        if (type === "limit" && slippage < 1) setSlippage(1);
+    }, [slippage]);
 
     // Memoize sellToken for LimitOrderConfig to prevent infinite re-renders
     // For close-with-collateral, we flash loan the COLLATERAL (sellToken), not debt
@@ -236,17 +246,8 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             
             console.log("[Limit Order] Batch confirmed, salt:", lastOrderSalt);
             
-            // Check if order appears in CoW orderbook
-            setTimeout(async () => {
-                try {
-                    const { checkOrderInOrderbook } = await import("~~/utils/cow");
-                    const appDataHash = lastOrderSalt; // We'd need to store appDataHash too
-                    // For now just log that batch confirmed
-                    console.log("[Limit Order] Batch confirmed - check CoW Explorer for order status");
-                } catch (e) {
-                    console.error("[Limit Order] Failed to check orderbook:", e);
-                }
-            }, 5000);
+            // Log batch confirmation for debugging
+            console.log("[Limit Order] Batch confirmed - check CoW Explorer for order status");
             
             // Reset state
             setLastOrderSalt(null);
@@ -487,7 +488,6 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         
         // Calculate per-chunk amounts
         const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
-        const chunkSellAmount = limitOrderCollateral / BigInt(numChunks);
         
         // PRE-HOOK: Empty! fundOrder already moves flash-loaned collateral to OrderManager
         const preInstructions: ProtocolInstruction[] = [];
@@ -596,7 +596,10 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         simulateWhenBatching: true,
     });
 
-    const handleSwapWrapper = async () => {
+    // Destructure batchingPreference early so it can be used in callbacks
+    const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
+
+    const handleSwapWrapper = useCallback(async () => {
         const txBeginProps = {
             network: "evm",
             protocol: protocolName,
@@ -629,10 +632,10 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         } finally {
             setIsSubmitting(false);
         }
-    };
+    }, [protocolName, chainId, debtToken, debtName, selectedTo?.address, selectedTo?.symbol, amountIn, isMax, slippage, preferBatching, selectedProvider?.name, swapRouter, context, handleSwap]);
 
     // ============ Limit Order: Submit Handler ============
-    const handleLimitOrderSubmit = async () => {
+    const handleLimitOrderSubmit = useCallback(async () => {
         if (!selectedTo || !userAddress || !orderManagerAddress || !walletClient || !publicClient) {
             throw new Error("Missing required data for limit order");
         }
@@ -664,7 +667,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             // - buyAmount (minBuyPerChunk) = EXACT amount of debt we need = repayAmountRaw
             // - sellAmount (chunkSize) = MAX collateral we're willing to sell = limitOrderCollateral (from CoW quote + slippage)
             // Slippage is already applied to limitOrderCollateral, so we can fill even if price moves against us.
-            
+
             console.log("[Limit Order] Building close-with-collateral order (KIND_BUY):", {
                 sellToken: selectedTo.symbol,
                 buyToken: debtName,
@@ -710,13 +713,13 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             // Check for AppData registration errors
             if (!limitOrderResult.success) {
                 const errorMsg = limitOrderResult.error || "Unknown error building order";
-                const fullError = limitOrderResult.errorDetails?.apiResponse 
+                const fullError = limitOrderResult.errorDetails?.apiResponse
                     ? `${errorMsg}\n\nAPI Response: ${limitOrderResult.errorDetails.apiResponse}`
                     : errorMsg;
                 console.error("[Limit Order] Build failed:", fullError, limitOrderResult.errorDetails);
                 notification.error(
-                    <TransactionToast 
-                        step="failed" 
+                    <TransactionToast
+                        step="failed"
                         message={`CoW API Error: ${errorMsg}`}
                     />
                 );
@@ -752,15 +755,15 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
                     // Store salt for CoW Explorer link in confirmation toast
                     setLastOrderSalt(limitOrderResult.salt);
-                    
+
                     // Suppress hook's generic notifications - we'll show custom ones
                     setSuppressBatchNotifications(true);
-                    
+
                     // Set batch ID to trigger status tracking
                     setBatchId(newBatchId);
 
                     notification.remove(notificationId);
-                    
+
                     // Show loading notification while waiting for confirmation
                     const loadingId = notification.loading(
                         <TransactionToast
@@ -769,11 +772,11 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                         />
                     );
                     setLimitOrderNotificationId(loadingId);
-                    
+
                     console.log("[Limit Order] Batch submitted:", newBatchId);
                     console.log("[Limit Order] Salt:", limitOrderResult.salt);
                     console.log("[Limit Order] AppData Hash:", limitOrderResult.appDataHash);
-                    
+
                     track("close_with_collateral_limit_order_complete", { ...txBeginProps, status: "submitted", mode: "batched" });
                     // Don't close modal yet - useEffect will close when batch confirms
                 } catch (batchError) {
@@ -818,13 +821,13 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 }
 
                 notification.remove(notificationId);
-                
+
                 // Log order details for debugging
                 console.log("[Limit Order] Order created successfully");
                 console.log("[Limit Order] Salt:", limitOrderResult.salt);
                 console.log("[Limit Order] AppData Hash:", limitOrderResult.appDataHash);
                 console.log("[Limit Order] OrderManager:", orderManagerAddress);
-                
+
                 // Check if order appears in CoW orderbook (give it a moment)
                 setTimeout(async () => {
                     try {
@@ -834,7 +837,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                             orderManagerAddress,
                             limitOrderResult.appDataHash
                         );
-                        
+
                         if (checkResult.found) {
                             console.log("[Limit Order] Order found in CoW orderbook:", checkResult.order);
                         } else {
@@ -845,11 +848,11 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                         console.error("[Limit Order] Failed to check orderbook:", e);
                     }
                 }, 5000); // Check after 5 seconds
-                
+
                 const explorerUrl = getCowExplorerAddressUrl(chainId, userAddress);
                 notification.success(
-                    <TransactionToast 
-                        step="confirmed" 
+                    <TransactionToast
+                        step="confirmed"
                         message="Limit order created! Position will close when order fills."
                         blockExplorerLink={explorerUrl}
                     />
@@ -870,9 +873,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         } finally {
             setIsLimitSubmitting(false);
         }
-    };
-
-    const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, debtDecimals, limitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, useBatchedTx, sendCallsAsync, setBatchId, setSuppressBatchNotifications, onClose]);
 
     // Can submit based on execution type
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter;
@@ -905,16 +906,12 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     });
 
     // Custom stats for close with collateral - using shared components
-    const customStats = (
+    const customStats = useMemo(() => (
         <div className="space-y-2">
             {/* Execution Type Toggle */}
             <ExecutionTypeToggle
                 value={executionType}
-                onChange={(type) => {
-                    setExecutionType(type);
-                    // Set higher default slippage for limit orders (1% minimum for better fill rates)
-                    if (type === "limit" && slippage < 1) setSlippage(1);
-                }}
+                onChange={handleExecutionTypeChange}
                 limitAvailable={cowAvailable}
                 limitReady={limitOrderReady}
             />
@@ -972,10 +969,10 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 </div>
             )}
         </div>
-    );
+    ), [executionType, handleExecutionTypeChange, cowAvailable, limitOrderReady, selectedTo, limitOrderSellToken, chainId, limitOrderCollateral, requiredCollateral, handleLimitOrderConfigChange, limitOrderConfig, isCowQuoteLoading, useBatchedTx, setUseBatchedTx, slippage, setSlippage, priceImpact, priceImpactColorClass, formattedPriceImpact, exchangeRate, debtName, swapQuote, expectedOutput, outputCoversRepay, cowQuote, debtDecimals, srcUSD, dstUSD]);
 
     // Info content
-    const infoContent = (
+    const infoContent = useMemo(() => (
         <div className="space-y-4 py-2">
             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
                 <InformationCircleIcon className="size-5 flex-shrink-0" />
@@ -1024,10 +1021,10 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 Total debt: {formatUnits(debtBalance, debtDecimals)} {debtName}
             </div>
         </div>
-    );
+    ), [swapRouter, debtBalance, debtDecimals, debtName]);
 
     // Warnings
-    const warnings = (
+    const warnings = useMemo(() => (
         <>
             {!hasEnoughCollateral && requiredCollateral > 0n && selectedTo && (
                 <WarningDisplay
@@ -1049,10 +1046,13 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 />
             )}
         </>
-    );
+    ), [hasEnoughCollateral, requiredCollateral, selectedTo, requiredCollateralFormatted, swapRouter, swapQuote, oneInchAdapter, hasAdapter, isOpen]);
 
     // Hide dropdown when there's only one collateral option (e.g., Morpho isolated pairs)
     const singleCollateral = toAssets.length === 1;
+
+    // Memoize fromAssets array to avoid recreation on every render
+    const fromAssetsArray = useMemo(() => [fromAsset], [fromAsset]);
 
     return (
         <SwapModalShell
@@ -1060,7 +1060,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             onClose={onClose}
             title="Close with Collateral"
             protocolName={protocolName}
-            fromAssets={[fromAsset]}
+            fromAssets={fromAssetsArray}
             toAssets={toAssets}
             selectedFrom={selectedFrom}
             setSelectedFrom={setSelectedFrom}

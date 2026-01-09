@@ -50,6 +50,10 @@ const networkOptions: NetworkOption[] = [
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
 ];
 
+// CSS class constants to avoid duplicate string warnings
+const BUTTON_ACTIVE_CLASS = "bg-base-100 text-base-content shadow-sm";
+const BUTTON_INACTIVE_CLASS = "text-base-content/50 hover:text-base-content/80";
+
 type ProtocolKey = "aave" | "compound" | "venus" | "vesu" | "nostra";
 
 type ProtocolConfig =
@@ -130,8 +134,8 @@ const MarketsPageContent: NextPage = () => {
                   <button
                     className={`rounded-md p-1.5 transition-all duration-200 ${
                       viewMode === "list"
-                        ? "bg-base-100 text-base-content shadow-sm"
-                        : "text-base-content/50 hover:text-base-content/80"
+                        ? BUTTON_ACTIVE_CLASS
+                        : BUTTON_INACTIVE_CLASS
                     }`}
                     onClick={() => setViewMode("list")}
                     aria-label="List view"
@@ -141,8 +145,8 @@ const MarketsPageContent: NextPage = () => {
                   <button
                     className={`rounded-md p-1.5 transition-all duration-200 ${
                       viewMode === "grid"
-                        ? "bg-base-100 text-base-content shadow-sm"
-                        : "text-base-content/50 hover:text-base-content/80"
+                        ? BUTTON_ACTIVE_CLASS
+                        : BUTTON_INACTIVE_CLASS
                     }`}
                     onClick={() => setViewMode("grid")}
                     aria-label="Grid view"
@@ -157,8 +161,8 @@ const MarketsPageContent: NextPage = () => {
                 <button
                   className={`rounded-md px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
                     groupMode === "token"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/50 hover:text-base-content/80"
+                      ? BUTTON_ACTIVE_CLASS
+                      : BUTTON_INACTIVE_CLASS
                   }`}
                   onClick={() => setGroupMode("token")}
                 >
@@ -167,8 +171,8 @@ const MarketsPageContent: NextPage = () => {
                 <button
                   className={`rounded-md px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
                     groupMode === "protocol"
-                      ? "bg-base-100 text-base-content shadow-sm"
-                      : "text-base-content/50 hover:text-base-content/80"
+                      ? BUTTON_ACTIVE_CLASS
+                      : BUTTON_INACTIVE_CLASS
                   }`}
                   onClick={() => setGroupMode("protocol")}
                 >

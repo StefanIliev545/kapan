@@ -1,6 +1,6 @@
 import { FC, useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { track } from "@vercel/analytics";
-import { formatUnits, parseUnits, Address, type Hex } from "viem";
+import { formatUnits, parseUnits, Address } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { useSendCalls } from "wagmi/experimental";
 import { parseAmount } from "~~/utils/validation";
@@ -12,7 +12,7 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
-import { useAutoSlippage, SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
+import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { useCowLimitOrder, type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
 import { useCowQuote, getCowQuoteSellAmount } from "~~/hooks/useCowQuote";
 import { 
@@ -34,14 +34,13 @@ import {
     getCowExplorerAddressUrl,
 } from "~~/utils/cow";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
-import { ExclamationTriangleIcon, InformationCircleIcon, Cog6ToothIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
-import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
+import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import {
     ExecutionTypeToggle,
     type ExecutionType,
     MarketSwapStats,
-    SlippageSelector,
     LimitOrderSection,
 } from "./common";
 import { WarningDisplay } from "~~/components/common/ErrorDisplay";
@@ -147,6 +146,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         price: debtFromPrice,
     }), [debtFromName, debtFromToken, debtFromDecimals, currentDebtBalance, debtFromIcon, debtFromPrice]);
 
+    // Memoized array for fromAssets prop
+    const fromAssets = useMemo(() => [fromAsset], [fromAsset]);
+
     const [selectedFrom, setSelectedFrom] = useState<SwapAsset | null>(fromAsset);
     const [selectedTo, setSelectedTo] = useState<SwapAsset | null>(null);
     const [slippage, setSlippage] = useState<number>(0.1); // Start with minimum, will auto-adjust
@@ -158,7 +160,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const [executionType, setExecutionType] = useState<ExecutionType>("market");
     const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
     const [isLimitSubmitting, setIsLimitSubmitting] = useState(false);
-    const [useBatchedTx, setUseBatchedTx] = useState<boolean>(false);
+    const [useBatchedTx] = useState<boolean>(false);
     const [lastOrderSalt, setLastOrderSalt] = useState<string | null>(null);
     const [limitOrderNotificationId, setLimitOrderNotificationId] = useState<string | number | null>(null);
     const cowAvailable = isCowProtocolSupported(chainId);
@@ -456,7 +458,6 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         
         // Calculate per-chunk amounts
         const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
-        const chunkSellAmount = limitOrderNewDebt / BigInt(numChunks);
         const chunkFlashLoanAmount = cowFlashLoanInfo.amount / BigInt(numChunks);
         
         // PRE-HOOK: Empty - fundOrder handles transfer
@@ -548,7 +549,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         simulateWhenBatching: true,
     });
 
-    const handleSwapWrapper = async () => {
+    const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
+
+    const handleSwapWrapper = useCallback(async () => {
         const txBeginProps = {
             network: "evm",
             protocol: protocolName,
@@ -581,10 +584,10 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         } finally {
             setIsSubmitting(false);
         }
-    };
+    }, [protocolName, chainId, context, debtFromToken, debtFromName, selectedTo?.address, selectedTo?.symbol, amountIn, isMax, slippage, preferBatching, selectedProvider?.name, swapRouter, handleSwap]);
 
     // ============ Limit Order: Submit Handler ============
-    const handleLimitOrderSubmit = async () => {
+    const handleLimitOrderSubmit = useCallback(async () => {
         if (!selectedTo || !userAddress || !orderManagerAddress || !walletClient || !publicClient) {
             throw new Error("Missing required data for limit order");
         }
@@ -655,13 +658,13 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
             if (!limitOrderResult.success) {
                 const errorMsg = limitOrderResult.error || "Unknown error building order";
-                const fullError = limitOrderResult.errorDetails?.apiResponse 
+                const fullError = limitOrderResult.errorDetails?.apiResponse
                     ? `${errorMsg}\n\nAPI Response: ${limitOrderResult.errorDetails.apiResponse}`
                     : errorMsg;
                 console.error("[Limit Order] Build failed:", fullError, limitOrderResult.errorDetails);
                 notification.error(
-                    <TransactionToast 
-                        step="failed" 
+                    <TransactionToast
+                        step="failed"
                         message={`CoW API Error: ${errorMsg}`}
                     />
                 );
@@ -701,8 +704,8 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
                     notification.remove(notificationId);
                     notification.loading(
-                        <TransactionToast 
-                            step="pending" 
+                        <TransactionToast
+                            step="pending"
                             message="Waiting for batch confirmation..."
                         />
                     );
@@ -750,8 +753,8 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 notification.remove(notificationId);
             }
             notification.error(
-                <TransactionToast 
-                    step="failed" 
+                <TransactionToast
+                    step="failed"
                     message={e instanceof Error ? e.message : "Transaction failed"}
                 />
             );
@@ -764,9 +767,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         } finally {
             setIsLimitSubmitting(false);
         }
-    };
-
-    const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, limitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, useBatchedTx, sendCallsAsync, setSuppressBatchNotifications, setBatchId, onClose]);
 
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && requiredNewDebt > 0n && hasAdapter;
     const canSubmitLimit = executionType === "limit" && limitOrderReady && !!cowFlashLoanInfo && 
@@ -787,8 +788,23 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         resetDep: selectedTo?.address,
     });
 
+    // Memoized extraContent for LimitOrderSection
+    const limitOrderExtraContent = useMemo(() => {
+        if (!cowQuote || !selectedTo) return null;
+        return (
+            <div className="text-base-content/60 border-base-300 border-t pt-1 text-xs">
+                CoW quote: sell ~{formatUnits(getCowQuoteSellAmount(cowQuote), selectedTo.decimals)} {selectedTo.symbol}
+                {limitOrderNewDebt > getCowQuoteSellAmount(cowQuote) && (
+                    <span className="text-warning ml-1">
+                        (+{slippage}% buffer)
+                    </span>
+                )}
+            </div>
+        );
+    }, [cowQuote, selectedTo, limitOrderNewDebt, slippage]);
+
     // Custom stats for debt swap - using shared components
-    const customStatsWithToggle = (
+    const customStatsWithToggle = useMemo(() => (
         <div className="space-y-2">
             {/* Execution Type Toggle */}
             <ExecutionTypeToggle
@@ -835,20 +851,11 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                     slippage={slippage}
                     setSlippage={setSlippage}
                     showSlippage={true}
-                    extraContent={cowQuote && selectedTo && (
-                        <div className="text-base-content/60 border-base-300 border-t pt-1 text-xs">
-                            CoW quote: sell ~{formatUnits(getCowQuoteSellAmount(cowQuote), selectedTo.decimals)} {selectedTo.symbol}
-                            {limitOrderNewDebt > getCowQuoteSellAmount(cowQuote) && (
-                                <span className="text-warning ml-1">
-                                    (+{slippage}% buffer)
-                                </span>
-                            )}
-                        </div>
-                    )}
+                    extraContent={limitOrderExtraContent}
                 />
             )}
         </div>
-    );
+    ), [executionType, setExecutionType, cowAvailable, limitOrderReady, slippage, setSlippage, priceImpact, priceImpactColorClass, formattedPriceImpact, exchangeRate, selectedTo, debtFromName, swapQuote, expectedOutput, outputCoversRepay, srcUSD, dstUSD, chainId, limitOrderSellToken, limitOrderNewDebt, requiredNewDebt, handleLimitOrderConfigChange, limitOrderConfig, isCowQuoteLoading, limitOrderExtraContent]);
 
     // Info content
     const infoContent = executionType === "market" ? (
@@ -1006,7 +1013,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             onClose={onClose}
             title="Swap Debt"
             protocolName={protocolName}
-            fromAssets={[fromAsset]}
+            fromAssets={fromAssets}
             toAssets={toAssets}
             initialFromAddress={debtFromToken}
             selectedFrom={selectedFrom}

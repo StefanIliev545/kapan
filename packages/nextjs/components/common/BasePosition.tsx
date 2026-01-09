@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useCallback } from "react";
 import Image from "next/image";
 import clsx from "clsx";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
@@ -12,6 +12,9 @@ import { useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
+
+// Static handler for stopPropagation - extracted to module level to avoid recreation
+const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
 
 // ====================
 // Sub-components to reduce duplication
@@ -264,8 +267,8 @@ export const BasePosition: FC<BasePositionProps> = ({
 
   const hasAnyActions = actions.length > 0;
 
-  // Toggle expanded state
-  const toggleExpanded = (e: React.MouseEvent) => {
+  // Toggle expanded state - memoized to avoid recreation on every render
+  const toggleExpanded = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest(".dropdown")) {
       return;
     }
@@ -277,7 +280,7 @@ export const BasePosition: FC<BasePositionProps> = ({
     } else {
       expanded.toggle();
     }
-  };
+  }, [hasAnyActions, onToggleExpanded, expanded]);
 
   // Default info button using shared PositionInfoDropdown component
   const defaultInfoButton = (
@@ -399,11 +402,11 @@ export const BasePosition: FC<BasePositionProps> = ({
               {renderName ? renderName(name) : name}
             </span>
             {infoButtonNode && (
-              <div className="hidden flex-shrink-0 sm:block" onClick={e => e.stopPropagation()}>
+              <div className="hidden flex-shrink-0 sm:block" onClick={stopPropagation}>
                 {infoButtonNode}
               </div>
             )}
-            {afterInfoContent && <div className="hidden sm:block" onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
+            {afterInfoContent && <div className="hidden sm:block" onClick={stopPropagation}>{afterInfoContent}</div>}
           </div>
 
           {/* Stats - spread out across available space */}
@@ -465,11 +468,11 @@ export const BasePosition: FC<BasePositionProps> = ({
               </div>
             </div>
             {infoButtonNode && (
-              <div className="ml-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+              <div className="ml-1.5 flex-shrink-0" onClick={stopPropagation}>
                 {infoButtonNode}
               </div>
             )}
-            {afterInfoContent && <div onClick={e => e.stopPropagation()}>{afterInfoContent}</div>}
+            {afterInfoContent && <div onClick={stopPropagation}>{afterInfoContent}</div>}
           </div>
 
           {/* Stats: Rates */}
@@ -496,7 +499,7 @@ export const BasePosition: FC<BasePositionProps> = ({
 
         {/* Action Buttons - Only visible when expanded */}
         {isExpanded && hasAnyActions && (
-          <div className="border-base-300/50 -mx-4 mt-3 border-t pt-2" onClick={e => e.stopPropagation()}>
+          <div className="border-base-300/50 -mx-4 mt-3 border-t pt-2" onClick={stopPropagation}>
             {beforeActionsContent}
             {/* Unified segmented bar - centered */}
             <div className="flex w-full justify-center pb-0">
@@ -510,12 +513,12 @@ export const BasePosition: FC<BasePositionProps> = ({
         )}
 
         {isExpanded && actionsDisabled && !suppressDisabledMessage && (
-          <div className="text-base-content/50 mt-3 text-sm" onClick={e => e.stopPropagation()}>
+          <div className="text-base-content/50 mt-3 text-sm" onClick={stopPropagation}>
             {disabledMessage}
           </div>
         )}
 
-        {isExpanded && extraActions && <div className="mt-3" onClick={e => e.stopPropagation()}>{extraActions}</div>}
+        {isExpanded && extraActions && <div className="mt-3" onClick={stopPropagation}>{extraActions}</div>}
       </div>
     </>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -16,6 +16,15 @@ import { createTextChangeHandler } from "~~/utils/handlers";
 
 // Categories list
 const categories = ["All", "DeFi Strategies", "Market Analysis", "Ecosystem", "Risk Management", "Tutorials"];
+
+// Animation constants - extracted to avoid inline object creation
+const FADE_IN_INITIAL = { opacity: 0, y: 20 };
+const FADE_IN_ANIMATE = { opacity: 1, y: 0 };
+const FADE_IN_UP_INITIAL = { opacity: 0, y: -20 };
+const FADE_IN_TRANSITION = { duration: 0.5 };
+const FADE_IN_TRANSITION_DELAY_02 = { duration: 0.5, delay: 0.2 };
+const FADE_IN_TRANSITION_DELAY_03 = { duration: 0.5, delay: 0.3 };
+const FADE_IN_TRANSITION_DELAY_05 = { duration: 0.5, delay: 0.5 };
 
 // Helper function to get image src from coverImage field
 const getImageSrc = (coverImage: BlogPost['coverImage']): string => {
@@ -37,9 +46,9 @@ const getImageAlt = (coverImage: BlogPost['coverImage'], title: string): string 
 const FeaturedPost = ({ post }: { post: BlogPost }) => (
   <Link href={`/blog/${post.slug}`} className="block">
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
+      initial={FADE_IN_INITIAL}
+      animate={FADE_IN_ANIMATE}
+      transition={FADE_IN_TRANSITION}
       className="card bg-base-200/80 dark:bg-base-300/30 group overflow-hidden shadow-xl transition-all duration-300 hover:shadow-2xl"
     >
       <div className="md:flex">
@@ -85,14 +94,17 @@ const FeaturedPost = ({ post }: { post: BlogPost }) => (
 );
 
 // Blog post card component
-const BlogPostCard = ({ post, index }: { post: BlogPost; index: number }) => (
-  <Link href={`/blog/${post.slug}`} className="block h-full">
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-      className="card bg-base-200/80 dark:bg-base-300/30 group h-full overflow-hidden shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
-    >
+const BlogPostCard = React.memo(function BlogPostCard({ post, index }: { post: BlogPost; index: number }) {
+  const transition = React.useMemo(() => ({ duration: 0.5, delay: index * 0.1 }), [index]);
+
+  return (
+    <Link href={`/blog/${post.slug}`} className="block h-full">
+      <motion.div
+        initial={FADE_IN_INITIAL}
+        animate={FADE_IN_ANIMATE}
+        transition={transition}
+        className="card bg-base-200/80 dark:bg-base-300/30 group h-full overflow-hidden shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+      >
       <figure className="relative h-56 w-full">
         <Image
           src={getImageSrc(post.coverImage)}
@@ -130,7 +142,33 @@ const BlogPostCard = ({ post, index }: { post: BlogPost; index: number }) => (
       </div>
     </motion.div>
   </Link>
-);
+  );
+});
+
+// Category button component to avoid inline onClick handlers
+const CategoryButton = React.memo(function CategoryButton({
+  category,
+  isSelected,
+  onSelect,
+}: {
+  category: string;
+  isSelected: boolean;
+  onSelect: (category: string) => void;
+}) {
+  const handleClick = useCallback(() => {
+    onSelect(category);
+  }, [category, onSelect]);
+
+  return (
+    <button
+      className={`btn btn-sm ${isSelected ? "btn-primary dark:btn-accent" : "btn-ghost"}`}
+      onClick={handleClick}
+    >
+      <TagIcon className="mr-1 size-4" />
+      {category}
+    </button>
+  );
+});
 
 type BlogContentProps = {
   allPosts: BlogPost[];
@@ -138,7 +176,7 @@ type BlogContentProps = {
   regularPosts: BlogPost[];
 };
 
-export default function BlogContent({ allPosts, featuredPost, regularPosts }: BlogContentProps) {
+export default function BlogContent({ allPosts, featuredPost }: BlogContentProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
@@ -163,7 +201,7 @@ export default function BlogContent({ allPosts, featuredPost, regularPosts }: Bl
       <div className="relative py-16 md:py-24">
         <div className="container mx-auto px-4">
           <div className="mx-auto mb-12 max-w-3xl text-center">
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <motion.div initial={FADE_IN_UP_INITIAL} animate={FADE_IN_ANIMATE} transition={FADE_IN_TRANSITION}>
               <h1 className="from-primary to-secondary dark:from-accent dark:to-primary mb-4 bg-gradient-to-r bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
                 Kapan Finance Blog
               </h1>
@@ -173,9 +211,9 @@ export default function BlogContent({ allPosts, featuredPost, regularPosts }: Bl
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
+              initial={FADE_IN_INITIAL}
+              animate={FADE_IN_ANIMATE}
+              transition={FADE_IN_TRANSITION_DELAY_02}
               className="relative mt-8"
             >
               <div className="relative mx-auto flex w-full max-w-2xl">
@@ -195,20 +233,18 @@ export default function BlogContent({ allPosts, featuredPost, regularPosts }: Bl
 
           {/* Categories */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
+            initial={FADE_IN_INITIAL}
+            animate={FADE_IN_ANIMATE}
+            transition={FADE_IN_TRANSITION_DELAY_03}
             className="mb-12 flex flex-wrap justify-center gap-2"
           >
             {categories.map(category => (
-              <button
+              <CategoryButton
                 key={category}
-                className={`btn btn-sm ${selectedCategory === category ? "btn-primary dark:btn-accent" : "btn-ghost"}`}
-                onClick={() => setSelectedCategory(category)}
-              >
-                <TagIcon className="mr-1 size-4" />
-                {category}
-              </button>
+                category={category}
+                isSelected={selectedCategory === category}
+                onSelect={setSelectedCategory}
+              />
             ))}
           </motion.div>
         </div>
@@ -255,9 +291,9 @@ export default function BlogContent({ allPosts, featuredPost, regularPosts }: Bl
 
         {/* Newsletter signup */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
+          initial={FADE_IN_INITIAL}
+          animate={FADE_IN_ANIMATE}
+          transition={FADE_IN_TRANSITION_DELAY_05}
           className="card from-primary/10 to-secondary/10 dark:from-accent/10 dark:to-primary/10 rounded-xl bg-gradient-to-r p-8 shadow-lg"
         >
           <div className="mx-auto max-w-2xl text-center">

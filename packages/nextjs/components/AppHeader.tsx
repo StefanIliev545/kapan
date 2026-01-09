@@ -20,6 +20,15 @@ import { useHeaderState } from "~~/hooks/common/useHeaderState";
 import { useAccount } from "~~/hooks/useAccount";
 import { normalizeUserAddress } from "~~/utils/address";
 
+// Motion animation constants
+const INITIAL_OPACITY = { opacity: 0 };
+const ANIMATE_OPACITY = { opacity: 1 };
+const INDICATOR_TRANSITION = { type: "spring" as const, stiffness: 400, damping: 30 };
+const WALLET_TRANSITION = { delay: 0.5, duration: 0.5 };
+
+// Style constants
+const Z_INDEX_BACK = { zIndex: -1 };
+
 type HeaderMenuLink = {
   label: string;
   href: string;
@@ -38,6 +47,45 @@ const appMenuLinks: HeaderMenuLink[] = [
     icon: <BanknotesIcon className="size-5" />,
   },
 ];
+
+// Helper component for individual menu link to avoid inline ref callback
+const MenuLinkItem = ({
+  href,
+  icon,
+  label,
+  isActive,
+  buttonRefs,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  isActive: boolean;
+  buttonRefs: React.MutableRefObject<Map<string, HTMLAnchorElement>>;
+}) => {
+  const setRef = useCallback(
+    (el: HTMLAnchorElement | null) => {
+      if (el) buttonRefs.current.set(href, el);
+    },
+    [buttonRefs, href],
+  );
+
+  return (
+    <Link
+      href={href}
+      ref={setRef}
+      className={`relative z-10 flex items-center gap-2 rounded-md px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors duration-200 ${
+        isActive
+          ? "text-base-content"
+          : "text-base-content/40 hover:text-base-content/70"
+      }`}
+    >
+      <span className={`transition-transform duration-200 ${isActive ? "scale-110" : ""}`}>
+        {icon}
+      </span>
+      <span>{label}</span>
+    </Link>
+  );
+};
 
 const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
   const pathname = usePathname();
@@ -62,6 +110,15 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
     }
   }, [activeHref, pathname]);
 
+  // Memoize indicator animation to avoid inline object
+  const indicatorAnimate = useMemo(
+    () =>
+      indicatorStyle
+        ? { left: indicatorStyle.left, width: indicatorStyle.width }
+        : undefined,
+    [indicatorStyle],
+  );
+
   if (isMobile) {
     // Mobile: vertical list style
     return (
@@ -73,8 +130,8 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
               <Link
                 href={href}
                 className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-all duration-200 ${
-                  isActive 
-                    ? "bg-base-content/10 text-base-content" 
+                  isActive
+                    ? "bg-base-content/10 text-base-content"
                     : "text-base-content/50 hover:bg-base-content/5 hover:text-base-content/70"
                 }`}
               >
@@ -95,38 +152,26 @@ const AppHeaderMenuLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
       className="bg-base-200/60 border-base-300/40 relative flex items-center rounded-lg border p-1"
     >
       {/* Sliding indicator */}
-      {indicatorStyle && (
+      {indicatorAnimate && (
         <motion.div
           className="bg-base-content/10 absolute inset-y-1 rounded-md"
           initial={false}
-          animate={{
-            left: indicatorStyle.left,
-            width: indicatorStyle.width,
-          }}
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          animate={indicatorAnimate}
+          transition={INDICATOR_TRANSITION}
         />
       )}
-      
+
       {appMenuLinks.map(({ label, href, icon }) => {
         const isActive = pathname === href || pathname.startsWith(href + "/");
         return (
-          <Link
+          <MenuLinkItem
             key={href}
             href={href}
-            ref={(el) => {
-              if (el) buttonRefs.current.set(href, el);
-            }}
-            className={`relative z-10 flex items-center gap-2 rounded-md px-4 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors duration-200 ${
-              isActive 
-                ? "text-base-content" 
-                : "text-base-content/40 hover:text-base-content/70"
-            }`}
-          >
-            <span className={`transition-transform duration-200 ${isActive ? "scale-110" : ""}`}>
-              {icon}
-            </span>
-            <span>{label}</span>
-          </Link>
+            icon={icon}
+            label={label}
+            isActive={isActive}
+            buttonRefs={buttonRefs}
+          />
         );
       })}
     </div>
@@ -187,6 +232,16 @@ const AddressSearchBar = () => {
     setValue(connectedAddress ?? "");
   }, [connectedAddress, updateUrlWithAddress]);
 
+  const handleInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setValue(event.target.value);
+      if (hasSubmittedInvalid) {
+        setHasSubmittedInvalid(false);
+      }
+    },
+    [hasSubmittedInvalid],
+  );
+
   const isInvalid = hasSubmittedInvalid && !normalizeUserAddress(value);
 
   return (
@@ -196,12 +251,7 @@ const AddressSearchBar = () => {
       </span>
       <input
         value={value}
-        onChange={event => {
-          setValue(event.target.value);
-          if (hasSubmittedInvalid) {
-            setHasSubmittedInvalid(false);
-          }
-        }}
+        onChange={handleInputChange}
         placeholder="Search address"
         className={`bg-base-200/60 border-base-content/10 focus:ring-base-content/20 focus:border-base-content/20 placeholder:text-base-content/30 w-full rounded-lg border py-2.5 pl-10 pr-12 text-sm transition-colors focus:outline-none focus:ring-1 ${
           isInvalid ? "border-error focus:ring-error/40" : ""
@@ -220,6 +270,12 @@ const AddressSearchBar = () => {
     </form>
   );
 };
+// Menu links component for mobile to avoid inline JSX
+const MobileAppMenuLinksWrapper = () => <AppHeaderMenuLinks isMobile />;
+
+// Wallet button wrapper for mobile drawer
+const AutoWalletButton = () => <WalletButton variant="auto" />;
+
 /**
  * App header for /app/app page with wallet connection and settings
  */
@@ -235,7 +291,7 @@ export const AppHeader = () => {
           className={`bg-base-100/95 absolute inset-0 backdrop-blur-md transition-all duration-300 ${
             scrolled ? "shadow-[0_1px_3px_rgba(0,0,0,0.3)]" : ""
           }`}
-          style={{ zIndex: -1 }}
+          style={Z_INDEX_BACK}
         >
           {/* Subtle bottom border */}
           <div className="bg-base-content/5 absolute inset-x-0 bottom-0 h-[1px]"></div>
@@ -254,8 +310,8 @@ export const AppHeader = () => {
                 <MobileNavigationDrawer
                   isOpen={isDrawerOpen}
                   onClose={closeDrawer}
-                  menuLinks={<AppHeaderMenuLinks isMobile />}
-                  walletButtons={<WalletButton variant="auto" />}
+                  menuLinks={<MobileAppMenuLinksWrapper />}
+                  walletButtons={<AutoWalletButton />}
                 />
               </div>
 
@@ -278,9 +334,9 @@ export const AppHeader = () => {
               {/* Smart connect button - adapts to selected network */}
               <motion.div
                 className="relative z-20 hidden items-center md:flex"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
+                initial={INITIAL_OPACITY}
+                animate={ANIMATE_OPACITY}
+                transition={WALLET_TRANSITION}
               >
                 <WalletButton variant="auto" />
               </motion.div>

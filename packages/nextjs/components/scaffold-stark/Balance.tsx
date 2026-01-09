@@ -27,7 +27,6 @@ export const Balance = ({ address, className = "", usdMode }: BalanceProps) => {
   const {
     formatted: strkFormatted,
     isLoading: strkIsLoading,
-    isError: strkIsError,
     symbol: strkSymbol,
   } = useScaffoldStrkBalance({
     address,

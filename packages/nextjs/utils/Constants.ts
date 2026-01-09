@@ -18,6 +18,11 @@ const sepoliaMainnetStrkClassHash =
 const devnetStrkClassHash =
   "0x046ded64ae2dead6448e247234bab192a9c483644395b66f2155f2614e5804b0" as const;
 
+// Cairo type constants for Starknet ABI
+const CAIRO_U256 = "core::integer::u256";
+const CAIRO_CONTRACT_ADDRESS = "core::starknet::contract_address::ContractAddress";
+const CAIRO_BOOL = "core::bool";
+
 const universalErc20Abi = [
   {
     type: "impl",
@@ -67,7 +72,7 @@ const universalErc20Abi = [
         inputs: [],
         outputs: [
           {
-            type: "core::integer::u256",
+            type: CAIRO_U256,
           },
         ],
         state_mutability: "view",
@@ -78,12 +83,12 @@ const universalErc20Abi = [
         inputs: [
           {
             name: "account",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
         ],
         outputs: [
           {
-            type: "core::integer::u256",
+            type: CAIRO_U256,
           },
         ],
         state_mutability: "view",
@@ -94,16 +99,16 @@ const universalErc20Abi = [
         inputs: [
           {
             name: "owner",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
           {
             name: "spender",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
         ],
         outputs: [
           {
-            type: "core::integer::u256",
+            type: CAIRO_U256,
           },
         ],
         state_mutability: "view",
@@ -114,16 +119,16 @@ const universalErc20Abi = [
         inputs: [
           {
             name: "recipient",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
           {
             name: "amount",
-            type: "core::integer::u256",
+            type: CAIRO_U256,
           },
         ],
         outputs: [
           {
-            type: "core::bool",
+            type: CAIRO_BOOL,
           },
         ],
         state_mutability: "external",
@@ -134,20 +139,20 @@ const universalErc20Abi = [
         inputs: [
           {
             name: "sender",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
           {
             name: "recipient",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
           {
             name: "amount",
-            type: "core::integer::u256",
+            type: CAIRO_U256,
           },
         ],
         outputs: [
           {
-            type: "core::bool",
+            type: CAIRO_BOOL,
           },
         ],
         state_mutability: "external",
@@ -158,16 +163,16 @@ const universalErc20Abi = [
         inputs: [
           {
             name: "spender",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
           {
             name: "amount",
-            type: "core::integer::u256",
+            type: CAIRO_U256,
           },
         ],
         outputs: [
           {
-            type: "core::bool",
+            type: CAIRO_BOOL,
           },
         ],
         state_mutability: "external",
@@ -189,7 +194,7 @@ const universalErc20Abi = [
         inputs: [],
         outputs: [
           {
-            type: "core::integer::u256",
+            type: CAIRO_U256,
           },
         ],
         state_mutability: "view",
@@ -200,12 +205,12 @@ const universalErc20Abi = [
         inputs: [
           {
             name: "account",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
         ],
         outputs: [
           {
-            type: "core::integer::u256",
+            type: CAIRO_U256,
           },
         ],
         state_mutability: "view",
@@ -216,20 +221,20 @@ const universalErc20Abi = [
         inputs: [
           {
             name: "sender",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
           {
             name: "recipient",
-            type: "core::starknet::contract_address::ContractAddress",
+            type: CAIRO_CONTRACT_ADDRESS,
           },
           {
             name: "amount",
-            type: "core::integer::u256",
+            type: CAIRO_U256,
           },
         ],
         outputs: [
           {
-            type: "core::bool",
+            type: CAIRO_BOOL,
           },
         ],
         state_mutability: "external",
@@ -244,17 +249,17 @@ const universalErc20Abi = [
       {
         kind: "key",
         name: "from",
-        type: "core::starknet::contract_address::ContractAddress",
+        type: CAIRO_CONTRACT_ADDRESS,
       },
       {
         kind: "key",
         name: "to",
-        type: "core::starknet::contract_address::ContractAddress",
+        type: CAIRO_CONTRACT_ADDRESS,
       },
       {
         kind: "data",
         name: "value",
-        type: "core::integer::u256",
+        type: CAIRO_U256,
       },
     ],
   },

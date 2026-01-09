@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import GenericModal from "./CustomConnectButton/GenericModal";
 import { Address as AddressType, devnet } from "@starknet-react/chains";
 import { useNetwork, useProvider } from "@starknet-react/core";
@@ -19,25 +19,6 @@ const TOKEN_ADDRESSES = {
   WBTC: "0x00abbd6f1e590eb83addd87ba5ac27960d859b1f17d11a3c1cd6a0006704b141",
   USDC: "0x0715649d4c493ca350743e43915b88d2e6838b1c78ddc23d6d9385446b9d6844",
 };
-
-// Token ABI for mint function
-const TOKEN_ABI = [
-  {
-    inputs: [
-      {
-        name: "recipient",
-        type: "felt"
-      },
-      {
-        name: "amount",
-        type: "Uint256"
-      }
-    ],
-    name: "mint",
-    outputs: [],
-    type: "function"
-  }
-];
 
 /**
  * Faucet modal which lets you send ETH to any address.
@@ -85,7 +66,7 @@ export const Faucet = () => {
   useEffect(() => {
     const checkChain = async () => {
       try {
-        const providerInfo = await publicClient.getBlock();
+        await publicClient.getBlock();
       } catch (error) {
         console.error("⚡️ ~ file: Faucet.tsx:checkChain ~ error", error);
         notification.error(
@@ -105,9 +86,9 @@ export const Faucet = () => {
     if (connectedAddress && !inputAddress) {
       setInputAddress(connectedAddress);
     }
-  }, [connectedAddress]);
+  }, [connectedAddress, inputAddress]);
 
-  const sendETH = async () => {
+  const sendETH = useCallback(async () => {
     if (!faucetAddress || !inputAddress) {
       return;
     }
@@ -122,9 +103,9 @@ export const Faucet = () => {
     setInputAddress(undefined);
     setSendValue("");
     notification.success("STRK sent successfully!");
-  };
+  }, [faucetAddress, inputAddress, sendValue]);
 
-  const mintLendingTokens = async () => {
+  const mintLendingTokens = useCallback(async () => {
     console.log("Mint lending tokens clicked");
     console.log("Connected address:", connectedAddress);
     console.log("sendAsync available:", !!sendAsync);
@@ -155,7 +136,23 @@ export const Faucet = () => {
       setMintLoading(false);
       setMintModalOpen(false);
     }
-  };
+  }, [connectedAddress, sendAsync]);
+
+  const handleOpenMintModal = useCallback(() => {
+    setMintModalOpen(true);
+  }, []);
+
+  const handleCloseMintModal = useCallback(() => {
+    setMintModalOpen(false);
+  }, []);
+
+  const handleAddressChange = useCallback((value: string) => {
+    setInputAddress(value as AddressType);
+  }, []);
+
+  const handleSendValueChange = useCallback((value: string) => {
+    setSendValue(value);
+  }, []);
 
   // Render only on local chain
   if (ConnectedChain?.id !== devnet.id) {
@@ -169,9 +166,9 @@ export const Faucet = () => {
         <span>Faucet</span>
       </label>
       
-      <label 
+      <label
         className="btn btn-sm gap-1 border border-[#32BAC4] font-normal shadow-none"
-        onClick={() => setMintModalOpen(true)}
+        onClick={handleOpenMintModal}
       >
         <CurrencyDollarIcon className="size-4 text-[#32BAC4]" />
         <span>Get lending tokens</span>
@@ -193,10 +190,10 @@ export const Faucet = () => {
               <AddressInput
                 placeholder="Destination Address"
                 value={inputAddress ?? ""}
-                onChange={value => setInputAddress(value as AddressType)}
+                onChange={handleAddressChange}
               />
             </div>
-            <EtherInput placeholder="Amount to send" value={sendValue} onChange={value => setSendValue(value)} />
+            <EtherInput placeholder="Amount to send" value={sendValue} onChange={handleSendValueChange} />
           </div>
           <button
             className="btn btn-sm bg-btn-wallet h-10 cursor-pointer rounded-[4px] border border-[#4f4ab7] px-2 hover:bg-[#385183]"
@@ -218,9 +215,9 @@ export const Faucet = () => {
         <div className="modal-box bg-base-100 max-w-lg">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold">Get Lending Tokens</h3>
-            <button 
+            <button
               className="btn btn-ghost btn-sm btn-circle"
-              onClick={() => setMintModalOpen(false)}
+              onClick={handleCloseMintModal}
             >
               ✕
             </button>

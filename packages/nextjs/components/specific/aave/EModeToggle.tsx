@@ -29,7 +29,7 @@ export const EModeToggle: FC<EModeToggleProps> = ({
   writeContractName = "AaveGatewayWrite"
 }) => {
   const { address: userAddress } = useAccount();
-  const { userEModeId, userEMode, emodes, poolAddress, isLoading, refetchUserEMode } = useAaveLikeEMode(chainId, viewContractName, writeContractName);
+  const { userEModeId, emodes, poolAddress, isLoading, refetchUserEMode } = useAaveLikeEMode(chainId, viewContractName, writeContractName);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
 

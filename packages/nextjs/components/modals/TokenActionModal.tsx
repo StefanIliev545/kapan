@@ -297,12 +297,13 @@ const format = (num: number) => new Intl.NumberFormat("en-US", { maximumFraction
 const HealthFactor = ({ value }: { value: number }) => {
   const isFiniteValue = Number.isFinite(value);
   const percent = isFiniteValue ? Math.min(100, Math.max(0, ((value - 1) / 3) * 100)) : 100;
+  const barStyle = useMemo(() => ({ width: `${percent}%` }), [percent]);
   return (
     <div className="flex flex-col text-xs">
       <span className="text-base-content/50 mb-1">Health Factor</span>
       <div className="flex items-center gap-2">
         <div className="bg-base-300 h-1.5 w-20 overflow-hidden rounded-full">
-          <div className="bg-base-content/60 h-full rounded-full" style={{ width: `${percent}%` }} />
+          <div className="bg-base-content/60 h-full rounded-full" style={barStyle} />
         </div>
         <span className="text-base-content font-medium">{isFiniteValue ? value.toFixed(2) : "∞"}</span>
       </div>
@@ -311,17 +312,20 @@ const HealthFactor = ({ value }: { value: number }) => {
 };
 
 // Render a labeled bar with percentage for Loan To Value
-const LoanToValueBar = ({ value }: { value: number }) => (
-  <div className="flex flex-col text-xs">
-    <span className="text-base-content/50 mb-1">Loan To Value</span>
-    <div className="flex items-center gap-2">
-      <div className="bg-base-300 h-1.5 w-20 overflow-hidden rounded-full">
-        <div className="bg-base-content/60 h-full rounded-full" style={{ width: `${value}%` }} />
+const LoanToValueBar = ({ value }: { value: number }) => {
+  const barStyle = useMemo(() => ({ width: `${value}%` }), [value]);
+  return (
+    <div className="flex flex-col text-xs">
+      <span className="text-base-content/50 mb-1">Loan To Value</span>
+      <div className="flex items-center gap-2">
+        <div className="bg-base-300 h-1.5 w-20 overflow-hidden rounded-full">
+          <div className="bg-base-content/60 h-full rounded-full" style={barStyle} />
+        </div>
+        <span className="text-base-content font-medium">{formatPercentage(value)}%</span>
       </div>
-      <span className="text-base-content font-medium">{formatPercentage(value)}%</span>
     </div>
-  </div>
-);
+  );
+};
 
 // TokenPill imported from common/TokenDisplay.tsx for standardized token display
 
@@ -345,15 +349,15 @@ export const PercentInput: FC<{
     setAmount("");
     setActive(null);
   }, [resetTrigger]);
-  const setPercent = (p: number) => {
+  const setPercent = useCallback((p: number) => {
     const base = percentBase ?? balance;
     const val = (base * BigInt(p)) / 100n;
     const formatted = formatUnits(val, decimals);
     setAmount(formatted);
     setActive(p);
     onChange(formatted, p === 100);
-  };
-  const handleChange = (val: string) => {
+  }, [percentBase, balance, decimals, onChange]);
+  const handleChange = useCallback((val: string) => {
     const result = parseAmount(val || "0", decimals);
     let parsed = result.value ?? 0n;
     const base = percentBase ?? balance;
@@ -366,7 +370,18 @@ export const PercentInput: FC<{
     setAmount(val);
     setActive(null);
     onChange(val, isMaxFlag);
-  };
+  }, [decimals, percentBase, balance, max, onChange]);
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    handleChange(e.target.value);
+  }, [handleChange]);
+  const handleSetPercent25 = useCallback(() => setPercent(25), [setPercent]);
+  const handleSetPercent50 = useCallback(() => setPercent(50), [setPercent]);
+  const handleSetPercent100 = useCallback(() => setPercent(100), [setPercent]);
+  const percentHandlers = useMemo(() => ({
+    25: handleSetPercent25,
+    50: handleSetPercent50,
+    100: handleSetPercent100,
+  }), [handleSetPercent25, handleSetPercent50, handleSetPercent100]);
   const usd = (parseFloat(amount || "0") * price).toFixed(2);
   return (
     <>
@@ -374,7 +389,7 @@ export const PercentInput: FC<{
         <input
           type="number"
           value={amount}
-          onChange={e => handleChange(e.target.value)}
+          onChange={handleInputChange}
           placeholder="0.0"
           className="bg-base-200/50 border-base-300/50 text-base-content placeholder:text-base-content/30 focus:border-base-content/30 w-full rounded-lg border px-4 py-3 pr-24 focus:outline-none"
         />
@@ -384,11 +399,11 @@ export const PercentInput: FC<{
           </div>
         )}
         <div className="divide-base-300 absolute inset-y-0 right-3 flex items-center divide-x text-xs">
-          {[25, 50, 100].map(p => (
+          {([25, 50, 100] as const).map(p => (
             <button
               key={p}
               type="button"
-              onClick={() => setPercent(p)}
+              onClick={percentHandlers[p]}
               className={`px-1 ${active === p ? "underline" : ""}`}
             >
               {p}%
@@ -526,14 +541,19 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
     wasOpenRef.current = isOpen;
   }, [action, isOpen, network, protocolName, token.address, token.name]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setAmount("");
     setIsMax(false);
     setTxState("idle");
     onClose();
-  };
+  }, [onClose, setAmount]);
 
-  const handleConfirm = async () => {
+  const handlePercentInputChange = useCallback((val: string, maxed: boolean) => {
+    setAmount(val);
+    setIsMax(maxed);
+  }, [setAmount]);
+
+  const handleConfirm = useCallback(async () => {
     if (txState === "success") {
       handleClose();
       return;
@@ -576,7 +596,23 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
         error: e instanceof Error ? e.message : String(e),
       });
     }
-  };
+  }, [txState, handleClose, action, token.name, token.address, network, protocolName, amount, isMax, onConfirm]);
+
+  // Memoize the actions array for SegmentedActionBar
+  const actionBarActions = useMemo(() => {
+    const pendingIcon = <span className="loading loading-spinner loading-xs" />;
+    const starkIcon = <Fuel className="size-4 text-gray-400" />;
+    return [
+      {
+        key: txState === "success" ? "close" : "confirm",
+        label: txState === "pending" ? "Submitting..." : txState === "success" ? "Close" : txState === "error" ? "Retry" : action,
+        icon: txState === "pending" ? pendingIcon : network === "stark" ? starkIcon : undefined,
+        onClick: handleConfirm,
+        disabled: isConfirmDisabled,
+        variant: "ghost" as const,
+      },
+    ];
+  }, [txState, action, network, handleConfirm, isConfirmDisabled]);
 
   return (
     <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
@@ -611,10 +647,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               balance={balance}
               decimals={decimals}
               price={token.usdPrice}
-              onChange={(val, maxed) => {
-                setAmount(val);
-                setIsMax(maxed);
-              }}
+              onChange={handlePercentInputChange}
               percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
               max={effectiveMax}
               resetTrigger={isOpen}
@@ -633,21 +666,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
               <SegmentedActionBar
                 className="w-full"
                 autoCompact
-                actions={[
-                  {
-                    key: txState === "success" ? "close" : "confirm",
-                    label: txState === "pending" ? "Submitting..." : txState === "success" ? "Close" : txState === "error" ? "Retry" : action,
-                    icon:
-                      txState === "pending" ? (
-                        <span className="loading loading-spinner loading-xs" />
-                      ) : network === "stark" ? (
-                        <Fuel className="size-4 text-gray-400" />
-                      ) : undefined,
-                    onClick: handleConfirm,
-                    disabled: isConfirmDisabled,
-                    variant: "ghost",
-                  },
-                ]}
+                actions={actionBarActions}
               />
             </div>
           </div>
@@ -676,7 +695,6 @@ export const TokenActionCard: FC<Omit<TokenActionModalProps, "isOpen" | "onClose
 }) => {
   // Use shared hook for common state and calculations
   const {
-    amount,
     setAmount,
     decimals,
     effectiveMax,
@@ -696,6 +714,18 @@ export const TokenActionCard: FC<Omit<TokenActionModalProps, "isOpen" | "onClose
     ltv,
     max,
   });
+
+  const handleCardChange = useCallback((val: string) => {
+    setAmount(val);
+  }, [setAmount]);
+
+  const handleDemoClick = useCallback(() => {
+    console.debug("Demo confirm disabled");
+  }, []);
+
+  const cardActions = useMemo(() => [
+    { key: "confirm", label: action, onClick: handleDemoClick, disabled: true, variant: "ghost" as const }
+  ], [action, handleDemoClick]);
 
   return (
     <div className="card bg-base-100 border-base-300 overflow-hidden rounded-none border">
@@ -724,7 +754,7 @@ export const TokenActionCard: FC<Omit<TokenActionModalProps, "isOpen" | "onClose
             balance={balance}
             decimals={decimals}
             price={token.usdPrice}
-            onChange={(val) => { setAmount(val); }}
+            onChange={handleCardChange}
             percentBase={percentBase ?? (action === "Borrow" ? effectiveMax : undefined)}
             max={effectiveMax}
             resetTrigger={true}
@@ -741,7 +771,7 @@ export const TokenActionCard: FC<Omit<TokenActionModalProps, "isOpen" | "onClose
             <SegmentedActionBar
               className="w-full"
               autoCompact
-              actions={[{ key: "confirm", label: action, onClick: () => { console.debug("Demo confirm disabled"); }, disabled: true, variant: "ghost" as const }]}
+              actions={cardActions}
             />
           </div>
         </div>

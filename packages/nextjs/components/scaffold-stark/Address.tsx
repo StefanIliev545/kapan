@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { default as NextImage } from "next/image";
 import Link from "next/link";
-import ConnectModal from "./CustomConnectButton/ConnectModal";
 import { Address as AddressType } from "@starknet-react/chains";
 import { devnet } from "@starknet-react/chains";
-import { getChecksumAddress, validateChecksumAddress } from "starknet";
+import { getChecksumAddress } from "starknet";
 import { CheckCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import { BalanceSkeleton } from "~~/components/common";
 import { BlockieAvatar } from "~~/components/scaffold-stark/BlockieAvatar";
@@ -38,7 +37,7 @@ const blockieSizeMap = {
  * Displays an address (or ENS) with a Blockie image and option to copy address.
  */
 export const Address = ({ address, disableAddressLink, format, size = "base" }: AddressProps) => {
-  const [ensAvatar, setEnsAvatar] = useState<string | null>();
+  const [ensAvatar] = useState<string | null>();
   const { copy, isCopied: addressCopied } = useCopyToClipboard();
 
   const { targetNetwork } = useTargetNetwork();
@@ -55,19 +54,6 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
   }, [address]);
 
   const blockExplorerAddressLink = getBlockExplorerAddressLink(targetNetwork, checkSumAddress || address || "");
-
-  const isValidHexAddress = (value: string): boolean => {
-    if (value.toLowerCase() === "0x") {
-      value = "0x0";
-    }
-
-    if (value.toLowerCase() === "0x0x0") {
-      return false;
-    }
-
-    const hexAddressRegex = /^0x[0-9a-fA-F]+$/;
-    return hexAddressRegex.test(value);
-  };
 
   const [displayAddress, setDisplayAddress] = useState(
     truncateAddress(checkSumAddress),

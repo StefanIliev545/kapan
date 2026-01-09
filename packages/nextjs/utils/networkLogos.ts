@@ -12,15 +12,19 @@ export interface NetworkLogoConfig {
   logoDark?: string;
 }
 
+// Logo constants to avoid duplication
+const ARB_LOGO = "/logos/arb.svg";
+const STARKNET_LOGO = "/logos/starknet.svg";
+
 /**
  * Network logo mappings by chain name.
  * Used as primary lookup for networks.
  */
 export const NETWORK_LOGOS_BY_NAME: Record<string, NetworkLogoConfig> = {
   // EVM Networks
-  Arbitrum: { logo: "/logos/arb.svg" },
-  "Arbitrum One": { logo: "/logos/arb.svg" },
-  "Arbitrum Sepolia": { logo: "/logos/arb.svg" },
+  Arbitrum: { logo: ARB_LOGO },
+  "Arbitrum One": { logo: ARB_LOGO },
+  "Arbitrum Sepolia": { logo: ARB_LOGO },
   Ethereum: { logo: "/logos/ethereum.svg" },
   Optimism: { logo: "/logos/optimism.svg" },
   Base: { logo: "/logos/base.svg" },
@@ -29,9 +33,9 @@ export const NETWORK_LOGOS_BY_NAME: Record<string, NetworkLogoConfig> = {
   Unichain: { logo: "/logos/unichain.svg" },
   Hardhat: { logo: "/logos/eth.svg" },
   // Starknet Networks
-  Starknet: { logo: "/logos/starknet.svg" },
-  "Starknet Mainnet": { logo: "/logos/starknet.svg" },
-  "Starknet Sepolia": { logo: "/logos/starknet.svg" },
+  Starknet: { logo: STARKNET_LOGO },
+  "Starknet Mainnet": { logo: STARKNET_LOGO },
+  "Starknet Sepolia": { logo: STARKNET_LOGO },
 };
 
 /**
@@ -43,11 +47,11 @@ export const NETWORK_LOGOS_BY_CHAIN_ID: Record<number, NetworkLogoConfig> = {
   [CHAIN_IDS.OPTIMISM]: { logo: "/logos/optimism.svg" },
   [CHAIN_IDS.UNICHAIN]: { logo: "/logos/unichain.svg" },
   [CHAIN_IDS.BASE]: { logo: "/logos/base.svg" },
-  [CHAIN_IDS.ARBITRUM]: { logo: "/logos/arb.svg" },
+  [CHAIN_IDS.ARBITRUM]: { logo: ARB_LOGO },
   [CHAIN_IDS.LINEA]: { logo: "/logos/linea.svg" },
   [CHAIN_IDS.PLASMA]: { logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" },
   [CHAIN_IDS.HARDHAT]: { logo: "/logos/eth.svg" },
-  421614: { logo: "/logos/arb.svg" }, // Arbitrum Sepolia (testnet, not in CHAIN_IDS)
+  421614: { logo: ARB_LOGO }, // Arbitrum Sepolia (testnet, not in CHAIN_IDS)
 };
 
 /**

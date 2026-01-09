@@ -33,7 +33,6 @@ const canonicalizeTokenName = (name: string) => TOKEN_ALIASES[name.toLowerCase()
 
 const AAVE_CHAIN_IDS = [arbitrum.id, base.id, optimism.id, linea.id];
 const ZEROLEND_CHAIN_IDS = [base.id, linea.id];
-const VENUS_CHAIN_IDS = [arbitrum.id, base.id];
 
 const useAaveLikeData = (
   contractName: "AaveGatewayView" | "ZeroLendGatewayView",

@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   deepMergeContracts,
   getFunctionsByStateMutability,
   contracts,
-  parseParamWithType,
   parseTuple,
 } from "../contract";
 import { Abi } from "abi-wan-kanabi";

@@ -3,7 +3,7 @@
     "next/core-web-vitals",
     "plugin:@typescript-eslint/recommended"
   ],
-  "plugins": ["sonarjs", "tailwindcss"],
+  "plugins": ["sonarjs", "tailwindcss", "react-perf"],
   "rules": {
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/ban-ts-comment": "off",
@@ -17,7 +17,11 @@
     "tailwindcss/enforces-shorthand": "warn",
     "tailwindcss/enforces-negative-arbitrary-values": "warn",
     "tailwindcss/no-custom-classname": "off",
-    "tailwindcss/no-contradicting-classname": "error"
+    "tailwindcss/no-contradicting-classname": "error",
+    "react-perf/jsx-no-new-object-as-prop": "warn",
+    "react-perf/jsx-no-new-array-as-prop": "warn",
+    "react-perf/jsx-no-new-function-as-prop": "warn",
+    "react-perf/jsx-no-jsx-as-prop": "warn"
   },
   "settings": {
     "tailwindcss": {

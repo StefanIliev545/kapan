@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
@@ -8,6 +8,17 @@ import { usePaymasterGasTokens } from "@starknet-react/core";
 import { useOutsideClick } from "~~/hooks/scaffold-eth";
 import { GasTokenComponent } from "./GasTokenComponent";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
+
+// Static animation variants - extracted to module level to avoid recreation
+const BUTTON_HOVER = { scale: 1.05 };
+const BUTTON_TAP = { scale: 0.95 };
+const DROPDOWN_INITIAL = { opacity: 0, y: -10, scale: 0.95 };
+const DROPDOWN_ANIMATE = { opacity: 1, y: 0, scale: 1 };
+const DROPDOWN_EXIT = { opacity: 0, y: -10, scale: 0.95 };
+const DROPDOWN_TRANSITION = { duration: 0.2 };
+
+// Static fallback image path
+const FALLBACK_ICON = '/logos/strk.svg';
 
 // Default gas token (STRK)
 const DEFAULT_GAS_TOKEN = {
@@ -56,7 +67,18 @@ export const GasTokenSelector = () => {
     enabled: true, // Enable the query
   });
 
-  useOutsideClick(dropdownRef, () => setIsOpen(false));
+  // Memoized close handler for outside click
+  const handleOutsideClick = useCallback(() => setIsOpen(false), []);
+  useOutsideClick(dropdownRef, handleOutsideClick);
+
+  // Memoized toggle handler for button click
+  const handleToggle = useCallback(() => setIsOpen(prev => !prev), []);
+
+  // Memoized image error handler
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    target.src = FALLBACK_ICON;
+  }, []);
 
   // Normalize token list from paymaster to get addresses and decimals
   const availableTokens: TokenInfo[] = useMemo(() => {
@@ -76,18 +98,18 @@ export const GasTokenSelector = () => {
       : [{ address: DEFAULT_GAS_TOKEN.address, decimals: 18 }];
   }, [paymasterTokens]);
 
-  const handleTokenSelect = () => {
+  const handleTokenSelect = useCallback(() => {
     setIsOpen(false);
-  };
+  }, []);
 
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Gas Token Button */}
       <motion.button
         className="hover:bg-base-300/50 flex items-center gap-2 rounded p-1 transition-colors duration-200"
-        onClick={() => setIsOpen(!isOpen)}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        onClick={handleToggle}
+        whileHover={BUTTON_HOVER}
+        whileTap={BUTTON_TAP}
       >
         {/* Gas Icon */}
         <div className="text-base-content/70 size-4">
@@ -103,19 +125,15 @@ export const GasTokenSelector = () => {
             alt={selectedToken.name}
             fill
             className="object-contain"
-            onError={(e) => {
-              // Fallback to a default icon if the token icon fails to load
-              const target = e.target as HTMLImageElement;
-              target.src = '/logos/strk.svg';
-            }}
+            onError={handleImageError}
           />
         </div>
 
         {/* Dropdown Arrow */}
-        <ChevronDownIcon 
+        <ChevronDownIcon
           className={`text-base-content/50 size-4 transition-transform duration-200${
             isOpen ? 'rotate-180' : ''
-          }`} 
+          }`}
         />
       </motion.button>
 
@@ -123,10 +141,10 @@ export const GasTokenSelector = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
+            initial={DROPDOWN_INITIAL}
+            animate={DROPDOWN_ANIMATE}
+            exit={DROPDOWN_EXIT}
+            transition={DROPDOWN_TRANSITION}
             className="bg-base-100 border-base-300/50 absolute right-0 top-full z-50 mt-2 max-h-[400px] min-w-[360px] overflow-auto rounded-lg border shadow-xl"
           >
             <div className="p-3">

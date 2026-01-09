@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,6 +8,24 @@ import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
 import { useLandingSection } from "~~/contexts/LandingSectionContext";
 import { useAppUrl } from "~~/hooks/common";
+
+// Animation constants for Launch App button (Fallout neon sign flicker)
+const LAUNCH_BUTTON_INITIAL = { opacity: 0 };
+
+const LAUNCH_BUTTON_ANIMATE = {
+  // Neon sign flicker: dark -> try to turn on -> fail -> try again -> flicker -> stabilize
+  opacity: [0, 0, 0.8, 0, 0, 0.6, 0.1, 0.9, 0.2, 1, 0.7, 1, 1],
+};
+
+const LAUNCH_BUTTON_EXIT = {
+  opacity: [1, 0.5, 0.8, 0, 0.3, 0],
+};
+
+const LAUNCH_BUTTON_TRANSITION = {
+  duration: 1.4,
+  times: [0, 0.1, 0.15, 0.22, 0.35, 0.42, 0.47, 0.55, 0.62, 0.75, 0.85, 0.92, 1],
+  ease: "linear" as const,
+};
 
 /**
  * Landing page header - minimal dark theme design
@@ -19,6 +38,15 @@ export const LandingHeader = () => {
   // Show launch button on sections that don't have their own CTA (sections 1-4)
   // Section 0 = Hero (has CTA), Section 5 = Final CTA (has CTA)
   const showLaunchButton = currentSection > 0 && currentSection < totalSections - 1;
+
+  const handleLaunchClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      track("To App conversion", { button: "Landing Header" });
+      window.location.assign(appUrl);
+    },
+    [appUrl],
+  );
 
   return (
     <div className="fixed inset-x-0 top-0 z-50 p-4 md:px-8 md:py-6">
@@ -59,24 +87,11 @@ export const LandingHeader = () => {
             {showLaunchButton && (
               <motion.a
                 href="/app"
-                onClick={e => {
-                  e.preventDefault();
-                  track("To App conversion", { button: "Landing Header" });
-                  window.location.assign(appUrl);
-                }}
-                initial={{ opacity: 0 }}
-                animate={{ 
-                  // Neon sign flicker: dark -> try to turn on -> fail -> try again -> flicker -> stabilize
-                  opacity: [0, 0, 0.8, 0, 0, 0.6, 0.1, 0.9, 0.2, 1, 0.7, 1, 1],
-                }}
-                exit={{ 
-                  opacity: [1, 0.5, 0.8, 0, 0.3, 0],
-                }}
-                transition={{ 
-                  duration: 1.4,
-                  times: [0, 0.1, 0.15, 0.22, 0.35, 0.42, 0.47, 0.55, 0.62, 0.75, 0.85, 0.92, 1],
-                  ease: "linear",
-                }}
+                onClick={handleLaunchClick}
+                initial={LAUNCH_BUTTON_INITIAL}
+                animate={LAUNCH_BUTTON_ANIMATE}
+                exit={LAUNCH_BUTTON_EXIT}
+                transition={LAUNCH_BUTTON_TRANSITION}
                 className="bg-primary/10 hover:bg-primary/20 border-primary/20 hover:border-primary/40 text-primary group flex items-center gap-2 rounded-lg border px-4 py-2 transition-all duration-300"
               >
                 <span className="text-xs font-semibold uppercase tracking-wider">Launch App</span>
