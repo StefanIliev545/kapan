@@ -415,13 +415,6 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
   // Handle debt swap modal open request
   const handleDebtSwapRequest = useCallback((state: DebtSwapModalState) => {
-    console.log("[MorphoPositionsSection] Opening debt swap modal with state:", {
-      debtTokenAddress: state.debtTokenAddress,
-      debtTokenSymbol: state.debtTokenSymbol,
-      collateralTokenAddress: state.collateralTokenAddress,
-      collateralTokenSymbol: state.collateralTokenSymbol,
-      hasContext: !!state.morphoContext,
-    });
     setDebtSwapModalState(state);
   }, []);
 

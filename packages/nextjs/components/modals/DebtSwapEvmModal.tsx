@@ -304,19 +304,11 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     // Filter "To" assets (exclude current debt)
     // For Morpho: derive from compatible target markets (same collateral, different debt)
     const toAssets = useMemo(() => {
-        console.log("[DebtSwapEvmModal] Building toAssets:", {
-            isMorpho,
-            morphoTargetMarketsCount: morphoTargetMarkets.length,
-            availableAssetsCount: availableAssets?.length,
-            collateralTokenAddress,
-            debtFromToken,
-        });
-
         if (isMorpho && morphoTargetMarkets.length > 0) {
             // Build SwapAsset array from Morpho target markets
             // Markets are already sorted by borrow APY
             const seenAddresses = new Set<string>();
-            const result = morphoTargetMarkets
+            return morphoTargetMarkets
                 .filter(m => {
                     const addr = m.loanAsset?.address?.toLowerCase();
                     if (!addr || seenAddresses.has(addr)) return false;
@@ -336,14 +328,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                     borrowApy: m.state.borrowApy,
                     marketId: m.uniqueKey,
                 } as SwapAsset));
-
-            console.log("[DebtSwapEvmModal] Morpho toAssets:", result.map(a => ({ symbol: a.symbol, address: a.address })));
-            return result;
         }
-        const fallback = (availableAssets || []).filter(a => a.address.toLowerCase() !== debtFromToken.toLowerCase());
-        console.log("[DebtSwapEvmModal] Fallback toAssets:", fallback.map(a => ({ symbol: a.symbol, address: a.address })));
-        return fallback;
-    }, [isMorpho, morphoTargetMarkets, availableAssets, debtFromToken, collateralTokenAddress]);
+        return (availableAssets || []).filter(a => a.address.toLowerCase() !== debtFromToken.toLowerCase());
+    }, [isMorpho, morphoTargetMarkets, availableAssets, debtFromToken]);
 
     // Sync selectedMorphoMarket when user selects a "to" asset
     useEffect(() => {
