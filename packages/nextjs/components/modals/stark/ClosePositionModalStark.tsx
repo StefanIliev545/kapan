@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { BaseModal } from "../BaseModal";
 import {
   CairoCustomEnum,
@@ -252,7 +252,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
 
   const { sendAsync } = useScaffoldMultiWriteContract({ calls });
 
-  const handleClosePosition = async () => {
+  const handleClosePosition = useCallback(async () => {
     try {
       await sendAsync();
       notification.success("Position closed");
@@ -261,7 +261,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
       console.error(e);
       notification.error("Failed to close position");
     }
-  };
+  }, [sendAsync, onClose]);
 
   // Use the shared hook for remainder calculation
   const adaptedQuote = selectedQuote ? adaptAvnuQuote(selectedQuote) : null;
@@ -292,6 +292,23 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
       )
     : null;
 
+  // Memoize JSX elements for props
+  const withdrawActionElement = useMemo(() => (
+    <button className="btn btn-ghost btn-sm" onClick={handleClosePosition}>
+      Close Position
+    </button>
+  ), [handleClosePosition]);
+
+  const additionalContentElement = useMemo(() => {
+    if (!feesInDebtToken) return null;
+    return (
+      <div className="flex justify-between text-[12px]">
+        <span className="text-gray-600">Fees in {debt.name}</span>
+        <span className="text-gray-700">{feesInDebtToken} {debt.name}</span>
+      </div>
+    );
+  }, [feesInDebtToken, debt.name]);
+
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
       <div className="space-y-3">
@@ -306,19 +323,8 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
             buyAmountUsd={selectedQuote.buyAmountInUsd}
             fees={feeBreakdown}
             remainderInfo={remainderInfo}
-            withdrawAction={
-              <button className="btn btn-ghost btn-sm" onClick={handleClosePosition}>
-                Close Position
-              </button>
-            }
-            additionalContent={
-              feesInDebtToken && (
-                <div className="flex justify-between text-[12px]">
-                  <span className="text-gray-600">Fees in {debt.name}</span>
-                  <span className="text-gray-700">{feesInDebtToken} {debt.name}</span>
-                </div>
-              )
-            }
+            withdrawAction={withdrawActionElement}
+            additionalContent={additionalContentElement}
           />
         ) : (
           <div className="mt-2 text-xs text-gray-500">Fetching quote...</div>

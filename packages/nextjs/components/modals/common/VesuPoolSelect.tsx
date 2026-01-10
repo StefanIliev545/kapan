@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { FC, useCallback } from "react";
 import type { VesuPools, VesuV1Pool, VesuV2Pool } from "./useRefinanceTypes";
 
 /* ------------------------------ Types ------------------------------ */
@@ -79,7 +79,7 @@ export const VesuPoolSelect: FC<VesuPoolSelectProps> = props => {
   };
 
   // Handle pool selection change
-  const handlePoolChange = (poolName: string) => {
+  const handlePoolChange = useCallback((poolName: string) => {
     if (props.mode === "evm") {
       props.onPoolChange(poolName);
     } else {
@@ -96,10 +96,10 @@ export const VesuPoolSelect: FC<VesuPoolSelectProps> = props => {
         }
       }
     }
-  };
+  }, [props, selectedVersion, vesuPools.v1Pools, vesuPools.v2Pools]);
 
   // Handle version toggle
-  const handleVersionClick = (version: "v1" | "v2", e: React.MouseEvent) => {
+  const handleVersionClick = useCallback((version: "v1" | "v2", e: React.MouseEvent) => {
     e.stopPropagation();
     if (selectedVersion === version) return;
 
@@ -113,7 +113,14 @@ export const VesuPoolSelect: FC<VesuPoolSelectProps> = props => {
         props.onV2PoolAddressChange(vesuPools.v2Pools[0].address);
       }
     }
-  };
+  }, [selectedVersion, onVersionChange, props, vesuPools.v1Pools, vesuPools.v2Pools]);
+
+  const handleV1Click = useCallback((e: React.MouseEvent) => handleVersionClick("v1", e), [handleVersionClick]);
+  const handleV2Click = useCallback((e: React.MouseEvent) => handleVersionClick("v2", e), [handleVersionClick]);
+  const handleSelectChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    e.stopPropagation();
+    handlePoolChange(e.target.value);
+  }, [handlePoolChange]);
 
   return (
     <div className="ml-auto flex flex-shrink-0 flex-nowrap items-center gap-1">
@@ -121,13 +128,13 @@ export const VesuPoolSelect: FC<VesuPoolSelectProps> = props => {
       <div className="join join-xs flex-shrink-0">
         <button
           className={`btn btn-ghost btn-xs join-item ${selectedVersion === "v1" ? "btn-active" : ""}`}
-          onClick={e => handleVersionClick("v1", e)}
+          onClick={handleV1Click}
         >
           V1
         </button>
         <button
           className={`btn btn-ghost btn-xs join-item ${selectedVersion === "v2" ? "btn-active" : ""}`}
-          onClick={e => handleVersionClick("v2", e)}
+          onClick={handleV2Click}
         >
           V2
         </button>
@@ -137,10 +144,7 @@ export const VesuPoolSelect: FC<VesuPoolSelectProps> = props => {
       <select
         className="select select-bordered select-xs w-auto min-w-[100px] max-w-[140px] flex-shrink-0 text-xs"
         value={getCurrentValue()}
-        onChange={e => {
-          e.stopPropagation();
-          handlePoolChange(e.target.value);
-        }}
+        onChange={handleSelectChange}
       >
         {poolOptions.map(pool => (
           <option key={pool.name} value={pool.value}>

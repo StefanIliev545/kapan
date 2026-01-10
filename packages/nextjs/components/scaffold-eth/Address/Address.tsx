@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { AddressCopyIcon } from "./AddressCopyIcon";
 import { AddressLinkWrapper } from "./AddressLinkWrapper";
 import { Address as AddressType, getAddress, isAddress } from "viem";
@@ -113,15 +114,18 @@ export const Address = ({
   const ensSize = getNextSize(textSizeMap, addressSize);
   const blockieSize = showSkeleton && !onlyEnsOrAddress ? getNextSize(blockieSizeMap, addressSize, 4) : addressSize;
 
+  // Memoize skeleton style to avoid creating new object on each render
+  const skeletonStyle = useMemo(() => {
+    const sizeValue = (blockieSizeMap[blockieSize] * 24) / blockieSizeMap["base"];
+    return { width: sizeValue, height: sizeValue };
+  }, [blockieSize]);
+
   if (!checkSumAddress) {
     return (
       <div className="flex items-center">
         <div
           className="skeleton flex-shrink-0 rounded-full"
-          style={{
-            width: (blockieSizeMap[blockieSize] * 24) / blockieSizeMap["base"],
-            height: (blockieSizeMap[blockieSize] * 24) / blockieSizeMap["base"],
-          }}
+          style={skeletonStyle}
         ></div>
         <div className="flex flex-col space-y-1">
           {!onlyEnsOrAddress && (

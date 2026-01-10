@@ -1,4 +1,4 @@
-import { FC, useMemo } from "react";
+import { FC, useCallback, useMemo } from "react";
 import { BorrowModalStark } from "./BorrowModalStark";
 import { DepositModalStark } from "./DepositModalStark";
 import {
@@ -121,6 +121,48 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   const selectedAddress = selectedToken ? normalizeStarkAddress(selectedToken.address) : "";
   const selectedSymbol = selectedToken ? getTokenSymbol(selectedToken, selectedAddress) : "";
 
+  // Memoized token objects for modals to avoid react-perf warnings
+  const borrowTokenProps = useMemo(() => {
+    if (!selectedToken) return null;
+    return {
+      name: selectedSymbol,
+      icon: tokenNameToLogo(selectedSymbol.toLowerCase()),
+      address: selectedAddress,
+      currentRate: selectedToken.borrowAPR ?? 0,
+      usdPrice:
+        selectedToken.price && selectedToken.price.is_valid
+          ? Number(selectedToken.price.value) / 1e18
+          : 0,
+    };
+  }, [selectedToken, selectedSymbol, selectedAddress]);
+
+  const depositTokenProps = useMemo(() => {
+    if (!selectedToken) return null;
+    return {
+      name: selectedSymbol,
+      icon: tokenNameToLogo(selectedSymbol.toLowerCase()),
+      address: selectedAddress,
+      currentRate: selectedToken.supplyAPY ?? 0,
+      usdPrice:
+        selectedToken.price && selectedToken.price.is_valid
+          ? Number(selectedToken.price.value) / 1e18
+          : 0,
+    };
+  }, [selectedToken, selectedSymbol, selectedAddress]);
+
+  const vesuContextWithCollateral = useMemo(() => {
+    if (protocolName === "vesu_v2" && vesuContext) {
+      return { ...(vesuContext as any), collateralToken: collateralAsset, isVtoken: true };
+    }
+    return vesuContext;
+  }, [protocolName, vesuContext, collateralAsset]);
+
+  // Memoized token click handlers
+  const createTokenClickHandler = useCallback(
+    (token: TokenWithRates) => () => handleSelectToken(token),
+    [handleSelectToken],
+  );
+
   return (
     <>
       <TokenSelectModalShell
@@ -144,7 +186,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
                 rate={rate}
                 rateLabel={rateLabel}
                 balanceLabel={balanceLabel}
-                onClick={() => handleSelectToken(token)}
+                onClick={createTokenClickHandler(token)}
               />
             );
           })}
@@ -152,45 +194,23 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
       </TokenSelectModalShell>
 
       {/* Render borrow modal if a token is selected */}
-      {!suppressActionModals && selectedToken && action === "borrow" && (
+      {!suppressActionModals && selectedToken && action === "borrow" && borrowTokenProps && (
         <BorrowModalStark
           isOpen={isActionModalOpen}
           onClose={handleActionModalClose}
-          token={{
-            name: selectedSymbol,
-            icon: tokenNameToLogo(selectedSymbol.toLowerCase()),
-            address: selectedAddress,
-            currentRate: selectedToken.borrowAPR ?? 0,
-            usdPrice:
-              selectedToken.price && selectedToken.price.is_valid
-                ? Number(selectedToken.price.value) / 1e18
-                : 0,
-          }}
+          token={borrowTokenProps}
           protocolName={protocolName}
           currentDebt={0}
-          vesuContext={
-            protocolName === "vesu_v2" && vesuContext
-              ? { ...(vesuContext as any), collateralToken: collateralAsset, isVtoken: true }
-              : vesuContext
-          }
+          vesuContext={vesuContextWithCollateral}
           position={position}
         />
       )}
 
-      {!suppressActionModals && selectedToken && action === "deposit" && (
+      {!suppressActionModals && selectedToken && action === "deposit" && depositTokenProps && (
         <DepositModalStark
           isOpen={isActionModalOpen}
           onClose={handleActionModalClose}
-          token={{
-            name: selectedSymbol,
-            icon: tokenNameToLogo(selectedSymbol.toLowerCase()),
-            address: selectedAddress,
-            currentRate: selectedToken.supplyAPY ?? 0,
-            usdPrice:
-              selectedToken.price && selectedToken.price.is_valid
-                ? Number(selectedToken.price.value) / 1e18
-                : 0,
-          }}
+          token={depositTokenProps}
           protocolName={protocolName}
           vesuContext={vesuContext}
           position={position}

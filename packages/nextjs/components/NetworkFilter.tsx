@@ -1,7 +1,7 @@
 "use client";
 
 import { track } from "@vercel/analytics";
-import { Suspense, useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback, useMemo, FC } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
 import Image from "next/image";
@@ -23,8 +23,60 @@ interface NetworkFilterProps {
 const STORAGE_KEY = "kapan-network-filter-selection";
 
 // --- tweakable behavior flags ---
-const SHALLOW_URL_SYNC = true; // ✅ don't trigger app-router navigation
+const SHALLOW_URL_SYNC = true; // don't trigger app-router navigation
 const HISTORY_MODE: "replace" | "push" = "push"; // "push" so Back works
+
+// Sub-component for network button to handle ref and click properly
+interface NetworkButtonProps {
+  network: NetworkOption;
+  isActive: boolean;
+  isDarkMode: boolean;
+  onNetworkChange: (networkId: string) => void;
+  onRef: (id: string, el: HTMLButtonElement | null) => void;
+}
+
+const NetworkButton: FC<NetworkButtonProps> = ({
+  network,
+  isActive,
+  isDarkMode,
+  onNetworkChange,
+  onRef,
+}) => {
+  const handleClick = useCallback(() => {
+    onNetworkChange(network.id);
+  }, [onNetworkChange, network.id]);
+
+  const handleRef = useCallback((el: HTMLButtonElement | null) => {
+    onRef(network.id, el);
+  }, [onRef, network.id]);
+
+  return (
+    <button
+      ref={handleRef}
+      type="button"
+      aria-pressed={isActive}
+      className={`
+        relative z-10 flex min-w-[90px] items-center justify-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors duration-200
+        ${isActive
+          ? "text-base-content"
+          : "text-base-content/35 hover:text-base-content/60"
+        }
+      `}
+      onClick={handleClick}
+    >
+      <div className="relative size-4 shrink-0">
+        <Image
+          src={getNetworkOptionLogo(network, isDarkMode)}
+          alt={network.name}
+          fill
+          sizes="16px"
+          className="object-contain"
+        />
+      </div>
+      <span className="whitespace-nowrap">{network.name}</span>
+    </button>
+  );
+};
 
 const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   networks,
@@ -73,16 +125,16 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     const onPopState = () => {
       const url = new URL(window.location.href);
       const urlNetwork = url.searchParams.get("network");
-      if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
-        setSelectedNetwork(urlNetwork!);
-        onNetworkChange(urlNetwork!);
+      if (isValid(urlNetwork) && urlNetwork && urlNetwork !== selectedRef.current) {
+        setSelectedNetwork(urlNetwork);
+        onNetworkChange(urlNetwork);
 
         // cache
         try {
-          localStorage.setItem(STORAGE_KEY, urlNetwork!);
+          localStorage.setItem(STORAGE_KEY, urlNetwork);
         } catch { }
         // non-blocking wallet network switch
-        const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork!];
+        const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
         if (chainId && chainId !== chain?.id) {
           try {
             void switchChain?.({ chainId });
@@ -95,7 +147,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [SHALLOW_URL_SYNC, isValid, onNetworkChange, chain?.id, switchChain]);
+  }, [isValid, onNetworkChange, chain?.id, switchChain]);
 
   // 1) Initialize once after mount (URL > cache > default)
   useEffect(() => {
@@ -105,12 +157,12 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     const urlNetwork = searchParams.get("network");
     let initial = defaultNetwork;
 
-    if (isValid(urlNetwork)) {
-      initial = urlNetwork!;
+    if (isValid(urlNetwork) && urlNetwork) {
+      initial = urlNetwork;
     } else {
       try {
         const cached = localStorage.getItem(STORAGE_KEY);
-        if (isValid(cached)) initial = cached!;
+        if (isValid(cached) && cached) initial = cached;
       } catch { }
     }
 
@@ -140,13 +192,13 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     if (SHALLOW_URL_SYNC) return; // shallow mode: we manage URL with popstate above
 
     const urlNetwork = searchParams.get("network");
-    if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
-      setSelectedNetwork(urlNetwork!);
-      onNetworkChange(urlNetwork!);
+    if (isValid(urlNetwork) && urlNetwork && urlNetwork !== selectedRef.current) {
+      setSelectedNetwork(urlNetwork);
+      onNetworkChange(urlNetwork);
       try {
-        localStorage.setItem(STORAGE_KEY, urlNetwork!);
+        localStorage.setItem(STORAGE_KEY, urlNetwork);
       } catch { }
-      const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork!];
+      const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
       if (chainId && chainId !== chain?.id) {
         try {
           void switchChain?.({ chainId });
@@ -168,7 +220,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networks, defaultNetwork]);
 
-  const handleNetworkChange = (networkId: string, { trackEvent = true }: { trackEvent?: boolean } = {}) => {
+  const handleNetworkChange = useCallback((networkId: string, { trackEvent = true }: { trackEvent?: boolean } = {}) => {
     if (!isValid(networkId) || networkId === selectedRef.current) return;
 
     if (trackEvent) {
@@ -203,7 +255,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     );
     if (params.get("network") !== networkId) {
       if (SHALLOW_URL_SYNC) {
-        shallowUpdateUrl(networkId, HISTORY_MODE); // ← no navigation
+        shallowUpdateUrl(networkId, HISTORY_MODE); // no navigation
       } else {
         // Fallback to Next navigation (rare case if you really need it)
         const next = new URLSearchParams(searchParams.toString());
@@ -213,12 +265,19 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         router.replace(`${pathname}?${next.toString()}`, { scroll: false });
       }
     }
-  };
+  }, [isValid, pathname, onNetworkChange, chain?.id, switchChain, searchParams, shallowUpdateUrl, router]);
 
   // Track button refs for measuring positions
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null);
+
+  // Callback for storing button refs
+  const handleButtonRef = useCallback((id: string, el: HTMLButtonElement | null) => {
+    if (el) {
+      buttonRefs.current.set(id, el);
+    }
+  }, []);
 
   // Update indicator position when selection changes
   useEffect(() => {
@@ -234,52 +293,39 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     }
   }, [selectedNetwork, networks]);
 
+  // Memoize the indicator style object
+  const indicatorStyleObject = useMemo(() => {
+    if (!indicatorStyle) return undefined;
+    return {
+      left: indicatorStyle.left,
+      width: indicatorStyle.width,
+    };
+  }, [indicatorStyle]);
+
   return (
     <div
       ref={containerRef}
       className="bg-base-200/50 border-base-content/10 relative inline-flex items-center gap-0.5 rounded-lg border p-1"
     >
       {/* Animated sliding indicator */}
-      {indicatorStyle && (
+      {indicatorStyleObject && (
         <div
           className="bg-base-content/10 absolute inset-y-1 rounded-md transition-all duration-300 ease-out"
-          style={{
-            left: indicatorStyle.left,
-            width: indicatorStyle.width,
-          }}
+          style={indicatorStyleObject}
         />
       )}
 
       {networks.map((network) => {
         const isActive = selectedNetwork === network.id;
         return (
-          <button
+          <NetworkButton
             key={network.id}
-            ref={(el) => {
-              if (el) buttonRefs.current.set(network.id, el);
-            }}
-            type="button"
-            aria-pressed={isActive}
-            className={`
-              relative z-10 flex min-w-[90px] items-center justify-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors duration-200
-              ${isActive
-                ? "text-base-content"
-                : "text-base-content/35 hover:text-base-content/60"
-              }
-            `}
-            onClick={() => handleNetworkChange(network.id)}
-          >
-            <div className="relative size-4 shrink-0">
-              <Image
-                src={getNetworkOptionLogo(network, isDarkMode)}
-                alt={network.name}
-                fill
-                sizes="16px"
-                className="object-contain"
-              />
-            </div>
-            <span className="whitespace-nowrap">{network.name}</span>
-          </button>
+            network={network}
+            isActive={isActive}
+            isDarkMode={isDarkMode}
+            onNetworkChange={handleNetworkChange}
+            onRef={handleButtonRef}
+          />
         );
       })}
     </div>
@@ -287,35 +333,39 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 };
 
 export const NetworkFilter: React.FC<NetworkFilterProps> = (props) => {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex items-center gap-4 rounded-lg bg-transparent p-4">
-          <div className="flex items-center gap-2">
-            {props.networks.map((network) => (
-              <button
-                key={network.id}
-                type="button"
-                disabled
-                // keep pointer-events enabled for other parts of the page:
-                className="btn btn-sm btn-outline inline-flex items-center gap-2 normal-case opacity-60"
-              >
-                <div className="relative size-5">
-                  <Image
-                    src={network.logo}
-                    alt={network.name}
-                    fill
-                    sizes="20px"
-                    className="object-contain"
-                  />
-                </div>
-                <span className="whitespace-nowrap">{network.name}</span>
-              </button>
-            ))}
-          </div>
+  // Memoize fallback JSX to avoid re-creating on each render
+  const suspenseFallback = useMemo(
+    () => (
+      <div className="flex items-center gap-4 rounded-lg bg-transparent p-4">
+        <div className="flex items-center gap-2">
+          {props.networks.map((network) => (
+            <button
+              key={network.id}
+              type="button"
+              disabled
+              // keep pointer-events enabled for other parts of the page:
+              className="btn btn-sm btn-outline inline-flex items-center gap-2 normal-case opacity-60"
+            >
+              <div className="relative size-5">
+                <Image
+                  src={network.logo}
+                  alt={network.name}
+                  fill
+                  sizes="20px"
+                  className="object-contain"
+                />
+              </div>
+              <span className="whitespace-nowrap">{network.name}</span>
+            </button>
+          ))}
         </div>
-      }
-    >
+      </div>
+    ),
+    [props.networks],
+  );
+
+  return (
+    <Suspense fallback={suspenseFallback}>
       <NetworkFilterInner {...props} />
     </Suspense>
   );

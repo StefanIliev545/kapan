@@ -6,6 +6,9 @@ import BlogPostContent from "./BlogPostContent";
 import { getPostData, getSortedPostsData } from "~~/utils/blog";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
+// Static style for MDX images - extracted to avoid creating new object on each render
+const mdxImageStyle = { height: "auto", width: "100%" };
+
 // Custom MDX components
 const mdxComponents = {
   h1: (props: any) => <h1 className="mb-4 mt-8 text-3xl font-bold" {...props} />,
@@ -24,7 +27,7 @@ const mdxComponents = {
       width={props.width ?? 800}
       height={props.height ?? 450}
       sizes="(max-width: 768px) 100vw, 800px"
-      style={{ height: "auto", width: "100%" }}
+      style={mdxImageStyle}
     />
   ),
 };
@@ -99,11 +102,15 @@ export default async function BlogPostPage({
             : `${baseUrl}/thumbnail.png`,
     };
 
+    // Pre-compute dangerouslySetInnerHTML object
+    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- Server Component only runs once, no re-render concerns
+    const schemaHtml = { __html: JSON.stringify(articleSchema).replace(/</g, "\\u003c") };
+
     return (
       <>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema).replace(/</g, "\\u003c") }}
+          dangerouslySetInnerHTML={schemaHtml}
         />
         <BlogPostContent post={post} relatedPosts={relatedPosts} content={content} />
       </>

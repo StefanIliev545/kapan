@@ -1,6 +1,6 @@
 import { keccak256, toUtf8Bytes, Interface } from "ethers";
 import stringify from "json-stringify-deterministic";
-import { getCowApiUrl, COW_FLASH_LOAN_ROUTER, COW_AAVE_BORROWERS, COW_PROTOCOL, getKapanCowAdapter, getPreferredFlashLoanLender } from "./addresses";
+import { getCowApiUrl, COW_FLASH_LOAN_ROUTER, COW_AAVE_BORROWERS, getKapanCowAdapter, getPreferredFlashLoanLender } from "./addresses";
 import { BALANCER, ALL_AAVE_V3_POOLS } from "~~/utils/constants";
 import { withRetry, isNetworkError, isRateLimitError } from "~~/utils/retry";
 

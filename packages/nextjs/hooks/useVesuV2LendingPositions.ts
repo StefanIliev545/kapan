@@ -18,6 +18,87 @@ import {
 
 const ZERO_ADDRESS = normalizeStarknetAddress(0n);
 
+const toHexAddress = (raw: bigint): string => `0x${raw.toString(16).padStart(64, "0")}`;
+
+const resolveSymbol = (symbol: unknown, address: string): string => {
+  if (typeof symbol === "bigint") {
+    const symbolStr = feltToString(symbol);
+    if (symbolStr && symbolStr.trim().length > 0) return symbolStr;
+  }
+  return getTokenNameFallback(address) ?? "UNKNOWN";
+};
+
+const buildVesuContext = (
+  poolAddress: string,
+  counterpart: string,
+  isVtoken: boolean,
+  collateralAddress: string,
+) => {
+  const baseContext = createVesuContextV2(poolAddress, counterpart);
+  return isVtoken
+    ? { ...baseContext, isVtoken: true, collateralToken: collateralAddress }
+    : baseContext;
+};
+
+type DebtPositionResult = {
+  borrowPosition: ProtocolPosition | undefined;
+  debtSymbol: string | undefined;
+  ltvPercent: number | null;
+  debtUsd: number | null;
+};
+
+const buildDebtPosition = (
+  debtAsset: AssetWithRates | undefined,
+  debtAddress: string,
+  collateralUsd: number,
+  collateralAddress: string,
+  nominalDebt: bigint,
+  hasDebt: boolean,
+  borrowCtxForV2: ReturnType<typeof createVesuContextV2> & { isVtoken: boolean; collateralToken: string },
+  normalizedPoolAddress: string,
+  moveCollaterals: CollateralWithAmount[],
+): DebtPositionResult => {
+  if (!debtAsset) {
+    return { borrowPosition: undefined, debtSymbol: undefined, ltvPercent: null, debtUsd: null };
+  }
+
+  const debtSymbol = resolveSymbol(debtAsset.symbol, debtAddress);
+  const debtPrice = normalizePrice(debtAsset.price);
+  const debtUsd = computeUsdValue(nominalDebt, debtAsset.decimals, debtPrice);
+  const ltvPercent = collateralUsd > 0 && debtUsd > 0 ? (debtUsd / collateralUsd) * 100 : null;
+
+  const baseBorrowPosition: ProtocolPosition = {
+    icon: tokenNameToLogo(debtSymbol.toLowerCase()),
+    name: debtSymbol,
+    balance: 0,
+    tokenBalance: nominalDebt,
+    currentRate: (debtAsset.borrowAPR ?? 0) * 100,
+    tokenAddress: debtAddress,
+    tokenDecimals: debtAsset.decimals,
+    tokenPrice: debtPrice,
+    tokenSymbol: debtSymbol,
+    collateralValue: collateralUsd,
+    vesuContext: {
+      borrow: borrowCtxForV2,
+      ...(hasDebt ? { repay: createVesuContextV2(normalizedPoolAddress, collateralAddress) } : {}),
+    },
+    actionsDisabled: false,
+    actionsDisabledReason: undefined,
+  };
+
+  const borrowPosition = hasDebt
+    ? {
+        ...baseBorrowPosition,
+        balance: -(debtUsd ?? 0),
+        moveSupport: {
+          preselectedCollaterals: moveCollaterals,
+          disableCollateralSelection: true,
+        },
+      }
+    : baseBorrowPosition;
+
+  return { borrowPosition, debtSymbol, ltvPercent, debtUsd };
+};
 
 interface UseVesuV2LendingPositionsResult {
   assetsWithRates: AssetWithRates[];
@@ -190,26 +271,20 @@ export const useVesuV2LendingPositions = (
     return cachedPositions
       .map((position, index) => {
         const [collateralAddressRaw, debtAddressRaw, stats] = position;
-        if (stats.collateral_amount === 0n && stats.nominal_debt === 0n) {
-          return null;
-        }
-        const collateralAddress = `0x${collateralAddressRaw.toString(16).padStart(64, "0")}`;
-        const debtAddress = `0x${debtAddressRaw.toString(16).padStart(64, "0")}`;
+        const isEmptyPosition = stats.collateral_amount === 0n && stats.nominal_debt === 0n;
+        if (isEmptyPosition) return null;
 
+        const collateralAddress = toHexAddress(collateralAddressRaw);
+        const debtAddress = toHexAddress(debtAddressRaw);
         const collateralAsset = assetMap.get(collateralAddress);
-        const debtAsset = assetMap.get(debtAddress);
+        if (!collateralAsset) return null;
 
+        const debtAsset = assetMap.get(debtAddress);
         const hasDebt = stats.nominal_debt > 0n;
-        const hasDebtCounterpart = debtAddressRaw !== 0n;
-        const counterpartForContext = hasDebtCounterpart ? debtAddress : ZERO_ADDRESS;
-        const baseWithdrawContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
-        const baseDepositContext = createVesuContextV2(normalizedPoolAddress, counterpartForContext);
-        const withdrawContext = stats.is_vtoken
-          ? { ...baseWithdrawContext, isVtoken: true, collateralToken: collateralAddress }
-          : baseWithdrawContext;
-        const depositContext = stats.is_vtoken
-          ? { ...baseDepositContext, isVtoken: true, collateralToken: collateralAddress }
-          : baseDepositContext;
+        const counterpartForContext = debtAddressRaw !== 0n ? debtAddress : ZERO_ADDRESS;
+
+        const withdrawContext = buildVesuContext(normalizedPoolAddress, counterpartForContext, stats.is_vtoken, collateralAddress);
+        const depositContext = buildVesuContext(normalizedPoolAddress, counterpartForContext, stats.is_vtoken, collateralAddress);
 
         // Prepare borrow context targeting the collateral token (needed for vToken positions with zero-debt)
         const borrowCtxForV2 = {
@@ -218,17 +293,11 @@ export const useVesuV2LendingPositions = (
           collateralToken: collateralAddress,
         } as const;
 
-        if (!collateralAsset) {
-          return null;
-        }
-
-        let collateralSymbol = feltToString(collateralAsset.symbol);
-        if (!collateralSymbol || collateralSymbol.trim().length === 0) {
-          collateralSymbol = getTokenNameFallback(collateralAddress) ?? "UNKNOWN";
-        }
+        const collateralSymbol = resolveSymbol(collateralAsset.symbol, collateralAddress);
         const collateralPrice = normalizePrice(collateralAsset.price);
         const collateralUsd = computeUsdValue(stats.collateral_amount, collateralAsset.decimals, collateralPrice);
         const formattedCollateral = formatUnits(stats.collateral_amount, collateralAsset.decimals ?? 18);
+
         const moveCollaterals: CollateralWithAmount[] = [
           {
             token: collateralAddress,
@@ -241,9 +310,6 @@ export const useVesuV2LendingPositions = (
           },
         ];
 
-        // VesuV2 supports managing vToken positions (deposit/withdraw)
-        const disabledReason = undefined;
-
         const supplyPosition: ProtocolPosition = {
           icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
           name: collateralSymbol,
@@ -254,64 +320,22 @@ export const useVesuV2LendingPositions = (
           tokenDecimals: collateralAsset.decimals,
           tokenPrice: collateralPrice,
           tokenSymbol: collateralSymbol,
-          vesuContext: {
-            deposit: depositContext,
-            withdraw: withdrawContext,
-          },
-          actionsDisabled: false, // VesuV2 supports vToken management
-          actionsDisabledReason: disabledReason,
+          vesuContext: { deposit: depositContext, withdraw: withdrawContext },
+          actionsDisabled: false,
+          actionsDisabledReason: undefined,
         };
 
-        let borrowPosition: ProtocolPosition | undefined;
-        let debtSymbol: string | undefined;
-        let ltvPercent: number | null = null;
-        let debtUsd: number | null = null;
-        if (debtAsset) {
-          let resolvedDebtSymbol = feltToString(debtAsset.symbol);
-          if (!resolvedDebtSymbol || resolvedDebtSymbol.trim().length === 0) {
-            resolvedDebtSymbol = getTokenNameFallback(debtAddress) ?? "UNKNOWN";
-          }
-          debtSymbol = resolvedDebtSymbol;
-          const debtPrice = normalizePrice(debtAsset.price);
-          debtUsd = computeUsdValue(stats.nominal_debt, debtAsset.decimals, debtPrice);
-          if (collateralUsd > 0 && debtUsd > 0) {
-            ltvPercent = (debtUsd / collateralUsd) * 100;
-          }
-
-          const baseBorrowPosition: ProtocolPosition = {
-            icon: tokenNameToLogo(debtSymbol.toLowerCase()),
-            name: debtSymbol,
-            balance: 0,
-            tokenBalance: stats.nominal_debt,
-            currentRate: (debtAsset.borrowAPR ?? 0) * 100,
-            tokenAddress: debtAddress,
-            tokenDecimals: debtAsset.decimals,
-            tokenPrice: debtPrice,
-            tokenSymbol: debtSymbol,
-            collateralValue: collateralUsd,
-            vesuContext: {
-              borrow: borrowCtxForV2,
-              ...(hasDebt
-                ? { repay: createVesuContextV2(normalizedPoolAddress, collateralAddress) }
-                : {}),
-            },
-            actionsDisabled: false, // VesuV2 supports vToken management
-            actionsDisabledReason: disabledReason,
-          };
-
-          if (hasDebt) {
-            borrowPosition = {
-              ...baseBorrowPosition,
-              balance: -(debtUsd ?? 0),
-              moveSupport: {
-                preselectedCollaterals: moveCollaterals,
-                disableCollateralSelection: true,
-              },
-            };
-          } else {
-            borrowPosition = baseBorrowPosition;
-          }
-        }
+        const { borrowPosition, debtSymbol, ltvPercent } = buildDebtPosition(
+          debtAsset,
+          debtAddress,
+          collateralUsd,
+          collateralAddress,
+          stats.nominal_debt,
+          hasDebt,
+          borrowCtxForV2,
+          normalizedPoolAddress,
+          moveCollaterals,
+        );
 
         return {
           key: `${collateralAddress}-${debtAddress}-${index}`,
@@ -323,7 +347,6 @@ export const useVesuV2LendingPositions = (
           debtSymbol,
           collateralAsset,
           debtAsset,
-          // Always provide a borrow context that targets collateral for vToken migration
           borrowContext: borrowCtxForV2,
           ltvPercent,
           moveCollaterals,

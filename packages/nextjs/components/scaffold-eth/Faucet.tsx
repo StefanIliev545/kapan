@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Address as AddressType, createWalletClient, http, parseEther } from "viem";
 import { hardhat } from "viem/chains";
 import { useAccount } from "wagmi";
@@ -44,7 +44,7 @@ export const Faucet = () => {
     getFaucetAddress();
   }, []);
 
-  const sendETH = async () => {
+  const sendETH = useCallback(async () => {
     if (!faucetAddress || !inputAddress) {
       return;
     }
@@ -62,7 +62,15 @@ export const Faucet = () => {
       console.error("⚡️ ~ file: Faucet.tsx:sendETH ~ error", error);
       setLoading(false);
     }
-  };
+  }, [faucetAddress, inputAddress, sendValue, faucetTxn]);
+
+  const handleAddressChange = useCallback((value: string) => {
+    setInputAddress(value as AddressType);
+  }, []);
+
+  const handleValueChange = useCallback((value: string) => {
+    setSendValue(value);
+  }, []);
 
   // Render only on local chain
   if (ConnectedChain?.id !== hardhat.id) {
@@ -99,9 +107,9 @@ export const Faucet = () => {
               <AddressInput
                 placeholder="Destination Address"
                 value={inputAddress ?? ""}
-                onChange={value => setInputAddress(value as AddressType)}
+                onChange={handleAddressChange}
               />
-              <EtherInput placeholder="Amount to send" value={sendValue} onChange={value => setSendValue(value)} />
+              <EtherInput placeholder="Amount to send" value={sendValue} onChange={handleValueChange} />
               <button className="btn btn-primary btn-sm h-10 rounded-full px-2" onClick={sendETH} disabled={loading}>
                 {!loading ? (
                   <BanknotesIcon className="size-6" />

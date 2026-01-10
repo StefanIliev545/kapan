@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, type ReactNode } from "react";
+import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createSafeContext } from "./createSafeContext";
 
 interface SelectedGasToken {
@@ -44,18 +44,24 @@ export const SelectedGasTokenProvider: React.FC<{ children: ReactNode }> = ({ ch
     }
   }, []);
 
-  // Save to localStorage when token changes
-  const updateSelectedToken = (token: SelectedGasToken) => {
+  // Save to localStorage when token changes - memoized with useCallback
+  const updateSelectedToken = useCallback((token: SelectedGasToken) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(token));
     } catch (error) {
       console.warn("Failed to save selected gas token to localStorage:", error);
     }
     setSelectedToken(token);
-  };
+  }, []);
+
+  // Memoize context value to avoid creating new object on each render
+  const contextValue = useMemo(
+    () => ({ selectedToken, updateSelectedToken }),
+    [selectedToken, updateSelectedToken]
+  );
 
   return (
-    <SelectedGasTokenContext.Provider value={{ selectedToken, updateSelectedToken }}>
+    <SelectedGasTokenContext.Provider value={contextValue}>
       {children}
     </SelectedGasTokenContext.Provider>
   );

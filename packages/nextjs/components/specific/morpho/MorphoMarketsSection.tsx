@@ -722,13 +722,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       .filter(m => Boolean(m.collateralAsset)) // only pairs (as in your original)
       .filter(m => {
         // Filter by selected collateral asset
-        if (selectedCollateral !== "all") {
-          if (m.collateralAsset?.symbol !== selectedCollateral) return false;
-        }
+        if (selectedCollateral !== "all" && m.collateralAsset?.symbol !== selectedCollateral) return false;
         // Filter by selected debt asset
-        if (selectedDebtAsset !== "all") {
-          if (m.loanAsset?.symbol !== selectedDebtAsset) return false;
-        }
+        if (selectedDebtAsset !== "all" && m.loanAsset?.symbol !== selectedDebtAsset) return false;
         return true;
       })
       .map(m => {

@@ -2,6 +2,10 @@ import Image from "next/image";
 import React, { type FC } from "react";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 
+// Static objects for disabled actions - extracted to avoid creating new objects on each render
+const DISABLED_SUPPLY_ACTIONS = { deposit: false, withdraw: false, move: false } as const;
+const DISABLED_BORROW_ACTIONS = { borrow: false, repay: false, move: false } as const;
+
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { SupplyPosition } from "~~/components/SupplyPosition";
@@ -104,7 +108,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
                 protocolName={protocolName}
                 networkType="starknet"
                 hideBalanceColumn
-                availableActions={{ deposit: false, withdraw: false, move: false }}
+                availableActions={DISABLED_SUPPLY_ACTIONS}
                 showInfoDropdown={false}
               />
             ))}
@@ -123,7 +127,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
                 protocolName={protocolName}
                 networkType="starknet"
                 hideBalanceColumn
-                availableActions={{ borrow: false, repay: false, move: false }}
+                availableActions={DISABLED_BORROW_ACTIONS}
                 showInfoDropdown={false}
               />
             ))}

@@ -341,12 +341,15 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   // Memoized props for SwitchTokenSelectModalStark
   const switchTokenCurrentToken = useMemo(() => {
     if (!swapRow || !swapType) return null;
+    // For debt swaps, borrow must exist
+    if (swapType === "debt" && !swapRow.borrow) return null;
+    const borrowData = swapRow.borrow;
     return {
-      address: swapType === "debt" ? swapRow.borrow!.tokenAddress : swapRow.supply.tokenAddress,
-      symbol: swapType === "debt" ? swapRow.borrow!.name : swapRow.supply.name,
-      name: swapType === "debt" ? swapRow.borrow!.name : swapRow.supply.name,
-      icon: swapType === "debt" ? swapRow.borrow!.icon : swapRow.supply.icon,
-      decimals: swapType === "debt" ? (swapRow.borrow!.tokenDecimals || 18) : (swapRow.supply.tokenDecimals || 18),
+      address: swapType === "debt" && borrowData ? borrowData.tokenAddress : swapRow.supply.tokenAddress,
+      symbol: swapType === "debt" && borrowData ? borrowData.name : swapRow.supply.name,
+      name: swapType === "debt" && borrowData ? borrowData.name : swapRow.supply.name,
+      icon: swapType === "debt" && borrowData ? borrowData.icon : swapRow.supply.icon,
+      decimals: swapType === "debt" && borrowData ? (borrowData.tokenDecimals || 18) : (swapRow.supply.tokenDecimals || 18),
     };
   }, [swapRow, swapType]);
 
@@ -596,7 +599,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       )}
 
       {/* Switch debt modal */}
-      {swapType === "debt" && swapRow && selectedTarget && swapRow.borrowContext && switchDebtCollateral && switchDebtCurrentDebt && switchDebtTargetDebt && (
+      {swapType === "debt" && swapRow && swapRow.borrow && selectedTarget && swapRow.borrowContext && switchDebtCollateral && switchDebtCurrentDebt && switchDebtTargetDebt && (
         <SwitchDebtModalStark
           isOpen={switchDebtModal.isOpen}
           onClose={switchDebtModal.close}
@@ -605,7 +608,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
           collateral={switchDebtCollateral}
           currentDebt={switchDebtCurrentDebt}
           targetDebt={switchDebtTargetDebt}
-          debtBalance={swapRow.borrow!.tokenBalance}
+          debtBalance={swapRow.borrow.tokenBalance}
           collateralBalance={swapRow.supply.tokenBalance}
         />
       )}

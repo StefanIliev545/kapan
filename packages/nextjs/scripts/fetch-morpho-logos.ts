@@ -182,7 +182,8 @@ function isValidSymbol(symbol: string): boolean {
   return true;
 }
 
-async function checkLogoExists(url: string): Promise<boolean> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function _checkLogoExists(url: string): Promise<boolean> {
   return new Promise((resolve) => {
     https.get(url, (res) => {
       resolve(res.statusCode === 200);

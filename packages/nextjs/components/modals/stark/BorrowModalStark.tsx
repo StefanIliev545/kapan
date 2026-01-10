@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, useMemo } from "react";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
 import { useLendingAction } from "~~/hooks/useLendingAction";
 import type { VesuContext } from "~~/utils/vesu";
@@ -37,12 +37,19 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
   if (token.decimals == null) {
     token.decimals = decimalsForAction;
   }
+
+  // Memoize token object with correct decimals to avoid creating new object on each render
+  const tokenWithDecimals = useMemo(
+    () => ({ ...token, decimals: decimalsForAction }),
+    [token, decimalsForAction]
+  );
+
   return (
     <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
       action="Borrow"
-      token={{ ...token, decimals: decimalsForAction }}
+      token={tokenWithDecimals}
       protocolName={protocolName}
       apyLabel="Borrow APY"
       apy={token.currentRate}

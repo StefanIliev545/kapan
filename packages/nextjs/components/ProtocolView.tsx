@@ -828,6 +828,32 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     [readOnly, enabledFeatures.move, enabledFeatures.swap]
   );
 
+  // Memoized swap handlers for each supply position
+  const supplySwapHandlers = useMemo(() => {
+    return filteredSuppliedPositions.reduce<Record<string, () => void>>((acc, position, index) => {
+      const key = `supplied-${position.name}-${index}`;
+      acc[key] = () => handleSwap(position);
+      return acc;
+    }, {});
+  }, [filteredSuppliedPositions, handleSwap]);
+
+  // Memoized close and debt swap handlers for each borrow position
+  const borrowCloseHandlers = useMemo(() => {
+    return filteredBorrowedPositions.reduce<Record<string, () => void>>((acc, position, index) => {
+      const key = `borrowed-${position.name}-${index}`;
+      acc[key] = () => handleCloseWithCollateral(position);
+      return acc;
+    }, {});
+  }, [filteredBorrowedPositions, handleCloseWithCollateral]);
+
+  const borrowDebtSwapHandlers = useMemo(() => {
+    return filteredBorrowedPositions.reduce<Record<string, () => void>>((acc, position, index) => {
+      const key = `borrowed-${position.name}-${index}`;
+      acc[key] = () => handleDebtSwap(position);
+      return acc;
+    }, {});
+  }, [filteredBorrowedPositions, handleDebtSwap]);
+
   // Memoized tokens for Starknet TokenSelectModalStark - Supply
   const starknetSupplyTokens = useMemo(
     () => allSupplyPositions.map(pos => positionToStarknetToken(pos, true)),
@@ -1112,22 +1138,25 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 {filteredSuppliedPositions.length > 0 ? (
                   <div className="flex flex-1 flex-col pt-2">
                     <div className="space-y-3">
-                      {filteredSuppliedPositions.map((position, index) => (
-                        <div key={`supplied-${position.name}-${index}`} className="min-h-[60px]">
-                          <SupplyPosition
-                            {...position}
-                            protocolName={protocolName}
-                            networkType={networkType}
-                            chainId={chainId}
-                            position={positionManager}
-                            disableMove={disableMoveSupply || readOnly}
-                            availableActions={supplyAvailableActions}
-                            onSwap={() => handleSwap(position)}
-                            suppressDisabledMessage
-                            defaultExpanded={expandFirstPositions && index === 0}
-                          />
-                        </div>
-                      ))}
+                      {filteredSuppliedPositions.map((position, index) => {
+                        const key = `supplied-${position.name}-${index}`;
+                        return (
+                          <div key={key} className="min-h-[60px]">
+                            <SupplyPosition
+                              {...position}
+                              protocolName={protocolName}
+                              networkType={networkType}
+                              chainId={chainId}
+                              position={positionManager}
+                              disableMove={disableMoveSupply || readOnly}
+                              availableActions={supplyAvailableActions}
+                              onSwap={supplySwapHandlers[key]}
+                              suppressDisabledMessage
+                              defaultExpanded={expandFirstPositions && index === 0}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Primary actions pinned to bottom */}
@@ -1185,23 +1214,26 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 {filteredBorrowedPositions.length > 0 ? (
                   <div className="flex flex-1 flex-col pt-2">
                     <div className="space-y-3">
-                      {filteredBorrowedPositions.map((position, index) => (
-                        <div key={`borrowed-${position.name}-${index}`} className="min-h-[60px]">
-                          <BorrowPosition
-                            {...position}
-                            protocolName={protocolName}
-                            networkType={networkType}
-                            chainId={chainId}
-                            position={positionManager}
-                            availableAssets={position.collaterals || availableCollaterals}
-                            availableActions={borrowAvailableActions}
-                            onClosePosition={() => handleCloseWithCollateral(position)}
-                            onSwap={() => handleDebtSwap(position)}
-                            suppressDisabledMessage
-                            defaultExpanded={expandFirstPositions && index === 0}
-                          />
-                        </div>
-                      ))}
+                      {filteredBorrowedPositions.map((position, index) => {
+                        const key = `borrowed-${position.name}-${index}`;
+                        return (
+                          <div key={key} className="min-h-[60px]">
+                            <BorrowPosition
+                              {...position}
+                              protocolName={protocolName}
+                              networkType={networkType}
+                              chainId={chainId}
+                              position={positionManager}
+                              availableAssets={position.collaterals || availableCollaterals}
+                              availableActions={borrowAvailableActions}
+                              onClosePosition={borrowCloseHandlers[key]}
+                              onSwap={borrowDebtSwapHandlers[key]}
+                              suppressDisabledMessage
+                              defaultExpanded={expandFirstPositions && index === 0}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* "Add Borrow" button - pinned to bottom with gap */}

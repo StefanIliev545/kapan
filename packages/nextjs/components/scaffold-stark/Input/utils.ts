@@ -26,7 +26,8 @@ export const isValidInteger = (dataType: string, value: string | bigint): boolea
 // Helper functions:
 
 const isSignedType = (dataType: string): boolean => {
-  return dataType.split("::").pop()!.startsWith("i");
+  const lastPart = dataType.split("::").pop();
+  return lastPart?.startsWith("i") ?? false;
 };
 
 const extractBitCount = (dataType: string, isSigned: boolean): number => {

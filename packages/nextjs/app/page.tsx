@@ -9,23 +9,25 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
+// Static organization schema and HTML - extracted outside component to avoid recreating on each render
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Kapan Finance",
+  url: "https://kapan.finance",
+  logo: "https://kapan.finance/thumbnail.png",
+};
+const organizationSchemaHtml = { __html: JSON.stringify(organizationSchema).replace(/</g, "\\u003c") };
+
 /**
  * Home Page Component - Sticky scroll landing
  */
 const Home: NextPage = () => {
-  const organizationSchema = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "Kapan Finance",
-    url: "https://kapan.finance",
-    logo: "https://kapan.finance/thumbnail.png",
-  };
-
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema).replace(/</g, "\\u003c") }}
+        dangerouslySetInnerHTML={organizationSchemaHtml}
       />
       <StickyLanding />
     </>

@@ -1,4 +1,4 @@
-import { FC, useMemo } from "react";
+import { FC, useMemo, useCallback } from "react";
 import { ProtocolPosition } from "../ProtocolView";
 import { BorrowModal } from "./BorrowModal";
 import { DepositModal } from "./DepositModal";
@@ -73,6 +73,12 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
     [tokensWithBalances],
   );
 
+  // Factory for token click handlers
+  const createTokenClickHandler = useCallback(
+    (token: ProtocolPosition) => () => handleSelectToken(token),
+    [handleSelectToken],
+  );
+
   const modalTitle = isBorrow ? "Select Token to Borrow" : "Select Token to Supply";
   const rateLabel = isBorrow ? "APR" : "APY";
   const emptyMessage = `No tokens available to ${isBorrow ? "borrow" : "supply"}`;
@@ -114,7 +120,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
               rateDecimals={2}
               rateIsRaw={false}
               balanceLabel={token.balanceLabel}
-              onClick={() => handleSelectToken(token)}
+              onClick={createTokenClickHandler(token)}
             />
           ))}
         </TokenListContainer>

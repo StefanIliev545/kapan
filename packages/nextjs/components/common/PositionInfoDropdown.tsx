@@ -1,5 +1,13 @@
-import { FC, ReactNode, MouseEvent } from "react";
+import { FC, ReactNode, MouseEvent, useCallback } from "react";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
+
+// Static style for dropdown content - extracted to avoid creating new object on each render
+const dropdownContentStyle = {
+  right: "auto",
+  transform: "translateX(-50%)",
+  left: "50%",
+  borderRadius: "4px",
+};
 
 export type PositionInfoDropdownProps = {
   /** Token/asset name */
@@ -33,11 +41,11 @@ export const PositionInfoDropdown: FC<PositionInfoDropdownProps> = ({
   className = "",
   stopPropagation = false,
 }) => {
-  const handleClick = (e: MouseEvent<HTMLDivElement>) => {
+  const handleClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
     if (stopPropagation) {
       e.stopPropagation();
     }
-  };
+  }, [stopPropagation]);
 
   return (
     <div
@@ -57,12 +65,7 @@ export const PositionInfoDropdown: FC<PositionInfoDropdownProps> = ({
       <div
         tabIndex={0}
         className="dropdown-content card card-compact bg-base-100 z-[1] w-64 max-w-[90vw] p-2 shadow"
-        style={{
-          right: "auto",
-          transform: "translateX(-50%)",
-          left: "50%",
-          borderRadius: "4px",
-        }}
+        style={dropdownContentStyle}
       >
         <div className="card-body p-3">
           <h3 className="card-title text-sm">{name} Details</h3>

@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useCallback } from "react";
 import { ClockIcon } from "@heroicons/react/24/outline";
 import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { SlippageSelector } from "./SwapStatsGrid";
@@ -149,6 +149,11 @@ export const BatchedTxToggle: FC<BatchedTxToggleProps> = ({
     setUseBatchedTx,
     className = "",
 }) => {
+    const handleToggle = useCallback(
+        (e: React.ChangeEvent<HTMLInputElement>) => setUseBatchedTx(e.target.checked),
+        [setUseBatchedTx],
+    );
+
     return (
         <div className={`border-base-300/30 mt-2 flex items-center justify-between border-t pt-2 ${className}`}>
             <div className="flex items-center gap-1.5">
@@ -162,7 +167,7 @@ export const BatchedTxToggle: FC<BatchedTxToggleProps> = ({
                 <input
                     type="checkbox"
                     checked={useBatchedTx}
-                    onChange={e => setUseBatchedTx(e.target.checked)}
+                    onChange={handleToggle}
                     className="toggle toggle-xs toggle-primary"
                 />
             </div>

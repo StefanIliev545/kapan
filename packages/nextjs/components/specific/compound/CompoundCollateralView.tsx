@@ -291,8 +291,10 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   }, [collateralFactors]);
 
   // Ensure baseTokenDecimals is in the expected array format
-  const baseTokenDecimalsArray =
-    typeof baseTokenDecimals === "number" ? [BigInt(baseTokenDecimals)] : [baseTokenDecimals];
+  const baseTokenDecimalsArray = useMemo(
+    () => (typeof baseTokenDecimals === "number" ? [BigInt(baseTokenDecimals)] : [baseTokenDecimals]),
+    [baseTokenDecimals],
+  );
 
   // Extract baseToken price in USD
   const baseTokenUsdPrice = useMemo(() => {

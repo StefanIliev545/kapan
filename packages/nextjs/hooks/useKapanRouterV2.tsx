@@ -691,7 +691,7 @@ export const useKapanRouterV2 = () => {
 
       // Flash loan repayment happens automatically - Router must have funds from Withdraw
     ];
-  }, [userAddress, encodeCompoundMarket]);
+  }, [userAddress]);
 
   type BuildMultiplyFlowParams = {
     protocolName: string;
@@ -972,7 +972,7 @@ export const useKapanRouterV2 = () => {
       // NOTE: Output[7] (debt token) stays in router to repay flash loan
       // Any excess debt token from swap (beyond flash loan repayment) is dust in router
     ];
-  }, [userAddress, encodeCompoundMarket]);
+  }, [userAddress]);
 
   /**
    * Build a "swap debt A -> debt B" flow using a flash loan:
@@ -1079,7 +1079,7 @@ export const useKapanRouterV2 = () => {
         encodeLendingInstruction(LendingOp.Borrow, debtToToken, userAddress, 0n, context, 1)
       ),
     ];
-  }, [userAddress, encodeCompoundMarket]);
+  }, [userAddress]);
 
   // --- Authorization Helpers ---
 

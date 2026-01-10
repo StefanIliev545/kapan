@@ -97,6 +97,14 @@ const MarketsPageContent: NextPage = () => {
     startTransition(() => setSelectedNetwork(networkId));
   }, []);
 
+  // Memoized view mode handlers
+  const handleSetViewModeList = useCallback(() => setViewMode("list"), []);
+  const handleSetViewModeGrid = useCallback(() => setViewMode("grid"), []);
+
+  // Memoized group mode handlers
+  const handleSetGroupModeToken = useCallback(() => setGroupMode("token"), []);
+  const handleSetGroupModeProtocol = useCallback(() => setGroupMode("protocol"), []);
+
   useEffect(() => {
     setMountedNetworks(prev => {
       if (prev.has(selectedNetwork)) return prev;
@@ -137,7 +145,7 @@ const MarketsPageContent: NextPage = () => {
                         ? BUTTON_ACTIVE_CLASS
                         : BUTTON_INACTIVE_CLASS
                     }`}
-                    onClick={() => setViewMode("list")}
+                    onClick={handleSetViewModeList}
                     aria-label="List view"
                   >
                     <ListBulletIcon className="size-4" />
@@ -148,7 +156,7 @@ const MarketsPageContent: NextPage = () => {
                         ? BUTTON_ACTIVE_CLASS
                         : BUTTON_INACTIVE_CLASS
                     }`}
-                    onClick={() => setViewMode("grid")}
+                    onClick={handleSetViewModeGrid}
                     aria-label="Grid view"
                   >
                     <Squares2X2Icon className="size-4" />
@@ -164,7 +172,7 @@ const MarketsPageContent: NextPage = () => {
                       ? BUTTON_ACTIVE_CLASS
                       : BUTTON_INACTIVE_CLASS
                   }`}
-                  onClick={() => setGroupMode("token")}
+                  onClick={handleSetGroupModeToken}
                 >
                   By Token
                 </button>
@@ -174,7 +182,7 @@ const MarketsPageContent: NextPage = () => {
                       ? BUTTON_ACTIVE_CLASS
                       : BUTTON_INACTIVE_CLASS
                   }`}
-                  onClick={() => setGroupMode("protocol")}
+                  onClick={handleSetGroupModeProtocol}
                 >
                   By Protocol
                 </button>

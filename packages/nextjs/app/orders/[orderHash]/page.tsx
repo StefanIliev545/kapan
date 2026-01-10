@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -107,11 +107,13 @@ const ORDER_MANAGER_ABI = [
 
 // ----- Sub-components -----
 
+const handleHistoryBack = () => window.history.back();
+
 function BackButton() {
   return (
     <div className="mx-auto mb-8 max-w-7xl">
       <button
-        onClick={() => window.history.back()}
+        onClick={handleHistoryBack}
         className="text-base-content/50 hover:text-base-content inline-flex items-center gap-2 text-sm transition-colors"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -255,6 +257,7 @@ interface ProgressBarProps {
 
 function ProgressBar({ completedChunks, totalChunks }: ProgressBarProps) {
   const progressPercent = totalChunks > 0 ? (completedChunks / totalChunks) * 100 : 0;
+  const progressStyle = useMemo(() => ({ width: `${progressPercent}%` }), [progressPercent]);
 
   return (
     <div className="mb-12">
@@ -265,7 +268,7 @@ function ProgressBar({ completedChunks, totalChunks }: ProgressBarProps) {
       <div className="bg-base-300 relative h-2">
         <div
           className="bg-primary absolute inset-y-0 left-0 transition-all duration-700 ease-out"
-          style={{ width: `${progressPercent}%` }}
+          style={progressStyle}
         />
       </div>
       <div className="mt-1 text-right">
@@ -629,15 +632,18 @@ function OrderFooter({ orderHash, chainId, orderManagerAddress }: OrderFooterPro
   const { copy: copyToClipboard } = useCopyToClipboard();
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
 
+  const handleCopyOrderHash = useCallback(() => copyToClipboard(orderHash), [copyToClipboard, orderHash]);
+  const handleCopyShareUrl = useCallback(() => copyToClipboard(shareUrl), [copyToClipboard, shareUrl]);
+
   return (
     <div className="border-base-300/50 border-t pt-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <OrderHashDisplay orderHash={orderHash} onCopy={() => copyToClipboard(orderHash)} />
+        <OrderHashDisplay orderHash={orderHash} onCopy={handleCopyOrderHash} />
         <FooterLinks
           chainId={chainId}
           orderManagerAddress={orderManagerAddress}
           shareUrl={shareUrl}
-          onCopyShare={() => copyToClipboard(shareUrl)}
+          onCopyShare={handleCopyShareUrl}
         />
       </div>
     </div>
@@ -818,6 +824,8 @@ function useOrderNote(orderHash: string, sellSymbol: string, buySymbol: string, 
   return { operationType, operationLabel, operationColorClass, protocolName, protocolLogo };
 }
 
+const EMPTY_CHUNK_DETAILS: ChunkDetail[] = [];
+
 // ----- Main component -----
 
 export default function OrderDetailPage() {
@@ -881,6 +889,11 @@ export default function OrderDetailPage() {
     buySymbol,
     chainId,
     order ? Number(order.createdAt) : 0
+  );
+
+  const chunkDetails = useMemo(
+    () => executionSummary?.chunkDetails ?? EMPTY_CHUNK_DETAILS,
+    [executionSummary]
   );
 
   // Early returns for loading and error states
@@ -962,7 +975,7 @@ export default function OrderDetailPage() {
             priceImpact={priceImpact}
           />
           <ExecutionHistory
-            chunkDetails={executionSummary?.chunkDetails ?? []}
+            chunkDetails={chunkDetails}
             sellDecimals={sellDecimals}
             buyDecimals={buyDecimals}
             chainId={chainId}

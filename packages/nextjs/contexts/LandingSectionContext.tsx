@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { createSafeContext } from "./createSafeContext";
 
 interface LandingSectionContextType {
@@ -19,8 +19,14 @@ export const LandingSectionProvider = ({ children }: { children: ReactNode }) =>
   const [currentSection, setCurrentSection] = useState(0);
   const [totalSections, setTotalSections] = useState(6);
 
+  // Memoize context value to avoid creating new object on each render
+  const contextValue = useMemo(
+    () => ({ currentSection, totalSections, setCurrentSection, setTotalSections }),
+    [currentSection, totalSections]
+  );
+
   return (
-    <LandingSectionContext.Provider value={{ currentSection, totalSections, setCurrentSection, setTotalSections }}>
+    <LandingSectionContext.Provider value={contextValue}>
       {children}
     </LandingSectionContext.Provider>
   );

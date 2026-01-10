@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, useCallback } from "react";
 import Image from "next/image";
 import { type FlashLoanProviderOption } from "~~/utils/flashLoan";
 
@@ -78,6 +78,12 @@ export const FlashLoanProviderSelector: FC<FlashLoanProviderSelectorProps> = ({
   onSelectProvider,
   label = "Flash Loan Provider",
 }) => {
+  // Factory for provider click handlers
+  const createProviderClickHandler = useCallback(
+    (provider: FlashLoanProviderOption) => () => onSelectProvider(provider),
+    [onSelectProvider],
+  );
+
   if (providers.length === 0) return null;
 
   return (
@@ -108,7 +114,7 @@ export const FlashLoanProviderSelector: FC<FlashLoanProviderSelectorProps> = ({
               <ProviderDropdownItem
                 key={provider.name}
                 provider={provider}
-                onClick={() => onSelectProvider(provider)}
+                onClick={createProviderClickHandler(provider)}
               />
             ))}
           </ul>

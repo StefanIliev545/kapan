@@ -154,6 +154,40 @@ export const EtherInputCore = ({
 
   const tooltipMessage = isPriceFetching ? "Fetching price" : "Unable to fetch price";
 
+  // Memoize prefix JSX to avoid re-creating on each render
+  const prefixElement = useMemo(
+    () => (
+      <span className={styleConfig.prefixClass}>
+        {internalUsdMode ? "$" : "\u039E"}
+      </span>
+    ),
+    [styleConfig.prefixClass, internalUsdMode],
+  );
+
+  // Memoize suffix JSX to avoid re-creating on each render
+  const suffixElement = useMemo(
+    () => (
+      <div
+        className={`${
+          isPriceFetched
+            ? ""
+            : "tooltip tooltip-secondary before:left-auto before:right-[-10px] before:transform-none before:content-[attr(data-tip)]"
+        }`}
+        data-tip={tooltipMessage}
+      >
+        <button
+          className={styleConfig.buttonClass}
+          onClick={toggleMode}
+          disabled={!internalUsdMode && !isPriceFetched}
+          type="button"
+        >
+          <ArrowsRightLeftIcon className="size-3 cursor-pointer" aria-hidden="true" />
+        </button>
+      </div>
+    ),
+    [isPriceFetched, tooltipMessage, styleConfig.buttonClass, toggleMode, internalUsdMode],
+  );
+
   return (
     <InputBaseComponent
       name={name}
@@ -161,30 +195,8 @@ export const EtherInputCore = ({
       placeholder={placeholder}
       onChange={handleChangeNumber}
       disabled={disabled}
-      prefix={
-        <span className={styleConfig.prefixClass}>
-          {internalUsdMode ? "$" : "\u039E"}
-        </span>
-      }
-      suffix={
-        <div
-          className={`${
-            isPriceFetched
-              ? ""
-              : "tooltip tooltip-secondary before:left-auto before:right-[-10px] before:transform-none before:content-[attr(data-tip)]"
-          }`}
-          data-tip={tooltipMessage}
-        >
-          <button
-            className={styleConfig.buttonClass}
-            onClick={toggleMode}
-            disabled={!internalUsdMode && !isPriceFetched}
-            type="button"
-          >
-            <ArrowsRightLeftIcon className="size-3 cursor-pointer" aria-hidden="true" />
-          </button>
-        </div>
-      }
+      prefix={prefixElement}
+      suffix={suffixElement}
     />
   );
 };

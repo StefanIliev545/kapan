@@ -1,4 +1,4 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useMemo } from "react";
 import { SegmentedActionBar } from "../../common/SegmentedActionBar";
 
 export interface ModalFooterProps {
@@ -61,6 +61,21 @@ export const ModalFooter: FC<ModalFooterProps> = ({
   leftContent,
   useSegmentedBar = true,
 }) => {
+  const segmentedActions = useMemo(() => [
+    {
+      key: "action",
+      label: actionLabel,
+      icon: isLoading ? (
+        <span className="loading loading-spinner loading-xs" />
+      ) : (
+        actionIcon
+      ),
+      onClick: onAction,
+      disabled: isActionDisabled || isLoading,
+      variant: "ghost" as const,
+    },
+  ], [actionLabel, isLoading, actionIcon, onAction, isActionDisabled]);
+
   if (useSegmentedBar) {
     return (
       <div className={`modal-action pt-2 ${className}`}>
@@ -68,20 +83,7 @@ export const ModalFooter: FC<ModalFooterProps> = ({
         <SegmentedActionBar
           className={leftContent ? "flex-1" : "w-full"}
           autoCompact
-          actions={[
-            {
-              key: "action",
-              label: actionLabel,
-              icon: isLoading ? (
-                <span className="loading loading-spinner loading-xs" />
-              ) : (
-                actionIcon
-              ),
-              onClick: onAction,
-              disabled: isActionDisabled || isLoading,
-              variant: "ghost",
-            },
-          ]}
+          actions={segmentedActions}
         />
       </div>
     );

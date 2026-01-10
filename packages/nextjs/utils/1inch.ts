@@ -149,6 +149,9 @@ export const fetch1inchSwap = async (
     from: params.from,
     slippage: params.slippage,
     disableEstimate: params.disableEstimate,
+    includeTokensInfo: params.includeTokensInfo,
+    includeProtocols: params.includeProtocols,
+    includeGas: params.includeGas,
   });
 
   const url = `${ONE_INCH_API_BASE}/${chainId}/swap?${searchParams.toString()}`;

@@ -74,6 +74,7 @@ export const AmountInput: FC<AmountInputProps> = ({
   useEffect(() => {
     setActivePercent(null);
     onChange("", false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetTrigger]); // Intentionally not including onChange to prevent loops
 
   const handlePercentClick = useCallback(
@@ -125,13 +126,30 @@ export const AmountInput: FC<AmountInputProps> = ({
   // Percentage buttons to show
   const percentButtons = showPercentButtons ? [25, 50, 100] : (showMaxButton ? [100] : []);
 
+  const handleOnChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(e.target.value),
+    [handleInputChange],
+  );
+
+  // Factory for percentage button click handlers
+  const createPercentClickHandler = useCallback(
+    (p: number) => () => {
+      if (p === 100 && showMaxButton && !showPercentButtons) {
+        handleMaxClick();
+      } else {
+        handlePercentClick(p);
+      }
+    },
+    [handleMaxClick, handlePercentClick, showMaxButton, showPercentButtons],
+  );
+
   return (
     <div className={className}>
       <div className="relative">
         <input
           type="number"
           value={value}
-          onChange={(e) => handleInputChange(e.target.value)}
+          onChange={handleOnChange}
           placeholder={placeholder}
           disabled={disabled}
           className={`bg-base-200/50 border-base-300/50 text-base-content placeholder:text-base-content/30 focus:border-base-content/30 w-full rounded-lg border px-4 py-3 focus:outline-none ${
@@ -149,7 +167,7 @@ export const AmountInput: FC<AmountInputProps> = ({
               <button
                 key={p}
                 type="button"
-                onClick={() => (p === 100 && showMaxButton && !showPercentButtons) ? handleMaxClick() : handlePercentClick(p)}
+                onClick={createPercentClickHandler(p)}
                 disabled={disabled}
                 className={`px-1 ${activePercent === p ? "underline" : ""} ${disabled ? "opacity-50" : ""}`}
               >
@@ -206,13 +224,18 @@ export const SimpleAmountInput: FC<{
     });
   }, [value, usdPrice]);
 
+  const handleOnChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value),
+    [onChange],
+  );
+
   return (
     <div className={className}>
       <div className="relative flex-1">
         <input
           type="number"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={handleOnChange}
           placeholder={placeholder}
           disabled={disabled}
           className="border-base-300 w-full border-0 border-b-2 bg-transparent px-2 py-1 pr-16 text-right font-medium outline-none"

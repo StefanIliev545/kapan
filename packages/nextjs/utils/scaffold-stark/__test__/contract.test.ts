@@ -247,19 +247,20 @@ describe("Contract Declarations", () => {
 
   it("should have a valid contract structure", () => {
     expect(contracts).toBeDefined();
-    if (contracts) {
-      Object.keys(contracts!).forEach((network) => {
-        expect(typeof network).toBe("string");
-        const networkContracts = contracts![network];
+    if (!contracts) return;
 
-        Object.keys(networkContracts).forEach((contractName) => {
-          const contract = networkContracts[contractName];
-          expect(contract).toHaveProperty("address");
-          expect(contract).toHaveProperty("abi");
-          expect(contract).toHaveProperty("classHash");
-        });
+    const contractsNonNull = contracts;
+    Object.keys(contractsNonNull).forEach((network) => {
+      expect(typeof network).toBe("string");
+      const networkContracts = contractsNonNull[network];
+
+      Object.keys(networkContracts).forEach((contractName) => {
+        const contract = networkContracts[contractName];
+        expect(contract).toHaveProperty("address");
+        expect(contract).toHaveProperty("abi");
+        expect(contract).toHaveProperty("classHash");
       });
-    }
+    });
   });
 
   it("should collect only function items from ABI", () => {

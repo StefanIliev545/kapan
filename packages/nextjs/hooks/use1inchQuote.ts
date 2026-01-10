@@ -48,6 +48,7 @@ export const use1inchQuote = ({
                         from,
                         slippage,
                         disableEstimate: true, // Always disable for adapter flow
+                        includeTokensInfo: true, // Include USD values for price impact calculation
                     }
                 );
             } catch (e) {

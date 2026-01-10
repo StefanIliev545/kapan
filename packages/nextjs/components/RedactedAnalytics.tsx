@@ -1,9 +1,10 @@
 "use client";
 
+import { useCallback } from "react";
 import { Analytics, type BeforeSendEvent } from "@vercel/analytics/next";
 
 export function RedactedAnalytics() {
-  const beforeSend = (event: BeforeSendEvent) => {
+  const beforeSend = useCallback((event: BeforeSendEvent) => {
     if (
       "data" in event &&
       event.data &&
@@ -14,7 +15,7 @@ export function RedactedAnalytics() {
     }
 
     return event;
-  };
+  }, []);
 
   return <Analytics beforeSend={beforeSend} />;
 }

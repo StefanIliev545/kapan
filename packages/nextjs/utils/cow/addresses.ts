@@ -18,6 +18,12 @@ export { COW_PROTOCOL, COW_API_URLS, COW_EXPLORER_URLS, MORPHO_BLUE, AAVE_V3_POO
 const BALANCER_V2_NAME = "Balancer V2";
 const BALANCER_V3_NAME = "Balancer V3";
 
+// Helper to safely get addresses from protocol maps (throws at build time if missing)
+function requireAddress(address: string | undefined, name: string): string {
+  if (!address) throw new Error(`Missing required address: ${name}`);
+  return address;
+}
+
 /**
  * Get CoW Explorer URL for an order
  * @param chainId - Chain ID
@@ -117,22 +123,22 @@ export function getKapanCowAdapter(chainId: number): string | undefined {
 export const FLASH_LOAN_LENDERS: Record<number, Record<string, string>> = {
   // Ethereum Mainnet
   1: {
-    aaveV3: AAVE_V3_POOLS[1]!,
+    aaveV3: requireAddress(AAVE_V3_POOLS[1], "AAVE_V3_POOLS[1]"),
     balancerV2: BALANCER.v2Vault,
   },
   // Arbitrum One
   42161: {
-    aaveV3: AAVE_V3_POOLS[42161]!,
+    aaveV3: requireAddress(AAVE_V3_POOLS[42161], "AAVE_V3_POOLS[42161]"),
     balancerV2: BALANCER.v2Vault,
   },
   // Base
   8453: {
-    aaveV3: AAVE_V3_POOLS[8453]!,
+    aaveV3: requireAddress(AAVE_V3_POOLS[8453], "AAVE_V3_POOLS[8453]"),
     balancerV2: BALANCER.v2Vault,
   },
   // Optimism
   10: {
-    aaveV3: AAVE_V3_POOLS[10]!,
+    aaveV3: requireAddress(AAVE_V3_POOLS[10], "AAVE_V3_POOLS[10]"),
     balancerV2: BALANCER.v2Vault,
   },
   // Gnosis Chain
@@ -141,16 +147,16 @@ export const FLASH_LOAN_LENDERS: Record<number, Record<string, string>> = {
   },
   // Polygon
   137: {
-    aaveV3: AAVE_V3_POOLS[137]!,
+    aaveV3: requireAddress(AAVE_V3_POOLS[137], "AAVE_V3_POOLS[137]"),
     balancerV2: BALANCER.v2Vault,
   },
   // Linea
   59144: {
-    aaveV3: AAVE_V3_POOLS[59144]!,
+    aaveV3: requireAddress(AAVE_V3_POOLS[59144], "AAVE_V3_POOLS[59144]"),
   },
   // Avalanche
   43114: {
-    aaveV3: AAVE_V3_POOLS[43114]!,
+    aaveV3: requireAddress(AAVE_V3_POOLS[43114], "AAVE_V3_POOLS[43114]"),
   },
 };
 
@@ -171,35 +177,35 @@ export type CowFlashLoanProvider = {
 export const COW_FLASH_LOAN_PROVIDERS: Record<number, CowFlashLoanProvider[]> = {
   // Ethereum Mainnet - Morpho (0%), Balancer V2/V3 (0%), Aave (0.05%)
   1: [
-    { address: MORPHO_BLUE[1]!, provider: "morpho", feeBps: 0, name: "Morpho Blue" },
+    { address: requireAddress(MORPHO_BLUE[1], "MORPHO_BLUE[1]"), provider: "morpho", feeBps: 0, name: "Morpho Blue" },
     { address: BALANCER.v2Vault, provider: "balancerV2", feeBps: 0, name: BALANCER_V2_NAME },
     { address: BALANCER.v3Vault, provider: "balancerV3", feeBps: 0, name: BALANCER_V3_NAME },
-    { address: AAVE_V3_POOLS[1]!, provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+    { address: requireAddress(AAVE_V3_POOLS[1], "AAVE_V3_POOLS[1]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
   ],
   // Base - Morpho (0%), Balancer V2/V3 (0%), Aave (0.05%)
   8453: [
-    { address: MORPHO_BLUE[8453]!, provider: "morpho", feeBps: 0, name: "Morpho Blue" },
+    { address: requireAddress(MORPHO_BLUE[8453], "MORPHO_BLUE[8453]"), provider: "morpho", feeBps: 0, name: "Morpho Blue" },
     { address: BALANCER.v2Vault, provider: "balancerV2", feeBps: 0, name: BALANCER_V2_NAME },
     { address: BALANCER.v3Vault, provider: "balancerV3", feeBps: 0, name: BALANCER_V3_NAME },
-    { address: AAVE_V3_POOLS[8453]!, provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+    { address: requireAddress(AAVE_V3_POOLS[8453], "AAVE_V3_POOLS[8453]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
   ],
   // Arbitrum - Morpho (0%), Balancer V2/V3 (0%), Aave (0.05%)
   42161: [
-    { address: MORPHO_BLUE[42161]!, provider: "morpho", feeBps: 0, name: "Morpho Blue" },
+    { address: requireAddress(MORPHO_BLUE[42161], "MORPHO_BLUE[42161]"), provider: "morpho", feeBps: 0, name: "Morpho Blue" },
     { address: BALANCER.v2Vault, provider: "balancerV2", feeBps: 0, name: BALANCER_V2_NAME },
     { address: BALANCER.v3Vault, provider: "balancerV3", feeBps: 0, name: BALANCER_V3_NAME },
-    { address: AAVE_V3_POOLS[42161]!, provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+    { address: requireAddress(AAVE_V3_POOLS[42161], "AAVE_V3_POOLS[42161]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
   ],
   // Optimism - Balancer V2/V3 (0%), Aave (0.05%)
   10: [
     { address: BALANCER.v2Vault, provider: "balancerV2", feeBps: 0, name: BALANCER_V2_NAME },
     { address: BALANCER.v3Vault, provider: "balancerV3", feeBps: 0, name: BALANCER_V3_NAME },
-    { address: AAVE_V3_POOLS[10]!, provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+    { address: requireAddress(AAVE_V3_POOLS[10], "AAVE_V3_POOLS[10]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
   ],
   // Polygon - Balancer (0%), Aave (0.05%)
   137: [
     { address: BALANCER.v2Vault, provider: "balancerV2", feeBps: 0, name: BALANCER_V2_NAME },
-    { address: AAVE_V3_POOLS[137]!, provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+    { address: requireAddress(AAVE_V3_POOLS[137], "AAVE_V3_POOLS[137]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
   ],
   // Gnosis - Balancer only (0%)
   100: [
@@ -207,11 +213,11 @@ export const COW_FLASH_LOAN_PROVIDERS: Record<number, CowFlashLoanProvider[]> = 
   ],
   // Linea - Aave only (0.05%)
   59144: [
-    { address: AAVE_V3_POOLS[59144]!, provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+    { address: requireAddress(AAVE_V3_POOLS[59144], "AAVE_V3_POOLS[59144]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
   ],
   // Avalanche - Aave only (0.05%)
   43114: [
-    { address: AAVE_V3_POOLS[43114]!, provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+    { address: requireAddress(AAVE_V3_POOLS[43114], "AAVE_V3_POOLS[43114]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
   ],
 };
 

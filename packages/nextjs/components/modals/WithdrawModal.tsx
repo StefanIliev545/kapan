@@ -64,6 +64,17 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
 
   const { commonModalProps } = useWithdrawModalConfig({ token, supplyBalance });
 
+  const renderBatchingPreference = useCallback(
+    () => (
+      <BatchingPreference
+        enabled={preferBatching}
+        setEnabled={setPreferBatching}
+        isLoaded={isPreferenceLoaded}
+      />
+    ),
+    [preferBatching, setPreferBatching, isPreferenceLoaded],
+  );
+
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -77,13 +88,7 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
       chainId={chainId}
       position={position}
       onConfirm={handleConfirm}
-      renderExtraContent={() => (
-        <BatchingPreference
-          enabled={preferBatching}
-          setEnabled={setPreferBatching}
-          isLoaded={isPreferenceLoaded}
-        />
-      )}
+      renderExtraContent={renderBatchingPreference}
     />
   );
 };

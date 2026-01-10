@@ -23,6 +23,9 @@ import { calculateFlashLoanFee, getPreferredFlashLoanLender, type ChunkCalculati
 import { type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
 import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 
+// Protocol identifier constants
+const PROTOCOL_MORPHO = "morpho-blue";
+
 // ==================== Types ====================
 
 export interface QuoteData {
@@ -442,7 +445,7 @@ function buildDepositInstructions(
   context: string
 ): ProtocolInstruction[] {
   const isCompound = normalizedProtocol === "compound";
-  const isMorpho = normalizedProtocol === "morpho-blue";
+  const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
   return [
@@ -463,7 +466,7 @@ function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInst
   const { collateral, debt, userAddress, flashLoanAmountRaw, marginAmountRaw, protocolName, morphoContext, market, chunkParams, chainId } = params;
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
-  const isMorpho = normalizedProtocol === "morpho-blue";
+  const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
 
   const context = isMorpho && morphoContext
@@ -539,7 +542,7 @@ function buildMultiChunkModeChunks(params: CowInstructionsBuildParams): ChunkIns
   const { collateral, debt, userAddress, protocolName, morphoContext, market, orderManagerAddress, chunkParams } = params;
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
-  const isMorpho = normalizedProtocol === "morpho-blue";
+  const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
 
   const context = isMorpho && morphoContext
@@ -620,7 +623,7 @@ export function buildInitialDepositInstructions(
   if (!collateral || !userAddress || marginAmountRaw <= 0n) return [];
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
-  const isMorpho = normalizedProtocol === "morpho-blue";
+  const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
 
   const context = isMorpho && morphoContext
@@ -802,7 +805,7 @@ export function buildPreOrderInstructions(params: PreOrderInstructionsParams): P
   } = params;
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
-  const isMorpho = normalizedProtocol === "morpho-blue";
+  const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
   const context = isMorpho && morphoContext
     ? encodeMorphoContext(morphoContext)
@@ -861,7 +864,7 @@ export function createSeedBorrowInstruction(
   market?: Address
 ): ProtocolInstruction {
   const normalizedProtocol = normalizeProtocolName(protocolName);
-  const isMorpho = normalizedProtocol === "morpho-blue";
+  const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
   const context = isMorpho && morphoContext
     ? encodeMorphoContext(morphoContext)
@@ -928,4 +931,48 @@ export function prepareLimitOrderFlashLoanConfig(
     token: debtAddress,
     amount: chunkSize,
   };
+}
+
+// ==================== Metrics Display Formatting Helpers ====================
+
+/**
+ * Format LTV display value
+ */
+export function formatLtvDisplay(ltv: number): string {
+  return ltv > 0 ? `${ltv.toFixed(1)}%` : "-";
+}
+
+/**
+ * Format price display value
+ */
+export function formatPriceDisplay(price: number): string {
+  return price > 0 ? `$${price.toFixed(2)}` : "-";
+}
+
+/**
+ * Get CSS class for APY-based coloring
+ */
+export function getApyColorClass(value: number | null): string {
+  if (value === null) return "";
+  if (value > 0) return "text-success";
+  if (value < 0) return "text-error";
+  return "";
+}
+
+/**
+ * Format APY display value with sign
+ */
+export function formatApyDisplay(apy: number | null): string {
+  if (apy === null) return "-";
+  const sign = apy > 0 ? "+" : "";
+  return `${sign}${apy.toFixed(2)}%`;
+}
+
+/**
+ * Format 30-day yield display value
+ */
+export function formatYield30dDisplay(yield30d: number | null): string {
+  if (yield30d === null) return "-";
+  const sign = yield30d >= 0 ? "+" : "";
+  return `${sign}$${Math.abs(yield30d).toFixed(2)}`;
 }

@@ -13,26 +13,10 @@ import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
-import { useCowLimitOrder, type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
+import { useCowLimitOrder } from "~~/hooks/useCowLimitOrder";
 import { useCowQuote, getCowQuoteSellAmount } from "~~/hooks/useCowQuote";
-import { 
-    FlashLoanProvider,
-    ProtocolInstruction,
-    createRouterInstruction,
-    createProtocolInstruction,
-    encodeApprove,
-    encodePullToken,
-    encodeAdd,
-    encodeLendingInstruction,
-    LendingOp,
-    normalizeProtocolName,
-} from "~~/utils/v2/instructionHelpers";
-import { 
-    CompletionType, 
-    getPreferredFlashLoanLender, 
-    calculateFlashLoanFee, 
-    getCowExplorerAddressUrl,
-} from "~~/utils/cow";
+import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
+import { getCowExplorerAddressUrl } from "~~/utils/cow";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
@@ -46,7 +30,22 @@ import {
 import { WarningDisplay } from "~~/components/common/ErrorDisplay";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
-import { saveOrderNote, createDebtSwapNote } from "~~/utils/orderNotes";
+import {
+    trackModalOpen,
+    createLimitOrderAnalyticsProps,
+    buildCowFlashLoanInfo,
+    buildCowChunkInstructions,
+    logLimitOrderBuildStart,
+    buildLimitOrderCallParams,
+    handleLimitOrderBuildFailure,
+    saveLimitOrderNote,
+    executeBatchedLimitOrder,
+    executeSequentialLimitOrder,
+    handleLimitOrderError,
+    shouldSwitchSwapRouter,
+    calculateRequiredNewDebt,
+    calculateLimitOrderNewDebt,
+} from "./debtSwapEvmHelpers";
 
 interface DebtSwapEvmModalProps {
     isOpen: boolean;
@@ -80,7 +79,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     availableAssets,
     context,
 }) => {
-    const { 
+    const {
         buildDebtSwapFlow,
         setBatchId,
         setSuppressBatchNotifications,
@@ -99,30 +98,26 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // Update swap router if chain changes and current router is not available
     useEffect(() => {
-        if (swapRouter === "1inch" && !oneInchAvailable) {
-            setSwapRouter(pendleAvailable ? "pendle" : "1inch");
-        } else if (swapRouter === "pendle" && !pendleAvailable) {
-            setSwapRouter(oneInchAvailable ? "1inch" : "pendle");
+        const newRouter = shouldSwitchSwapRouter(swapRouter, oneInchAvailable, pendleAvailable);
+        if (newRouter) {
+            setSwapRouter(newRouter as SwapRouter);
         }
     }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
 
     const wasOpenRef = useRef(false);
 
     useEffect(() => {
-        if (isOpen && !wasOpenRef.current) {
-            const modalOpenProps = {
-                network: "evm",
-                protocol: protocolName,
+        const modalJustOpened = isOpen && !wasOpenRef.current;
+        if (modalJustOpened) {
+            trackModalOpen(
+                protocolName,
                 chainId,
-                market: context ?? null,
+                context,
                 debtFromToken,
                 debtFromName,
-                availableAssets: availableAssets?.length ?? null,
-            } satisfies Record<string, string | number | boolean | null>;
-
-            track("debt_swap_modal_open", modalOpenProps);
+                availableAssets?.length ?? null
+            );
         }
-
         wasOpenRef.current = isOpen;
     }, [availableAssets?.length, chainId, debtFromName, debtFromToken, isOpen, context, protocolName]);
 
@@ -172,10 +167,10 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const { sendCallsAsync } = useSendCalls();
 
     // CoW limit order hook
-    const { 
-        buildOrderCalls: buildLimitOrderCalls, 
-        isReady: limitOrderReady, 
-        orderManagerAddress 
+    const {
+        buildOrderCalls: buildLimitOrderCalls,
+        isReady: limitOrderReady,
+        orderManagerAddress
     } = useCowLimitOrder();
 
     // Callback for LimitOrderConfig
@@ -193,7 +188,8 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // Ensure "From" is always the debt token
     useEffect(() => {
-        if (!selectedFrom || selectedFrom.address !== debtFromToken) {
+        const fromMismatch = !selectedFrom || selectedFrom.address !== debtFromToken;
+        if (fromMismatch) {
             setSelectedFrom(fromAsset);
         }
     }, [selectedFrom, debtFromToken, fromAsset]);
@@ -208,31 +204,33 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     useEffect(() => {
         const fromIsPT = isPendleToken(debtFromName);
         const toIsPT = selectedTo && isPendleToken(selectedTo.symbol);
-        if ((fromIsPT || toIsPT) && pendleAvailable) {
+        const shouldSwitchToPendle = (fromIsPT || toIsPT) && pendleAvailable;
+        if (shouldSwitchToPendle) {
             setSwapRouter("pendle");
         }
     }, [debtFromName, selectedTo, pendleAvailable]);
 
     // Handle batch confirmation for limit orders
     useEffect(() => {
-        if (isBatchConfirmed && executionType === "limit" && orderManagerAddress && lastOrderSalt) {
-            if (limitOrderNotificationId) {
-                notification.remove(limitOrderNotificationId);
-            }
-            
-            const explorerUrl = getCowExplorerAddressUrl(chainId, orderManagerAddress);
-            notification.success(
-                <TransactionToast
-                    step="confirmed"
-                    message="Limit order created!"
-                    blockExplorerLink={explorerUrl}
-                />
-            );
-            
-            setLastOrderSalt(null);
-            setLimitOrderNotificationId(null);
-            onClose();
+        const shouldHandleBatchConfirmation = isBatchConfirmed && executionType === "limit" && orderManagerAddress && lastOrderSalt;
+        if (!shouldHandleBatchConfirmation) return;
+
+        if (limitOrderNotificationId) {
+            notification.remove(limitOrderNotificationId);
         }
+
+        const explorerUrl = getCowExplorerAddressUrl(chainId, orderManagerAddress);
+        notification.success(
+            <TransactionToast
+                step="confirmed"
+                message="Limit order created!"
+                blockExplorerLink={explorerUrl}
+            />
+        );
+
+        setLastOrderSalt(null);
+        setLimitOrderNotificationId(null);
+        onClose();
     }, [isBatchConfirmed, executionType, orderManagerAddress, chainId, lastOrderSalt, limitOrderNotificationId, onClose]);
 
     // Amount to repay in raw
@@ -242,7 +240,6 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     }, [amountIn, debtFromDecimals]);
 
     // Step 1: Get unit quote (1 newDebt -> X currentDebt) to estimate exchange rate
-    // Use 1inch on supported chains, Pendle otherwise
     const unitQuoteAmount = useMemo(() => {
         if (!selectedTo) return "0";
         return parseUnits("1", selectedTo.decimals).toString();
@@ -271,48 +268,18 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const isUnitQuoteLoading = swapRouter === "1inch" ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
 
     // Calculate required newDebt input based on unit quote
-    // We want to borrow just enough newDebt to swap and get repayAmountRaw of currentDebt
-    // The slippage % from UI is used as buffer for price movement between quote and execution
     const { requiredNewDebt, requiredNewDebtFormatted, exchangeRate } = useMemo(() => {
-        if (!selectedTo || repayAmountRaw === 0n) {
-            return { requiredNewDebt: 0n, requiredNewDebtFormatted: "0", exchangeRate: "0" };
-        }
-
-        // Get unit output from whichever quote is available
-        let unitOut = 0n;
-        if (oneInchUnitQuote) {
-            unitOut = BigInt(oneInchUnitQuote.dstAmount);
-        } else if (pendleUnitQuote) {
-            const outAmount = pendleUnitQuote.data.amountPtOut || pendleUnitQuote.data.amountTokenOut || "0";
-            unitOut = BigInt(outAmount);
-        }
-
-        if (unitOut === 0n) {
-            return { requiredNewDebt: 0n, requiredNewDebtFormatted: "0", exchangeRate: "0" };
-        }
-        
-        // Exchange rate: how much currentDebt per 1 newDebt
-        const rate = formatUnits(unitOut, debtFromDecimals);
-        
-        // requiredNewDebt = repayAmountRaw / rate
-        // = repayAmountRaw * 1_newDebt / unitOut
-        const unitIn = parseUnits("1", selectedTo.decimals);
-        const base = (repayAmountRaw * unitIn) / unitOut;
-        
-        // Apply slippage buffer from UI (e.g., 1% slippage -> multiply by 1.01)
-        // This accounts for price movement between quote fetch and tx execution
-        const slippageBps = BigInt(Math.round(slippage * 100)); // 1% -> 100 bps
-        const required = (base * (10000n + slippageBps)) / 10000n;
-        
-        return {
-            requiredNewDebt: required,
-            requiredNewDebtFormatted: formatUnits(required, selectedTo.decimals),
-            exchangeRate: rate,
-        };
+        return calculateRequiredNewDebt({
+            selectedTo,
+            repayAmountRaw,
+            oneInchUnitQuote,
+            pendleUnitQuote,
+            debtFromDecimals,
+            slippage,
+        });
     }, [oneInchUnitQuote, pendleUnitQuote, selectedTo, repayAmountRaw, debtFromDecimals, slippage]);
 
     // Flash Loan selection - check liquidity for the NEW debt token we're flash loaning
-    // We flash loan `requiredNewDebt` of the new debt token, swap it to current debt, repay, then borrow to cover flash
     const { selectedProvider, setSelectedProvider, liquidityData } = useFlashLoanSelection({
         flashLoanProviders,
         defaultProvider: defaultFlashLoanProvider,
@@ -325,7 +292,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const minSwapAmount = selectedTo ? parseUnits("0.001", selectedTo.decimals) : 0n;
     const oneInchSwapEnabled = oneInchAvailable && swapRouter === "1inch" && requiredNewDebt > minSwapAmount && !!selectedTo && !!oneInchAdapter && isOpen && executionType === "market";
     const pendleSwapEnabled = pendleAvailable && swapRouter === "pendle" && requiredNewDebt > minSwapAmount && !!selectedTo && !!pendleAdapter && isOpen && executionType === "market";
-    
+
     // 1inch quote
     const { data: oneInchSwapQuote, isLoading: is1inchSwapQuoteLoading, error: oneInchQuoteError } = use1inchQuote({
         chainId,
@@ -371,18 +338,16 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
 
     // What the swap will actually produce (from the real quote)
-    const expectedOutput = swapQuote 
+    const expectedOutput = swapQuote
         ? formatUnits(BigInt(swapQuote.dstAmount), debtFromDecimals)
         : "0";
-    
+
     // Is the expected output enough to cover the repay?
-    const outputCoversRepay = swapQuote 
+    const outputCoversRepay = swapQuote
         ? BigInt(swapQuote.dstAmount) >= repayAmountRaw
         : false;
 
     // ============ Limit Order: CoW Quote ============
-    // For debt swap: KIND_BUY order (exact old debt to receive, max new debt to sell)
-    // Quote asks: "To buy exactly X oldDebt, how much newDebt do I need to sell?"
     const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
         sellToken: selectedTo?.address || "",        // newDebt to sell
         buyToken: debtFromToken,                      // oldDebt to receive (exact)
@@ -394,129 +359,36 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // ============ Limit Order: New Debt Amount from CoW Quote ============
     const limitOrderNewDebt = useMemo(() => {
-        if (!cowQuote || !selectedTo) return 0n;
-        
-        const baseSellAmount = getCowQuoteSellAmount(cowQuote);
-        if (baseSellAmount === 0n) return 0n;
-        
-        // Apply slippage buffer
-        const slippageBps = BigInt(Math.round(slippage * 100));
-        const withSlippage = (baseSellAmount * (10000n + slippageBps)) / 10000n;
-        
-        return withSlippage;
+        return calculateLimitOrderNewDebt(cowQuote, selectedTo, slippage);
     }, [cowQuote, selectedTo, slippage]);
 
     // ============ Limit Order: Flash Loan Info ============
-    // For debt swap, we flash loan NEW DEBT (sellToken)
     const cowFlashLoanInfo = useMemo(() => {
-        if (!limitOrderConfig?.selectedProvider || executionType !== "limit" || !selectedTo || limitOrderNewDebt === 0n) {
-            return null;
-        }
-        const lenderInfo = getPreferredFlashLoanLender(chainId, limitOrderConfig.selectedProvider.provider);
-        if (!lenderInfo) return null;
-        
-        const fee = calculateFlashLoanFee(limitOrderNewDebt, lenderInfo.provider);
-        return {
-            lender: lenderInfo.address,
-            provider: lenderInfo.provider,
-            fee,
-            amount: limitOrderNewDebt,
-            token: selectedTo.address,
-        };
+        return buildCowFlashLoanInfo(chainId, limitOrderConfig, executionType, selectedTo, limitOrderNewDebt);
     }, [chainId, limitOrderConfig, executionType, limitOrderNewDebt, selectedTo]);
 
     // ============ Limit Order: Build Chunk Instructions ============
-    /**
-     * Debt Swap - CoW Limit Order Flow
-     * 
-     * Order: SELL newDebt -> BUY oldDebt (KIND_BUY: exact oldDebt amount)
-     * Flash Loan: newDebt token (sellToken)
-     * 
-     * PRE-HOOK:
-     * - fundOrder moves flash-loaned newDebt to OrderManager
-     * - No pre-instructions needed
-     * 
-     * SWAP: VaultRelayer pulls newDebt from OrderManager, Settlement sends oldDebt to OrderManager
-     * 
-     * POST-HOOK for KIND_BUY orders:
-     * - UTXO[0] = actual sell amount (newDebt sold) - prepended by OM
-     * - UTXO[1] = leftover amount (newDebt not sold) - prepended by OM
-     * - [0] PullToken: pull oldDebt from OM (exact buyAmount) -> UTXO[2]
-     * - [1] Approve oldDebt for protocol -> UTXO[3]
-     * - [2] Repay oldDebt using UTXO[2] -> UTXO[4]
-     * - [3] Borrow newDebt equal to actual sell (UTXO[0]) -> UTXO[5]
-     * - [4] Add: UTXO[5] + UTXO[1] -> UTXO[6] (flash loan repay)
-     * - [implicit] PushToken(UTXO[6], adapter)
-     */
-    const buildCowInstructions = useMemo((): ChunkInstructions[] => {
-        if (!selectedTo || !userAddress || repayAmountRaw === 0n || !orderManagerAddress || !cowFlashLoanInfo) {
+    const buildCowInstructions = useMemo(() => {
+        if (!selectedTo || !userAddress || !orderManagerAddress || !cowFlashLoanInfo) {
             return [{ preInstructions: [], postInstructions: [] }];
         }
-
-        const normalizedProtocol = normalizeProtocolName(protocolName);
-        const numChunks = limitOrderConfig?.numChunks ?? 1;
-        
-        // Calculate per-chunk amounts
-        const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
-        const chunkFlashLoanAmount = cowFlashLoanInfo.amount / BigInt(numChunks);
-        
-        // PRE-HOOK: Empty - fundOrder handles transfer
-        const preInstructions: ProtocolInstruction[] = [];
-
-        const postInstructions: ProtocolInstruction[] = [
-            // [0] PullToken: pull oldDebt from OM (per-chunk buyAmount) -> UTXO[2]
-            createRouterInstruction(encodePullToken(chunkBuyAmount, debtFromToken, orderManagerAddress)),
-            
-            // [1] Approve oldDebt for lending protocol (using UTXO[2]) -> UTXO[3]
-            createRouterInstruction(encodeApprove(2, normalizedProtocol)),
-            
-            // [2] Repay user's oldDebt using UTXO[2] -> UTXO[4]
-            createProtocolInstruction(
-                normalizedProtocol,
-                encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, chunkBuyAmount, context || "0x", 2)
-            ),
-            
-            // [3] Borrow newDebt equal to actual sell amount (UTXO[0]) -> UTXO[5]
-            createProtocolInstruction(
-                normalizedProtocol,
-                encodeLendingInstruction(
-                    LendingOp.Borrow, 
-                    selectedTo.address,
-                    userAddress,
-                    chunkFlashLoanAmount,  // Per-chunk max borrow for auth calculation
-                    context || "0x", 
-                    0  // Use UTXO[0] = actual sell amount
-                )
-            ),
-            
-            // [4] Add: borrowed (UTXO[5]) + leftover (UTXO[1]) -> UTXO[6]
-            createRouterInstruction(encodeAdd(5, 1)),
-            
-            // Flash loan repay is implicit via flashLoanRepaymentUtxoIndex
-        ];
-
-        console.log("[buildCowInstructions] Debt Swap (KIND_BUY):", {
-            sellToken: selectedTo.symbol,
-            buyToken: debtFromName,
-            totalOldDebtToBuy: formatUnits(repayAmountRaw, debtFromDecimals),
-            chunkOldDebtToBuy: formatUnits(chunkBuyAmount, debtFromDecimals),
-            flashLoanToken: selectedTo.symbol,
-            totalFlashLoanAmount: formatUnits(cowFlashLoanInfo.amount, selectedTo.decimals),
-            chunkFlashLoanAmount: formatUnits(chunkFlashLoanAmount, selectedTo.decimals),
-            numChunks,
-            utxoLayout: "UTXO[0]=actualSell, UTXO[1]=leftover, UTXO[5]=borrowed, UTXO[6]=borrowed+leftover",
+        return buildCowChunkInstructions({
+            selectedTo,
+            userAddress,
+            repayAmountRaw,
+            orderManagerAddress,
+            protocolName,
+            context,
+            debtFromToken,
+            debtFromName,
+            debtFromDecimals,
+            cowFlashLoanInfo,
+            limitOrderConfig,
         });
-
-        // Return N identical chunks - each processes per-chunk amounts
-        return Array(numChunks).fill(null).map(() => ({
-            preInstructions,
-            postInstructions,
-            flashLoanRepaymentUtxoIndex: 6,
-        }));
-    }, [selectedTo, userAddress, repayAmountRaw, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderNewDebt, limitOrderConfig?.numChunks]);
+    }, [selectedTo, userAddress, repayAmountRaw, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderConfig]);
 
     // amountOut = required new debt (what user will borrow)
-    const amountOut = executionType === "limit" 
+    const amountOut = executionType === "limit"
         ? (limitOrderNewDebt > 0n && selectedTo ? formatUnits(limitOrderNewDebt, selectedTo.decimals) : "0")
         : requiredNewDebtFormatted;
 
@@ -588,6 +460,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // ============ Limit Order: Submit Handler ============
     const handleLimitOrderSubmit = useCallback(async () => {
+        // Validate required data
         if (!selectedTo || !userAddress || !orderManagerAddress || !walletClient || !publicClient) {
             throw new Error("Missing required data for limit order");
         }
@@ -595,174 +468,97 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             throw new Error("No flash loan provider selected");
         }
 
-        const txBeginProps = {
-            network: "evm",
-            protocol: protocolName,
+        const analyticsProps = createLimitOrderAnalyticsProps({
+            protocolName,
             chainId,
-            executionType: "limit",
-            oldDebtToken: debtFromToken,
-            oldDebtName: debtFromName,
-            newDebtToken: selectedTo.address,
-            newDebtName: selectedTo.symbol,
-            repayAmount: formatUnits(repayAmountRaw, debtFromDecimals),
-            newDebtAmount: formatUnits(limitOrderNewDebt, selectedTo.decimals),
-            flashLoanProvider: limitOrderConfig.selectedProvider.name,
-        } satisfies Record<string, string | number | boolean | null>;
+            debtFromToken,
+            debtFromName,
+            selectedTo,
+            repayAmountRaw,
+            debtFromDecimals,
+            limitOrderNewDebt,
+            flashLoanProviderName: limitOrderConfig.selectedProvider.name,
+        });
 
         setIsLimitSubmitting(true);
         let notificationId: string | number | undefined;
 
         try {
-            track("debt_swap_limit_order_begin", txBeginProps);
+            track("debt_swap_limit_order_begin", analyticsProps);
 
-            console.log("[Limit Order] Building debt swap order (KIND_BUY):", {
-                sellToken: selectedTo.symbol,
-                buyToken: debtFromName,
-                maxSellAmount: formatUnits(limitOrderNewDebt, selectedTo.decimals),
-                exactBuyAmount: formatUnits(repayAmountRaw, debtFromDecimals),
-                flashLoanToken: selectedTo.symbol,
-                flashLoanAmount: formatUnits(cowFlashLoanInfo.amount, selectedTo.decimals),
-                flashLoanLender: cowFlashLoanInfo.lender,
-                cowQuoteSellAmount: cowQuote ? formatUnits(getCowQuoteSellAmount(cowQuote), selectedTo.decimals) : "N/A",
+            logLimitOrderBuildStart({
+                selectedTo,
+                debtFromName,
+                limitOrderNewDebt,
+                repayAmountRaw,
+                debtFromDecimals,
+                cowFlashLoanInfo,
+                cowQuote,
             });
 
             // Build limit order calls
-            const numChunks = limitOrderConfig?.numChunks ?? 1;
-            const chunkSellAmount = limitOrderNewDebt / BigInt(numChunks);
-            const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
-            const chunkFlashLoanAmount = cowFlashLoanInfo.amount / BigInt(numChunks);
-
-            const limitOrderResult = await buildLimitOrderCalls({
-                sellToken: selectedTo.address as Address,    // newDebt to sell
-                buyToken: debtFromToken,                      // oldDebt to receive
-                chunkSize: chunkSellAmount,                   // Per-chunk newDebt to sell
-                minBuyPerChunk: chunkBuyAmount,               // Per-chunk oldDebt amount needed
-                totalAmount: limitOrderNewDebt,               // Total across all chunks
-                chunks: buildCowInstructions,
-                completion: CompletionType.Iterations,
-                targetValue: numChunks,
-                minHealthFactor: "1.0",
-                seedAmount: 0n,
-                flashLoan: {
-                    lender: cowFlashLoanInfo.lender as Address,
-                    token: selectedTo.address as Address,
-                    amount: chunkFlashLoanAmount,
-                },
-                preOrderInstructions: [],
-                isKindBuy: true,
+            const callParams = buildLimitOrderCallParams({
+                selectedTo,
+                debtFromToken,
+                limitOrderNewDebt,
+                repayAmountRaw,
+                cowFlashLoanInfo,
+                buildCowInstructions,
+                limitOrderConfig,
             });
+
+            const limitOrderResult = await buildLimitOrderCalls(callParams);
 
             if (!limitOrderResult) {
                 throw new Error("Failed to build limit order calls");
             }
 
             if (!limitOrderResult.success) {
-                const errorMsg = limitOrderResult.error || "Unknown error building order";
-                const fullError = limitOrderResult.errorDetails?.apiResponse
-                    ? `${errorMsg}\n\nAPI Response: ${limitOrderResult.errorDetails.apiResponse}`
-                    : errorMsg;
-                console.error("[Limit Order] Build failed:", fullError, limitOrderResult.errorDetails);
-                notification.error(
-                    <TransactionToast
-                        step="failed"
-                        message={`CoW API Error: ${errorMsg}`}
-                    />
-                );
-                throw new Error(errorMsg);
+                handleLimitOrderBuildFailure(limitOrderResult, analyticsProps);
             }
 
             console.log("[Limit Order] Order calls built:", limitOrderResult.calls.length);
 
             // Save order note for display on orders page
-            if (limitOrderResult.salt) {
-                saveOrderNote(createDebtSwapNote(
-                    limitOrderResult.salt,
-                    protocolName,
-                    debtFromName,      // old debt being repaid
-                    selectedTo.symbol, // new debt being taken on
-                    chainId
-                ));
-            }
+            saveLimitOrderNote(
+                limitOrderResult.salt,
+                protocolName,
+                debtFromName,
+                selectedTo.symbol,
+                chainId
+            );
 
             const allCalls = limitOrderResult.calls;
             notificationId = notification.loading(
                 <TransactionToast step="pending" message={`Creating limit order (${allCalls.length} operations)...`} />
             );
 
-            if (useBatchedTx && sendCallsAsync) {
-                console.log("[Limit Order] Using batched TX mode (EIP-5792)");
-                try {
-                    const { id: newBatchId } = await sendCallsAsync({
-                        calls: allCalls,
-                        experimental_fallback: true,
-                    });
-
-                    setSuppressBatchNotifications(true);
-                    setBatchId(newBatchId);
-                    setLastOrderSalt(limitOrderResult.salt);
-                    setLimitOrderNotificationId(notificationId);
-
-                    notification.remove(notificationId);
-                    notification.loading(
-                        <TransactionToast
-                            step="pending"
-                            message="Waiting for batch confirmation..."
-                        />
-                    );
-
-                    track("debt_swap_limit_order_complete", { ...txBeginProps, status: "batched", batchId: newBatchId });
-                } catch (batchError) {
-                    console.log("[Limit Order] Batch TX failed, falling back to sequential:", batchError);
-                    throw batchError;
-                }
+            if (useBatchedTx) {
+                await executeBatchedLimitOrder({
+                    allCalls,
+                    sendCallsAsync: (params) => sendCallsAsync(params),
+                    setSuppressBatchNotifications,
+                    setBatchId,
+                    setLastOrderSalt,
+                    setLimitOrderNotificationId,
+                    salt: limitOrderResult.salt,
+                    notificationId,
+                    analyticsProps,
+                });
             } else {
-                // Sequential execution
-                console.log("[Limit Order] Using sequential TX mode");
-                for (let i = 0; i < allCalls.length; i++) {
-                    const call = allCalls[i];
-                    notification.remove(notificationId);
-                    notificationId = notification.loading(
-                        <TransactionToast step="pending" message={`Executing step ${i + 1}/${allCalls.length}...`} />
-                    );
-
-                    const hash = await walletClient.sendTransaction({
-                        to: call.to,
-                        data: call.data,
-                        chain: walletClient.chain,
-                        account: walletClient.account!,
-                    });
-
-                    await publicClient.waitForTransactionReceipt({ hash });
-                }
-
-                notification.remove(notificationId);
-                const explorerUrl = getCowExplorerAddressUrl(chainId, orderManagerAddress);
-                notification.success(
-                    <TransactionToast
-                        step="confirmed"
-                        message="Limit order created!"
-                        blockExplorerLink={explorerUrl}
-                    />
-                );
-
-                track("debt_swap_limit_order_complete", { ...txBeginProps, status: "success" });
-                onClose();
+                await executeSequentialLimitOrder({
+                    allCalls,
+                    walletClient,
+                    publicClient,
+                    chainId,
+                    orderManagerAddress,
+                    analyticsProps,
+                    onClose,
+                    notificationId,
+                });
             }
         } catch (e) {
-            if (notificationId) {
-                notification.remove(notificationId);
-            }
-            notification.error(
-                <TransactionToast
-                    step="failed"
-                    message={e instanceof Error ? e.message : "Transaction failed"}
-                />
-            );
-            track("debt_swap_limit_order_complete", {
-                ...txBeginProps,
-                status: "error",
-                error: e instanceof Error ? e.message : String(e),
-            });
+            handleLimitOrderError(e, notificationId, analyticsProps);
             throw e;
         } finally {
             setIsLimitSubmitting(false);
@@ -770,14 +566,27 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, limitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, useBatchedTx, sendCallsAsync, setSuppressBatchNotifications, setBatchId, onClose]);
 
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && requiredNewDebt > 0n && hasAdapter;
-    const canSubmitLimit = executionType === "limit" && limitOrderReady && !!cowFlashLoanInfo && 
+    const canSubmitLimit = executionType === "limit" && limitOrderReady && !!cowFlashLoanInfo &&
         parseFloat(amountIn) > 0 && !!orderManagerAddress && limitOrderNewDebt > 0n;
     const canSubmit = executionType === "market" ? canSubmitMarket : canSubmitLimit;
 
-    // USD values from 1inch (if available)
-    const srcUSD = swapQuote?.srcUSD ? parseFloat(swapQuote.srcUSD) : null;
-    const dstUSD = swapQuote?.dstUSD ? parseFloat(swapQuote.dstUSD) : null;
-    
+    // Calculate USD values from token prices for price impact fallback
+    // (1inch v6.0 API doesn't return srcUSD/dstUSD, so we compute from token prices)
+    // Swap is: newDebt (selectedTo) → oldDebt (debtFromToken)
+    const srcUsdFallback = useMemo(() => {
+        if (!selectedTo?.price || requiredNewDebt === 0n) return undefined;
+        const amount = parseFloat(formatUnits(requiredNewDebt, selectedTo.decimals));
+        if (amount <= 0) return undefined;
+        return amount * Number(formatUnits(selectedTo.price, 8));
+    }, [selectedTo?.price, selectedTo?.decimals, requiredNewDebt]);
+
+    const dstUsdFallback = useMemo(() => {
+        if (!debtFromPrice || !expectedOutput) return undefined;
+        const parsed = parseFloat(expectedOutput);
+        if (isNaN(parsed) || parsed <= 0) return undefined;
+        return parsed * Number(formatUnits(debtFromPrice, 8));
+    }, [debtFromPrice, expectedOutput]);
+
     // Auto-slippage and price impact calculation
     const { priceImpact, priceImpactColorClass, formattedPriceImpact } = useAutoSlippage({
         slippage,
@@ -786,6 +595,8 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         pendleQuote: pendleQuoteData,
         swapRouter,
         resetDep: selectedTo?.address,
+        srcUsdFallback,
+        dstUsdFallback,
     });
 
     // Memoized extraContent for LimitOrderSection
@@ -830,10 +641,10 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                         outputCoversRequired={outputCoversRepay}
                     />
                     {/* Show USD values if available */}
-                    {srcUSD !== null && dstUSD !== null && (
+                    {srcUsdFallback !== undefined && dstUsdFallback !== undefined && (
                         <div className="text-base-content/60 flex justify-between px-1 text-xs">
-                            <span>New debt: ~${srcUSD.toFixed(2)}</span>
-                            <span>Repaying: ~${dstUSD.toFixed(2)}</span>
+                            <span>New debt: ~${srcUsdFallback.toFixed(2)}</span>
+                            <span>Repaying: ~${dstUsdFallback.toFixed(2)}</span>
                         </div>
                     )}
                 </>
@@ -855,157 +666,50 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 />
             )}
         </div>
-    ), [executionType, setExecutionType, cowAvailable, limitOrderReady, slippage, setSlippage, priceImpact, priceImpactColorClass, formattedPriceImpact, exchangeRate, selectedTo, debtFromName, swapQuote, expectedOutput, outputCoversRepay, srcUSD, dstUSD, chainId, limitOrderSellToken, limitOrderNewDebt, requiredNewDebt, handleLimitOrderConfigChange, limitOrderConfig, isCowQuoteLoading, limitOrderExtraContent]);
+    ), [executionType, setExecutionType, cowAvailable, limitOrderReady, slippage, setSlippage, priceImpact, priceImpactColorClass, formattedPriceImpact, exchangeRate, selectedTo, debtFromName, swapQuote, expectedOutput, outputCoversRepay, srcUsdFallback, dstUsdFallback, chainId, limitOrderSellToken, limitOrderNewDebt, requiredNewDebt, handleLimitOrderConfigChange, limitOrderConfig, isCowQuoteLoading, limitOrderExtraContent]);
 
     // Info content
     const infoContent = executionType === "market" ? (
-        <div className="space-y-4 py-2">
-            <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                <InformationCircleIcon className="size-5 flex-shrink-0" />
-                <span>
-                    <strong>How Debt Swap Works</strong>
-                    <br />
-                    This feature allows you to change your debt asset without closing your collateral position.
-                </span>
-            </div>
-
-            <div className="space-y-4 px-2">
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">1</div>
-                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
-                    </div>
-                    <div className="pb-4">
-                        <h4 className="text-sm font-medium">Flash Loan</h4>
-                        <p className="text-base-content/70 text-xs">We borrow the new debt asset via a Flash Loan.</p>
-                        <div className="bg-base-200 mt-1 inline-block rounded p-1 text-xs">
-                            Provider: {selectedProvider?.name || "Auto"}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">2</div>
-                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
-                    </div>
-                    <div className="pb-4">
-                        <h4 className="text-sm font-medium">Swap</h4>
-                        <p className="text-base-content/70 text-xs">We swap the new debt token for your current debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.</p>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">3</div>
-                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
-                    </div>
-                    <div className="pb-4">
-                        <h4 className="text-sm font-medium">Repay Current Debt</h4>
-                        <p className="text-base-content/70 text-xs">Your current debt is repaid with the swapped tokens.</p>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">4</div>
-                    </div>
-                    <div>
-                        <h4 className="text-sm font-medium">Borrow New Debt</h4>
-                        <p className="text-base-content/70 text-xs">New debt is borrowed to repay the Flash Loan.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <MarketOrderInfoContent swapRouter={swapRouter} selectedProviderName={selectedProvider?.name} />
     ) : (
-        // Limit order info
-        <div className="space-y-4 py-2">
-            <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                <InformationCircleIcon className="size-5 flex-shrink-0" />
-                <span>
-                    <strong>How Limit Order Debt Swap Works</strong>
-                    <br />
-                    Your order waits for CoW solvers to find the best price, then executes atomically.
-                </span>
-            </div>
-
-            <div className="space-y-4 px-2">
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">1</div>
-                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
-                    </div>
-                    <div className="pb-4">
-                        <h4 className="text-sm font-medium">Create Order</h4>
-                        <p className="text-base-content/70 text-xs">Your limit order is created and submitted to CoW Protocol.</p>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">2</div>
-                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
-                    </div>
-                    <div className="pb-4">
-                        <h4 className="text-sm font-medium">Solver Competition</h4>
-                        <p className="text-base-content/70 text-xs">Solvers compete to fill your order at the best price.</p>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">3</div>
-                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
-                    </div>
-                    <div className="pb-4">
-                        <h4 className="text-sm font-medium">Flash Loan + Swap</h4>
-                        <p className="text-base-content/70 text-xs">Solver takes flash loan, swaps new debt for old debt.</p>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">4</div>
-                    </div>
-                    <div>
-                        <h4 className="text-sm font-medium">Repay + Borrow</h4>
-                        <p className="text-base-content/70 text-xs">Old debt repaid, new debt borrowed to cover flash loan. All atomic!</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <LimitOrderInfoContent />
     );
 
-    // Warnings
-    const warnings = (
-        <>
-            {executionType === "market" && swapQuote && !outputCoversRepay && (
-                <WarningDisplay
-                    message={`Swap output (${expectedOutput} ${debtFromName}) may not fully cover repay amount. Consider increasing slippage or reducing amount.`}
-                    size="sm"
-                />
-            )}
-            {executionType === "market" && swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
-                <WarningDisplay
-                    message="Warning: Quote 'from' address mismatch!"
-                    size="sm"
-                    breakAll
-                />
-            )}
-            {executionType === "market" && !hasAdapter && isOpen && (
-                <WarningDisplay
-                    message={`${swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.`}
-                    size="sm"
-                />
-            )}
-            {executionType === "limit" && isCowQuoteLoading && (
-                <div className="alert alert-info py-2 text-xs">
-                    <span className="loading loading-spinner loading-xs"></span>
-                    <span>Fetching CoW quote...</span>
-                </div>
-            )}
-        </>
+    // Memoize warnings JSX to avoid re-creating on each render
+    const warnings = useMemo(
+        () => (
+            <DebtSwapWarnings
+                executionType={executionType}
+                swapQuote={swapQuote}
+                outputCoversRepay={outputCoversRepay}
+                expectedOutput={expectedOutput}
+                debtFromName={debtFromName}
+                swapRouter={swapRouter}
+                oneInchAdapter={oneInchAdapter}
+                hasAdapter={hasAdapter}
+                isOpen={isOpen}
+                isCowQuoteLoading={isCowQuoteLoading}
+            />
+        ),
+        [executionType, swapQuote, outputCoversRepay, expectedOutput, debtFromName, swapRouter, oneInchAdapter, hasAdapter, isOpen, isCowQuoteLoading],
     );
+
+    // Pre-compute execution type dependent props to reduce cognitive complexity in JSX
+    const isMarketExecution = executionType === "market";
+    const quoteLoadingProp = isMarketExecution ? isQuoteLoading : isCowQuoteLoading;
+    const quoteErrorProp = isMarketExecution ? quoteError : null;
+    const flashLoanProvidersProp = isMarketExecution ? flashLoanProviders : undefined;
+    const selectedProviderProp = isMarketExecution ? selectedProvider : undefined;
+    const setSelectedProviderProp = isMarketExecution ? setSelectedProvider : undefined;
+    const liquidityDataProp = isMarketExecution ? liquidityData : undefined;
+    const swapRouterProp = isMarketExecution ? swapRouter : undefined;
+    const canSetSwapRouter = isMarketExecution && oneInchAvailable && pendleAvailable;
+    const setSwapRouterProp = canSetSwapRouter ? setSwapRouter : undefined;
+    const preferBatchingProp = isMarketExecution ? preferBatching : undefined;
+    const setPreferBatchingProp = isMarketExecution ? setPreferBatching : undefined;
+    const onSubmitHandler = isMarketExecution ? handleSwapWrapper : handleLimitOrderSubmit;
+    const isSubmittingProp = isMarketExecution ? isSubmitting : isLimitSubmitting;
+    const submitLabelProp = isMarketExecution ? "Swap Debt" : "Create Limit Order";
 
     return (
         <SwapModalShell
@@ -1025,22 +729,22 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             isMax={isMax}
             setIsMax={setIsMax}
             amountOut={amountOut}
-            isQuoteLoading={executionType === "market" ? isQuoteLoading : isCowQuoteLoading}
-            quoteError={executionType === "market" ? quoteError : null}
+            isQuoteLoading={quoteLoadingProp}
+            quoteError={quoteErrorProp}
             slippage={slippage}
             setSlippage={setSlippage}
-            flashLoanProviders={executionType === "market" ? flashLoanProviders : undefined}
-            selectedProvider={executionType === "market" ? selectedProvider : undefined}
-            setSelectedProvider={executionType === "market" ? setSelectedProvider : undefined}
-            flashLoanLiquidityData={executionType === "market" ? liquidityData : undefined}
-            swapRouter={executionType === "market" ? swapRouter : undefined}
-            setSwapRouter={executionType === "market" && oneInchAvailable && pendleAvailable ? setSwapRouter : undefined}
-            preferBatching={executionType === "market" ? preferBatching : undefined}
-            setPreferBatching={executionType === "market" ? setPreferBatching : undefined}
-            onSubmit={executionType === "market" ? handleSwapWrapper : handleLimitOrderSubmit}
-            isSubmitting={executionType === "market" ? isSubmitting : isLimitSubmitting}
+            flashLoanProviders={flashLoanProvidersProp}
+            selectedProvider={selectedProviderProp}
+            setSelectedProvider={setSelectedProviderProp}
+            flashLoanLiquidityData={liquidityDataProp}
+            swapRouter={swapRouterProp}
+            setSwapRouter={setSwapRouterProp}
+            preferBatching={preferBatchingProp}
+            setPreferBatching={setPreferBatchingProp}
+            onSubmit={onSubmitHandler}
+            isSubmitting={isSubmittingProp}
             canSubmit={canSubmit}
-            submitLabel={executionType === "market" ? "Swap Debt" : "Create Limit Order"}
+            submitLabel={submitLabelProp}
             infoContent={infoContent}
             warnings={warnings}
             fromLabel="Repay Debt"
@@ -1048,5 +752,162 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             fromReadOnly={true}
             customStats={customStatsWithToggle}
         />
+    );
+};
+
+// ============ Sub-components to reduce main component complexity ============
+
+interface MarketOrderInfoContentProps {
+    swapRouter: SwapRouter;
+    selectedProviderName?: string;
+}
+
+const MarketOrderInfoContent: FC<MarketOrderInfoContentProps> = ({ swapRouter, selectedProviderName }) => (
+    <div className="space-y-4 py-2">
+        <div className="alert alert-info bg-info/10 border-info/20 text-sm">
+            <InformationCircleIcon className="size-5 flex-shrink-0" />
+            <span>
+                <strong>How Debt Swap Works</strong>
+                <br />
+                This feature allows you to change your debt asset without closing your collateral position.
+            </span>
+        </div>
+
+        <div className="space-y-4 px-2">
+            <InfoStep step={1} title="Flash Loan" isLast={false}>
+                <p className="text-base-content/70 text-xs">We borrow the new debt asset via a Flash Loan.</p>
+                <div className="bg-base-200 mt-1 inline-block rounded p-1 text-xs">
+                    Provider: {selectedProviderName || "Auto"}
+                </div>
+            </InfoStep>
+
+            <InfoStep step={2} title="Swap" isLast={false}>
+                <p className="text-base-content/70 text-xs">
+                    We swap the new debt token for your current debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.
+                </p>
+            </InfoStep>
+
+            <InfoStep step={3} title="Repay Current Debt" isLast={false}>
+                <p className="text-base-content/70 text-xs">Your current debt is repaid with the swapped tokens.</p>
+            </InfoStep>
+
+            <InfoStep step={4} title="Borrow New Debt" isLast={true}>
+                <p className="text-base-content/70 text-xs">New debt is borrowed to repay the Flash Loan.</p>
+            </InfoStep>
+        </div>
+    </div>
+);
+
+const LimitOrderInfoContent: FC = () => (
+    <div className="space-y-4 py-2">
+        <div className="alert alert-info bg-info/10 border-info/20 text-sm">
+            <InformationCircleIcon className="size-5 flex-shrink-0" />
+            <span>
+                <strong>How Limit Order Debt Swap Works</strong>
+                <br />
+                Your order waits for CoW solvers to find the best price, then executes atomically.
+            </span>
+        </div>
+
+        <div className="space-y-4 px-2">
+            <InfoStep step={1} title="Create Order" isLast={false}>
+                <p className="text-base-content/70 text-xs">Your limit order is created and submitted to CoW Protocol.</p>
+            </InfoStep>
+
+            <InfoStep step={2} title="Solver Competition" isLast={false}>
+                <p className="text-base-content/70 text-xs">Solvers compete to fill your order at the best price.</p>
+            </InfoStep>
+
+            <InfoStep step={3} title="Flash Loan + Swap" isLast={false}>
+                <p className="text-base-content/70 text-xs">Solver takes flash loan, swaps new debt for old debt.</p>
+            </InfoStep>
+
+            <InfoStep step={4} title="Repay + Borrow" isLast={true}>
+                <p className="text-base-content/70 text-xs">Old debt repaid, new debt borrowed to cover flash loan. All atomic!</p>
+            </InfoStep>
+        </div>
+    </div>
+);
+
+interface InfoStepProps {
+    step: number;
+    title: string;
+    isLast: boolean;
+    children: React.ReactNode;
+}
+
+const InfoStep: FC<InfoStepProps> = ({ step, title, isLast, children }) => (
+    <div className="flex gap-3">
+        <div className="flex flex-col items-center">
+            <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">
+                {step}
+            </div>
+            {!isLast && <div className="bg-base-300 my-1 h-full w-0.5"></div>}
+        </div>
+        <div className={isLast ? "" : "pb-4"}>
+            <h4 className="text-sm font-medium">{title}</h4>
+            {children}
+        </div>
+    </div>
+);
+
+interface DebtSwapWarningsProps {
+    executionType: ExecutionType;
+    swapQuote: { dstAmount: string; tx: { data: string; from?: string }; srcUSD?: string | null; dstUSD?: string | null } | null | undefined;
+    outputCoversRepay: boolean;
+    expectedOutput: string;
+    debtFromName: string;
+    swapRouter: SwapRouter;
+    oneInchAdapter: { address: string } | null | undefined;
+    hasAdapter: boolean;
+    isOpen: boolean;
+    isCowQuoteLoading: boolean;
+}
+
+const DebtSwapWarnings: FC<DebtSwapWarningsProps> = ({
+    executionType,
+    swapQuote,
+    outputCoversRepay,
+    expectedOutput,
+    debtFromName,
+    swapRouter,
+    oneInchAdapter,
+    hasAdapter,
+    isOpen,
+    isCowQuoteLoading,
+}) => {
+    const showOutputWarning = executionType === "market" && swapQuote && !outputCoversRepay;
+    const showFromMismatchWarning = executionType === "market" && swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from?.toLowerCase() !== oneInchAdapter.address.toLowerCase();
+    const showNoAdapterWarning = executionType === "market" && !hasAdapter && isOpen;
+    const showCowQuoteLoading = executionType === "limit" && isCowQuoteLoading;
+
+    return (
+        <>
+            {showOutputWarning && (
+                <WarningDisplay
+                    message={`Swap output (${expectedOutput} ${debtFromName}) may not fully cover repay amount. Consider increasing slippage or reducing amount.`}
+                    size="sm"
+                />
+            )}
+            {showFromMismatchWarning && (
+                <WarningDisplay
+                    message="Warning: Quote 'from' address mismatch!"
+                    size="sm"
+                    breakAll
+                />
+            )}
+            {showNoAdapterWarning && (
+                <WarningDisplay
+                    message={`${swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.`}
+                    size="sm"
+                />
+            )}
+            {showCowQuoteLoading && (
+                <div className="alert alert-info py-2 text-xs">
+                    <span className="loading loading-spinner loading-xs"></span>
+                    <span>Fetching CoW quote...</span>
+                </div>
+            )}
+        </>
     );
 };

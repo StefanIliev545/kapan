@@ -56,6 +56,11 @@ import {
   calculateMinBuyPerChunk,
   handleLimitOrderBuildError,
   prepareLimitOrderFlashLoanConfig,
+  formatLtvDisplay,
+  formatPriceDisplay,
+  getApyColorClass,
+  formatApyDisplay,
+  formatYield30dDisplay,
   type QuoteData,
   type ChunkParamsResult,
 } from "./multiplyEvmHelpers";
@@ -80,9 +85,12 @@ interface MultiplyEvmModalProps {
 // No additional safety buffer - the protocol's LTV vs liquidation threshold gap is sufficient
 const SAFETY_BUFFER = 1.0;
 
+// Static empty objects for default props - extracted to avoid creating new objects on each render
+const EMPTY_APY_MAP: Record<string, number> = {};
+
 export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   isOpen, onClose, protocolName, chainId, collaterals, debtOptions, market, morphoContext,
-  maxLtvBps = 8000n, lltvBps = 8500n, supplyApyMap = {}, borrowApyMap = {}, eMode, disableAssetSelection = false,
+  maxLtvBps = 8000n, lltvBps = 8500n, supplyApyMap = EMPTY_APY_MAP, borrowApyMap = EMPTY_APY_MAP, eMode, disableAssetSelection = false,
 }) => {
   const wasOpenRef = useRef(false);
   const [collateral, setCollateral] = useState<SwapAsset | undefined>(collaterals[0]);
@@ -1002,7 +1010,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     [shortAmount, debtPrice, selectedProvider, swapRouter, pendleQuote, metrics.totalCollateralUsd]
   );
 
-  const ticks = [1, (1 + maxLeverage) / 2, maxLeverage];
+  const ticks = useMemo(() => [1, (1 + maxLeverage) / 2, maxLeverage], [maxLeverage]);
 
   // ==================== Render ====================
 
@@ -1677,38 +1685,43 @@ interface MetricsDisplayProps {
 
 const MetricsDisplay: FC<MetricsDisplayProps> = ({
   metrics, effectiveLltvBps, collateral, debt, collateralPrice, netApy, netYield30d,
-}) => (
-  <div className="bg-base-200/40 border-base-300/20 mb-3 flex items-center justify-between gap-2 rounded-lg border p-2 text-xs">
-    <div className="flex-1 text-center">
-      <div className="text-base-content/50 mb-0.5">LTV</div>
-      <div className="font-medium">{metrics.ltv > 0 ? `${metrics.ltv.toFixed(1)}%` : "-"} / {formatBps(effectiveLltvBps)}%</div>
-    </div>
-    <div className="bg-base-300/50 h-6 w-px" />
-    <div className="flex-1 text-center">
-      <div className="text-base-content/50 mb-0.5">{collateral?.symbol}</div>
-      <div className="font-medium">${collateralPrice > 0 ? collateralPrice.toFixed(2) : "-"}</div>
-    </div>
-    <div className="bg-base-300/50 h-6 w-px" />
-    <div className="flex-1 text-center">
-      <div className="text-base-content/50 mb-0.5">{debt?.symbol}</div>
-      <div className="font-medium">${debt ? Number(formatUnits(debt.price ?? 0n, 8)).toFixed(2) : "-"}</div>
-    </div>
-    <div className="bg-base-300/50 h-6 w-px" />
-    <div className="flex-1 text-center">
-      <div className="text-base-content/50 mb-0.5">Net APY</div>
-      <div className={`font-medium ${netApy !== null && netApy > 0 ? "text-success" : netApy !== null && netApy < 0 ? "text-error" : ""}`}>
-        {netApy !== null ? `${netApy > 0 ? "+" : ""}${netApy.toFixed(2)}%` : "-"}
+}) => {
+  const debtPriceFormatted = debt ? Number(formatUnits(debt.price ?? 0n, 8)).toFixed(2) : "-";
+  const debtPriceDisplay = debt ? `$${debtPriceFormatted}` : "-";
+
+  return (
+    <div className="bg-base-200/40 border-base-300/20 mb-3 flex items-center justify-between gap-2 rounded-lg border p-2 text-xs">
+      <div className="flex-1 text-center">
+        <div className="text-base-content/50 mb-0.5">LTV</div>
+        <div className="font-medium">{formatLtvDisplay(metrics.ltv)} / {formatBps(effectiveLltvBps)}%</div>
+      </div>
+      <div className="bg-base-300/50 h-6 w-px" />
+      <div className="flex-1 text-center">
+        <div className="text-base-content/50 mb-0.5">{collateral?.symbol}</div>
+        <div className="font-medium">{formatPriceDisplay(collateralPrice)}</div>
+      </div>
+      <div className="bg-base-300/50 h-6 w-px" />
+      <div className="flex-1 text-center">
+        <div className="text-base-content/50 mb-0.5">{debt?.symbol}</div>
+        <div className="font-medium">{debtPriceDisplay}</div>
+      </div>
+      <div className="bg-base-300/50 h-6 w-px" />
+      <div className="flex-1 text-center">
+        <div className="text-base-content/50 mb-0.5">Net APY</div>
+        <div className={`font-medium ${getApyColorClass(netApy)}`}>
+          {formatApyDisplay(netApy)}
+        </div>
+      </div>
+      <div className="bg-base-300/50 h-6 w-px" />
+      <div className="flex-1 text-center">
+        <div className="text-base-content/50 mb-0.5">30D Yield</div>
+        <div className={`font-medium ${getApyColorClass(netYield30d)}`}>
+          {formatYield30dDisplay(netYield30d)}
+        </div>
       </div>
     </div>
-    <div className="bg-base-300/50 h-6 w-px" />
-    <div className="flex-1 text-center">
-      <div className="text-base-content/50 mb-0.5">30D Yield</div>
-      <div className={`font-medium ${netYield30d !== null && netYield30d > 0 ? "text-success" : netYield30d !== null && netYield30d < 0 ? "text-error" : ""}`}>
-        {netYield30d !== null ? `${netYield30d >= 0 ? "+" : ""}$${Math.abs(netYield30d).toFixed(2)}` : "-"}
-      </div>
-    </div>
-  </div>
-);
+  );
+};
 
 interface DetailsSectionProps {
   executionType: "market" | "limit";

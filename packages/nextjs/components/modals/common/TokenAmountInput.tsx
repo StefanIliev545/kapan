@@ -1,6 +1,6 @@
 "use client";
 
-import { FC } from "react";
+import { FC, useCallback } from "react";
 import Image from "next/image";
 import { formatUnits } from "viem";
 import type { SwapAsset } from "../SwapModalShell";
@@ -49,18 +49,18 @@ export const TokenAmountInput: FC<TokenAmountInputProps> = ({
     onMaxClick,
     showBalance = true,
 }) => {
-    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         if (onAmountChange) {
             onAmountChange(e.target.value);
         }
-    };
+    }, [onAmountChange]);
 
-    const handleTokenChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleTokenChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
         const token = availableTokens.find(t => t.symbol === e.target.value);
         if (token && onTokenChange) {
             onTokenChange(token);
         }
-    };
+    }, [availableTokens, onTokenChange]);
 
     return (
         <div className="space-y-2">

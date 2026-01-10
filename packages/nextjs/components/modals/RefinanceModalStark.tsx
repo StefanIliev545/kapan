@@ -178,7 +178,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     }
   );
 
-  const effectiveSupportedMap = starknetSupportedMap;
+  const effectiveSupportedMapMemo = useMemo(() => starknetSupportedMap ?? {}, [starknetSupportedMap]);
 
   const debtInputRef = useRef<HTMLInputElement>(null);
 
@@ -249,7 +249,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   const debtUsd = 0;
   const ltv = "0.0";
   const refiHF = 999; // Safe default for Starknet
-  const hfColor = { tone: "text-success", badge: "badge-success" };
+  const hfColor = useMemo(() => ({ tone: "text-success", badge: "badge-success" }), []);
 
   /* --------------------------- Starknet execution --------------------------- */
   const legacy = useStarknetMovePositionLegacy({
@@ -273,7 +273,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   /* --------------------------- Action Handlers --------------------------- */
   const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0;
 
-  const handleExecuteMove = async () => {
+  const handleExecuteMove = useCallback(async () => {
     if (!debtConfirmed || !selectedProtocol) return;
 
     try {
@@ -324,7 +324,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [debtConfirmed, selectedProtocol, fromProtocol, position.name, position.tokenAddress, position.type, sendStarkAsync, setIsSubmitting, onClose]);
 
   // Handle Starknet errors
   useEffect(() => {
@@ -367,7 +367,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
       setSelectedProvider={setSelectedProvider}
       collaterals={collaterals}
       isLoadingCollaterals={isLoadingCollaterals}
-      effectiveSupportedMap={effectiveSupportedMap ?? {}}
+      effectiveSupportedMap={effectiveSupportedMapMemo}
       addedCollaterals={addedCollaterals}
       expandedCollateral={expandedCollateral}
       tempAmount={tempAmount}

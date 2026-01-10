@@ -11,7 +11,7 @@ type BalanceErrorProps = {
 export const BalanceError = ({ className = "" }: BalanceErrorProps) => {
   return (
     <div
-      className={`flex max-w-fit cursor-pointer flex-col items-center rounded-md border-2 border-base-content/30 px-2 ${className}`}
+      className={`border-base-content/30 flex max-w-fit cursor-pointer flex-col items-center rounded-md border-2 px-2 ${className}`}
     >
       <div className="text-warning">Error</div>
     </div>

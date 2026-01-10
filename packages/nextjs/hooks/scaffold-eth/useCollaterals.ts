@@ -3,14 +3,6 @@ import { formatUnits } from "viem";
 import { ContractName } from "~~/utils/scaffold-eth/contract";
 import { getGatewayContractName } from "./gatewayContracts";
 
-interface CollateralToken {
-  symbol: string;
-  balance: number; // Human readable format
-  rawBalance: bigint; // Full precision balance
-  address: string;
-  decimals: number;
-}
-
 export const useCollaterals = (tokenAddress: string, protocolName: string, userAddress: string, enabled: boolean, chainId?: number) => {
   // Get gateway contract name using shared utility
   const gatewayContractName = getGatewayContractName(protocolName);

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { NetworkOptions } from "./NetworkOptions";
 import { Address } from "@starknet-react/chains";
 import { useDisconnect, useNetwork } from "@starknet-react/core";
@@ -40,6 +40,14 @@ export const AddressInfoDropdown = ({
 
   useOutsideClick(dropdownRef, closeDropdown);
 
+  const handleCopyAddress = useCallback(() => {
+    copy(address);
+  }, [copy, address]);
+
+  const handleDisconnect = useCallback(() => {
+    disconnect();
+  }, [disconnect]);
+
   return (
     <>
       <details ref={dropdownRef} className="dropdown dropdown-end inline-block">
@@ -62,7 +70,7 @@ export const AddressInfoDropdown = ({
           <NetworkOptions hidden={!selectingNetwork} />
           <li className={selectingNetwork ? "hidden" : ""}>
             <button
-              onClick={() => copy(address)}
+              onClick={handleCopyAddress}
               className="btn-sm flex gap-3 !rounded-xl py-3"
               type="button"
             >
@@ -86,7 +94,7 @@ export const AddressInfoDropdown = ({
           ) : null}
 
           <li className={selectingNetwork ? "hidden" : ""}>
-            <button className="menu-item text-secondary-content btn-sm flex gap-3 !rounded-xl py-3" type="button" onClick={() => disconnect()}>
+            <button className="menu-item text-secondary-content btn-sm flex gap-3 !rounded-xl py-3" type="button" onClick={handleDisconnect}>
               <ArrowLeftEndOnRectangleIcon className="ml-2 h-6 w-4 sm:ml-0" /> <span>Disconnect</span>
             </button>
           </li>

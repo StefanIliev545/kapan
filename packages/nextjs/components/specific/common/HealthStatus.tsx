@@ -1,6 +1,6 @@
 "use client";
 
-import { FC } from "react";
+import { FC, useMemo } from "react";
 
 export interface HealthStatusProps {
   /** Utilization percentage (0-100) */
@@ -26,6 +26,12 @@ export const HealthStatus: FC<HealthStatusProps> = ({ utilizationPercentage }) =
   };
   const colors = getColorClasses();
 
+  // Memoize bar width style to avoid creating new object on each render
+  const barWidthStyle = useMemo(
+    () => ({ width: `${Math.min(utilizationPercentage, 100)}%` }),
+    [utilizationPercentage]
+  );
+
   return (
     <>
       {/* Desktop: bar + percentage */}
@@ -33,7 +39,7 @@ export const HealthStatus: FC<HealthStatusProps> = ({ utilizationPercentage }) =
         <div className="bg-base-300/60 h-1.5 w-24 overflow-hidden rounded-full">
           <div
             className={`h-full ${colors.bar} rounded-full shadow-sm transition-all duration-500 ${colors.glow}`}
-            style={{ width: `${Math.min(utilizationPercentage, 100)}%` }}
+            style={barWidthStyle}
           />
         </div>
         <span className={`font-mono text-xs font-semibold tabular-nums ${colors.text}`}>

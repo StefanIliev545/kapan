@@ -80,10 +80,8 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
     allTokensInfo.forEach((token: any) => {
       // Prefer on-chain decimals provided by the gateway; fallback for legacy deployments
       let decimals = typeof token.decimals !== "undefined" ? Number(token.decimals) : 18;
-      if (typeof token.decimals === "undefined") {
-        if (token.symbol === "USDC" || token.symbol === "USD₮0" || token.symbol === "USDC.e") {
-          decimals = 6;
-        }
+      if (typeof token.decimals === "undefined" && (token.symbol === "USDC" || token.symbol === "USD₮0" || token.symbol === "USDC.e")) {
+        decimals = 6;
       }
 
       const supplyAPY = aaveRateToAPY(token.supplyRate);

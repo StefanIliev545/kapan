@@ -70,10 +70,10 @@ export function encodeFlashLoan(
 }
 
 /**
- * Encode a FlashLoanV2 router instruction (deprecated, use encodeFlashLoan)
- * @deprecated Use encodeFlashLoan with FlashLoanProvider.BalancerV2 instead
+ * Encode a legacy FlashLoan router instruction (deprecated, use encodeFlashLoan)
+ * @deprecated Use encodeFlashLoan with appropriate FlashLoanProvider instead
  */
-export function encodeFlashLoanV2(amount: bigint, token: string, user: string): string {
+function encodeLegacyFlashLoan(amount: bigint, token: string, user: string): string {
   return coder.encode(
     [ROUTER_INSTRUCTION_TYPE],
     [[amount, token, user, RouterInstructionType.FlashLoan]]
@@ -81,14 +81,19 @@ export function encodeFlashLoanV2(amount: bigint, token: string, user: string): 
 }
 
 /**
+ * Encode a FlashLoanV2 router instruction (deprecated, use encodeFlashLoan)
+ * @deprecated Use encodeFlashLoan with FlashLoanProvider.BalancerV2 instead
+ */
+export function encodeFlashLoanV2(amount: bigint, token: string, user: string): string {
+  return encodeLegacyFlashLoan(amount, token, user);
+}
+
+/**
  * Encode a FlashLoanV3 router instruction (deprecated, use encodeFlashLoan)
  * @deprecated Use encodeFlashLoan with FlashLoanProvider.BalancerV3 instead
  */
 export function encodeFlashLoanV3(amount: bigint, token: string, user: string): string {
-  return coder.encode(
-    [ROUTER_INSTRUCTION_TYPE],
-    [[amount, token, user, RouterInstructionType.FlashLoan]]
-  );
+  return encodeLegacyFlashLoan(amount, token, user);
 }
 
 /**

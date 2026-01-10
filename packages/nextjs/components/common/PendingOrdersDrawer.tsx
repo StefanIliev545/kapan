@@ -40,6 +40,8 @@ function formatUsd(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
+const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
+
 interface OrderWithHash {
   orderHash: string;
   context: OrderContext;
@@ -116,15 +118,24 @@ export function PendingOrdersDrawer() {
     return () => window.removeEventListener(ORDER_CREATED_EVENT, handleOrderCreated);
   }, [fetchOrders]);
 
-  const handleCancel = async (orderHash: string) => {
+  const handleCancel = useCallback(async (orderHash: string) => {
     setCancellingHash(orderHash);
     const success = await cancelOrder(orderHash);
     setCancellingHash(null);
     if (success) await fetchOrders();
-  };
+  }, [cancelOrder, fetchOrders]);
+
+  // Toggle drawer open/close
+  const toggleDrawer = useCallback(() => {
+    setIsOpen(prev => !prev);
+  }, []);
+
+  // Close drawer
+  const closeDrawer = useCallback(() => {
+    setIsOpen(false);
+  }, []);
 
   // Filter to recent orders (past 7 days) and sort newest first
-  const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
   const now = Math.floor(Date.now() / 1000);
   
   const recentOrders = useMemo(() => {
@@ -137,13 +148,32 @@ export function PendingOrdersDrawer() {
   const activeOrders = recentOrders.filter(o => o.context.status === OrderStatus.Active);
   const activeCount = activeOrders.length;
 
-  const ordersForEvents = useMemo(() => 
+  const ordersForEvents = useMemo(() =>
     recentOrders.map(o => ({
       orderHash: o.orderHash,
       isComplete: o.context.status === OrderStatus.Completed,
     })),
     [recentOrders]
   );
+
+  // Memoized cancel handlers for each order
+  const cancelHandlers = useMemo(() => {
+    return recentOrders.reduce<Record<string, () => void>>((acc, order) => {
+      acc[order.orderHash] = () => handleCancel(order.orderHash);
+      return acc;
+    }, {});
+  }, [recentOrders, handleCancel]);
+
+  // Memoized progress bar styles for each order
+  const progressStyles = useMemo(() => {
+    return recentOrders.reduce<Record<string, React.CSSProperties>>((acc, order) => {
+      const totalChunks = Number(order.context.params.targetValue);
+      const completedChunks = Number(order.context.iterationCount);
+      const progressPercent = totalChunks > 0 ? (completedChunks / totalChunks) * 100 : 0;
+      acc[order.orderHash] = { width: `${progressPercent}%` };
+      return acc;
+    }, {});
+  }, [recentOrders]);
 
   const executionDataMap = useMultipleChunkExecutedEvents(ordersForEvents);
 
@@ -158,15 +188,15 @@ export function PendingOrdersDrawer() {
 
   const tokenInfoMap = useTokenInfo(tokenAddresses, chainId);
 
-  const getTokenSymbol = (address: string): string => {
+  const getTokenSymbol = useCallback((address: string): string => {
     const info = tokenInfoMap.get(address.toLowerCase());
     return info?.symbol ?? truncateAddress(address);
-  };
+  }, [tokenInfoMap]);
 
-  const getTokenDecimals = (address: string): number => {
+  const getTokenDecimals = useCallback((address: string): number => {
     const info = tokenInfoMap.get(address.toLowerCase());
     return info?.decimals ?? 18;
-  };
+  }, [tokenInfoMap]);
 
   // Look up order notes for operation type and protocol info
   const orderNotesMap = useMemo(() => {
@@ -215,7 +245,7 @@ export function PendingOrdersDrawer() {
       {/* Floating Button - only show if we have orders */}
       {showButton && (
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={toggleDrawer}
           className="bg-primary text-primary-content hover:bg-primary/90 fixed bottom-4 right-4 z-50 flex h-12 items-center gap-2 rounded-lg px-4 shadow-lg transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -245,7 +275,7 @@ export function PendingOrdersDrawer() {
                 </svg>
               </button>
             </div>
-            <button onClick={() => setIsOpen(false)} className="hover:bg-base-200 rounded p-1 transition-colors">
+            <button onClick={closeDrawer} className="hover:bg-base-200 rounded p-1 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" className="text-base-content/50 size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -355,9 +385,9 @@ export function PendingOrdersDrawer() {
                       {/* Row 2: Progress bar */}
                       <div className="mb-2">
                         <div className="bg-base-200 h-1 w-full">
-                          <div 
+                          <div
                             className={`h-full transition-all ${isActive ? 'bg-primary' : 'bg-success'}`}
-                            style={{ width: `${progressPercent}%` }}
+                            style={progressStyles[orderHash]}
                           />
                         </div>
                         <div className="mt-1 flex justify-between">
@@ -404,7 +434,7 @@ export function PendingOrdersDrawer() {
                         </Link>
                         {isActive && (
                           <button
-                            onClick={() => handleCancel(orderHash)}
+                            onClick={cancelHandlers[orderHash]}
                             disabled={isCancelling || isCancellingThis}
                             className="text-error hover:underline disabled:opacity-50"
                           >

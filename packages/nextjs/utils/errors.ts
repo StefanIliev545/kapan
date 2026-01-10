@@ -118,6 +118,54 @@ export interface GetErrorMessageOptions {
 }
 
 /**
+ * Extracts hex data from various data formats
+ */
+function extractHexFromData(data: unknown): string {
+  if (!data) return "";
+  if (typeof data === "string" && data.startsWith("0x")) return data;
+  if (typeof data === "object" && data !== null && "data" in data) {
+    const nested = (data as Record<string, unknown>).data;
+    if (typeof nested === "string") return nested;
+  }
+  const str = String(data);
+  const match = str.match(/(0x[a-fA-F0-9]{8,})/);
+  return match ? match[1] : "";
+}
+
+/**
+ * Extracts revert data from viem's walk method
+ */
+function extractRevertDataFromWalk(errorObj: { walk?: (fn: (e: unknown) => unknown) => unknown }): string {
+  if (!errorObj.walk) return "";
+
+  try {
+    const walkResult = errorObj.walk((e: unknown) =>
+      (e as { data?: unknown })?.data
+    );
+    return extractHexFromData((walkResult as { data?: unknown })?.data);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Extracts revert data from error message using regex patterns
+ */
+function extractRevertDataFromMessage(message: string): string {
+  const patterns = [
+    /return data: (0x[a-fA-F0-9]+)/i,
+    /data:\s*(0x[a-fA-F0-9]+)/i,
+    /(0x[a-fA-F0-9]{8,})/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) return match[1];
+  }
+  return "";
+}
+
+/**
  * Extracts revert data from various error structures
  */
 function extractRevertData(error: unknown): string {
@@ -130,51 +178,42 @@ function extractRevertData(error: unknown): string {
     walk?: (fn: (e: unknown) => unknown) => unknown;
   };
 
-  // Helper to extract hex from data
-  const extractHex = (data: unknown): string => {
-    if (!data) return "";
-    if (typeof data === "string" && data.startsWith("0x")) return data;
-    if (typeof data === "object" && data !== null && "data" in data) {
-      const nested = (data as Record<string, unknown>).data;
-      if (typeof nested === "string") return nested;
-    }
-    const str = String(data);
-    const match = str.match(/(0x[a-fA-F0-9]{8,})/);
-    return match ? match[1] : "";
-  };
-
   // Try direct data properties
-  let revertData = extractHex(errorObj.cause?.data) || extractHex(errorObj.data);
+  let revertData = extractHexFromData(errorObj.cause?.data) || extractHexFromData(errorObj.data);
 
   // Try viem's walk method
-  if (!revertData && errorObj.walk) {
-    try {
-      const walkResult = errorObj.walk((e: unknown) =>
-        (e as { data?: unknown })?.data
-      );
-      revertData = extractHex((walkResult as { data?: unknown })?.data);
-    } catch {
-      // walk failed, continue
-    }
+  if (!revertData) {
+    revertData = extractRevertDataFromWalk(errorObj);
   }
 
   // Extract from error message
   if (!revertData && errorObj.message) {
-    const patterns = [
-      /return data: (0x[a-fA-F0-9]+)/i,
-      /data:\s*(0x[a-fA-F0-9]+)/i,
-      /(0x[a-fA-F0-9]{8,})/,
-    ];
-    for (const pattern of patterns) {
-      const match = errorObj.message.match(pattern);
-      if (match) {
-        revertData = match[1];
-        break;
-      }
-    }
+    revertData = extractRevertDataFromMessage(errorObj.message);
   }
 
   return revertData;
+}
+
+/**
+ * Extracts message from viem BaseError
+ */
+function getViemErrorMessage(parsedError: BaseViemError, fallbackMessage: string): string {
+  if (parsedError.details) {
+    return parsedError.details;
+  }
+
+  if (parsedError.shortMessage) {
+    const isRevertError = parsedError instanceof ContractFunctionRevertedError;
+    const hasCustomError = isRevertError && parsedError.data && parsedError.data.errorName !== "Error";
+
+    if (hasCustomError) {
+      const customErrorArgs = parsedError.data?.args?.toString() ?? "";
+      return `${parsedError.shortMessage.replace(/reverted\.$/, "reverted with the following reason:")}\n${parsedError.data?.errorName}(${customErrorArgs})`;
+    }
+    return parsedError.shortMessage;
+  }
+
+  return parsedError.message ?? parsedError.name ?? fallbackMessage;
 }
 
 /**
@@ -229,23 +268,7 @@ export function getErrorMessage(
   const parsedError = errorObj.walk ? errorObj.walk() : error;
 
   if (parsedError instanceof BaseViemError) {
-    if (parsedError.details) {
-      return parsedError.details;
-    }
-
-    if (parsedError.shortMessage) {
-      if (
-        parsedError instanceof ContractFunctionRevertedError &&
-        parsedError.data &&
-        parsedError.data.errorName !== "Error"
-      ) {
-        const customErrorArgs = parsedError.data.args?.toString() ?? "";
-        return `${parsedError.shortMessage.replace(/reverted\.$/, "reverted with the following reason:")}\n${parsedError.data.errorName}(${customErrorArgs})`;
-      }
-      return parsedError.shortMessage;
-    }
-
-    return parsedError.message ?? parsedError.name ?? fallbackMessage;
+    return getViemErrorMessage(parsedError, fallbackMessage);
   }
 
   // Handle generic errors

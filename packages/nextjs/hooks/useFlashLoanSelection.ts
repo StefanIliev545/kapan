@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFlashLoanLiquidity } from "./useFlashLoanLiquidity";
 import {
-  FlashLoanProvider,
   type FlashLoanProviderOption,
   FLASH_LOAN_PRIORITY,
 } from "~~/utils/flashLoan";

@@ -101,6 +101,52 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 /**
+ * Check if an error is an abort error
+ */
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+/**
+ * Check if abort signal is triggered
+ */
+function checkAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+}
+
+/**
+ * Determine if we should retry based on attempt count and error
+ */
+function shouldRetry(
+  attempt: number,
+  retries: number,
+  error: unknown,
+  isRetryable: (error: unknown) => boolean
+): boolean {
+  if (isAbortError(error)) return false;
+  return attempt < retries && isRetryable(error);
+}
+
+/**
+ * Handle retry callback
+ */
+function handleRetryCallback(
+  attempt: number,
+  retries: number,
+  error: unknown,
+  delay: number,
+  onRetry?: (attempt: number, error: unknown, delay: number) => void
+): void {
+  if (onRetry) {
+    onRetry(attempt + 1, error, delay);
+  } else {
+    logger.warn(`[withRetry] Attempt ${attempt + 1}/${retries + 1} failed, retrying in ${delay}ms`, error);
+  }
+}
+
+/**
  * Execute an async function with retry and exponential backoff
  *
  * @param fn - Async function to execute
@@ -134,39 +180,19 @@ export async function withRetry<T>(
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      // Check if aborted before attempt
-      if (signal?.aborted) {
-        throw new DOMException('Aborted', 'AbortError');
-      }
+    checkAborted(signal);
 
+    try {
       return await fn();
     } catch (error) {
       lastError = error;
 
-      // Don't retry on abort
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      if (!shouldRetry(attempt, retries, error, isRetryable)) {
         throw error;
       }
 
-      // Check if we should retry
-      const shouldRetry = attempt < retries && isRetryable(error);
-
-      if (!shouldRetry) {
-        throw error;
-      }
-
-      // Calculate delay
       const delay = calculateBackoffDelay(attempt, baseDelay, maxDelay, backoffMultiplier, jitter);
-
-      // Call retry callback
-      if (onRetry) {
-        onRetry(attempt + 1, error, delay);
-      } else {
-        logger.warn(`[withRetry] Attempt ${attempt + 1}/${retries + 1} failed, retrying in ${delay}ms`, error);
-      }
-
-      // Wait before retry
+      handleRetryCallback(attempt, retries, error, delay, onRetry);
       await sleep(delay, signal);
     }
   }

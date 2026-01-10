@@ -93,11 +93,8 @@ export const isValidInteger = (dataType: IntegerVariant, value: string) => {
   }
   const hexString = valueAsBigInt.toString(16);
   const significantHexDigits = hexString.match(/.*x0*(.*)$/)?.[1] ?? "";
-  if (
+  return !(
     significantHexDigits.length * 4 > bitcount ||
     (isSigned && significantHexDigits.length * 4 === bitcount && parseInt(significantHexDigits.slice(-1)?.[0], 16) < 8)
-  ) {
-    return false;
-  }
-  return true;
+  );
 };

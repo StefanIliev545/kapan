@@ -148,13 +148,8 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     // Note: Vesu/VesuV2 are always included as destinations (even when source is Vesu)
     // because moving from Vesu V1 to Vesu V1 (different pool) is a valid move
     return [{ name: "Vesu", logo: getProtocolLogo("Vesu") }, { name: "VesuV2", logo: getProtocolLogo("VesuV2") }, { name: "Nostra", logo: getProtocolLogo("Nostra") }].filter(
-      p => {
-        // Only filter out Nostra if source is Nostra (Vesu/VesuV2 can always be destinations)
-        if (p.name.toLowerCase() === "nostra" && fromProtocol.toLowerCase() === "nostra") {
-          return false;
-        }
-        return true;
-      },
+      // Only filter out Nostra if source is Nostra (Vesu/VesuV2 can always be destinations)
+      p => !(p.name.toLowerCase() === "nostra" && fromProtocol.toLowerCase() === "nostra"),
     );
   }, [fromProtocol, networkType, chainId]);
 
@@ -172,11 +167,6 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     chainId,
   );
 
-  // Use stringified version for stable comparison
-  const collateralAddressesString = useMemo(() =>
-    evmCollaterals.map(c => c.address).join(','),
-    [evmCollaterals]
-  );
 
   const { isLoading: isLoadingSupport, supportedCollaterals } = useEvmCollateralSupport(
     destinationProtocols[0]?.name || "",

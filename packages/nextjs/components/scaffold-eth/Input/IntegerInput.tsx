@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseEther } from "viem";
 import { CommonInputProps, InputBase, IntegerVariant, isValidInteger } from "~~/components/scaffold-eth";
 
@@ -32,6 +32,28 @@ export const IntegerInput = ({
     }
   }, [value, variant]);
 
+  // Memoize suffix JSX to avoid re-creating on each render
+  const suffixElement = useMemo(() => {
+    if (inputError || disableMultiplyBy1e18) {
+      return null;
+    }
+    return (
+      <div
+        className="tooltip tooltip-top tooltip-secondary flex space-x-4 before:left-auto before:right-[-10px] before:transform-none before:content-[attr(data-tip)]"
+        data-tip="Multiply by 1e18 (wei)"
+      >
+        <button
+          className={`${disabled ? "cursor-not-allowed" : "cursor-pointer"} text-accent px-4 font-semibold`}
+          onClick={multiplyBy1e18}
+          disabled={disabled}
+          type="button"
+        >
+          ∗
+        </button>
+      </div>
+    );
+  }, [inputError, disableMultiplyBy1e18, disabled, multiplyBy1e18]);
+
   return (
     <InputBase
       name={name}
@@ -40,24 +62,7 @@ export const IntegerInput = ({
       error={inputError}
       onChange={onChange}
       disabled={disabled}
-      suffix={
-        !inputError &&
-        !disableMultiplyBy1e18 && (
-          <div
-            className="tooltip tooltip-top tooltip-secondary flex space-x-4 before:left-auto before:right-[-10px] before:transform-none before:content-[attr(data-tip)]"
-            data-tip="Multiply by 1e18 (wei)"
-          >
-            <button
-              className={`${disabled ? "cursor-not-allowed" : "cursor-pointer"} text-accent px-4 font-semibold`}
-              onClick={multiplyBy1e18}
-              disabled={disabled}
-              type="button"
-            >
-              ∗
-            </button>
-          </div>
-        )
-      }
+      suffix={suffixElement}
     />
   );
 };

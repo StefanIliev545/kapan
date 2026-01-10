@@ -283,6 +283,10 @@ export const AppHeader = () => {
   const { isDrawerOpen, scrolled, burgerMenuRef, pathname, toggleDrawer, closeDrawer } = useHeaderState();
   const isPositionsPage = pathname === "/app";
 
+  // Memoize JSX elements passed as props to avoid re-creating on each render
+  const mobileMenuLinks = useMemo(() => <MobileAppMenuLinksWrapper />, []);
+  const mobileWalletButtons = useMemo(() => <AutoWalletButton />, []);
+
   return (
     <>
       <div className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? "py-1" : "py-2"}`}>
@@ -310,8 +314,8 @@ export const AppHeader = () => {
                 <MobileNavigationDrawer
                   isOpen={isDrawerOpen}
                   onClose={closeDrawer}
-                  menuLinks={<MobileAppMenuLinksWrapper />}
-                  walletButtons={<AutoWalletButton />}
+                  menuLinks={mobileMenuLinks}
+                  walletButtons={mobileWalletButtons}
                 />
               </div>
 

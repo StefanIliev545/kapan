@@ -626,14 +626,14 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
           <div className="space-y-2">
             <div className="border-base-300 flex items-center gap-6 border-b">
               <button
-                className={`-mb-[1px] border-b-2 pb-2 ${activeTab === "protocol" ? "border-primary" : "text-base-content/60 border-transparent"}`}
+                className={`mb-[-1px] border-b-2 pb-2 ${activeTab === "protocol" ? "border-primary" : "text-base-content/60 border-transparent"}`}
                 onClick={handleProtocolTabClick}
               >
                 Destination Protocol
               </button>
               {showFlashLoanTab && (
                 <button
-                  className={`-mb-[1px] border-b-2 pb-2 ${activeTab === "flashloan" ? "border-primary" : "text-base-content/60 border-transparent"}`}
+                  className={`mb-[-1px] border-b-2 pb-2 ${activeTab === "flashloan" ? "border-primary" : "text-base-content/60 border-transparent"}`}
                   onClick={handleFlashLoanTabClick}
                 >
                   Flash Loan Provider

@@ -153,6 +153,23 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
     }
   }, [disabled, onSelect]);
 
+  // Memoize grid style to avoid inline object creation
+  const gridStyle = useMemo(() => ({
+    gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`
+  }), [gridCols]);
+
+  // Create memoized click handlers for protocols (for dropdown and grid variants)
+  const protocolClickHandlers = useMemo(() => {
+    return protocols.reduce<Record<string, () => void>>((acc, protocol) => {
+      acc[protocol.name] = () => {
+        if (!protocol.disabled) {
+          handleSelect(protocol.name);
+        }
+      };
+      return acc;
+    }, {});
+  }, [protocols, handleSelect]);
+
   // Render loading state
   if (isLoading) {
     return (
@@ -202,11 +219,14 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
                 <span className={`font-semibold ${compact ? "text-sm" : ""}`}>
                   {selectedOption ? formatProtocolName(selectedOption.name) : placeholder}
                 </span>
-                {selectedOption && getRate(selectedOption) !== undefined && (
-                  <span className="text-base-content/60 text-xs">
-                    {formatRate(getRate(selectedOption)!)} APY
-                  </span>
-                )}
+                {(() => {
+                  const rate = selectedOption && getRate(selectedOption);
+                  return rate !== undefined && (
+                    <span className="text-base-content/60 text-xs">
+                      {formatRate(rate)} APY
+                    </span>
+                  );
+                })()}
               </div>
             </div>
             <ChevronDownIcon className="text-base-content/50 size-5" />
@@ -240,7 +260,7 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
                         isSelected={protocol.name === selectedProtocol}
                         disabled={protocol.disabled}
                         disabledReason={protocol.disabledReason}
-                        onClick={() => handleSelect(protocol.name)}
+                        onClick={protocolClickHandlers[protocol.name]}
                       />
                     );
                   })}
@@ -271,7 +291,7 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
         )}
         <div
           className={`grid gap-2`}
-          style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
+          style={gridStyle}
         >
           {protocols.map((protocol) => {
             const isSelected = protocol.name === selectedProtocol;
@@ -286,7 +306,7 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
                   ${isSelected ? "border-primary bg-primary/10" : "border-base-300 hover:border-primary/40"}
                   ${protocol.disabled ? "cursor-not-allowed opacity-50" : ""}
                 `}
-                onClick={() => !protocol.disabled && handleSelect(protocol.name)}
+                onClick={protocolClickHandlers[protocol.name]}
                 title={protocol.disabled ? protocol.disabledReason : undefined}
               >
                 <div className="flex items-center gap-2">
@@ -337,7 +357,7 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
                 ${isSelected ? "btn-primary" : "btn-ghost border-base-300 border"}
                 ${protocol.disabled ? "btn-disabled" : ""}
               `}
-              onClick={() => !protocol.disabled && handleSelect(protocol.name)}
+              onClick={protocolClickHandlers[protocol.name]}
               title={protocol.disabled ? protocol.disabledReason : undefined}
             >
               <ProtocolLogo

@@ -70,7 +70,8 @@ export const AccountProvider = ({ children }: AccountProviderProps) => {
         if (!ignore && chainId) {
           setAccountChainId(BigInt(chainId.toString()));
         }
-      } catch (error) {
+      } catch {
+        // Silently fall back to mainnet chain ID
         if (!ignore) {
           setAccountChainId(BigInt(constants.StarknetChainId.SN_MAIN));
         }

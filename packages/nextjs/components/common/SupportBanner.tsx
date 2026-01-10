@@ -3,6 +3,10 @@
 import Image from "next/image";
 import React from "react";
 
+// Static style objects to avoid creating new objects on each render
+const animationDelayStyle1 = { animationDelay: '-1.3s' };
+const animationDelayStyle2 = { animationDelay: '-2.6s' };
+
 interface SupportBannerProps {
     className?: string;
 }
@@ -29,7 +33,7 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
                 {/* Support on X Card */}
                 <div className="group relative">
                     {/* Animated glow border */}
-                    <div className="absolute -inset-[1px] overflow-hidden rounded-lg opacity-60">
+                    <div className="absolute inset-[-1px] overflow-hidden rounded-lg opacity-60">
                         <div className="animate-rotate-glow absolute inset-0">
                             <div className="absolute inset-[-100%] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(168,85,247,0.3)_60deg,rgba(236,72,153,0.35)_120deg,transparent_180deg)]" />
                         </div>
@@ -70,8 +74,8 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
                 {/* Fund via Giveth Card */}
                 <div className="group relative">
                     {/* Animated glow border */}
-                    <div className="absolute -inset-[1px] overflow-hidden rounded-lg opacity-60">
-                        <div className="animate-rotate-glow absolute inset-0" style={{ animationDelay: '-1.3s' }}>
+                    <div className="absolute inset-[-1px] overflow-hidden rounded-lg opacity-60">
+                        <div className="animate-rotate-glow absolute inset-0" style={animationDelayStyle1}>
                             <div className="absolute inset-[-100%] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(34,197,94,0.3)_60deg,rgba(16,185,129,0.35)_120deg,transparent_180deg)]" />
                         </div>
                     </div>
@@ -113,8 +117,8 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
                 {/* Join Our Community Card */}
                 <div className="group relative">
                     {/* Animated glow border */}
-                    <div className="absolute -inset-[1px] overflow-hidden rounded-lg opacity-60">
-                        <div className="animate-rotate-glow absolute inset-0" style={{ animationDelay: '-2.6s' }}>
+                    <div className="absolute inset-[-1px] overflow-hidden rounded-lg opacity-60">
+                        <div className="animate-rotate-glow absolute inset-0" style={animationDelayStyle2}>
                             <div className="absolute inset-[-100%] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(99,102,241,0.3)_60deg,rgba(139,92,246,0.35)_120deg,transparent_180deg)]" />
                         </div>
                     </div>

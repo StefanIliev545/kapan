@@ -1,4 +1,4 @@
-import { FC, memo } from "react";
+import { FC, memo, useCallback } from "react";
 import { ProtocolLogo } from "./ProtocolLogo";
 import formatPercentage from "~~/utils/formatPercentage";
 
@@ -63,11 +63,11 @@ export const ProtocolDropdownItem: FC<ProtocolDropdownItemProps> = memo(({
   disabledReason,
   onClick,
 }) => {
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     if (!disabled && onClick) {
       onClick();
     }
-  };
+  }, [disabled, onClick]);
 
   return (
     <div

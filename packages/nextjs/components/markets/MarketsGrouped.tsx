@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useMemo, useState } from "react";
+import { FC, useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ContractResponse } from "../specific/vesu/VesuMarkets";
@@ -68,6 +68,7 @@ const useAaveLikeData = (
         },
       ];
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [arbInfo.data, baseInfo.data, lineaInfo.data, optInfo.data, chainIds, connectedAddress]);
 
   const { data: results } = useReadContracts({
@@ -233,14 +234,22 @@ const useVenusData = (): MarketData[] => {
   }, [venusArbMarkets.data, venusArbRates.data, venusBaseMarkets.data, venusBaseRates.data]);
 };
 
-const useVesuData = (): MarketData[] => {
-  const v1Pools = [
-    { poolName: "Genesis", poolId: VESU_V1_POOLS.Genesis },
-    { poolName: "CarmineRunes", poolId: VESU_V1_POOLS.CarmineRunes },
-    { poolName: "Re7StarknetEcosystem", poolId: VESU_V1_POOLS.Re7StarknetEcosystem },
-    { poolName: "Re7xSTRK", poolId: VESU_V1_POOLS.Re7xSTRK },
-  ] as const;
+const VESU_V1_POOL_CONFIGS = [
+  { poolName: "Genesis", poolId: VESU_V1_POOLS.Genesis },
+  { poolName: "CarmineRunes", poolId: VESU_V1_POOLS.CarmineRunes },
+  { poolName: "Re7StarknetEcosystem", poolId: VESU_V1_POOLS.Re7StarknetEcosystem },
+  { poolName: "Re7xSTRK", poolId: VESU_V1_POOLS.Re7xSTRK },
+] as const;
 
+const VESU_V2_POOL_CONFIGS = [
+  { poolName: "Prime", address: VESU_V2_POOLS.Prime },
+  { poolName: "Re7xBTC", address: VESU_V2_POOLS.Re7xBTC },
+  { poolName: "Re7USDCCore", address: VESU_V2_POOLS.Re7USDCCore },
+  { poolName: "Re7USDCPrime", address: VESU_V2_POOLS.Re7USDCPrime },
+  { poolName: "Re7USDCStableCore", address: VESU_V2_POOLS.Re7USDCStableCore },
+] as const;
+
+const useVesuData = (): MarketData[] => {
   const vesuGenesis = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_assets_ui",
@@ -266,31 +275,24 @@ const useVesuData = (): MarketData[] => {
     refetchInterval: 0,
   });
 
-  const v1Assets = [vesuGenesis, vesuCarmineRunes, vesuRe7StarknetEcosystem, vesuRe7xSTRK];
-
-  const v2Pools = [
-    { poolName: "Prime", address: VESU_V2_POOLS.Prime },
-    { poolName: "Re7xBTC", address: VESU_V2_POOLS.Re7xBTC },
-    { poolName: "Re7USDCCore", address: VESU_V2_POOLS.Re7USDCCore },
-    { poolName: "Re7USDCPrime", address: VESU_V2_POOLS.Re7USDCPrime },
-    { poolName: "Re7USDCStableCore", address: VESU_V2_POOLS.Re7USDCStableCore },
-  ] as const;
-
   const vesuPrime = useVesuV2Assets(VESU_V2_POOLS.Prime);
   const vesuRe7xBTC = useVesuV2Assets(VESU_V2_POOLS.Re7xBTC);
   const vesuRe7USDCCore = useVesuV2Assets(VESU_V2_POOLS.Re7USDCCore);
   const vesuRe7USDCPrime = useVesuV2Assets(VESU_V2_POOLS.Re7USDCPrime);
   const vesuRe7USDCStableCore = useVesuV2Assets(VESU_V2_POOLS.Re7USDCStableCore);
 
-  const v2Assets = [vesuPrime, vesuRe7xBTC, vesuRe7USDCCore, vesuRe7USDCPrime, vesuRe7USDCStableCore];
   const allowDeposit = false;
 
   return useMemo(() => {
     const markets: MarketData[] = [];
 
+    // Build arrays inside useMemo to avoid dependency array issues
+    const v1Assets = [vesuGenesis, vesuCarmineRunes, vesuRe7StarknetEcosystem, vesuRe7xSTRK];
+    const v2Assets = [vesuPrime, vesuRe7xBTC, vesuRe7USDCCore, vesuRe7USDCPrime, vesuRe7USDCStableCore];
+
     v1Assets.forEach(({ data }, index) => {
       if (!data) return;
-      const poolName = getV1PoolDisplay(v1Pools[index].poolName as any).name;
+      const poolName = getV1PoolDisplay(VESU_V1_POOL_CONFIGS[index].poolName as any).name;
       (data as unknown as ContractResponse).forEach(asset => {
         const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
         const raw = typeof (asset as any).symbol === "bigint" ? feltToString((asset as any).symbol) : String((asset as any).symbol ?? "");
@@ -320,7 +322,7 @@ const useVesuData = (): MarketData[] => {
     });
 
     v2Assets.forEach(({ assetsWithRates }, index) => {
-      const { name: poolName } = getV2PoolDisplay(v2Pools[index].poolName as any);
+      const { name: poolName } = getV2PoolDisplay(VESU_V2_POOL_CONFIGS[index].poolName as any);
       assetsWithRates.forEach(asset => {
         const address = `0x${asset.address.toString(16).padStart(64, "0")}`;
         const rawSymbol = typeof asset.symbol === "bigint" ? feltToString(asset.symbol) : String(asset.symbol ?? "");
@@ -345,7 +347,11 @@ const useVesuData = (): MarketData[] => {
     });
 
     return markets;
-  }, [allowDeposit, v1Assets, v1Pools, v2Assets, v2Pools]);
+  }, [
+    allowDeposit,
+    vesuGenesis, vesuCarmineRunes, vesuRe7StarknetEcosystem, vesuRe7xSTRK,
+    vesuPrime, vesuRe7xBTC, vesuRe7USDCCore, vesuRe7USDCPrime, vesuRe7USDCStableCore,
+  ]);
 };
 
 export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
@@ -416,7 +422,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     Record<string, { column: "supply" | "borrow"; direction: "asc" | "desc" }>
   >({});
 
-  const toggleGroupSort = (name: string, column: "supply" | "borrow") => {
+  const toggleGroupSort = useCallback((name: string, column: "supply" | "borrow") => {
     setGroupSorts(prev => {
       const current = prev[name] || { column: "borrow", direction: "asc" };
       return {
@@ -427,7 +433,17 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
             : { column, direction: "asc" },
       };
     });
-  };
+  }, []);
+
+  // Memoized handlers for sort buttons
+  const handleSortBySupply = useCallback(() => setSortBy("supply"), []);
+  const handleSortByBorrow = useCallback(() => setSortBy("borrow"), []);
+
+  // Factory for group sort handlers
+  const createGroupSortHandler = useCallback(
+    (name: string, column: "supply" | "borrow") => () => toggleGroupSort(name, column),
+    [toggleGroupSort],
+  );
 
   const networkIcons: Record<MarketData["network"], string> = {
     arbitrum: "/logos/arb.svg",
@@ -472,21 +488,21 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
           <div className="bg-base-200/50 flex rounded-lg p-0.5">
             <button
               className={`rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
-                sortBy === "supply" 
-                  ? "bg-success/20 text-success shadow-sm" 
+                sortBy === "supply"
+                  ? "bg-success/20 text-success shadow-sm"
                   : "text-base-content/50 hover:text-base-content/80"
               }`}
-              onClick={() => setSortBy("supply")}
+              onClick={handleSortBySupply}
             >
               Supply APY
             </button>
             <button
               className={`rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
-                sortBy === "borrow" 
-                  ? "bg-error/20 text-error shadow-sm" 
+                sortBy === "borrow"
+                  ? "bg-error/20 text-error shadow-sm"
                   : "text-base-content/50 hover:text-base-content/80"
               }`}
-              onClick={() => setSortBy("borrow")}
+              onClick={handleSortByBorrow}
             >
               Borrow APR
             </button>
@@ -568,7 +584,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                     className={`text-center text-[10px] font-semibold uppercase tracking-widest transition-colors ${
                       sortInfo.column === "supply" ? "text-success" : "text-base-content/40 hover:text-base-content/60"
                     }`}
-                    onClick={() => toggleGroupSort(group.name, "supply")}
+                    onClick={createGroupSortHandler(group.name, "supply")}
                   >
                     Supply APY {sortInfo.column === "supply" && (sortInfo.direction === "asc" ? "↑" : "↓")}
                   </button>
@@ -577,7 +593,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                     className={`text-center text-[10px] font-semibold uppercase tracking-widest transition-colors ${
                       sortInfo.column === "borrow" ? "text-error" : "text-base-content/40 hover:text-base-content/60"
                     }`}
-                    onClick={() => toggleGroupSort(group.name, "borrow")}
+                    onClick={createGroupSortHandler(group.name, "borrow")}
                   >
                     Borrow APR {sortInfo.column === "borrow" && (sortInfo.direction === "asc" ? "↑" : "↓")}
                   </button>

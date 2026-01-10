@@ -3,7 +3,7 @@
  * Provides theme-aware logo selection and centralized logo mappings.
  */
 
-import { CHAIN_IDS, getChainIdFromName } from "./chainConfig";
+import { CHAIN_IDS } from "./chainConfig";
 
 export interface NetworkLogoConfig {
   /** Logo for dark mode (or default if no theme-specific logo) */

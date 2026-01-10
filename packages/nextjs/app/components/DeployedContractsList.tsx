@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { ArrowTopRightOnSquareIcon, CheckCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import { arbitrum, base, linea, optimism } from "viem/chains";
@@ -81,6 +81,7 @@ export const DeployedContractsList = () => {
   const setTargetEvmNetwork = useGlobalState(state => state.setTargetEVMNetwork);
   const evmNetworks = useMemo(() => getTargetNetworks(), []);
   const { copy, isCopied } = useCopyToClipboard();
+  const handleCopyAddress = useCallback((address: string) => () => copy(address), [copy]);
   const [selectedNetwork, setSelectedNetwork] = useState<string>(() => {
     const activeNetworkId = chainIdToNetworkOptionId[targetEvmNetwork.id];
     return activeNetworkId ?? defaultEvmNetworkId;
@@ -165,10 +166,8 @@ export const DeployedContractsList = () => {
       return;
     }
 
-    if (selectedNetwork !== "starknet" && contractsToDisplay.length === 0) {
-      if (Object.keys(starknetContractsForTarget).length > 0) {
-        setSelectedNetwork("starknet");
-      }
+    if (selectedNetwork !== "starknet" && contractsToDisplay.length === 0 && Object.keys(starknetContractsForTarget).length > 0) {
+      setSelectedNetwork("starknet");
     }
   }, [contractsToDisplay.length, isMounted, selectedNetwork, starknetContractsForTarget]);
 
@@ -213,7 +212,7 @@ export const DeployedContractsList = () => {
                     </span>
                     <button
                       className="btn btn-xs btn-ghost"
-                      onClick={() => copy(contract.address)}
+                      onClick={handleCopyAddress(contract.address)}
                     >
                       {isCopied ? (
                         <CheckCircleIcon className="text-success size-4" />

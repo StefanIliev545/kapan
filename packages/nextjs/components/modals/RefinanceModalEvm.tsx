@@ -77,7 +77,7 @@ const CollatPriceProbe: FC<{
     const ok = isSuccess && typeof price === "number" && isFinite(price) && price > 0;
     if (!ok) return;
 
-    const p8 = BigInt(Math.round(price! * 1e8));
+    const p8 = BigInt(Math.round(price * 1e8));
     if (lastReported.current === p8) return;
 
     lastReported.current = p8;
@@ -237,12 +237,12 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   });
 
   const selectedProvider = hookSelectedProvider?.name;
-  const setSelectedProvider = (name: string) => {
+  const setSelectedProvider = useCallback((name: string) => {
     const p = flashLoanProviders.find(p => p.name === name);
     if (p) {
       setHookSelectedProvider(p);
     }
-  };
+  }, [flashLoanProviders, setHookSelectedProvider]);
 
   /* ---------------------- Support map for selection --------------------- */
   const collateralAddresses = useMemo(() => collaterals.map(c => c.address), [collaterals]);
@@ -531,7 +531,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     return false;
   }, [debtConfirmed, selectedProtocol, addedCollaterals, isMorphoSelected, selectedMorphoMarket, morphoSupportedCollaterals, effectiveSupportedMap]);
 
-  const handleExecuteMove = async () => {
+  const handleExecuteMove = useCallback(async () => {
     if (!debtConfirmed || !selectedProtocol) return;
 
     let batchingUsed = false;
@@ -674,12 +674,34 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [
+    debtConfirmed,
+    selectedProtocol,
+    fromProtocol,
+    position,
+    preferBatching,
+    chainId,
+    isMorphoSelected,
+    selectedMorphoMarket,
+    debtAmountBigInt,
+    addedCollaterals,
+    collaterals,
+    selectedProvider,
+    selectedPool,
+    onClose,
+    createMoveBuilder,
+    hookSelectedProvider,
+  ]);
 
   // Determine source pool name
   const sourcePoolName = useMemo(() => {
     // For EVM, we don't need to exclude source pool by name
     return null;
+  }, []);
+
+  const handleDebtAmountChange = useCallback((value: string) => {
+    setDebtAmount(value);
+    setIsDebtMaxClicked(false);
   }, []);
 
   return (
@@ -689,10 +711,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       debtSymbol={debtSymbol}
       debtIcon={debtIcon}
       debtAmount={debtAmount}
-      setDebtAmount={(value) => {
-        setDebtAmount(value);
-        setIsDebtMaxClicked(false);
-      }}
+      setDebtAmount={handleDebtAmountChange}
       debtMaxLabel={debtMaxLabel}
       debtMaxRaw={debtMaxRaw}
       debtConfirmed={debtConfirmed}

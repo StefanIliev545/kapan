@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useState, useCallback } from "react";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useAccount, useWriteContract } from "wagmi";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
@@ -79,9 +79,9 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
   }, [membershipStatus]);
 
   // Handle the market entry action
-  const handleMarketEntry = async () => {
+  const handleMarketEntry = useCallback(async () => {
     if (!userAddress || isMember || isEntering || !comptrollerAddress) return;
-    
+
     try {
       setIsEntering(true);
       await writeContractAsync({
@@ -96,12 +96,12 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
     } finally {
       setIsEntering(false);
     }
-  };
+  }, [userAddress, isMember, isEntering, comptrollerAddress, vTokenAddress, writeContractAsync, refetchMembership]);
 
   // Handle the market exit action
-  const handleMarketExit = async () => {
+  const handleMarketExit = useCallback(async () => {
     if (!userAddress || !isMember || isExiting || !comptrollerAddress) return;
-    
+
     try {
       setIsExiting(true);
       await writeContractAsync({
@@ -116,7 +116,7 @@ export const VenusMarketEntry: FC<VenusMarketEntryProps> = ({
     } finally {
       setIsExiting(false);
     }
-  };
+  }, [userAddress, isMember, isExiting, comptrollerAddress, vTokenAddress, writeContractAsync, refetchMembership]);
 
   // If we're still loading or no wallet is connected, show a neutral state
   if (isCheckingMembership || !userAddress) {

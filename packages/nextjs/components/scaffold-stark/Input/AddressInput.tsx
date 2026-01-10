@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { blo } from "blo";
 import { useDebounceValue } from "usehooks-ts";
 import { CommonInputProps, InputBase } from "~~/components/scaffold-stark";
@@ -38,6 +38,22 @@ export const AddressInput = ({
     [onChange],
   );
 
+  // Memoize suffix JSX to avoid re-creating on each render
+  const suffixElement = useMemo(
+    () =>
+      value ? (
+        <Image
+          alt=""
+          className="!rounded-full"
+          src={blo(value as `0x${string}`)}
+          width={35}
+          height={35}
+          unoptimized
+        />
+      ) : null,
+    [value],
+  );
+
   return (
     <InputBase<Address>
       name={name}
@@ -46,18 +62,7 @@ export const AddressInput = ({
       onChange={handleChange}
       disabled={disabled}
       prefix={null}
-      suffix={
-        value && (
-          <Image
-            alt=""
-            className="!rounded-full"
-            src={blo(value as `0x${string}`)}
-            width={35}
-            height={35}
-            unoptimized
-          />
-        )
-      }
+      suffix={suffixElement}
     />
   );
 };

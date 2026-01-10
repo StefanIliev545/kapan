@@ -1,6 +1,6 @@
 "use client";
 
-import { FC } from "react";
+import { FC, useCallback } from "react";
 import { ClockIcon } from "@heroicons/react/24/outline";
 
 export type ExecutionType = "market" | "limit";
@@ -31,6 +31,14 @@ export const ExecutionTypeToggle: FC<ExecutionTypeToggleProps> = ({
     size = "xs",
     className = "",
 }) => {
+    const handleMarketClick = useCallback(() => {
+        onChange("market");
+    }, [onChange]);
+
+    const handleLimitClick = useCallback(() => {
+        onChange("limit");
+    }, [onChange]);
+
     if (!limitAvailable) {
         return null;
     }
@@ -41,13 +49,13 @@ export const ExecutionTypeToggle: FC<ExecutionTypeToggleProps> = ({
     return (
         <div className={`bg-base-200 mx-auto flex w-fit gap-1 rounded-lg p-1 ${className}`}>
             <button
-                onClick={() => onChange("market")}
+                onClick={handleMarketClick}
                 className={`${buttonClass} ${value === "market" ? "btn-primary" : "btn-ghost"}`}
             >
                 Market
             </button>
             <button
-                onClick={() => onChange("limit")}
+                onClick={handleLimitClick}
                 className={`${buttonClass} ${value === "limit" ? "btn-primary" : "btn-ghost"}`}
                 disabled={isLimitDisabled}
                 title={isLimitDisabled ? limitDisabledReason : "Execute via CoW Protocol limit order"}

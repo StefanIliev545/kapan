@@ -2,6 +2,9 @@
 
 import clsx from "clsx";
 
+// Base spinner class for DaisyUI loading components (hook test v2)
+const SPINNER_BASE = "loading loading-spinner";
+
 /**
  * Standardized loading component sizes
  * Maps to DaisyUI's loading-* classes
@@ -25,7 +28,7 @@ export const LoadingSpinner = ({
   label
 }: LoadingSpinnerProps) => (
   <span className={clsx("inline-flex items-center gap-2", className)}>
-    <span className={clsx("loading loading-spinner", `loading-${size}`)} />
+    <span className={clsx(SPINNER_BASE, `loading-${size}`)} />
     {label && <span>{label}</span>}
   </span>
 );
@@ -58,7 +61,7 @@ export const LoadingOverlay = ({
     aria-busy="true"
     aria-live="polite"
   >
-    <span className={clsx("loading loading-spinner", `loading-${size}`)} />
+    <span className={clsx(SPINNER_BASE, `loading-${size}`)} />
     {label && <span className="text-base-content/60 mt-2 text-sm">{label}</span>}
     <span className="sr-only">{label}</span>
   </div>
@@ -77,7 +80,7 @@ export const ButtonLoading = ({
   size = "xs",
   className
 }: ButtonLoadingProps) => (
-  <span className={clsx("loading loading-spinner", `loading-${size}`, className)} />
+  <span className={clsx(SPINNER_BASE, `loading-${size}`, className)} />
 );
 
 /**
@@ -98,7 +101,7 @@ export const LoadingAlert = ({
   className,
 }: LoadingAlertProps) => (
   <div className={clsx(`alert alert-${variant} py-2 text-xs`, className)}>
-    <span className={clsx("loading loading-spinner", `loading-${size}`)} />
+    <span className={clsx(SPINNER_BASE, `loading-${size}`)} />
     <span>{message}</span>
   </div>
 );
@@ -213,7 +216,7 @@ export const ModalLoading = ({
     aria-busy="true"
     aria-live="polite"
   >
-    <span className="loading loading-spinner loading-lg" />
+    <span className={`${SPINNER_BASE} loading-lg`} />
     <p className="text-base-content/60 mt-4">{message}</p>
     <span className="sr-only">{message}</span>
   </div>

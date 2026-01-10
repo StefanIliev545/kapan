@@ -1,4 +1,4 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useCallback, useMemo } from "react";
 import Image from "next/image";
 import clsx from "clsx";
 import { formatUnits } from "viem";
@@ -82,6 +82,11 @@ export const TokenIcon: FC<TokenIconProps> = ({
     ? { width: customSize, height: customSize }
     : undefined;
 
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    target.src = fallbackIcon;
+  }, [fallbackIcon]);
+
   if (showContainer) {
     return (
       <div
@@ -97,10 +102,7 @@ export const TokenIcon: FC<TokenIconProps> = ({
           alt={altText}
           fill
           className={clsx("object-contain", roundedClass)}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = fallbackIcon;
-          }}
+          onError={handleImageError}
         />
       </div>
     );
@@ -120,10 +122,7 @@ export const TokenIcon: FC<TokenIconProps> = ({
         alt={altText}
         fill
         className={clsx("object-contain", roundedClass)}
-        onError={(e) => {
-          const target = e.target as HTMLImageElement;
-          target.src = fallbackIcon;
-        }}
+        onError={handleImageError}
       />
     </div>
   );
@@ -418,18 +417,22 @@ export const TokenPill: FC<TokenPillProps> = ({
   const displayName = symbol || name;
   const resolvedIcon = icon || (displayName ? tokenNameToLogo(displayName) : "/logos/x-logo.svg");
 
+  const iconStyle = useMemo(() => ({ width: sizeConfig.icon, height: sizeConfig.icon }), [sizeConfig.icon]);
+
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    target.src = "/logos/x-logo.svg";
+  }, []);
+
   return (
     <div className={clsx("flex items-center gap-1", sizeConfig.text, className)}>
-      <div className="relative flex-shrink-0" style={{ width: sizeConfig.icon, height: sizeConfig.icon }}>
+      <div className="relative flex-shrink-0" style={iconStyle}>
         <Image
           src={resolvedIcon}
           alt={displayName || "token"}
           fill
           className="rounded-full object-contain"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/logos/x-logo.svg";
-          }}
+          onError={handleImageError}
         />
       </div>
       {value !== undefined && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Address } from "@starknet-react/chains";
 import { BalanceError, BalanceSkeleton } from "~~/components/common";
 import { useTargetNetwork } from "~~/hooks/scaffold-stark/useTargetNetwork";
@@ -35,11 +35,11 @@ export const Balance = ({ address, className = "", usdMode }: BalanceProps) => {
     price > 0 ? Boolean(usdMode) : false,
   );
 
-  const toggleBalanceMode = () => {
+  const toggleBalanceMode = useCallback(() => {
     if (price > 0 || strkPrice > 0) {
       setDisplayUsdMode((prevMode) => !prevMode);
     }
-  };
+  }, [price, strkPrice]);
 
   if (
     !address ||

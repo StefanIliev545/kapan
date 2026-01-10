@@ -98,9 +98,9 @@ export function useAaveLikeEMode(
   // Check if user has incompatible borrows for a target E-Mode
   // Note: This is a simplified check - full implementation would need to check
   // the borrowableBitmap against user's actual borrowed assets
-  const canSwitchToEMode = (targetCategoryId: number): boolean => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const canSwitchToEMode = (_targetCategoryId: number): boolean => {
     // Can always switch to category 0 (disable E-Mode)
-    if (targetCategoryId === 0) return true;
     // For other categories, we need to verify no incompatible borrows
     // This would require checking the user's borrow positions against the category's borrowableBitmap
     // For now, return true and let the transaction fail if incompatible

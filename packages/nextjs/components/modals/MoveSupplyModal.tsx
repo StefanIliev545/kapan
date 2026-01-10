@@ -241,7 +241,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     }
   };
 
-  const resetModal = () => {
+  const resetModal = useCallback(() => {
     setStatus(MoveStatus.Initial);
     setTransactionHash(null);
     setSelectedProtocol("");
@@ -249,7 +249,11 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     setTransferAmount(token.rawBalance);
     setInputValue("");
     onClose();
-  };
+  }, [token.rawBalance, onClose]);
+
+  const handleTryAgain = useCallback(() => {
+    setStatus(MoveStatus.Initial);
+  }, []);
 
   // Filter and sort protocols (exclude current)
   const isZerolendSupported = useMemo(() => chainId === base.id || chainId === linea.id, [chainId]);
@@ -274,14 +278,14 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
 
   // --- Create proper memoized component functions ---
 
-  const AmountInputComponent = useCallback(() => {
-    const startEditing = () => {
-      if (!isEditingAmount) {
-        isFocusingRef.current = true;
-        setIsEditingAmount(true);
-      }
-    };
+  const startEditing = useCallback(() => {
+    if (!isEditingAmount) {
+      isFocusingRef.current = true;
+      setIsEditingAmount(true);
+    }
+  }, [isEditingAmount]);
 
+  const AmountInputComponent = useCallback(() => {
     return (
       <div
         className={`border-base-300/60 bg-base-100/80 rounded-2xl border p-4 shadow-sm transition-colors ${
@@ -362,6 +366,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     );
   }, [
     isEditingAmount,
+    startEditing,
     token.address,
     token.name,
     token.decimals,
@@ -374,6 +379,11 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
     handleKeyPressCallback,
     handleSetMaxAmountCallback,
   ]);
+
+  const createProtocolSelectHandler = useCallback(
+    (protocol: string) => () => setSelectedProtocol(protocol),
+    [],
+  );
 
   const ProtocolSelectorComponent = useCallback(
     () => (
@@ -436,7 +446,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
                         isRateWorse={isRateWorse}
                         isRateBetter={isRateBetter}
                         isSelected={protocol === selectedProtocol}
-                        onClick={() => setSelectedProtocol(protocol)}
+                        onClick={createProtocolSelectHandler(protocol)}
                       />
                     );
                   })}
@@ -456,6 +466,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
       rateDifference,
       formatRate,
       selectedRate,
+      createProtocolSelectHandler,
     ],
   );
 
@@ -504,7 +515,7 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({ isOpen, onClose, tok
             <button className="btn btn-outline flex-1" onClick={resetModal}>
               Cancel
             </button>
-            <button className="btn btn-primary flex-1" onClick={() => setStatus(MoveStatus.Initial)}>
+            <button className="btn btn-primary flex-1" onClick={handleTryAgain}>
               Try Again
             </button>
           </div>

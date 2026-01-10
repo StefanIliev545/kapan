@@ -1,6 +1,6 @@
 /**
  * CoW Order Recovery Utility
- * 
+ *
  * When an order is created on-chain but WatchTower doesn't pick it up,
  * this utility can parse the transaction and attempt to re-register
  * the appData with the CoW API to surface the actual error.
@@ -51,6 +51,58 @@ export interface RecoveryResult {
 }
 
 /**
+ * Try to decode a router instruction
+ */
+function tryDecodeRouterInstruction(data: string): { amount: bigint; token: string; instrType: number } | null {
+  try {
+    const routerInstr = coder.decode([ROUTER_INSTRUCTION_TYPE], data);
+    const [amount, token, , instrType] = routerInstr[0] as [bigint, string, string, number];
+    return { amount, token, instrType };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Try to decode a router instruction with InputPtr variant
+ */
+function tryDecodeRouterInstructionWithInput(data: string): { amount: bigint; token: string; instrType: number } | null {
+  try {
+    const routerInstrWithInput = coder.decode(
+      [ROUTER_INSTRUCTION_TYPE, "tuple(uint256 index)"],
+      data
+    );
+    const decoded = routerInstrWithInput as unknown as [[bigint, string, string, number], { index: bigint }];
+    const [amount, token, , instrType] = decoded[0];
+    return { amount, token, instrType };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find PullToken instruction in decoded instructions
+ */
+function findPullTokenInstruction(instructions: Array<{ protocolName: string; data: string }>): { amount: bigint; token: string } | null {
+  for (const instr of instructions) {
+    if (instr.protocolName !== "router") continue;
+
+    // Try standard decode
+    const standard = tryDecodeRouterInstruction(instr.data);
+    if (standard && standard.instrType === 1) {
+      return { amount: standard.amount, token: standard.token };
+    }
+
+    // Try InputPtr variant
+    const withInput = tryDecodeRouterInstructionWithInput(instr.data);
+    if (withInput && withInput.instrType === 1) {
+      return { amount: withInput.amount, token: withInput.token };
+    }
+  }
+  return null;
+}
+
+/**
  * Decode pre-instructions to extract flash loan amount
  * For close-with-collateral, first instruction is PullToken(amount, token, orderManager)
  */
@@ -59,44 +111,203 @@ function extractFlashLoanAmountFromInstructions(preInstructionsBytes: string): {
     // Decode as ProtocolInstruction[]
     const decoded = coder.decode([PROTOCOL_INSTRUCTION_TYPE], preInstructionsBytes);
     const instructions = decoded[0] as Array<{ protocolName: string; data: string }>;
-    
+
     if (instructions.length === 0) return null;
-    
-    // Find PullToken instruction (type 1)
-    for (const instr of instructions) {
-      if (instr.protocolName === "router") {
-        try {
-          const routerInstr = coder.decode([ROUTER_INSTRUCTION_TYPE], instr.data);
-          const [amount, token, , instrType] = routerInstr[0] as [bigint, string, string, number];
-          
-          // PullToken = 1
-          if (instrType === 1) {
-            return { amount, token };
-          }
-        } catch {
-          // Try with InputPtr variant
-          try {
-            const routerInstrWithInput = coder.decode(
-              [ROUTER_INSTRUCTION_TYPE, "tuple(uint256 index)"],
-              instr.data
-            );
-            const decoded = routerInstrWithInput as unknown as [[bigint, string, string, number], { index: bigint }];
-            const [amount, token, , instrType] = decoded[0];
-            if (instrType === 1) {
-              return { amount, token };
-            }
-          } catch {
-            continue;
-          }
-        }
-      }
-    }
-    
-    return null;
+
+    return findPullTokenInstruction(instructions);
   } catch (e) {
     console.error("[extractFlashLoanAmount] Failed to decode instructions:", e);
     return null;
   }
+}
+
+/** Order params type from transaction decoding */
+interface OrderParams {
+  user: string;
+  preInstructionsPerIteration: string[];
+  preTotalAmount: bigint;
+  sellToken: string;
+  buyToken: string;
+  chunkSize: bigint;
+  minBuyPerChunk: bigint;
+  postInstructionsPerIteration: string[];
+  completion: number;
+  targetValue: bigint;
+  minHealthFactor: bigint;
+  appDataHash: string;
+  isFlashLoanOrder: boolean;
+}
+
+/**
+ * Decode createOrder transaction input
+ */
+function decodeCreateOrderTx(input: string, debug: Record<string, unknown>): { params: OrderParams; salt: string; seedAmount: bigint } | { error: string } {
+  try {
+    const decoded = orderManagerIface.decodeFunctionData("createOrder", input);
+    const params = decoded[0] as OrderParams;
+    const salt = decoded[1] as string;
+    const seedAmount = decoded[2] as bigint;
+    debug.decodedParams = {
+      user: params.user,
+      sellToken: params.sellToken,
+      buyToken: params.buyToken,
+      isFlashLoanOrder: params.isFlashLoanOrder,
+      appDataHash: params.appDataHash,
+    };
+    debug.salt = salt;
+    debug.seedAmount = seedAmount.toString();
+    return { params, salt, seedAmount };
+  } catch (e) {
+    return { error: `Failed to decode createOrder call: ${e}` };
+  }
+}
+
+/**
+ * Extract order hash from transaction receipt
+ */
+function extractOrderHashFromReceipt(
+  receipt: Awaited<ReturnType<PublicClient["getTransactionReceipt"]>>,
+  debug: Record<string, unknown>
+): string | undefined {
+  const orderCreatedTopic = orderManagerIface.getEvent("OrderCreated")?.topicHash;
+  const orderCreatedLog = receipt.logs.find(log =>
+    log.topics[0]?.toLowerCase() === orderCreatedTopic?.toLowerCase()
+  );
+
+  if (orderCreatedLog && orderCreatedLog.topics[1]) {
+    const orderHash = orderCreatedLog.topics[1];
+    debug.orderHash = orderHash;
+    return orderHash;
+  }
+  return undefined;
+}
+
+/**
+ * Extract flash loan info from order params
+ */
+function extractFlashLoanInfo(
+  params: OrderParams,
+  debug: Record<string, unknown>
+): { amount?: bigint; token?: string } {
+  if (!params.isFlashLoanOrder || params.preInstructionsPerIteration.length === 0) {
+    return {};
+  }
+
+  const extracted = extractFlashLoanAmountFromInstructions(params.preInstructionsPerIteration[0]);
+  if (extracted) {
+    debug.extractedFlashLoan = {
+      amount: extracted.amount.toString(),
+      token: extracted.token,
+    };
+    return { amount: extracted.amount, token: extracted.token };
+  }
+
+  // Fallback: for close-with-collateral, flash loan token is buyToken
+  debug.flashLoanFallback = "Using buyToken as flash loan token";
+  return { token: params.buyToken };
+}
+
+/**
+ * Try to match appData with different flash loan providers
+ */
+function tryMatchAppDataWithProviders(
+  orderManagerAddress: string,
+  params: OrderParams,
+  salt: string,
+  chainId: number,
+  flashLoanAmount: bigint,
+  flashLoanToken: string,
+  debug: Record<string, unknown>
+): { appDataDoc: AppDataDocument; provider: string; hash: string } | undefined {
+  const providers = COW_FLASH_LOAN_PROVIDERS[chainId] || [];
+
+  for (const provider of providers) {
+    const appDataDoc = buildKapanAppData(
+      orderManagerAddress,
+      params.user,
+      salt,
+      chainId,
+      {
+        flashLoan: {
+          lender: provider.address,
+          token: flashLoanToken,
+          amount: flashLoanAmount,
+        },
+      }
+    );
+
+    const hash = computeAppDataHash(appDataDoc);
+    debug[`tried_${provider.provider}`] = hash;
+
+    if (hash.toLowerCase() === params.appDataHash.toLowerCase()) {
+      return { appDataDoc, provider: provider.provider, hash };
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Build appData for flash loan order
+ */
+function buildFlashLoanAppData(
+  orderManagerAddress: string,
+  params: OrderParams,
+  salt: string,
+  chainId: number,
+  flashLoanAmount: bigint,
+  flashLoanToken: string,
+  debug: Record<string, unknown>
+): { appDataDoc: AppDataDocument; provider: string; hash: string } {
+  // Try to match with known providers
+  const matched = tryMatchAppDataWithProviders(
+    orderManagerAddress, params, salt, chainId, flashLoanAmount, flashLoanToken, debug
+  );
+  if (matched) return matched;
+
+  // If no match, use default provider
+  const providers = COW_FLASH_LOAN_PROVIDERS[chainId] || [];
+  const appDataDoc = buildKapanAppData(
+    orderManagerAddress,
+    params.user,
+    salt,
+    chainId,
+    {
+      flashLoan: {
+        lender: providers[0]?.address || "",
+        token: flashLoanToken,
+        amount: flashLoanAmount,
+      },
+    }
+  );
+  return {
+    appDataDoc,
+    provider: "default (no match)",
+    hash: computeAppDataHash(appDataDoc),
+  };
+}
+
+/**
+ * Build appData for order (handles both flash loan and regular orders)
+ */
+function buildOrderAppData(
+  orderManagerAddress: string,
+  params: OrderParams,
+  salt: string,
+  chainId: number,
+  flashLoanAmount: bigint | undefined,
+  flashLoanToken: string | undefined,
+  debug: Record<string, unknown>
+): { appDataDoc: AppDataDocument; provider?: string; hash: string } {
+  if (params.isFlashLoanOrder && flashLoanAmount && flashLoanToken) {
+    return buildFlashLoanAppData(
+      orderManagerAddress, params, salt, chainId, flashLoanAmount, flashLoanToken, debug
+    );
+  }
+
+  // Non-flash-loan order
+  const appDataDoc = buildKapanAppData(orderManagerAddress, params.user, salt, chainId);
+  return { appDataDoc, hash: computeAppDataHash(appDataDoc) };
 }
 
 /**
@@ -109,7 +320,7 @@ export async function recoverOrderFromTx(
   orderManagerAddress: string
 ): Promise<RecoveryResult> {
   const debug: Record<string, unknown> = {};
-  
+
   try {
     // 1. Fetch transaction
     const tx = await publicClient.getTransaction({ hash: txHash as `0x${string}` });
@@ -118,156 +329,36 @@ export async function recoverOrderFromTx(
     }
     debug.txTo = tx.to;
     debug.txFrom = tx.from;
-    
+
     // 2. Decode createOrder call
-    let params: {
-      user: string;
-      preInstructionsPerIteration: string[];
-      preTotalAmount: bigint;
-      sellToken: string;
-      buyToken: string;
-      chunkSize: bigint;
-      minBuyPerChunk: bigint;
-      postInstructionsPerIteration: string[];
-      completion: number;
-      targetValue: bigint;
-      minHealthFactor: bigint;
-      appDataHash: string;
-      isFlashLoanOrder: boolean;
-    };
-    let salt: string;
-    let seedAmount: bigint;
-    
-    try {
-      const decoded = orderManagerIface.decodeFunctionData("createOrder", tx.input);
-      params = decoded[0] as typeof params;
-      salt = decoded[1] as string;
-      seedAmount = decoded[2] as bigint;
-      debug.decodedParams = {
-        user: params.user,
-        sellToken: params.sellToken,
-        buyToken: params.buyToken,
-        isFlashLoanOrder: params.isFlashLoanOrder,
-        appDataHash: params.appDataHash,
-      };
-      debug.salt = salt;
-      debug.seedAmount = seedAmount.toString();
-    } catch (e) {
-      return { success: false, error: `Failed to decode createOrder call: ${e}`, debug };
+    const decoded = decodeCreateOrderTx(tx.input, debug);
+    if ("error" in decoded) {
+      return { success: false, error: decoded.error, debug };
     }
-    
+    const { params, salt } = decoded;
+
     // 3. Get OrderCreated event from receipt
     const receipt = await publicClient.getTransactionReceipt({ hash: txHash as `0x${string}` });
     if (!receipt) {
       return { success: false, error: "Transaction receipt not found", debug };
     }
-    
-    const orderCreatedTopic = orderManagerIface.getEvent("OrderCreated")?.topicHash;
-    const orderCreatedLog = receipt.logs.find(log => 
-      log.topics[0]?.toLowerCase() === orderCreatedTopic?.toLowerCase()
-    );
-    
-    let orderHash: string | undefined;
-    if (orderCreatedLog && orderCreatedLog.topics[1]) {
-      orderHash = orderCreatedLog.topics[1];
-      debug.orderHash = orderHash;
-    }
-    
+
+    const orderHash = extractOrderHashFromReceipt(receipt, debug);
+
     // 4. Extract flash loan info if needed
-    let flashLoanAmount: bigint | undefined;
-    let flashLoanToken: string | undefined;
-    
-    if (params.isFlashLoanOrder && params.preInstructionsPerIteration.length > 0) {
-      const extracted = extractFlashLoanAmountFromInstructions(params.preInstructionsPerIteration[0]);
-      if (extracted) {
-        flashLoanAmount = extracted.amount;
-        flashLoanToken = extracted.token;
-        debug.extractedFlashLoan = {
-          amount: flashLoanAmount.toString(),
-          token: flashLoanToken,
-        };
-      } else {
-        // Fallback: for close-with-collateral, flash loan token is buyToken
-        // Amount might be derivable from other sources
-        flashLoanToken = params.buyToken;
-        debug.flashLoanFallback = "Using buyToken as flash loan token";
-      }
-    }
-    
-    // 5. Try to reconstruct appData with different providers
-    const providers = COW_FLASH_LOAN_PROVIDERS[chainId] || [];
-    
-    let matchingAppData: AppDataDocument | undefined;
-    let matchingProvider: string | undefined;
-    let computedHash: string | undefined;
-    
-    if (params.isFlashLoanOrder && flashLoanAmount && flashLoanToken) {
-      // Try each provider
-      for (const provider of providers) {
-        const appDataDoc = buildKapanAppData(
-          orderManagerAddress,
-          params.user,
-          salt,
-          chainId,
-          {
-            flashLoan: {
-              lender: provider.address,
-              token: flashLoanToken,
-              amount: flashLoanAmount,
-            },
-          }
-        );
-        
-        const hash = computeAppDataHash(appDataDoc);
-        debug[`tried_${provider.provider}`] = hash;
-        
-        if (hash.toLowerCase() === params.appDataHash.toLowerCase()) {
-          matchingAppData = appDataDoc;
-          matchingProvider = provider.provider;
-          computedHash = hash;
-          break;
-        }
-      }
-      
-      // If no match, try without specifying provider (use default construction)
-      if (!matchingAppData) {
-        const appDataDoc = buildKapanAppData(
-          orderManagerAddress,
-          params.user,
-          salt,
-          chainId,
-          {
-            flashLoan: {
-              lender: providers[0]?.address || "",
-              token: flashLoanToken,
-              amount: flashLoanAmount,
-            },
-          }
-        );
-        matchingAppData = appDataDoc;
-        computedHash = computeAppDataHash(appDataDoc);
-        matchingProvider = "default (no match)";
-      }
-    } else {
-      // Non-flash-loan order
-      const appDataDoc = buildKapanAppData(
-        orderManagerAddress,
-        params.user,
-        salt,
-        chainId
-      );
-      matchingAppData = appDataDoc;
-      computedHash = computeAppDataHash(appDataDoc);
-    }
-    
-    const hashMatch = computedHash?.toLowerCase() === params.appDataHash.toLowerCase();
-    
+    const flashLoanInfo = extractFlashLoanInfo(params, debug);
+
+    // 5. Build appData
+    const { appDataDoc, provider, hash: computedHash } = buildOrderAppData(
+      orderManagerAddress, params, salt, chainId,
+      flashLoanInfo.amount, flashLoanInfo.token, debug
+    );
+
+    const hashMatch = computedHash.toLowerCase() === params.appDataHash.toLowerCase();
+
     // 6. Attempt to register with CoW API
-    let apiResult: RecoveryResult["apiResult"];
-    if (matchingAppData) {
-      apiResult = await registerAppData(chainId, computedHash || "", matchingAppData);
-    }
-    
+    const apiResult = await registerAppData(chainId, computedHash, appDataDoc);
+
     return {
       success: true,
       orderHash,
@@ -279,10 +370,10 @@ export async function recoverOrderFromTx(
       storedAppDataHash: params.appDataHash,
       computedAppDataHash: computedHash,
       hashMatch,
-      flashLoanAmount: flashLoanAmount?.toString(),
-      flashLoanToken,
-      flashLoanProvider: matchingProvider,
-      appDataDoc: matchingAppData,
+      flashLoanAmount: flashLoanInfo.amount?.toString(),
+      flashLoanToken: flashLoanInfo.token,
+      flashLoanProvider: provider,
+      appDataDoc,
       apiResult,
       debug,
     };
@@ -324,10 +415,10 @@ export async function retryAppDataRegistration(
       chainId,
       flashLoanConfig ? { flashLoan: flashLoanConfig } : undefined
     );
-    
+
     const appDataHash = computeAppDataHash(appDataDoc);
     const apiResult = await registerAppData(chainId, appDataHash, appDataDoc);
-    
+
     return {
       success: apiResult.success,
       appDataHash,
@@ -370,12 +461,12 @@ export async function fetchOrdersForOwner(
 ): Promise<{ success: boolean; orders?: CowOrder[]; error?: string }> {
   try {
     const response = await fetch(`/api/cow/${chainId}/orders?owner=${owner}`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       return { success: false, error: `API error ${response.status}: ${errorText}` };
     }
-    
+
     const orders = await response.json();
     return { success: true, orders };
   } catch (e) {
@@ -392,12 +483,12 @@ export async function fetchOrderByUid(
 ): Promise<{ success: boolean; order?: CowOrder; error?: string }> {
   try {
     const response = await fetch(`/api/cow/${chainId}/orders?uid=${uid}`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       return { success: false, error: `API error ${response.status}: ${errorText}` };
     }
-    
+
     const order = await response.json();
     return { success: true, order };
   } catch (e) {
@@ -415,19 +506,19 @@ export async function checkOrderInOrderbook(
   appDataHash: string
 ): Promise<{ found: boolean; order?: CowOrder; error?: string }> {
   const result = await fetchOrdersForOwner(chainId, orderManagerAddress);
-  
+
   if (!result.success || !result.orders) {
     return { found: false, error: result.error };
   }
-  
+
   // Look for order with matching appDataHash
   const matchingOrder = result.orders.find(
     order => order.appData.toLowerCase() === appDataHash.toLowerCase()
   );
-  
+
   if (matchingOrder) {
     return { found: true, order: matchingOrder };
   }
-  
+
   return { found: false };
 }

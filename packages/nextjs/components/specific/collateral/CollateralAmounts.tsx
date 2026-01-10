@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { FC, useCallback } from "react";
 import Image from "next/image";
 import { formatUnits, parseUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -16,7 +16,7 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
   onChange,
   onMaxClick,
 }) => {
-  const handleAmountChange = (token: string, amountStr: string, decimals: number) => {
+  const handleAmountChange = useCallback((token: string, amountStr: string, decimals: number) => {
     const updated = collaterals.map(c => {
       if (c.token !== token) return c;
       try {
@@ -28,16 +28,32 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
     });
     onChange(updated);
     onMaxClick?.(token, false);
-  };
+  }, [collaterals, onChange, onMaxClick]);
 
-  const handleSetMax = (token: string, maxAmount: bigint, decimals: number) => {
+  const handleSetMax = useCallback((token: string, maxAmount: bigint, decimals: number) => {
     const maxStr = formatUnits(maxAmount, decimals);
     const updated = collaterals.map(c =>
       c.token === token ? { ...c, amount: maxAmount, inputValue: maxStr } : c,
     );
     onChange(updated);
     onMaxClick?.(token, true);
-  };
+  }, [collaterals, onChange, onMaxClick]);
+
+  // Factory for input change handlers
+  const createAmountChangeHandler = useCallback(
+    (token: string, decimals: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      handleAmountChange(token, e.target.value, decimals);
+    },
+    [handleAmountChange],
+  );
+
+  // Factory for max button handlers
+  const createMaxClickHandler = useCallback(
+    (token: string, maxAmount: bigint, decimals: number) => () => {
+      handleSetMax(token, maxAmount, decimals);
+    },
+    [handleSetMax],
+  );
 
   if (collaterals.length === 0) return null;
 
@@ -67,14 +83,14 @@ export const CollateralAmounts: FC<CollateralAmountsProps> = ({
               <input
                 type="text"
                 value={displayAmount}
-                onChange={e => handleAmountChange(c.token, e.target.value, c.decimals)}
+                onChange={createAmountChangeHandler(c.token, c.decimals)}
                 className="border-base-300 focus:border-primary flex-1 border-b-2 bg-transparent px-2 py-1 text-right"
                 placeholder="0.00"
                 disabled={!isSupported}
               />
               <button
                 className={`px-2 py-1 text-xs font-medium ${!isSupported ? 'cursor-not-allowed opacity-50' : ''}`}
-                onClick={() => handleSetMax(c.token, c.maxAmount, c.decimals)}
+                onClick={createMaxClickHandler(c.token, c.maxAmount, c.decimals)}
                 disabled={!isSupported}
               >
                 MAX

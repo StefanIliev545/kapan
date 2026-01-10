@@ -3,8 +3,6 @@ import * as chains from "@starknet-react/chains";
 import { StarkProfile } from "starknet";
 import scaffoldConfig from "~~/scaffold.config";
 
-type network = "mainnet" | "sepolia" | "devnet";
-
 const shouldUseProfile = () => {
   const set = new Set(["mainnet", "sepolia", "devnet"]);
   return set.has(scaffoldConfig.targetSNNetworks[0].network);

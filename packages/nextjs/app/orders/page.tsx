@@ -95,6 +95,10 @@ export default function OrdersPage() {
 
   const tokenInfoMap = useTokenInfo(tokenAddresses, chainId);
 
+  const handleBack = useCallback(() => {
+    window.history.back();
+  }, []);
+
   const getTokenSymbol = (address: string): string => {
     const info = tokenInfoMap.get(address.toLowerCase());
     return info?.symbol ?? truncateAddress(address);
@@ -137,8 +141,8 @@ export default function OrdersPage() {
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-8">
-          <button 
-            onClick={() => window.history.back()}
+          <button
+            onClick={handleBack}
             className="text-base-content/50 hover:text-base-content mb-6 inline-flex items-center gap-2 text-sm transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -245,14 +249,14 @@ export default function OrdersPage() {
   );
 }
 
-function OrderRow({ 
-  order, 
-  executionDataMap, 
-  getTokenSymbol, 
+function OrderRow({
+  order,
+  executionDataMap,
+  getTokenSymbol,
   getTokenDecimals,
   chainId,
-  dimmed = false 
-}: { 
+  dimmed = false
+}: {
   order: OrderWithHash;
   executionDataMap: Map<string, any>;
   getTokenSymbol: (address: string) => string;
@@ -274,6 +278,9 @@ function OrderRow({
   const totalChunks = Number(params.targetValue);
   const completedChunks = Number(iterationCount);
   const progressPercent = totalChunks > 0 ? (completedChunks / totalChunks) * 100 : 0;
+
+  // Memoize style object to avoid creating new object on each render
+  const progressBarStyle = useMemo(() => ({ width: `${progressPercent}%` }), [progressPercent]);
 
   const executionData = executionDataMap.get(orderHash);
   const hasExecutionData = executionData && executionData.chunks.length > 0;
@@ -393,9 +400,9 @@ function OrderRow({
       {isActive && (
         <div className="mt-3">
           <div className="bg-base-200 h-1 w-full">
-            <div 
+            <div
               className="bg-primary h-full transition-all"
-              style={{ width: `${progressPercent}%` }}
+              style={progressBarStyle}
             />
           </div>
         </div>

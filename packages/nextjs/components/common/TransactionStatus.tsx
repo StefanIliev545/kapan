@@ -11,7 +11,7 @@
  * For toast notifications, use TransactionToast with the notification utility.
  */
 
-import { FC } from "react";
+import { FC, useMemo } from "react";
 import { CheckCircle2, Loader2, AlertCircle, Wallet, Clock } from "lucide-react";
 
 export type TransactionStatusState = "idle" | "pending" | "confirming" | "success" | "error";
@@ -38,6 +38,7 @@ export interface TransactionStatusProps {
 const STATUS_CONFIG = {
   idle: {
     icon: null,
+    spinner: null,
     title: "",
     description: "",
     bgClass: "",
@@ -82,11 +83,16 @@ export const TransactionStatus: FC<TransactionStatusProps> = ({
   secondaryLinkText,
   compact = false,
 }) => {
-  if (status === "idle") return null;
-
   const config = STATUS_CONFIG[status];
   const showSpinner = status === "pending" || status === "confirming";
   const showSteps = currentStep !== undefined && totalSteps !== undefined && totalSteps > 1;
+
+  // Memoize progress bar style to avoid creating new object on each render
+  const progressBarStyle = useMemo(() => ({
+    width: showSteps ? `${(currentStep ?? 0) / (totalSteps ?? 1) * 100}%` : "0%",
+  }), [currentStep, totalSteps, showSteps]);
+
+  if (status === "idle") return null;
 
   if (compact) {
     return (
@@ -123,7 +129,7 @@ export const TransactionStatus: FC<TransactionStatusProps> = ({
               <div className="bg-base-300 h-1.5 w-full rounded-full">
                 <div
                   className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                  style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                  style={progressBarStyle}
                 />
               </div>
             </div>

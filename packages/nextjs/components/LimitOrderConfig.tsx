@@ -267,6 +267,19 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
     setSelectedProviderIndex(idx);
   }, []);
 
+  // Handle flash loan toggle
+  const handleFlashLoanToggle = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setUseFlashLoan(e.target.checked);
+  }, [setUseFlashLoan]);
+
+  // Handle chunks input change
+  const handleChunksChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setNumChunks(Math.max(1, Math.min(999, parseInt(e.target.value) || 1)));
+  }, [setNumChunks]);
+
+  // Factory for provider select handlers
+  const createProviderSelectHandler = useCallback((idx: number) => () => handleProviderSelect(idx), [handleProviderSelect]);
+
   // Selected provider
   const selectedProvider = useMemo(() => {
     if (providers.length === 0) return null;
@@ -364,7 +377,7 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
               return (
                 <button
                   key={provider.address}
-                  onClick={() => handleProviderSelect(idx)}
+                  onClick={createProviderSelectHandler(idx)}
                   className={`btn btn-xs ${
                     selectedProviderIndex === idx 
                       ? noLiquidity ? "btn-warning" : "btn-primary"
@@ -421,7 +434,7 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
           <input
             type="checkbox"
             checked={useFlashLoan}
-            onChange={e => setUseFlashLoan(e.target.checked)}
+            onChange={handleFlashLoanToggle}
             className="toggle toggle-primary toggle-xs"
           />
         </div>
@@ -437,7 +450,7 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
               min={1}
               max={999}
               value={numChunks}
-              onChange={e => setNumChunks(Math.max(1, Math.min(999, parseInt(e.target.value) || 1)))}
+              onChange={handleChunksChange}
               className="input input-bordered input-xs w-16 text-right"
             />
             {numChunks > 1 && (

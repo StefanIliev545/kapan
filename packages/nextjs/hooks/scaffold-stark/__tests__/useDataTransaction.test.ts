@@ -1,7 +1,6 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useDataTransaction } from "../useDataTransaction";
 import { useTargetNetwork } from "../useTargetNetwork";
-import { RpcProvider } from "starknet";
 import {
   vi,
   describe,

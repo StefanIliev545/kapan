@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useCallback, useMemo } from "react";
 import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
 
@@ -63,6 +63,12 @@ export const SlippageSelector: FC<SlippageSelectorProps> = ({
     setSlippage,
     options = SLIPPAGE_OPTIONS,
 }) => {
+    // Factory for slippage click handlers
+    const createSlippageClickHandler = useCallback(
+        (s: number) => () => setSlippage(s),
+        [setSlippage],
+    );
+
     return (
         <div className="dropdown dropdown-top dropdown-hover">
             <label tabIndex={0} className="hover:text-primary cursor-pointer">
@@ -73,7 +79,7 @@ export const SlippageSelector: FC<SlippageSelectorProps> = ({
                     <li key={s}>
                         <a
                             className={slippage === s ? "active" : ""}
-                            onClick={() => setSlippage(s)}
+                            onClick={createSlippageClickHandler(s)}
                         >
                             {s}%
                         </a>
@@ -122,36 +128,40 @@ export const MarketSwapStats: FC<MarketSwapStatsProps> = ({
     outputCoversRequired,
     className = "",
 }) => {
-    const stats: SwapStatItem[] = [
-        {
-            label: "Slippage",
-            value: `${slippage}%`,
-            labelExtra: <SlippageSelector slippage={slippage} setSlippage={setSlippage} />,
-        },
-    ];
+    const stats = useMemo(() => {
+        const result: SwapStatItem[] = [
+            {
+                label: "Slippage",
+                value: `${slippage}%`,
+                labelExtra: <SlippageSelector slippage={slippage} setSlippage={setSlippage} />,
+            },
+        ];
 
-    if (priceImpact !== undefined && priceImpact !== null) {
-        stats.push({
-            label: "Price Impact",
-            value: formattedPriceImpact || `${priceImpact.toFixed(2)}%`,
-            valueClassName: priceImpactClass,
-        });
-    }
+        if (priceImpact !== undefined && priceImpact !== null) {
+            result.push({
+                label: "Price Impact",
+                value: formattedPriceImpact || `${priceImpact.toFixed(2)}%`,
+                valueClassName: priceImpactClass,
+            });
+        }
 
-    if (exchangeRate && fromSymbol && toSymbol) {
-        stats.push({
-            label: "Rate",
-            value: `1 ${fromSymbol} = ${exchangeRate} ${toSymbol}`,
-        });
-    }
+        if (exchangeRate && fromSymbol && toSymbol) {
+            result.push({
+                label: "Rate",
+                value: `1 ${fromSymbol} = ${exchangeRate} ${toSymbol}`,
+            });
+        }
 
-    if (expectedOutput && toSymbol) {
-        stats.push({
-            label: "Output",
-            value: `${expectedOutput} ${toSymbol}`,
-            valueClassName: outputCoversRequired === false ? "text-warning" : outputCoversRequired === true ? "text-success" : "",
-        });
-    }
+        if (expectedOutput && toSymbol) {
+            result.push({
+                label: "Output",
+                value: `${expectedOutput} ${toSymbol}`,
+                valueClassName: outputCoversRequired === false ? "text-warning" : outputCoversRequired === true ? "text-success" : "",
+            });
+        }
+
+        return result;
+    }, [slippage, setSlippage, priceImpact, formattedPriceImpact, priceImpactClass, exchangeRate, fromSymbol, toSymbol, expectedOutput, outputCoversRequired]);
 
     return <SwapStatsGrid stats={stats} className={className} />;
 };

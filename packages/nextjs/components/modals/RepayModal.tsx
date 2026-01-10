@@ -62,6 +62,11 @@ export const RepayModal: FC<RepayModalProps> = ({
 
   const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = batchingPreference;
 
+  const renderBatchingPreference = useCallback(
+    () => <BatchingPreference enabled={preferBatching} setEnabled={setPreferBatching} isLoaded={isPreferenceLoaded} />,
+    [preferBatching, setPreferBatching, isPreferenceLoaded],
+  );
+
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -80,9 +85,7 @@ export const RepayModal: FC<RepayModalProps> = ({
       chainId={chainId}
       position={position}
       onConfirm={handleRepay}
-      renderExtraContent={() => (
-        <BatchingPreference enabled={preferBatching} setEnabled={setPreferBatching} isLoaded={isPreferenceLoaded} />
-      )}
+      renderExtraContent={renderBatchingPreference}
     />
   );
 };

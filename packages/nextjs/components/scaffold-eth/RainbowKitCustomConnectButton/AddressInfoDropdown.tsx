@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { NetworkOptions } from "./NetworkOptions";
 import { getAddress } from "viem";
@@ -40,12 +40,24 @@ export const AddressInfoDropdown = ({
   const { copy, isCopied: addressCopied } = useCopyToClipboard();
   const [selectingNetwork, setSelectingNetwork] = useState(false);
   const dropdownRef = useRef<HTMLDetailsElement>(null);
-  
-  const closeDropdown = () => {
+
+  const closeDropdown = useCallback(() => {
     setSelectingNetwork(false);
     dropdownRef.current?.removeAttribute("open");
-  };
+  }, []);
   useOutsideClick(dropdownRef, closeDropdown);
+
+  const handleCopyAddress = useCallback(() => {
+    copy(checkSumAddress);
+  }, [copy, checkSumAddress]);
+
+  const handleSelectNetwork = useCallback(() => {
+    setSelectingNetwork(true);
+  }, []);
+
+  const handleDisconnect = useCallback(() => {
+    disconnect();
+  }, [disconnect]);
 
   return (
     <details ref={dropdownRef} className="dropdown dropdown-end flex-none leading-3">
@@ -56,10 +68,10 @@ export const AddressInfoDropdown = ({
         </span>
         <ChevronDownIcon className="text-base-content/50 size-4" />
       </summary>
-      
+
       <div className="dropdown-content bg-base-100 border-base-200 z-[2] mt-2 w-64 overflow-hidden rounded-xl border shadow-lg">
         <NetworkOptions hidden={!selectingNetwork} />
-        
+
         {!selectingNetwork && (
           <>
             {/* Address Header */}
@@ -91,7 +103,7 @@ export const AddressInfoDropdown = ({
 
               {/* Copy Address */}
               <button
-                onClick={() => copy(checkSumAddress)}
+                onClick={handleCopyAddress}
                 className="hover:bg-base-200 flex w-full items-center gap-3 px-4 py-2.5 transition-colors"
               >
                 {addressCopied ? (
@@ -126,7 +138,7 @@ export const AddressInfoDropdown = ({
               {/* Switch Network */}
               {allowedNetworks.length > 1 && (
                 <button
-                  onClick={() => setSelectingNetwork(true)}
+                  onClick={handleSelectNetwork}
                   className="hover:bg-base-200 flex w-full items-center gap-3 px-4 py-2.5 transition-colors"
                 >
                   <ArrowsRightLeftIcon className="text-base-content/60 size-5" />
@@ -138,7 +150,7 @@ export const AddressInfoDropdown = ({
             {/* Disconnect */}
             <div className="border-base-200 border-t py-2">
               <button
-                onClick={() => disconnect()}
+                onClick={handleDisconnect}
                 className="hover:bg-error/10 text-error flex w-full items-center gap-3 px-4 py-2.5 transition-colors"
               >
                 <ArrowLeftOnRectangleIcon className="size-5" />

@@ -1,0 +1,620 @@
+/**
+ * Helper functions for DebtSwapEvmModal to reduce cognitive complexity.
+ * Extracted from DebtSwapEvmModal.tsx to improve maintainability.
+ */
+import { formatUnits, Address } from "viem";
+import { track } from "@vercel/analytics";
+import {
+    ProtocolInstruction,
+    createRouterInstruction,
+    createProtocolInstruction,
+    encodeApprove,
+    encodePullToken,
+    encodeAdd,
+    encodeLendingInstruction,
+    LendingOp,
+    normalizeProtocolName,
+} from "~~/utils/v2/instructionHelpers";
+import {
+    CompletionType,
+    getPreferredFlashLoanLender,
+    calculateFlashLoanFee,
+    getCowExplorerAddressUrl,
+} from "~~/utils/cow";
+import { notification } from "~~/utils/scaffold-stark/notification";
+import { TransactionToast } from "~~/components/TransactionToast";
+import { saveOrderNote, createDebtSwapNote } from "~~/utils/orderNotes";
+import { getCowQuoteSellAmount, type CowQuoteResponse } from "~~/hooks/useCowQuote";
+import type { ChunkInstructions, BuildOrderResult } from "~~/hooks/useCowLimitOrder";
+
+/** Alias for backwards compatibility */
+export type LimitOrderBuildResult = BuildOrderResult;
+import type { SwapAsset } from "./SwapModalShell";
+import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
+import type { WalletClient, PublicClient } from "viem";
+
+// ============ Types ============
+
+export type DebtSwapAnalyticsProps = Record<string, string | number | boolean | null | undefined>;
+
+export interface FlashLoanInfo {
+    lender: string;
+    provider: string;
+    fee: bigint;
+    amount: bigint;
+    token: string;
+}
+
+export interface CowChunkParams {
+    selectedTo: SwapAsset;
+    userAddress: string;
+    repayAmountRaw: bigint;
+    orderManagerAddress: string;
+    protocolName: string;
+    context: string | undefined;
+    debtFromToken: string;
+    debtFromName: string;
+    debtFromDecimals: number;
+    cowFlashLoanInfo: FlashLoanInfo;
+    limitOrderConfig: LimitOrderResult | null;
+}
+
+export interface LimitOrderSubmitParams {
+    selectedTo: SwapAsset;
+    userAddress: string;
+    orderManagerAddress: string;
+    walletClient: WalletClient;
+    publicClient: PublicClient;
+    limitOrderConfig: LimitOrderResult;
+    cowFlashLoanInfo: FlashLoanInfo;
+    protocolName: string;
+    chainId: number;
+    debtFromToken: string;
+    debtFromName: string;
+    repayAmountRaw: bigint;
+    debtFromDecimals: number;
+    limitOrderNewDebt: bigint;
+    cowQuote: unknown;
+    buildCowInstructions: ChunkInstructions[];
+    buildLimitOrderCalls: (params: unknown) => Promise<LimitOrderBuildResult | null>;
+    useBatchedTx: boolean;
+    sendCallsAsync?: (params: { calls: unknown[]; experimental_fallback: boolean }) => Promise<{ id: string }>;
+    setSuppressBatchNotifications: (val: boolean) => void;
+    setBatchId: (id: string) => void;
+    onClose: () => void;
+    setLastOrderSalt: (salt: string | null) => void;
+    setLimitOrderNotificationId: (id: string | number | null) => void;
+}
+
+// ============ Analytics Helpers ============
+
+export function trackModalOpen(
+    protocolName: string,
+    chainId: number,
+    context: string | undefined,
+    debtFromToken: string,
+    debtFromName: string,
+    availableAssetsLength: number | null
+): void {
+    const modalOpenProps = {
+        network: "evm",
+        protocol: protocolName,
+        chainId,
+        market: context ?? null,
+        debtFromToken,
+        debtFromName,
+        availableAssets: availableAssetsLength,
+    } satisfies Record<string, string | number | boolean | null>;
+
+    track("debt_swap_modal_open", modalOpenProps);
+}
+
+export function createLimitOrderAnalyticsProps(params: {
+    protocolName: string;
+    chainId: number;
+    debtFromToken: string;
+    debtFromName: string;
+    selectedTo: SwapAsset;
+    repayAmountRaw: bigint;
+    debtFromDecimals: number;
+    limitOrderNewDebt: bigint;
+    flashLoanProviderName: string;
+}): DebtSwapAnalyticsProps {
+    return {
+        network: "evm",
+        protocol: params.protocolName,
+        chainId: params.chainId,
+        executionType: "limit",
+        oldDebtToken: params.debtFromToken,
+        oldDebtName: params.debtFromName,
+        newDebtToken: params.selectedTo.address,
+        newDebtName: params.selectedTo.symbol,
+        repayAmount: formatUnits(params.repayAmountRaw, params.debtFromDecimals),
+        newDebtAmount: formatUnits(params.limitOrderNewDebt, params.selectedTo.decimals),
+        flashLoanProvider: params.flashLoanProviderName,
+        market: null,
+    } satisfies DebtSwapAnalyticsProps;
+}
+
+// ============ Flash Loan Helpers ============
+
+export function buildCowFlashLoanInfo(
+    chainId: number,
+    limitOrderConfig: LimitOrderResult | null,
+    executionType: string,
+    selectedTo: SwapAsset | null,
+    limitOrderNewDebt: bigint
+): FlashLoanInfo | null {
+    const hasValidProvider = limitOrderConfig?.selectedProvider;
+    const isLimitExecution = executionType === "limit";
+    const hasValidToken = selectedTo !== null;
+    const hasValidAmount = limitOrderNewDebt > 0n;
+
+    if (!hasValidProvider || !isLimitExecution || !hasValidToken || !hasValidAmount) {
+        return null;
+    }
+
+    // At this point we know selectedProvider is not null (checked via hasValidProvider)
+    const lenderInfo = getPreferredFlashLoanLender(chainId, limitOrderConfig.selectedProvider!.provider);
+    if (!lenderInfo) {
+        return null;
+    }
+
+    const fee = calculateFlashLoanFee(limitOrderNewDebt, lenderInfo.provider);
+    return {
+        lender: lenderInfo.address,
+        provider: lenderInfo.provider,
+        fee,
+        amount: limitOrderNewDebt,
+        token: selectedTo.address,
+    };
+}
+
+// ============ CoW Instructions Builder ============
+
+export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstructions[] {
+    const {
+        selectedTo,
+        userAddress,
+        repayAmountRaw,
+        orderManagerAddress,
+        protocolName,
+        context,
+        debtFromToken,
+        debtFromName,
+        debtFromDecimals,
+        cowFlashLoanInfo,
+        limitOrderConfig,
+    } = params;
+
+    // Early return for invalid state
+    if (!selectedTo || !userAddress || repayAmountRaw === 0n || !orderManagerAddress || !cowFlashLoanInfo) {
+        return [{ preInstructions: [], postInstructions: [] }];
+    }
+
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+    const numChunks = limitOrderConfig?.numChunks ?? 1;
+
+    // Calculate per-chunk amounts
+    const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
+    const chunkFlashLoanAmount = cowFlashLoanInfo.amount / BigInt(numChunks);
+
+    // PRE-HOOK: Empty - fundOrder handles transfer
+    const preInstructions: ProtocolInstruction[] = [];
+
+    const postInstructions: ProtocolInstruction[] = [
+        // [0] PullToken: pull oldDebt from OM (per-chunk buyAmount) -> UTXO[2]
+        createRouterInstruction(encodePullToken(chunkBuyAmount, debtFromToken as Address, orderManagerAddress as Address)),
+
+        // [1] Approve oldDebt for lending protocol (using UTXO[2]) -> UTXO[3]
+        createRouterInstruction(encodeApprove(2, normalizedProtocol)),
+
+        // [2] Repay user's oldDebt using UTXO[2] -> UTXO[4]
+        createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(LendingOp.Repay, debtFromToken as Address, userAddress as Address, chunkBuyAmount, context || "0x", 2)
+        ),
+
+        // [3] Borrow newDebt equal to actual sell amount (UTXO[0]) -> UTXO[5]
+        createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(
+                LendingOp.Borrow,
+                selectedTo.address,
+                userAddress as Address,
+                chunkFlashLoanAmount,  // Per-chunk max borrow for auth calculation
+                context || "0x",
+                0  // Use UTXO[0] = actual sell amount
+            )
+        ),
+
+        // [4] Add: borrowed (UTXO[5]) + leftover (UTXO[1]) -> UTXO[6]
+        createRouterInstruction(encodeAdd(5, 1)),
+
+        // Flash loan repay is implicit via flashLoanRepaymentUtxoIndex
+    ];
+
+    logCowInstructions({
+        selectedTo,
+        debtFromName,
+        repayAmountRaw,
+        debtFromDecimals,
+        chunkBuyAmount,
+        cowFlashLoanInfo,
+        chunkFlashLoanAmount,
+        numChunks,
+    });
+
+    // Return N identical chunks - each processes per-chunk amounts
+    return Array(numChunks).fill(null).map(() => ({
+        preInstructions,
+        postInstructions,
+        flashLoanRepaymentUtxoIndex: 6,
+    }));
+}
+
+function logCowInstructions(params: {
+    selectedTo: SwapAsset;
+    debtFromName: string;
+    repayAmountRaw: bigint;
+    debtFromDecimals: number;
+    chunkBuyAmount: bigint;
+    cowFlashLoanInfo: FlashLoanInfo;
+    chunkFlashLoanAmount: bigint;
+    numChunks: number;
+}): void {
+    console.log("[buildCowInstructions] Debt Swap (KIND_BUY):", {
+        sellToken: params.selectedTo.symbol,
+        buyToken: params.debtFromName,
+        totalOldDebtToBuy: formatUnits(params.repayAmountRaw, params.debtFromDecimals),
+        chunkOldDebtToBuy: formatUnits(params.chunkBuyAmount, params.debtFromDecimals),
+        flashLoanToken: params.selectedTo.symbol,
+        totalFlashLoanAmount: formatUnits(params.cowFlashLoanInfo.amount, params.selectedTo.decimals),
+        chunkFlashLoanAmount: formatUnits(params.chunkFlashLoanAmount, params.selectedTo.decimals),
+        numChunks: params.numChunks,
+        utxoLayout: "UTXO[0]=actualSell, UTXO[1]=leftover, UTXO[5]=borrowed, UTXO[6]=borrowed+leftover",
+    });
+}
+
+// ============ Limit Order Execution Helpers ============
+
+export function logLimitOrderBuildStart(params: {
+    selectedTo: SwapAsset;
+    debtFromName: string;
+    limitOrderNewDebt: bigint;
+    repayAmountRaw: bigint;
+    debtFromDecimals: number;
+    cowFlashLoanInfo: FlashLoanInfo;
+    cowQuote: CowQuoteResponse | null | undefined;
+}): void {
+    const { selectedTo, debtFromName, limitOrderNewDebt, repayAmountRaw, debtFromDecimals, cowFlashLoanInfo, cowQuote } = params;
+
+    console.log("[Limit Order] Building debt swap order (KIND_BUY):", {
+        sellToken: selectedTo.symbol,
+        buyToken: debtFromName,
+        maxSellAmount: formatUnits(limitOrderNewDebt, selectedTo.decimals),
+        exactBuyAmount: formatUnits(repayAmountRaw, debtFromDecimals),
+        flashLoanToken: selectedTo.symbol,
+        flashLoanAmount: formatUnits(cowFlashLoanInfo.amount, selectedTo.decimals),
+        flashLoanLender: cowFlashLoanInfo.lender,
+        cowQuoteSellAmount: cowQuote ? formatUnits(getCowQuoteSellAmount(cowQuote), selectedTo.decimals) : "N/A",
+    });
+}
+
+export interface LimitOrderCallParams {
+    selectedTo: SwapAsset;
+    debtFromToken: string;
+    limitOrderNewDebt: bigint;
+    repayAmountRaw: bigint;
+    cowFlashLoanInfo: FlashLoanInfo;
+    buildCowInstructions: ChunkInstructions[];
+    limitOrderConfig: LimitOrderResult;
+}
+
+export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
+    sellToken: Address;
+    buyToken: string;
+    chunkSize: bigint;
+    minBuyPerChunk: bigint;
+    totalAmount: bigint;
+    chunks: ChunkInstructions[];
+    completion: CompletionType;
+    targetValue: number;
+    minHealthFactor: string;
+    seedAmount: bigint;
+    flashLoan: { lender: Address; token: Address; amount: bigint };
+    preOrderInstructions: never[];
+    isKindBuy: boolean;
+} {
+    const { selectedTo, debtFromToken, limitOrderNewDebt, repayAmountRaw, cowFlashLoanInfo, buildCowInstructions, limitOrderConfig } = params;
+    const numChunks = limitOrderConfig?.numChunks ?? 1;
+    const chunkSellAmount = limitOrderNewDebt / BigInt(numChunks);
+    const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
+    const chunkFlashLoanAmount = cowFlashLoanInfo.amount / BigInt(numChunks);
+
+    return {
+        sellToken: selectedTo.address as Address,    // newDebt to sell
+        buyToken: debtFromToken,                      // oldDebt to receive
+        chunkSize: chunkSellAmount,                   // Per-chunk newDebt to sell
+        minBuyPerChunk: chunkBuyAmount,               // Per-chunk oldDebt amount needed
+        totalAmount: limitOrderNewDebt,               // Total across all chunks
+        chunks: buildCowInstructions,
+        completion: CompletionType.Iterations,
+        targetValue: numChunks,
+        minHealthFactor: "1.0",
+        seedAmount: 0n,
+        flashLoan: {
+            lender: cowFlashLoanInfo.lender as Address,
+            token: selectedTo.address as Address,
+            amount: chunkFlashLoanAmount,
+        },
+        preOrderInstructions: [],
+        isKindBuy: true,
+    };
+}
+
+export function handleLimitOrderBuildFailure(
+    result: LimitOrderBuildResult,
+    analyticsProps: DebtSwapAnalyticsProps
+): never {
+    const errorMsg = result.error || "Unknown error building order";
+    const fullError = result.errorDetails?.apiResponse
+        ? `${errorMsg}\n\nAPI Response: ${result.errorDetails.apiResponse}`
+        : errorMsg;
+
+    console.error("[Limit Order] Build failed:", fullError, result.errorDetails);
+    notification.error(
+        <TransactionToast
+            step="failed"
+            message={`CoW API Error: ${errorMsg}`}
+        />
+    );
+
+    track("debt_swap_limit_order_complete", {
+        ...analyticsProps,
+        status: "error",
+        error: errorMsg,
+    });
+
+    throw new Error(errorMsg);
+}
+
+export function saveLimitOrderNote(
+    salt: string | undefined,
+    protocolName: string,
+    debtFromName: string,
+    selectedToSymbol: string,
+    chainId: number
+): void {
+    if (!salt) return;
+
+    saveOrderNote(createDebtSwapNote(
+        salt,
+        protocolName,
+        debtFromName,      // old debt being repaid
+        selectedToSymbol,  // new debt being taken on
+        chainId
+    ));
+}
+
+export async function executeBatchedLimitOrder(params: {
+    allCalls: Array<{ to: string; data: string }>;
+    sendCallsAsync: (params: { calls: readonly unknown[] }) => Promise<{ id: string }>;
+    setSuppressBatchNotifications: (val: boolean) => void;
+    setBatchId: (id: string) => void;
+    setLastOrderSalt: (salt: string | null) => void;
+    setLimitOrderNotificationId: (id: string | number | null) => void;
+    salt: string;
+    notificationId: string | number;
+    analyticsProps: DebtSwapAnalyticsProps;
+}): Promise<void> {
+    const {
+        allCalls,
+        sendCallsAsync,
+        setSuppressBatchNotifications,
+        setBatchId,
+        setLastOrderSalt,
+        setLimitOrderNotificationId,
+        salt,
+        notificationId,
+        analyticsProps,
+    } = params;
+
+    console.log("[Limit Order] Using batched TX mode (EIP-5792)");
+
+    const { id: newBatchId } = await sendCallsAsync({
+        calls: allCalls,
+    });
+
+    setSuppressBatchNotifications(true);
+    setBatchId(newBatchId);
+    setLastOrderSalt(salt);
+    setLimitOrderNotificationId(notificationId);
+
+    notification.remove(notificationId);
+    notification.loading(
+        <TransactionToast
+            step="pending"
+            message="Waiting for batch confirmation..."
+        />
+    );
+
+    track("debt_swap_limit_order_complete", { ...analyticsProps, status: "batched", batchId: newBatchId });
+}
+
+export async function executeSequentialLimitOrder(params: {
+    allCalls: Array<{ to: string; data: string }>;
+    walletClient: WalletClient;
+    publicClient: PublicClient;
+    chainId: number;
+    orderManagerAddress: string;
+    analyticsProps: DebtSwapAnalyticsProps;
+    onClose: () => void;
+    notificationId: string | number;
+}): Promise<void> {
+    const {
+        allCalls,
+        walletClient,
+        publicClient,
+        chainId,
+        orderManagerAddress,
+        analyticsProps,
+        onClose,
+    } = params;
+    let { notificationId } = params;
+
+    console.log("[Limit Order] Using sequential TX mode");
+
+    if (!walletClient.account) {
+        throw new Error("WalletClient must have an account configured");
+    }
+    const account = walletClient.account;
+
+    for (let i = 0; i < allCalls.length; i++) {
+        const call = allCalls[i];
+        notification.remove(notificationId);
+        notificationId = notification.loading(
+            <TransactionToast step="pending" message={`Executing step ${i + 1}/${allCalls.length}...`} />
+        );
+
+        const hash = await walletClient.sendTransaction({
+            to: call.to as Address,
+            data: call.data as `0x${string}`,
+            chain: walletClient.chain,
+            account,
+        });
+
+        await publicClient.waitForTransactionReceipt({ hash });
+    }
+
+    notification.remove(notificationId);
+    const explorerUrl = getCowExplorerAddressUrl(chainId, orderManagerAddress);
+    notification.success(
+        <TransactionToast
+            step="confirmed"
+            message="Limit order created!"
+            blockExplorerLink={explorerUrl}
+        />
+    );
+
+    track("debt_swap_limit_order_complete", { ...analyticsProps, status: "success" });
+    onClose();
+}
+
+export function handleLimitOrderError(
+    error: unknown,
+    notificationId: string | number | undefined,
+    analyticsProps: DebtSwapAnalyticsProps
+): void {
+    if (notificationId) {
+        notification.remove(notificationId);
+    }
+
+    const errorMessage = error instanceof Error ? error.message : "Transaction failed";
+    notification.error(
+        <TransactionToast
+            step="failed"
+            message={errorMessage}
+        />
+    );
+
+    track("debt_swap_limit_order_complete", {
+        ...analyticsProps,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+    });
+}
+
+// ============ Swap Router Helpers ============
+
+export function shouldSwitchSwapRouter(
+    swapRouter: string,
+    oneInchAvailable: boolean,
+    pendleAvailable: boolean
+): string | null {
+    if (swapRouter === "1inch" && !oneInchAvailable) {
+        return pendleAvailable ? "pendle" : null;
+    }
+    if (swapRouter === "pendle" && !pendleAvailable) {
+        return oneInchAvailable ? "1inch" : null;
+    }
+    return null;
+}
+
+// ============ Quote Calculation Helpers ============
+
+export interface QuoteCalculationResult {
+    requiredNewDebt: bigint;
+    requiredNewDebtFormatted: string;
+    exchangeRate: string;
+}
+
+export function calculateRequiredNewDebt(params: {
+    selectedTo: SwapAsset | null;
+    repayAmountRaw: bigint;
+    oneInchUnitQuote: { dstAmount: string } | null | undefined;
+    pendleUnitQuote: { data: { amountPtOut?: string; amountTokenOut?: string } } | null | undefined;
+    debtFromDecimals: number;
+    slippage: number;
+}): QuoteCalculationResult {
+    const { selectedTo, repayAmountRaw, oneInchUnitQuote, pendleUnitQuote, debtFromDecimals, slippage } = params;
+
+    if (!selectedTo || repayAmountRaw === 0n) {
+        return { requiredNewDebt: 0n, requiredNewDebtFormatted: "0", exchangeRate: "0" };
+    }
+
+    // Get unit output from whichever quote is available
+    const unitOut = getUnitOutput(oneInchUnitQuote, pendleUnitQuote);
+
+    if (unitOut === 0n) {
+        return { requiredNewDebt: 0n, requiredNewDebtFormatted: "0", exchangeRate: "0" };
+    }
+
+    // Exchange rate: how much currentDebt per 1 newDebt
+    const rate = formatUnits(unitOut, debtFromDecimals);
+
+    // requiredNewDebt = repayAmountRaw / rate = repayAmountRaw * 1_newDebt / unitOut
+    const unitIn = 10n ** BigInt(selectedTo.decimals);
+    const base = (repayAmountRaw * unitIn) / unitOut;
+
+    // Apply slippage buffer from UI (e.g., 1% slippage -> multiply by 1.01)
+    const slippageBps = BigInt(Math.round(slippage * 100)); // 1% -> 100 bps
+    const required = (base * (10000n + slippageBps)) / 10000n;
+
+    return {
+        requiredNewDebt: required,
+        requiredNewDebtFormatted: formatUnits(required, selectedTo.decimals),
+        exchangeRate: rate,
+    };
+}
+
+function getUnitOutput(
+    oneInchUnitQuote: { dstAmount: string } | null | undefined,
+    pendleUnitQuote: { data: { amountPtOut?: string; amountTokenOut?: string } } | null | undefined
+): bigint {
+    if (oneInchUnitQuote) {
+        return BigInt(oneInchUnitQuote.dstAmount);
+    }
+    if (pendleUnitQuote) {
+        const outAmount = pendleUnitQuote.data.amountPtOut || pendleUnitQuote.data.amountTokenOut || "0";
+        return BigInt(outAmount);
+    }
+    return 0n;
+}
+
+export function calculateLimitOrderNewDebt(
+    cowQuote: CowQuoteResponse | null | undefined,
+    selectedTo: SwapAsset | null,
+    slippage: number
+): bigint {
+    if (!cowQuote || !selectedTo) return 0n;
+
+    const baseSellAmount = getCowQuoteSellAmount(cowQuote);
+    if (baseSellAmount === 0n) return 0n;
+
+    // Apply slippage buffer
+    const slippageBps = BigInt(Math.round(slippage * 100));
+    const withSlippage = (baseSellAmount * (10000n + slippageBps)) / 10000n;
+
+    return withSlippage;
+}

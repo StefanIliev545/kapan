@@ -1,6 +1,6 @@
 "use client";
 
-import React, { FC, useMemo } from "react";
+import React, { FC, useMemo, useCallback, MouseEvent } from "react";
 import Image from "next/image";
 import { ExternalLink } from "lucide-react";
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
@@ -89,11 +89,21 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
     return bestMarket.uniqueKey;
   }, [markets]);
 
-  const handleSelect = (market: MorphoMarket) => {
+  const handleSelect = useCallback((market: MorphoMarket) => {
     if (disabled) return;
     const context = createMorphoContext(market);
     onSelectMarket(market, context);
-  };
+  }, [disabled, onSelectMarket]);
+
+  const handleStopPropagation = useCallback((e: MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  // Factory for market click handlers
+  const createMarketClickHandler = useCallback(
+    (market: MorphoMarket) => () => handleSelect(market),
+    [handleSelect],
+  );
 
   // Loading state
   if (isLoading) {
@@ -142,7 +152,7 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
                 ${isSelected ? "border-primary bg-primary/10" : "border-base-300 hover:border-base-content/30"}
                 ${disabled ? "cursor-not-allowed opacity-50" : ""}
               `}
-              onClick={() => handleSelect(market)}
+              onClick={createMarketClickHandler(market)}
             >
               <div className="flex items-center justify-between gap-3">
                 {/* Left side: Radio + Market info */}
@@ -190,7 +200,7 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
                         href={morphoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
+                        onClick={handleStopPropagation}
                         className="text-base-content/40 hover:text-primary transition-colors"
                       >
                         <ExternalLink className="size-3" />

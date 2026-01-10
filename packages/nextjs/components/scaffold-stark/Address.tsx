@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { default as NextImage } from "next/image";
 import Link from "next/link";
 import { Address as AddressType } from "@starknet-react/chains";
@@ -71,6 +71,12 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
     }
   }, [fetchedProfile, checkSumAddress, address, format]);
 
+  const handleCopy = useCallback(() => {
+    if (checkSumAddress) {
+      copy(checkSumAddress);
+    }
+  }, [copy, checkSumAddress]);
+
   // Skeleton UI
   if (isLoading) {
     return <BalanceSkeleton />;
@@ -120,7 +126,7 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
         </a>
       )}
       <button
-        onClick={() => copy(checkSumAddress)}
+        onClick={handleCopy}
         className="ml-1.5 cursor-pointer border-0 bg-transparent p-0"
         type="button"
       >

@@ -1,9 +1,14 @@
+import { useCallback } from "react";
 import { NetworkOptions } from "./NetworkOptions";
 import { useDisconnect } from "wagmi";
 import { ArrowLeftOnRectangleIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 
 export const WrongNetworkDropdown = () => {
   const { disconnect } = useDisconnect();
+
+  const handleDisconnect = useCallback(() => {
+    disconnect();
+  }, [disconnect]);
 
   return (
     <div className="dropdown dropdown-end mr-2">
@@ -20,7 +25,7 @@ export const WrongNetworkDropdown = () => {
           <button
             className="menu-item text-error btn-sm flex gap-3 !rounded-xl py-3"
             type="button"
-            onClick={() => disconnect()}
+            onClick={handleDisconnect}
           >
             <ArrowLeftOnRectangleIcon className="ml-2 h-6 w-4 sm:ml-0" />
             <span>Disconnect</span>

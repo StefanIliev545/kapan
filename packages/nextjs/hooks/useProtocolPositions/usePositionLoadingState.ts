@@ -74,11 +74,9 @@ export function usePositionLoadingState({
 
   // Set hasLoadedOnce when loading completes
   useEffect(() => {
-    if (!isLoading && !hasLoadedOnce) {
+    if (!isLoading && !hasLoadedOnce && (data !== undefined || error !== undefined)) {
       // Mark as loaded once we have data or an error
-      if (data !== undefined || error !== undefined) {
-        setHasLoadedOnce(true);
-      }
+      setHasLoadedOnce(true);
     }
   }, [isLoading, hasLoadedOnce, data, error]);
 

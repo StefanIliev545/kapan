@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, cloneElement, isValidElement, useState, useEffect } from "react";
+import { ReactNode, cloneElement, isValidElement, useState, useEffect, useMemo } from "react";
 import { motion, MotionValue, useTransform } from "framer-motion";
 import { TextScramble } from "./TextScramble";
 
@@ -19,6 +19,10 @@ export interface SectionData {
 export interface SectionContentProps {
   isActive?: boolean;
 }
+
+// Static animation props for motion.div to avoid creating new objects on each render
+const decorativeLineInitial = { width: 0 };
+const decorativeLineWhileInView = { width: "40px" };
 
 interface StickySectionProps {
   section: SectionData;
@@ -69,21 +73,24 @@ export const StickySection = ({
   }, [opacity, hasBeenActive]);
 
   const isCompact = section.compactHeader;
-  
+
   // Clone content element and inject isActive prop if it accepts it
   const contentWithProps = section.content && isValidElement(section.content)
     ? cloneElement(section.content as React.ReactElement<SectionContentProps>, { isActive: hasBeenActive })
     : section.content;
 
+  // Memoize motion style object to avoid creating new object on each render
+  const motionStyle = useMemo(() => ({
+    opacity,
+    scale,
+    y,
+    zIndex: index,
+    pointerEvents,
+  }), [opacity, scale, y, index, pointerEvents]);
+
   return (
     <motion.div
-      style={{
-        opacity,
-        scale,
-        y,
-        zIndex: index,
-        pointerEvents,
-      }}
+      style={motionStyle}
       className="absolute inset-0 flex items-center justify-center overflow-hidden"
     >
       <div className={`w-full ${isCompact ? "max-w-7xl" : "max-w-5xl"} flex flex-col items-center px-6 text-center md:px-8`}>
@@ -91,8 +98,8 @@ export const StickySection = ({
         <div className={`flex flex-col items-center ${isCompact ? "mb-4 gap-2 md:mb-6 md:gap-3" : "mb-8 gap-4 md:mb-12 md:gap-6"}`}>
           {/* Decorative line */}
           <motion.div
-            initial={{ width: 0 }}
-            whileInView={{ width: "40px" }}
+            initial={decorativeLineInitial}
+            whileInView={decorativeLineWhileInView}
             className="bg-base-content/20 h-[1px]"
           />
           

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -24,16 +24,42 @@ export const NetworkSwitcher = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   useOutsideClick(dropdownRef, () => setIsOpen(false));
-  
+
+  const toggleDropdown = useCallback(() => setIsOpen(!isOpen), [isOpen]);
+
+  const handleNetworkClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const networkId = Number(e.currentTarget.dataset.networkId);
+    const networkName = e.currentTarget.dataset.networkName || "";
+    const isActive = e.currentTarget.dataset.isActive === "true";
+    if (!isActive) {
+      track("Network switched event", {
+        network: networkName,
+        chainId: networkId,
+      });
+      switchChain?.({ chainId: networkId });
+    }
+    setIsOpen(false);
+  }, [switchChain]);
+
+  // Pre-compute active network styles for all networks
+  const networkStyles = useMemo(() => {
+    return Object.fromEntries(
+      allowedNetworks.map(network => [
+        network.id,
+        { color: getNetworkColor(network, isDarkMode) },
+      ])
+    );
+  }, [isDarkMode]);
+
   if (!chain) return null;
 
   const networkLogo = getNetworkLogo(chain, isDarkMode);
-  
+
   return (
     <div ref={dropdownRef} className="relative flex-1">
       <div 
         className="flex cursor-pointer items-center gap-2 py-1 transition-opacity duration-200 hover:opacity-80"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleDropdown}
         aria-label="Switch Network"
       >
         <div className="relative size-5">
@@ -64,29 +90,23 @@ export const NetworkSwitcher = () => {
                 <button
                   key={network.id}
                   className={`hover:bg-base-300/50 w-full px-4 py-3 text-left ${isActive ? "bg-base-300/70" : ""} flex items-center gap-3`}
-                  onClick={() => {
-                    if (!isActive) {
-                      track("Network switched event", {
-                        network: network.name,
-                        chainId: network.id,
-                      });
-                      switchChain?.({ chainId: network.id });
-                    }
-                    setIsOpen(false);
-                  }}
+                  data-network-id={network.id}
+                  data-network-name={network.name}
+                  data-is-active={isActive}
+                  onClick={handleNetworkClick}
                 >
                   <div className="relative size-5 flex-shrink-0">
-                    <Image 
-                      src={networkLogo} 
-                      alt={network.name} 
-                      fill 
+                    <Image
+                      src={networkLogo}
+                      alt={network.name}
+                      fill
                       className="object-contain"
                     />
                   </div>
                   <div className="flex flex-col">
-                    <span 
+                    <span
                       className="text-sm font-medium"
-                      style={{ color: isActive ? getNetworkColor(network, isDarkMode) : undefined }}
+                      style={isActive ? networkStyles[network.id] : undefined}
                     >
                       {network.name}
                     </span>

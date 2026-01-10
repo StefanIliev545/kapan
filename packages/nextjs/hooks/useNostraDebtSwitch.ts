@@ -45,7 +45,8 @@ export const useNostraDebtSwitch = ({
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [protocolInstructions, setProtocolInstructions] = useState<BaseProtocolInstruction[]>([]);
   const [fetchedAuthorizations, setFetchedAuthorizations] = useState<LendingAuthorization[]>([]);
-  const [avnuCalldata, setAvnuCalldata] = useState<bigint[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_avnuCalldata, setAvnuCalldata] = useState<bigint[]>([]);
 
   useEffect(() => {
     setSelectedQuote(null);

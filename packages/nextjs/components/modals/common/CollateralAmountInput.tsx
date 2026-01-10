@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { FC, useCallback } from "react";
 
 /* ------------------------------ Types ------------------------------ */
 
@@ -80,25 +80,29 @@ export const CollateralAmountInput: FC<CollateralAmountInputProps> = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   decimals: _decimals,
 }) => {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const clamped = clampAmount(e.target.value, String(balance));
     onChange(clamped);
-  };
+  }, [balance, onChange]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       onConfirm();
     }
-  };
+  }, [onConfirm]);
 
-  const handleMaxClickInternal = () => {
+  const handleMaxClickInternal = useCallback(() => {
     onMaxClick();
-  };
+  }, [onMaxClick]);
+
+  const handleContainerClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
 
   const isConfirmDisabled = !value || parseFloat(value) <= 0;
 
   return (
-    <div className={`flex items-center gap-2 ${className}`} onClick={e => e.stopPropagation()}>
+    <div className={`flex items-center gap-2 ${className}`} onClick={handleContainerClick}>
       <div className="relative flex-1">
         <input
           type="number"

@@ -30,6 +30,21 @@ const faqItems = [
   },
 ];
 
+// Static FAQ schema and HTML - extracted outside component to avoid recreating on each render
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqItems.map(item => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.answer,
+    },
+  })),
+};
+const faqSchemaHtml = { __html: JSON.stringify(faqSchema).replace(/</g, "\\u003c") };
+
 export async function generateMetadata(): Promise<Metadata> {
   return {
     ...getMetadata({
@@ -44,24 +59,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const InfoPage = () => {
-  const faqSchema = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faqItems.map(item => ({
-      "@type": "Question",
-      name: item.question,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: item.answer,
-      },
-    })),
-  };
-
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema).replace(/</g, "\\u003c") }}
+        dangerouslySetInnerHTML={faqSchemaHtml}
       />
       <InfoPageContent faqItems={faqItems} />
     </>

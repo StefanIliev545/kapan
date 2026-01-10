@@ -1,6 +1,6 @@
 "use client";
 
-import { FC } from "react";
+import { FC, useCallback } from "react";
 import Image from "next/image";
 import { BaseModal } from "../BaseModal";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -40,6 +40,12 @@ export const SwitchTokenSelectModalStark: FC<SwitchTokenSelectModalStarkProps> =
   const current = resolveDisplay(currentToken);
   const showScrollHint = options.length > 8;
 
+  // Factory for token select handlers
+  const createSelectHandler = useCallback(
+    (token: TokenOption) => () => onSelect(token),
+    [onSelect],
+  );
+
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">
       <div className="space-y-3">
@@ -58,7 +64,7 @@ export const SwitchTokenSelectModalStark: FC<SwitchTokenSelectModalStarkProps> =
               <button
                 key={o.address}
                 className="hover:bg-base-200/60 flex w-full items-center justify-between p-3 transition-colors"
-                onClick={() => onSelect(o)}
+                onClick={createSelectHandler(o)}
               >
                 <div className="flex items-center gap-2 opacity-80">
                   <Image src={current.icon} alt={current.name} width={16} height={16} className="size-4" />

@@ -167,6 +167,9 @@ export const useVesuSwitch = ({
         const calldata = (swapCall.calldata as any[]).map(v => BigInt(v.toString()));
 
         // Build protocol instructions (pure; safe to run multiple times)
+        // targetToken is guaranteed to exist due to early return on !targetTokenAddr above
+        if (!targetToken) return;
+
         const instructions =
           type === "collateral"
             ? buildCollateralSwitchInstructions({
@@ -174,7 +177,7 @@ export const useVesuSwitch = ({
                 poolKey,
                 currentCollateral,
                 currentDebt,
-                targetToken: targetToken!,
+                targetToken,
                 collateralBalance,
                 debtBalance,
                 quote,
@@ -186,7 +189,7 @@ export const useVesuSwitch = ({
                 poolKey,
                 currentCollateral,
                 currentDebt,
-                targetToken: targetToken!,
+                targetToken,
                 collateralBalance,
                 debtBalance,
                 quote,
@@ -247,7 +250,7 @@ export const useVesuSwitch = ({
           const borrowOnly = new CairoCustomEnum({
             Deposit: undefined,
             Borrow: {
-              basic: { token: targetToken!.address, amount: uint256.bnToUint256(borrowAmount), user: address },
+              basic: { token: targetToken.address, amount: uint256.bnToUint256(borrowAmount), user: address },
               context: toContextOption(protocolKey, poolKey, currentCollateral.address),
             },
             Repay: undefined,

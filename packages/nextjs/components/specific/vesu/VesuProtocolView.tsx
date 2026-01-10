@@ -1,4 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 
 import { TokenSelectModalStark } from "~~/components/modals/stark/TokenSelectModalStark";
 import { useAccount } from "~~/hooks/useAccount";
@@ -53,7 +54,7 @@ function PoolSelector<T extends string>({ pools, selectedValue, onChange, getPoo
 
   return (
     <div className="flex items-center gap-2">
-      <img src="/logos/vesu.svg" alt="Vesu" className="size-4" />
+      <Image src="/logos/vesu.svg" alt="Vesu" width={16} height={16} className="size-4" />
       <select
         className="select select-sm select-bordered"
         value={selectedValue}

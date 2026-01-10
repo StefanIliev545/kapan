@@ -632,6 +632,22 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         setLimitSlippage(0.1);
     }, [selectedFrom?.address, selectedTo?.address]);
 
+    // Calculate USD values from token prices for price impact fallback
+    // (1inch v6.0 API doesn't return srcUSD/dstUSD, so we compute from token prices)
+    const srcUsdFallback = useMemo(() => {
+        if (!selectedFrom?.price || !amountIn) return undefined;
+        const parsed = parseFloat(amountIn);
+        if (isNaN(parsed) || parsed <= 0) return undefined;
+        return parsed * Number(formatUnits(selectedFrom.price, 8));
+    }, [selectedFrom?.price, amountIn]);
+
+    const dstUsdFallback = useMemo(() => {
+        if (!selectedTo?.price || !amountOut) return undefined;
+        const parsed = parseFloat(amountOut);
+        if (isNaN(parsed) || parsed <= 0) return undefined;
+        return parsed * Number(formatUnits(selectedTo.price, 8));
+    }, [selectedTo?.price, amountOut]);
+
     // Auto-slippage and price impact calculation
     const { priceImpact } = useAutoSlippage({
         slippage,
@@ -640,6 +656,8 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         pendleQuote,
         swapRouter,
         resetDep: `${selectedFrom?.address}-${selectedTo?.address}`,
+        srcUsdFallback,
+        dstUsdFallback,
     });
 
     // Calculate min output for limit orders with slippage
@@ -865,7 +883,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     /**
      * Main handler that routes to limit or market order execution.
      */
-    const handleSwapWrapper = async () => {
+    const handleSwapWrapper = useCallback(async () => {
         const txBeginProps = {
             network: "evm",
             protocol: protocolName,
@@ -878,7 +896,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             amountIn,
             isMax,
             slippage: executionType === "limit" ? limitSlippage : slippage,
-            preferBatching,
+            preferBatching: batchingPreference.enabled,
             flashLoanProvider: selectedProvider?.name ?? null,
             swapRouter,
             executionType,
@@ -903,7 +921,23 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         } finally {
             setIsSubmitting(false);
         }
-    };
+    }, [
+        executionType,
+        executeLimitOrder,
+        executeMarketOrder,
+        protocolName,
+        chainId,
+        context,
+        selectedFrom,
+        selectedTo,
+        amountIn,
+        isMax,
+        limitSlippage,
+        slippage,
+        batchingPreference.enabled,
+        selectedProvider,
+        swapRouter,
+    ]);
 
     const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
 
@@ -917,7 +951,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
 
     // Info content for "How it works" tab
-    const infoContent = (
+    const infoContent = useMemo(() => (
         <div className="space-y-4 py-2">
             <div className="alert alert-info bg-info/10 border-info/20 text-sm">
                 <InformationCircleIcon className="size-5 flex-shrink-0" />
@@ -981,10 +1015,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 </div>
             </div>
         </div>
-    );
+    ), [selectedProvider?.name, swapRouter]);
 
     // Warnings
-    const warnings = (
+    const warnings = useMemo(() => (
         <>
             {swapRouter === "1inch" && oneInchQuote && oneInchAdapter && oneInchQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
                 <WarningDisplay
@@ -1006,10 +1040,16 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 />
             )}
         </>
-    );
+    ), [swapRouter, oneInchQuote, oneInchAdapter, pendleAdapter, isOpen]);
+
+    // Handler for limit slippage change
+    const handleLimitSlippageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        setLimitSlippage(parseFloat(e.target.value));
+        setHasAutoSetLimitSlippage(true);
+    }, []);
 
     // Custom stats section with execution type toggle
-    const customStats = (
+    const customStats = useMemo(() => (
         <div className="space-y-3">
             {/* Execution Type Toggle */}
             <ExecutionTypeToggle
@@ -1060,10 +1100,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                             max="5"
                             step="0.01"
                             value={limitSlippage}
-                            onChange={e => {
-                                setLimitSlippage(parseFloat(e.target.value));
-                                setHasAutoSetLimitSlippage(true);
-                            }}
+                            onChange={handleLimitSlippageChange}
                             className="range range-warning range-xs w-full"
                         />
                         <div className="text-base-content/40 mt-0.5 flex justify-between text-[10px]">
@@ -1114,7 +1151,29 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 />
             )}
         </div>
-    );
+    ), [
+        executionType,
+        setExecutionType,
+        cowAvailable,
+        limitOrderReady,
+        isDevEnvironment,
+        isQuoteLoading,
+        marketRate,
+        selectedFrom,
+        selectedTo,
+        bestQuote,
+        limitSlippage,
+        handleLimitSlippageChange,
+        minBuyAmount,
+        limitOrderSellToken,
+        chainId,
+        handleLimitOrderConfigChange,
+        limitOrderConfig,
+        slippage,
+        setSlippage,
+        priceImpact,
+        amountOut,
+    ]);
 
     return (
         <SwapModalShell

@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 import { BaseModal } from "../BaseModal";
 import { ErrorDisplay } from "~~/components/common/ErrorDisplay";
@@ -68,7 +68,7 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
 
   const typeLabel = type === "collateral" ? "Collateral" : "Debt";
 
-  const onSubmit = async () => {
+  const onSubmit = useCallback(async () => {
     try {
       setSubmitting(true);
       await sendAsync();
@@ -79,7 +79,7 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [sendAsync, typeLabel, onClose]);
 
   // Resolve display name/icon with fallbacks (handles tokens like xSTRK)
   const resolveDisplay = (t: BasicToken | undefined | null) => {

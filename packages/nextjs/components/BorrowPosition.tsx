@@ -1,4 +1,4 @@
-import React, { FC, useMemo } from "react";
+import React, { FC, useMemo, useCallback, MouseEvent } from "react";
 import { Address } from "viem";
 import { MinusIcon, PlusIcon, ArrowPathIcon, XMarkIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "./FiatBalance";
@@ -58,9 +58,10 @@ function checkHasBetterRate(params: {
   const ratesAreSame = Math.abs(currentRate - displayedOptimalRate) < 0.000001;
   return (
     hasBalance &&
-    Boolean(displayedOptimalProtocol) &&
+    displayedOptimalProtocol !== undefined &&
+    displayedOptimalProtocol !== null &&
     !ratesAreSame &&
-    normalizeProtocolName(displayedOptimalProtocol!) !== normalizeProtocolName(protocolName) &&
+    normalizeProtocolName(displayedOptimalProtocol) !== normalizeProtocolName(protocolName) &&
     displayedOptimalRate < currentRate
   );
 }
@@ -411,6 +412,24 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     [name, tokenAddress, tokenDecimals, tokenBalanceBn],
   );
 
+  // Position data for Starknet move modal (includes poolId)
+  const movePoolIdForMemo = useMemo(() => {
+    const borrowPoolId = extractPoolIdFromVesuContext(vesuContext?.borrow);
+    const repayPoolId = extractPoolIdFromVesuContext(vesuContext?.repay);
+    return borrowPoolId ?? repayPoolId;
+  }, [vesuContext?.borrow, vesuContext?.repay]);
+  const movePosition = useMemo(
+    () => ({
+      name,
+      tokenAddress,
+      decimals: tokenDecimals ?? 18,
+      balance: tokenBalance ?? 0n,
+      poolId: movePoolIdForMemo,
+      type: "borrow" as const,
+    }),
+    [name, tokenAddress, tokenDecimals, tokenBalance, movePoolIdForMemo],
+  );
+
   // Shared token info for modals - eliminates duplicate token prop construction
   const modalTokenInfo = useMemo(
     () => buildModalTokenInfo({ name, icon, tokenAddress, currentRate, usdPrice, tokenDecimals }),
@@ -479,10 +498,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     debtSwapModalOpen: debtSwapModal.open,
   });
 
-  // Extract pool IDs from Vesu context for RefinanceModal
-  const borrowPoolId = extractPoolIdFromVesuContext(vesuContext?.borrow);
-  const repayPoolId = extractPoolIdFromVesuContext(vesuContext?.repay);
-  const movePoolId = borrowPoolId ?? repayPoolId;
+  // Extract protocol name for RefinanceModal
   const moveFromProtocol = getMoveFromProtocol(protocolName);
 
   // Get the collateral view with isVisible prop
@@ -524,6 +540,12 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     disconnectedMessage: "Connect wallet to move debt",
     enabledMessage: "Move debt to another protocol",
   });
+  const handleQuickMoveClick = useCallback((e: MouseEvent) => {
+    e.stopPropagation();
+    if (!isQuickMoveDisabled) {
+      moveModal.open();
+    }
+  }, [isQuickMoveDisabled, moveModal]);
   const headerQuickAction = hasBetterRate && showMoveButton ? (
     <button
       className={`flex-shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
@@ -531,12 +553,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
           ? "bg-base-300 text-base-content/50 cursor-not-allowed"
           : "bg-primary text-primary-content hover:bg-primary/80 animate-pulse"
       }`}
-      onClick={e => {
-        e.stopPropagation();
-        if (!isQuickMoveDisabled) {
-          moveModal.open();
-        }
-      }}
+      onClick={handleQuickMoveClick}
       disabled={isQuickMoveDisabled}
       aria-label="Move"
       title={quickMoveTitle}
@@ -655,14 +672,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
               isOpen={moveModal.isOpen}
               onClose={moveModal.close}
               fromProtocol={moveFromProtocol}
-              position={{
-                name,
-                tokenAddress,
-                decimals: tokenDecimals ?? 18,
-                balance: tokenBalance ?? 0n,
-                poolId: movePoolId,
-                type: "borrow",
-              }}
+              position={movePosition}
               networkType="starknet"
               preSelectedCollaterals={moveSupport?.preselectedCollaterals}
               disableCollateralSelection={moveSupport?.disableCollateralSelection}

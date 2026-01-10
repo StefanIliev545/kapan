@@ -60,11 +60,11 @@ export const InputBase = <T extends { toString: () => string } | undefined = str
 
   // Runs only when reFocus prop is passed, useful for setting the cursor
   // at the end of the input. Example AddressInput
-  const onFocus = (e: FocusEvent<HTMLInputElement, Element>) => {
+  const onFocus = useCallback((e: FocusEvent<HTMLInputElement, Element>) => {
     if (reFocus !== undefined) {
       e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length);
     }
-  };
+  }, [reFocus]);
 
   useEffect(() => {
     if (reFocus !== undefined && reFocus === true) inputRef.current?.focus();
