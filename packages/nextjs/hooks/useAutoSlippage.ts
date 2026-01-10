@@ -1,12 +1,17 @@
+// Auto-slippage calculation hook
 import { useEffect, useMemo } from "react";
-import { 
-    calculateSuggestedSlippage, 
-    calculatePriceImpactFromUSD, 
-    getPriceImpactSeverity, 
-    getPriceImpactColorClass, 
+import {
+    calculateSuggestedSlippage,
+    calculatePriceImpactFromUSD,
+    getPriceImpactSeverity,
+    getPriceImpactColorClass,
     formatPriceImpact,
-    PriceImpactSeverity 
+    PriceImpactSeverity,
+    DEFAULT_SLIPPAGE,
 } from "~~/utils/slippage";
+
+// Re-export from central slippage module for backward compatibility
+export { SLIPPAGE_OPTIONS, DEFAULT_SLIPPAGE } from "~~/utils/slippage";
 
 interface UseAutoSlippageParams {
     /** Current slippage value (managed by parent component) */
@@ -23,6 +28,10 @@ interface UseAutoSlippageParams {
     resetDep?: unknown;
     /** Whether auto-slippage is enabled (default: true) */
     enabled?: boolean;
+    /** Fallback USD value for input (when 1inch doesn't return srcUSD) */
+    srcUsdFallback?: number;
+    /** Fallback USD value for output (when 1inch doesn't return dstUSD) */
+    dstUsdFallback?: number;
 }
 
 interface UseAutoSlippageReturn {
@@ -63,6 +72,8 @@ export const useAutoSlippage = ({
     swapRouter,
     resetDep,
     enabled = true,
+    srcUsdFallback,
+    dstUsdFallback,
 }: UseAutoSlippageParams): UseAutoSlippageReturn => {
     // Calculate price impact from available data
     const priceImpact = useMemo(() => {
@@ -70,14 +81,15 @@ export const useAutoSlippage = ({
         if (swapRouter === "pendle" && pendleQuote?.data?.priceImpact !== undefined) {
             return Math.abs(pendleQuote.data.priceImpact * 100); // Convert to percentage
         }
-        // 1inch: calculate from USD values
+        // 1inch: calculate from USD values (API response or fallback from token prices)
         if (swapRouter === "1inch" && oneInchQuote) {
-            const srcUSD = oneInchQuote.srcUSD ? parseFloat(oneInchQuote.srcUSD) : null;
-            const dstUSD = oneInchQuote.dstUSD ? parseFloat(oneInchQuote.dstUSD) : null;
+            // Try API-provided USD values first, fall back to token-price-based values
+            const srcUSD = oneInchQuote.srcUSD ? parseFloat(oneInchQuote.srcUSD) : srcUsdFallback ?? null;
+            const dstUSD = oneInchQuote.dstUSD ? parseFloat(oneInchQuote.dstUSD) : dstUsdFallback ?? null;
             return calculatePriceImpactFromUSD(srcUSD, dstUSD);
         }
         return null;
-    }, [swapRouter, pendleQuote, oneInchQuote]);
+    }, [swapRouter, pendleQuote, oneInchQuote, srcUsdFallback, dstUsdFallback]);
 
     // Check if we have quote data
     const hasQuoteData = swapRouter === "1inch" ? !!oneInchQuote : !!pendleQuote;
@@ -116,9 +128,3 @@ export const useAutoSlippage = ({
         formattedPriceImpact,
     };
 };
-
-/** Standard slippage options for dropdown - includes low values for stable pairs */
-export const SLIPPAGE_OPTIONS = [0.01, 0.03, 0.05, 0.1, 0.3, 0.5, 1, 2, 3, 5];
-
-/** Default initial slippage - will be auto-adjusted based on price impact */
-export const DEFAULT_SLIPPAGE = 0.1;

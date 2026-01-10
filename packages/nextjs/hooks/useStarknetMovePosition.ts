@@ -49,6 +49,112 @@ const toOutputPointer = (instructionIndex: number) => ({
 
 const addrKey = (a?: string) => (a ?? "").toLowerCase();
 
+const MAX_UINT256 = (1n << 256n) - 1n;
+
+const applyMaxBuffer = (amount: bigint, isMax: boolean): bigint =>
+  isMax ? (amount * BigInt(101)) / BigInt(100) : amount;
+
+const addBorrowBuffer = (amount: bigint): bigint => ((amount * 101n) / 100n) + 1n;
+
+const normalizeProtocolName = (protocol: string, selectedVersion?: "v1" | "v2"): string => {
+  if (protocol === "VesuV2") return "vesu_v2";
+  if (protocol === "Vesu") return selectedVersion === "v2" ? "vesu_v2" : "vesu";
+  return protocol.toLowerCase();
+};
+
+type ContextOption = CairoOption<bigint[]>;
+
+const buildSourceContext = (
+  fromProtocol: string,
+  hasCollaterals: boolean,
+  poolId: bigint | string | undefined,
+  addedCollaterals: Record<string, string>,
+  tokenAddress: string,
+): { repayContext: ContextOption; withdrawContext: ContextOption } | null => {
+  const noneContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
+
+  if (!hasCollaterals) {
+    return { repayContext: noneContext, withdrawContext: noneContext };
+  }
+
+  if (fromProtocol === "Vesu") {
+    if (!poolId) {
+      console.error("Source pool ID is required for Vesu V1 positions");
+      return null;
+    }
+    const currentPoolId = typeof poolId === "string" ? BigInt(poolId) : poolId;
+    const firstCollateral = Object.keys(addedCollaterals)[0];
+    return {
+      repayContext: new CairoOption<bigint[]>(CairoOptionVariant.Some, [currentPoolId, BigInt(firstCollateral)]),
+      withdrawContext: new CairoOption<bigint[]>(CairoOptionVariant.Some, [currentPoolId, BigInt(tokenAddress)]),
+    };
+  }
+
+  if (fromProtocol === "VesuV2") {
+    if (!poolId) {
+      console.error("Source pool address is required for Vesu V2 positions");
+      return null;
+    }
+    const sourcePoolAddress = normalizeStarknetAddress(poolId);
+    const firstCollateral = Object.keys(addedCollaterals)[0];
+    return {
+      repayContext: new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(sourcePoolAddress), BigInt(firstCollateral)]),
+      withdrawContext: new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(sourcePoolAddress), BigInt(tokenAddress)]),
+    };
+  }
+
+  return { repayContext: noneContext, withdrawContext: noneContext };
+};
+
+const buildDestinationContext = (
+  toProtocol: string,
+  selectedVersion: "v1" | "v2",
+  hasCollaterals: boolean,
+  addedCollaterals: Record<string, string>,
+  selectedPoolId: bigint,
+  selectedV2PoolAddress: string,
+  tokenAddress: string,
+): { borrowContext: ContextOption; depositContext: ContextOption } => {
+  const noneContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
+
+  if (!hasCollaterals) {
+    return { borrowContext: noneContext, depositContext: noneContext };
+  }
+
+  const firstCollateral = Object.keys(addedCollaterals)[0];
+
+  if (toProtocol === "Vesu") {
+    const poolRef = selectedVersion === "v1" ? selectedPoolId : BigInt(selectedV2PoolAddress);
+    return {
+      borrowContext: new CairoOption<bigint[]>(CairoOptionVariant.Some, [poolRef, BigInt(firstCollateral)]),
+      depositContext: new CairoOption<bigint[]>(CairoOptionVariant.Some, [poolRef, BigInt(tokenAddress)]),
+    };
+  }
+
+  if (toProtocol === "VesuV2") {
+    return {
+      borrowContext: new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(selectedV2PoolAddress), BigInt(firstCollateral)]),
+      depositContext: new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(selectedV2PoolAddress), BigInt(tokenAddress)]),
+    };
+  }
+
+  return { borrowContext: noneContext, depositContext: noneContext };
+};
+
+const getSourcePool = (
+  fromProtocol: string,
+  poolId: bigint | string | undefined,
+  fallbackV2PoolAddress: string,
+): bigint | null => {
+  if (fromProtocol === "Vesu") {
+    return typeof poolId === "string" ? BigInt(poolId) : (poolId ?? 0n);
+  }
+  if (fromProtocol === "VesuV2") {
+    return BigInt(normalizeStarknetAddress(poolId ?? fallbackV2PoolAddress));
+  }
+  return null;
+};
+
 export const useStarknetMovePosition = (params: StarknetMoveParams): StarknetMoveResult => {
   const {
     isOpen,
@@ -139,74 +245,31 @@ export const useStarknetMovePosition = (params: StarknetMoveParams): StarknetMov
       return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
     }
 
-    const tokenDecimals = position.decimals;
-    const parsedAmount = parseUnits(debtAmount, tokenDecimals);
-    
-    // Normalize protocol names for Starknet
-    const sourceProtocolName = fromProtocol === "VesuV2" ? "vesu_v2" : fromProtocol.toLowerCase();
-    const targetProtocolName = toProtocol === "Vesu" 
-      ? (selectedVersion === "v2" ? "vesu_v2" : "vesu")
-      : toProtocol.toLowerCase();
-
-    // Build contexts based on protocols
-    let repayContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
-    let withdrawContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
-    let borrowContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
-    let depositContext = new CairoOption<bigint[]>(CairoOptionVariant.None);
-
+    const parsedAmount = parseUnits(debtAmount, position.decimals);
+    const sourceProtocolName = normalizeProtocolName(fromProtocol);
+    const targetProtocolName = normalizeProtocolName(toProtocol, selectedVersion);
     const hasCollaterals = Object.keys(addedCollaterals).length > 0;
 
-    // Source protocol context - always use position.poolId for source, never fall back to destination
-    if (fromProtocol === "Vesu" && hasCollaterals) {
-      if (!position.poolId) {
-        console.error("Source pool ID is required for Vesu V1 positions");
-        return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
-      }
-      const currentPoolId = typeof position.poolId === "string" ? BigInt(position.poolId) : position.poolId;
-      const firstCollateral = Object.keys(addedCollaterals)[0];
-      repayContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [currentPoolId, BigInt(firstCollateral)]);
-      withdrawContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [currentPoolId, BigInt(position.tokenAddress)]);
-    } else if (fromProtocol === "VesuV2" && hasCollaterals) {
-      if (!position.poolId) {
-        console.error("Source pool address is required for Vesu V2 positions");
-        return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
-      }
-      const sourcePoolAddress = normalizeStarknetAddress(position.poolId);
-      const firstCollateral = Object.keys(addedCollaterals)[0];
-      repayContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(sourcePoolAddress), BigInt(firstCollateral)]);
-      withdrawContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(sourcePoolAddress), BigInt(position.tokenAddress)]);
+    // Build contexts using helpers
+    const sourceCtx = buildSourceContext(fromProtocol, hasCollaterals, position.poolId, addedCollaterals, position.tokenAddress);
+    if (sourceCtx === null) {
+      return { pairInstructions: [], authInstructions: [], authCalldataKey: "" };
     }
-
-    // Destination protocol context
-    if (toProtocol === "Vesu" && hasCollaterals) {
-      const firstCollateral = Object.keys(addedCollaterals)[0];
-      if (selectedVersion === "v1") {
-        borrowContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [selectedPoolId, BigInt(firstCollateral)]);
-        depositContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [selectedPoolId, BigInt(position.tokenAddress)]);
-      } else {
-        borrowContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(selectedV2PoolAddress), BigInt(firstCollateral)]);
-        depositContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(selectedV2PoolAddress), BigInt(position.tokenAddress)]);
-      }
-    } else if (toProtocol === "VesuV2" && hasCollaterals) {
-      const firstCollateral = Object.keys(addedCollaterals)[0];
-      borrowContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(selectedV2PoolAddress), BigInt(firstCollateral)]);
-      depositContext = new CairoOption<bigint[]>(CairoOptionVariant.Some, [BigInt(selectedV2PoolAddress), BigInt(position.tokenAddress)]);
-    }
-
-    const applyMaxBuffer = (amount: bigint, isMax: boolean) =>
-      isMax ? (amount * BigInt(101)) / BigInt(100) : amount;
-    const MAX_UINT256 = (1n << 256n) - 1n;
-    // Match legacy behavior: +1.0% borrow allowance buffer (plus +1 to counter truncation)
-    const addBorrowBuffer = (amount: bigint) => ((amount * 101n) / 100n) + 1n; // ~+1.0% buffer
+    const { repayContext, withdrawContext } = sourceCtx;
+    const { borrowContext, depositContext } = buildDestinationContext(
+      toProtocol, selectedVersion, hasCollaterals, addedCollaterals, selectedPoolId, selectedV2PoolAddress, position.tokenAddress
+    );
 
     // MULTI-COLLATERAL: build per-pair instructions with correct contexts and pointers
     const entryList = Object.entries(addedCollaterals)
       .map(([addr, amt]) => ({ addrLower: addrKey(addr), amt }))
       .sort((a, b) => a.addrLower.localeCompare(b.addrLower));
+
     if (entryList.length > 1) {
       const n = BigInt(entryList.length);
       const share = parsedAmount / n;
       const remainder = parsedAmount - share * n;
+      const srcPool = getSourcePool(fromProtocol, position.poolId, selectedV2PoolAddress);
 
       const pairs = entryList.map((e, idx) => {
         const meta = collaterals.find(c => addrKey(c.address) === e.addrLower);
@@ -216,22 +279,12 @@ export const useStarknetMovePosition = (params: StarknetMoveParams): StarknetMov
         const thisRepay = isLast ? (repayAll ? parsedAmount - share * BigInt(entryList.length - 1) : share + remainder) : share;
 
         // Source contexts per collateral on Vesu/V2
-        let srcPool: bigint | null = null;
-        if (fromProtocol === "Vesu") {
-          const currentPoolId = typeof position.poolId === "string" ? BigInt(position.poolId) : (position.poolId ?? 0n);
-          srcPool = currentPoolId;
-        } else if (fromProtocol === "VesuV2") {
-          const sourcePoolAddress = BigInt(normalizeStarknetAddress(position.poolId ?? selectedV2PoolAddress));
-          srcPool = sourcePoolAddress;
-        }
-        const repayCtx =
-          srcPool !== null
-            ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(meta.address)])
-            : new CairoOption<bigint[]>(CairoOptionVariant.None);
-        const withdrawCtx =
-          srcPool !== null
-            ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
-            : new CairoOption<bigint[]>(CairoOptionVariant.None);
+        const repayCtx = srcPool !== null
+          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(meta.address)])
+          : new CairoOption<bigint[]>(CairoOptionVariant.None);
+        const withdrawCtx = srcPool !== null
+          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
+          : new CairoOption<bigint[]>(CairoOptionVariant.None);
 
         const repayInstruction = new CairoCustomEnum({
           Deposit: undefined,

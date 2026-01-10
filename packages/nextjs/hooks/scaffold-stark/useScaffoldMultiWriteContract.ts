@@ -2,7 +2,6 @@ import { useTargetNetwork } from "./useTargetNetwork";
 import { useSmartTransactor } from "./useSmartTransactor";
 import { Abi, useNetwork, useSendTransaction } from "@starknet-react/core";
 import { Call, InvocationsDetails, Contract as StarknetJsContract } from "starknet";
-import { notification } from "~~/utils/scaffold-stark";
 import {
   Contract,
   ContractAbi,
@@ -23,11 +22,12 @@ export const useScaffoldMultiWriteContract = <
   TFunctionName extends ExtractAbiFunctionNamesScaffold<ContractAbi<TContractName>, "external">,
 >({
   calls,
-  options,
+  options: _options,
 }: {
   calls: Array<UseScaffoldWriteConfig<TAbi, TContractName, TFunctionName> | Call>;
   options?: InvocationsDetails;
 }) => {
+  void _options; // TODO: add custom options support
   const { targetNetwork } = useTargetNetwork();
   const { chain } = useNetwork();
   const sendTxnWrapper = useSmartTransactor();

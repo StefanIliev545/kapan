@@ -5,7 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
@@ -128,7 +128,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   const kapanRouter = await get("KapanRouter");
   const WAIT = getWaitConfirmations(chainId);
 
-  const compoundGatewayWrite = await deploy("CompoundGatewayWrite", {
+  const compoundGatewayWrite = await safeDeploy(hre, deployer, "CompoundGatewayWrite", {
     from: deployer,
     args: [kapanRouter.address, deployer], // router, owner
     log: true,
@@ -165,7 +165,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   };
 
   // View gateway
-  const compoundGatewayView = await deploy("CompoundGatewayView", {
+  const compoundGatewayView = await safeDeploy(hre, deployer, "CompoundGatewayView", {
     from: deployer,
     args: [deployer], // owner
     log: true,
@@ -206,6 +206,8 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
   await verifyContract(hre, compoundGatewayWrite.address, [kapanRouter.address, deployer]);
   await verifyContract(hre, compoundGatewayView.address, [deployer]);
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployCompoundGatewayWrite;

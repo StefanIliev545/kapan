@@ -1,4 +1,4 @@
-import React, { FC, useMemo, useState } from "react";
+import React, { FC, useMemo, useState, useCallback } from "react";
 import { formatUnits } from "viem";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
@@ -147,11 +147,14 @@ export const FiatBalance: FC<FiatBalanceProps> = ({
 
   const displayClasses = `${className} ${isNegative ? "text-red-500" : "text-green-500"}`;
 
+  const handleMouseEnter = useCallback(() => setIsHovering(true), []);
+  const handleMouseLeave = useCallback(() => setIsHovering(false), []);
+
   return (
     <span
       className={`${displayClasses} ${shouldShowRawOnHover ? "cursor-pointer" : ""} transition-all duration-150`}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {isHovering && shouldShowRawOnHover ? formattedRawBalance : formattedUsd}
     </span>

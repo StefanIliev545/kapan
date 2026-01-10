@@ -5,8 +5,10 @@
  */
 
 const BASE_API = "https://api.cow.fi/base/api/v1";
-const MAINNET_API = "https://api.cow.fi/mainnet/api/v1";
-const ARBITRUM_API = "https://api.cow.fi/arbitrum_one/api/v1";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _MAINNET_API = "https://api.cow.fi/mainnet/api/v1";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _ARBITRUM_API = "https://api.cow.fi/arbitrum_one/api/v1";
 
 // Test addresses
 const BALANCER_VAULT = "0xBA12222222228d8Ba445958a75a0704d566BF2C8";

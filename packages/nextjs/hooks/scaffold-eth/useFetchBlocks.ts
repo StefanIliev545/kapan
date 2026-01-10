@@ -13,6 +13,7 @@ import { hardhat } from "viem/chains";
 import { decodeTransactionData } from "~~/utils/scaffold-eth";
 
 const BLOCKS_PER_PAGE = 20;
+const DEFAULT_ERROR_MESSAGE = "An error occurred.";
 
 export const testClient = createTestClient({
   chain: hardhat,
@@ -48,7 +49,7 @@ export const useFetchBlocks = () => {
         try {
           return testClient.getBlock({ blockNumber, includeTransactions: true });
         } catch (err) {
-          setError(err instanceof Error ? err : new Error("An error occurred."));
+          setError(err instanceof Error ? err : new Error(DEFAULT_ERROR_MESSAGE));
           throw err;
         }
       });
@@ -65,7 +66,7 @@ export const useFetchBlocks = () => {
               const receipt = await testClient.getTransactionReceipt({ hash: (tx as Transaction).hash });
               return { [(tx as Transaction).hash]: receipt };
             } catch (err) {
-              setError(err instanceof Error ? err : new Error("An error occurred."));
+              setError(err instanceof Error ? err : new Error(DEFAULT_ERROR_MESSAGE));
               throw err;
             }
           }),
@@ -75,7 +76,7 @@ export const useFetchBlocks = () => {
       setBlocks(fetchedBlocks);
       setTransactionReceipts(prevReceipts => ({ ...prevReceipts, ...Object.assign({}, ...txReceipts) }));
     } catch (err) {
-      setError(err instanceof Error ? err : new Error("An error occurred."));
+      setError(err instanceof Error ? err : new Error(DEFAULT_ERROR_MESSAGE));
     }
   }, [currentPage]);
 
@@ -115,7 +116,7 @@ export const useFetchBlocks = () => {
           setTotalBlocks(newBlock.number);
         }
       } catch (err) {
-        setError(err instanceof Error ? err : new Error("An error occurred."));
+        setError(err instanceof Error ? err : new Error(DEFAULT_ERROR_MESSAGE));
       }
     };
 

@@ -1,13 +1,15 @@
-import { useMemo, useState, useEffect } from "react";
-import { formatUnits } from "viem";
+import { useMemo } from "react";
 
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useAccount } from "~~/hooks/useAccount";
 import { useNostraAssets } from "~~/hooks/useNostraAssets";
 import { useScaffoldReadContract } from "./scaffold-stark";
-
-const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
+import {
+  toHexAddress,
+  computeUsdValue,
+  usePositionLoadingState,
+} from "./useProtocolPositions";
 
 type ParsedPosition = {
   debtBalance: bigint;
@@ -53,17 +55,6 @@ const parseUserPositions = (positions: unknown): Record<string, ParsedPosition> 
 
     return acc;
   }, {});
-};
-
-const computeUsdValue = (amount: bigint, decimals: number, priceWithEightDecimals: bigint): number => {
-  if (amount === 0n || priceWithEightDecimals === 0n) {
-    return 0;
-  }
-
-  const tokenAmount = Number(formatUnits(amount, decimals));
-  const priceAsNumber = Number(priceWithEightDecimals) / 1e8;
-
-  return tokenAmount * priceAsNumber;
 };
 
 export const useNostraLendingPositions = () => {
@@ -134,26 +125,23 @@ export const useNostraLendingPositions = () => {
   }, [assets, positionMap, rateMap, priceMap, decimalsMap]);
 
   const isLoading = isLoadingAssets || userPositionsQuery.isLoading;
-  
-  // Track whether we've loaded data at least once
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  
-  // Reset on address change
-  useEffect(() => {
-    setHasLoadedOnce(false);
-  }, [viewingAddress]);
 
-  useEffect(() => {
-    if (!isLoading && !hasLoadedOnce) {
-      setHasLoadedOnce(true);
-    }
-  }, [isLoading, hasLoadedOnce]);
+  // Use shared loading state management
+  const { hasLoadedOnce, isUpdating } = usePositionLoadingState({
+    isLoading,
+    isFetching: userPositionsQuery.isFetching,
+    userAddress: viewingAddress,
+    data: userPositionsQuery.data,
+    error: userPositionsQuery.error,
+  });
 
   return {
     suppliedPositions,
     borrowedPositions,
     isLoading,
     hasLoadedOnce,
+    isUpdating,
+    refetchPositions: userPositionsQuery.refetch,
   };
 };
 

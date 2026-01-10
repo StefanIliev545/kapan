@@ -36,7 +36,7 @@ export const TextScramble = ({
       isAnimatingRef.current = true;
       
       // Store current scrambled chars so they persist between frames
-      let scrambledChars = targetText.split("").map((char) => 
+      const scrambledChars = targetText.split("").map((char) => 
         char === " " ? " " : getRandomChar()
       );
       let lastScrambleTime = 0;

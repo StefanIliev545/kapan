@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute, waitForPendingTxs } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs } from "../../utils/safeExecute";
 
 /**
  * CoW Protocol addresses are deterministic (same on all supported chains)
@@ -47,10 +47,7 @@ const deployKapanOrderManager: DeployFunction = async function (hre: HardhatRunt
   // Get router address
   const router = await get("KapanRouter");
 
-  // Wait for any pending transactions to clear
-  await waitForPendingTxs(hre, deployer);
-
-  const result = await deploy("KapanOrderManager", {
+  const result = await safeDeploy(hre, deployer, "KapanOrderManager", {
     from: deployer,
     args: [
       deployer,                     // owner
@@ -86,6 +83,8 @@ const deployKapanOrderManager: DeployFunction = async function (hre: HardhatRunt
     COW_PROTOCOL.settlement,
     COW_PROTOCOL.hooksTrampoline,
   ]);
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployKapanOrderManager;

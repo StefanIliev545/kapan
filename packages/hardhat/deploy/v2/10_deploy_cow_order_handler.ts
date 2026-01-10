@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute, waitForPendingTxs } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs } from "../../utils/safeExecute";
 
 /**
  * Chains where CoW Protocol with hooks is supported
@@ -43,10 +43,7 @@ const deployKapanOrderHandler: DeployFunction = async function (hre: HardhatRunt
     return;
   }
 
-  // Wait for any pending transactions to clear
-  await waitForPendingTxs(hre, deployer);
-
-  const result = await deploy("KapanOrderHandler", {
+  const result = await safeDeploy(hre, deployer, "KapanOrderHandler", {
     from: deployer,
     args: [orderManager.address],
     log: true,
@@ -56,20 +53,21 @@ const deployKapanOrderHandler: DeployFunction = async function (hre: HardhatRunt
 
   if (result.newlyDeployed) {
     console.log(`KapanOrderHandler deployed to: ${result.address}`);
-    
-    // Wait for RPC node to update nonce (workaround for hardhat-deploy bug)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Set handler on OrderManager
-    const currentHandler = await read("KapanOrderManager", "orderHandler");
-    if (currentHandler !== result.address) {
-      await safeExecute(hre, deployer, "KapanOrderManager", "setOrderHandler", [result.address], { waitConfirmations: 1 });
-      console.log(`KapanOrderHandler set on KapanOrderManager`);
-    }
+  }
+
+  // Always ensure handler is set on OrderManager (idempotent)
+  const currentHandler = await read("KapanOrderManager", "orderHandler");
+  if (currentHandler !== result.address) {
+    await safeExecute(hre, deployer, "KapanOrderManager", "setOrderHandler", [result.address], { waitConfirmations: 1 });
+    console.log(`KapanOrderHandler set on KapanOrderManager`);
+  } else {
+    console.log(`KapanOrderHandler already set correctly`);
   }
 
   // Verification
   await verifyContract(hre, result.address, [orderManager.address]);
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployKapanOrderHandler;

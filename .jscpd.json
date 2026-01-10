@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/jscpd.json",
+  "threshold": 5,
+  "reporters": ["console", "json"],
+  "output": ".quality/jscpd",
+  "ignore": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/contracts/lib/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/generated/**",
+    "**/typechain-types/**"
+  ],
+  "format": ["typescript", "tsx", "javascript", "solidity"],
+  "minTokens": 50,
+  "minLines": 5,
+  "absolute": false
+}

@@ -191,7 +191,14 @@ export const useWalletTokenBalances = ({
   chainId?: number;
 }) => {
   const normalizedNetwork = network === "stark" ? "starknet" : network;
-  const queryResult = normalizedNetwork === "evm" ? useEvmBalances(tokens, chainId) : useStarknetBalances(tokens);
+  const isEvm = normalizedNetwork === "evm";
+
+  // Call both hooks unconditionally to satisfy React's rules of hooks
+  // Pass empty arrays when not the active network to avoid unnecessary requests
+  const evmResult = useEvmBalances(isEvm ? tokens : [], chainId);
+  const starkResult = useStarknetBalances(isEvm ? [] : tokens);
+
+  const queryResult = isEvm ? evmResult : starkResult;
 
   return {
     balances: queryResult.data ?? {},

@@ -1,8 +1,37 @@
 /**
  * Slippage calculation utilities for swap modals
+ *
+ * This module centralizes all slippage-related constants and calculations
+ * for consistent behavior across the application.
  */
 
 export type PriceImpactSeverity = "low" | "medium" | "high";
+
+// ============ Slippage Constants ============
+
+/** Standard slippage options for dropdown - includes low values for stable pairs */
+export const SLIPPAGE_OPTIONS = [0.01, 0.03, 0.05, 0.1, 0.3, 0.5, 1, 2, 3, 5] as const;
+
+/** Default initial slippage - will be auto-adjusted based on price impact */
+export const DEFAULT_SLIPPAGE = 0.1;
+
+/** Minimum slippage floor for stable pairs */
+export const MIN_SLIPPAGE = 0.01;
+
+/** Maximum slippage cap - anything higher is likely user error */
+export const MAX_SLIPPAGE = 5;
+
+/** Default slippage for limit orders (1% minimum for better fill rates) */
+export const LIMIT_ORDER_DEFAULT_SLIPPAGE = 1;
+
+// ============ Starknet Protocol Constants ============
+// These are hardcoded slippage values for Starknet protocols using AVNU
+
+/** Hardcoded slippage for Nostra AVNU swaps (5%) */
+export const NOSTRA_SLIPPAGE = 0.05;
+
+/** Hardcoded slippage for Vesu AVNU swaps (5%) */
+export const VESU_SLIPPAGE = 0.05;
 
 /**
  * Calculate suggested slippage based on price impact
@@ -22,9 +51,6 @@ export type PriceImpactSeverity = "low" | "medium" | "high";
  * @returns Suggested slippage percentage
  */
 export const calculateSuggestedSlippage = (priceImpact: number | null): number => {
-    const MIN_SLIPPAGE = 0.01;  // 0.01% minimum - for stable pairs
-    const MAX_SLIPPAGE = 5;     // 5% cap - anything higher is likely user error
-    
     if (priceImpact === null || priceImpact <= 0) {
         return MIN_SLIPPAGE;
     }
@@ -109,14 +135,70 @@ export const formatPriceImpact = (priceImpact: number | null): string => {
 
 /**
  * Calculate price impact from USD values (for 1inch quotes)
- * 
+ *
  * @param srcUSD - Source amount in USD
  * @param dstUSD - Destination amount in USD
  * @returns Price impact as percentage (positive means loss)
  */
 export const calculatePriceImpactFromUSD = (srcUSD: number | null, dstUSD: number | null): number | null => {
     if (srcUSD === null || dstUSD === null || srcUSD <= 0) return null;
-    
+
     // Positive result means value loss (paying more than receiving)
     return ((srcUSD - dstUSD) / srcUSD) * 100;
+};
+
+// ============ BigInt Slippage Calculations ============
+// These utilities handle slippage calculations with BigInt for precision
+
+/**
+ * Apply slippage buffer to an amount (increase for max sell)
+ *
+ * @param amount - Base amount as BigInt
+ * @param slippagePercent - Slippage as percentage (e.g., 3 for 3%)
+ * @returns Amount with slippage buffer added
+ */
+export const applySlippageBuffer = (amount: bigint, slippagePercent: number): bigint => {
+    if (amount === 0n) return 0n;
+    const slippageBps = BigInt(Math.round(slippagePercent * 100));
+    return (amount * (10000n + slippageBps)) / 10000n;
+};
+
+/**
+ * Apply slippage reduction to an amount (decrease for min buy)
+ *
+ * @param amount - Base amount as BigInt
+ * @param slippagePercent - Slippage as percentage (e.g., 3 for 3%)
+ * @returns Amount with slippage reduction applied
+ */
+export const applySlippageReduction = (amount: bigint, slippagePercent: number): bigint => {
+    if (amount === 0n) return 0n;
+    const slippageBps = BigInt(Math.round(slippagePercent * 100));
+    return (amount * (10000n - slippageBps)) / 10000n;
+};
+
+/**
+ * Convert slippage percentage to basis points
+ *
+ * @param slippagePercent - Slippage as percentage (e.g., 0.5 for 0.5%)
+ * @returns Slippage in basis points as BigInt
+ */
+export const slippageToBps = (slippagePercent: number): bigint => {
+    return BigInt(Math.round(slippagePercent * 100));
+};
+
+/**
+ * Standard buffer used in Starknet hooks (3%)
+ */
+export const STANDARD_BUFFER_BPS = 300n;
+
+/**
+ * Apply a basis points buffer to an amount
+ *
+ * @param amount - Base amount as BigInt
+ * @param bufferBps - Buffer in basis points (e.g., 300n for 3%)
+ * @returns Amount with buffer applied
+ */
+export const withBuffer = (amount: bigint, bufferBps: bigint = STANDARD_BUFFER_BPS): bigint => {
+    if (amount === 0n) return 0n;
+    return (amount * (10_000n + bufferBps)) / 10_000n;
 };

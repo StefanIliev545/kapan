@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http, Address, Hex, Chain } from "viem";
 import { base, arbitrum } from "viem/chains";
 import deployedContracts from "~~/contracts/deployedContracts";
+import { MORPHO_GRAPHQL_API } from "~~/utils/constants";
 
 // ============ Types ============
 
@@ -110,7 +111,6 @@ function normalizePosition(pos: OnChainPosition): OnChainPositionObject {
 
 // ============ Constants ============
 
-const MORPHO_GRAPHQL_API = "https://blue-api.morpho.org/graphql";
 const BATCH_SIZE = 100; // Markets per on-chain call
 const MAX_HEALTH_FACTOR = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 

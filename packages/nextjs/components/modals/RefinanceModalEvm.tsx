@@ -11,15 +11,21 @@ import React, {
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
-import type { Address } from "viem";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, parseUnits, type Address } from "viem";
 import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useMovePositionState } from "~~/hooks/useMovePositionState";
 import { RefinanceModalContent } from "./RefinanceModalContent";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useMorphoMarketSupport } from "~~/hooks/useMorphoMarketSupport";
 import { encodeMorphoContext, type MorphoMarketContextForEncoding } from "~~/utils/v2/instructionHelpers";
+import {
+  useMergedCollaterals,
+  usePreselectedCollateralsEffect,
+  useStableProtocolSelection,
+  useDebtInputFocus,
+  type CollateralFromHook,
+  type RefinanceModalEvmProps,
+} from "./common";
 
 /* ------------------------------ Helpers ------------------------------ */
 type PriceMap = Record<string, bigint>;
@@ -50,11 +56,12 @@ const getLtBps = (c: any): number => {
 };
 
 /* --------------------------- Price Probe ----------------------------- */
+type PriceCallback = (addressLower: string, priceIn8Decimals: bigint) => void;
 const CollatPriceProbe: FC<{
   symbol?: string;
   address: string;
   enabled: boolean;
-  onPrice: (addressLower: string, p8: bigint) => void;
+  onPrice: PriceCallback;
 }> = memo(({ symbol, address, enabled, onPrice }) => {
   const sym = (symbol || "").trim();
   const { isSuccess, price } = useTokenPriceApi(sym) as {
@@ -70,7 +77,7 @@ const CollatPriceProbe: FC<{
     const ok = isSuccess && typeof price === "number" && isFinite(price) && price > 0;
     if (!ok) return;
 
-    const p8 = BigInt(Math.round(price! * 1e8));
+    const p8 = BigInt(Math.round(price * 1e8));
     if (lastReported.current === p8) return;
 
     lastReported.current = p8;
@@ -82,31 +89,7 @@ const CollatPriceProbe: FC<{
 CollatPriceProbe.displayName = "CollatPriceProbe";
 
 /* ---------------------------- Component ------------------------------ */
-type RefinanceModalEvmProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  fromProtocol: string;
-  position: {
-    name: string;
-    tokenAddress: string;
-    decimals: number;
-    balance?: number | bigint;
-    poolId?: bigint | string;
-    type: "borrow" | "supply";
-  };
-  chainId?: number;
-  preSelectedCollaterals?: Array<{
-    token: string;
-    symbol: string;
-    decimals: number;
-    amount?: bigint;
-    maxAmount?: bigint;
-    inputValue?: string;
-  }>;
-  disableCollateralSelection?: boolean;
-  /** Pre-encoded context for the source protocol (e.g., Morpho MarketParams) */
-  fromContext?: string;
-};
+export { type RefinanceModalEvmProps };
 
 export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   isOpen,
@@ -142,64 +125,13 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   const filteredDestinationProtocols = destinationProtocols;
 
-  // Merge preselected collaterals with collaterals from hook
-  const collaterals = useMemo(() => {
-    // If collateral selection is disabled and we have preselected collaterals,
-    // ONLY use the preselected collaterals (don't merge with hook data)
-    // This is important for protocols like Morpho where the collateral is fixed per market
-    if (disableCollateralSelection && preSelectedCollaterals && preSelectedCollaterals.length > 0) {
-      return preSelectedCollaterals.map(pc => {
-        const rawBalance = pc.maxAmount || pc.amount || 0n;
-        return {
-          address: pc.token,
-          symbol: pc.symbol,
-          icon: tokenNameToLogo(pc.symbol.toLowerCase()),
-          decimals: pc.decimals,
-          rawBalance: rawBalance,
-          balance: rawBalance ? Number(formatUnits(rawBalance, pc.decimals)) : 0,
-        };
-      });
-    }
-
-    if (!preSelectedCollaterals || preSelectedCollaterals.length === 0) {
-      return collateralsFromHook;
-    }
-
-    const existingMap = new Map(collateralsFromHook.map(c => [addrKey(c.address), c]));
-    const merged = [...collateralsFromHook];
-
-    preSelectedCollaterals.forEach(pc => {
-      const key = addrKey(pc.token);
-      if (!existingMap.has(key)) {
-        const rawBalance = pc.maxAmount || pc.amount || 0n;
-        merged.push({
-          address: pc.token,
-          symbol: pc.symbol,
-          icon: tokenNameToLogo(pc.symbol.toLowerCase()),
-          decimals: pc.decimals,
-          rawBalance: rawBalance,
-          balance: rawBalance ? Number(formatUnits(rawBalance, pc.decimals)) : 0,
-        });
-      } else {
-        const existing = existingMap.get(key);
-        if (existing && (pc.maxAmount || pc.amount)) {
-          const preselectedBalance = pc.maxAmount || pc.amount || 0n;
-          if (preselectedBalance > existing.rawBalance) {
-            const index = merged.findIndex(c => addrKey(c.address) === key);
-            if (index >= 0) {
-              merged[index] = {
-                ...existing,
-                rawBalance: preselectedBalance,
-                balance: Number(formatUnits(preselectedBalance, pc.decimals)),
-              };
-            }
-          }
-        }
-      }
-    });
-
-    return merged;
-  }, [collateralsFromHook, preSelectedCollaterals, disableCollateralSelection]);
+  // Merge preselected collaterals with collaterals from hook using shared utility
+  const collaterals = useMergedCollaterals({
+    collateralsFromHook: collateralsFromHook as CollateralFromHook[],
+    preSelectedCollaterals,
+    disableCollateralSelection,
+    sortByAddress: false,
+  });
 
   /* ----------------------- Stable prices (merged) ------------------------ */
   const [mergedPrices, setMergedPrices] = useState<PriceMap>({});
@@ -240,15 +172,12 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     setActiveTab,
     selectedProtocol,
     setSelectedProtocol,
-    selectedProvider: _stateSelectedProvider,
-    setSelectedProvider: _stateSetSelectedProvider,
     selectedVersion,
     setSelectedVersion,
     expandedCollateral,
     setExpandedCollateral,
     tempAmount,
     setTempAmount,
-    tempIsMax,
     setTempIsMax,
     addedCollaterals,
     collateralIsMaxMap,
@@ -308,12 +237,12 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   });
 
   const selectedProvider = hookSelectedProvider?.name;
-  const setSelectedProvider = (name: string) => {
+  const setSelectedProvider = useCallback((name: string) => {
     const p = flashLoanProviders.find(p => p.name === name);
     if (p) {
       setHookSelectedProvider(p);
     }
-  };
+  }, [flashLoanProviders, setHookSelectedProvider]);
 
   /* ---------------------- Support map for selection --------------------- */
   const collateralAddresses = useMemo(() => collaterals.map(c => c.address), [collaterals]);
@@ -397,41 +326,23 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   const debtInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize preselected collaterals
-  useEffect(() => {
-    if (isOpen && preSelectedCollaterals && preSelectedCollaterals.length > 0 && collaterals.length > 0) {
-      const firstPreselected = preSelectedCollaterals[0];
-      const firstPreselectedKey = addrKey(firstPreselected.token);
-      const meta = collaterals.find(col => addrKey(col.address) === firstPreselectedKey);
+  // Initialize preselected collaterals using shared hook
+  usePreselectedCollateralsEffect({
+    isOpen,
+    preSelectedCollaterals,
+    collaterals,
+    expandedCollateral,
+    setExpandedCollateral,
+    setTempAmount,
+  });
 
-      if (meta && !expandedCollateral) {
-        setExpandedCollateral(firstPreselectedKey);
-
-        if (firstPreselected.amount) {
-          const amount = formatUnits(firstPreselected.amount, firstPreselected.decimals);
-          setTempAmount(amount);
-        } else if (firstPreselected.inputValue) {
-          setTempAmount(firstPreselected.inputValue);
-        } else {
-          setTempAmount(String(meta.balance));
-        }
-      }
-    }
-  }, [isOpen, preSelectedCollaterals, collaterals, expandedCollateral, setExpandedCollateral, setTempAmount]);
-
-  /* -------------------------- Stable selections ------------------------- */
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!selectedProtocol && filteredDestinationProtocols.length > 0) {
-      setSelectedProtocol(filteredDestinationProtocols[0].name);
-    } else if (
-      selectedProtocol &&
-      filteredDestinationProtocols.length > 0 &&
-      !filteredDestinationProtocols.some(p => p.name === selectedProtocol)
-    ) {
-      setSelectedProtocol(filteredDestinationProtocols[0].name);
-    }
-  }, [isOpen, filteredDestinationProtocols, selectedProtocol, setSelectedProtocol]);
+  // Maintain stable protocol selection using shared hook
+  useStableProtocolSelection({
+    isOpen,
+    filteredDestinationProtocols,
+    selectedProtocol,
+    setSelectedProtocol,
+  });
 
 
 
@@ -449,11 +360,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     }
   }, [isOpen, selectedProtocol, selectedVersion, evmVesuPools, selectedPool]);
 
-  useEffect(() => {
-    if (!(isOpen && !debtConfirmed)) return;
-    const t = setTimeout(() => debtInputRef.current?.focus(), 100);
-    return () => clearTimeout(t);
-  }, [isOpen, debtConfirmed]);
+  // Auto-focus debt input using shared hook
+  useDebtInputFocus({ isOpen, debtConfirmed, debtInputRef });
 
   useEffect(() => {
     resetState();
@@ -623,7 +531,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     return false;
   }, [debtConfirmed, selectedProtocol, addedCollaterals, isMorphoSelected, selectedMorphoMarket, morphoSupportedCollaterals, effectiveSupportedMap]);
 
-  const handleExecuteMove = async () => {
+  const handleExecuteMove = useCallback(async () => {
     if (!debtConfirmed || !selectedProtocol) return;
 
     let batchingUsed = false;
@@ -766,12 +674,34 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [
+    debtConfirmed,
+    selectedProtocol,
+    fromProtocol,
+    position,
+    preferBatching,
+    chainId,
+    isMorphoSelected,
+    selectedMorphoMarket,
+    debtAmountBigInt,
+    addedCollaterals,
+    collaterals,
+    selectedProvider,
+    selectedPool,
+    onClose,
+    createMoveBuilder,
+    hookSelectedProvider,
+  ]);
 
   // Determine source pool name
   const sourcePoolName = useMemo(() => {
     // For EVM, we don't need to exclude source pool by name
     return null;
+  }, []);
+
+  const handleDebtAmountChange = useCallback((value: string) => {
+    setDebtAmount(value);
+    setIsDebtMaxClicked(false);
   }, []);
 
   return (
@@ -781,10 +711,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       debtSymbol={debtSymbol}
       debtIcon={debtIcon}
       debtAmount={debtAmount}
-      setDebtAmount={(value) => {
-        setDebtAmount(value);
-        setIsDebtMaxClicked(false);
-      }}
+      setDebtAmount={handleDebtAmountChange}
       debtMaxLabel={debtMaxLabel}
       debtMaxRaw={debtMaxRaw}
       debtConfirmed={debtConfirmed}

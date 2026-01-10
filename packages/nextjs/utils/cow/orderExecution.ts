@@ -1,5 +1,5 @@
 import { formatUnits } from "viem";
-import type { ChunkExecution, OrderExecutionData } from "~~/hooks/useChunkExecutedEvents";
+import type { OrderExecutionData } from "~~/hooks/useChunkExecutedEvents";
 
 export interface ExecutionSummary {
   /** Total amount sold */

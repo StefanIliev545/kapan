@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createSafeContext } from "./createSafeContext";
 
 interface SelectedGasToken {
   address: string;
@@ -24,7 +25,8 @@ const DEFAULT_TOKEN: SelectedGasToken = {
   balance: "0.000"
 };
 
-const SelectedGasTokenContext = createContext<SelectedGasTokenContextType | undefined>(undefined);
+const { Context: SelectedGasTokenContext, useContextValue } =
+  createSafeContext<SelectedGasTokenContextType>("SelectedGasToken");
 
 export const SelectedGasTokenProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [selectedToken, setSelectedToken] = useState<SelectedGasToken>(DEFAULT_TOKEN);
@@ -42,27 +44,27 @@ export const SelectedGasTokenProvider: React.FC<{ children: ReactNode }> = ({ ch
     }
   }, []);
 
-  // Save to localStorage when token changes
-  const updateSelectedToken = (token: SelectedGasToken) => {
+  // Save to localStorage when token changes - memoized with useCallback
+  const updateSelectedToken = useCallback((token: SelectedGasToken) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(token));
     } catch (error) {
       console.warn("Failed to save selected gas token to localStorage:", error);
     }
     setSelectedToken(token);
-  };
+  }, []);
+
+  // Memoize context value to avoid creating new object on each render
+  const contextValue = useMemo(
+    () => ({ selectedToken, updateSelectedToken }),
+    [selectedToken, updateSelectedToken]
+  );
 
   return (
-    <SelectedGasTokenContext.Provider value={{ selectedToken, updateSelectedToken }}>
+    <SelectedGasTokenContext.Provider value={contextValue}>
       {children}
     </SelectedGasTokenContext.Provider>
   );
 };
 
-export const useSelectedGasToken = () => {
-  const context = useContext(SelectedGasTokenContext);
-  if (context === undefined) {
-    throw new Error('useSelectedGasToken must be used within a SelectedGasTokenProvider');
-  }
-  return context;
-};
+export const useSelectedGasToken = useContextValue;

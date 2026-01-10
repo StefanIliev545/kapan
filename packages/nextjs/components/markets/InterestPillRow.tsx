@@ -14,11 +14,11 @@ export const RatePill: FC<{
   alt: string;
   sameProtocol?: boolean;
 }> = ({ current, optimal, color, logo, alt, sameProtocol = false }) => (
-  <div className="flex rounded-lg overflow-hidden shadow text-sm text-white">
+  <div className="flex overflow-hidden rounded-lg text-sm text-white shadow">
     <span className={`px-3 py-1 ${color}`}>{current}</span>
     <span
-      className={`px-3 py-1 flex items-center gap-1 ${
-        sameProtocol ? color : "bg-gradient-to-r from-fuchsia-500 to-purple-600 animate-pulse"
+      className={`flex items-center gap-1 px-3 py-1 ${
+        sameProtocol ? color : "animate-pulse bg-gradient-to-r from-fuchsia-500 to-purple-600"
       }`}
     >
       {optimal}
@@ -105,8 +105,8 @@ export const InterestPillRow: FC<{
   if (labels === "center") {
     return (
       <div className={`flex justify-between gap-4 ${className}`}>
-        <div className="flex flex-col items-center space-y-1 flex-1">
-          <span className="text-sm text-base-content/70">Supply rate</span>
+        <div className="flex flex-1 flex-col items-center space-y-1">
+          <span className="text-base-content/70 text-sm">Supply rate</span>
           <RatePill
             current={supplyRate}
             optimal={supplyOptimalDisplay}
@@ -116,8 +116,8 @@ export const InterestPillRow: FC<{
             sameProtocol={sameSupplyProtocol}
           />
         </div>
-        <div className="flex flex-col items-center space-y-1 flex-1">
-          <span className="text-sm text-base-content/70">Borrow rate</span>
+        <div className="flex flex-1 flex-col items-center space-y-1">
+          <span className="text-base-content/70 text-sm">Borrow rate</span>
           <RatePill
             current={borrowRate}
             optimal={borrowOptimalDisplay}
@@ -133,7 +133,7 @@ export const InterestPillRow: FC<{
 
   return (
     <div className={`space-y-1 ${className}`}>
-      <div className="flex justify-between text-sm text-base-content/70">
+      <div className="text-base-content/70 flex justify-between text-sm">
         <span>Supply rate</span>
         <span>Borrow rate</span>
       </div>

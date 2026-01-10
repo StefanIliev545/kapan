@@ -1,7 +1,6 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useDataTransaction } from "../useDataTransaction";
 import { useTargetNetwork } from "../useTargetNetwork";
-import { RpcProvider } from "starknet";
 import {
   vi,
   describe,
@@ -81,6 +80,7 @@ describe("useDataTransaction", () => {
   };
 
   beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional no-op mock for tests
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     // Set up the mock for useTargetNetwork

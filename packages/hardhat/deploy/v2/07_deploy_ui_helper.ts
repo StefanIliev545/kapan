@@ -4,7 +4,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 // import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
-import { getWaitConfirmations } from "../../utils/safeExecute";
+import { safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Deploys the UiHelper contract
@@ -19,7 +19,7 @@ const deployUiHelper: DeployFunction = async function (hre: HardhatRuntimeEnviro
   const WAIT = getWaitConfirmations(chainId);
 
   // Deploy UiHelper (no constructor arguments needed)
-  const uiHelper = await deploy("UiHelper", {
+  const uiHelper = await safeDeploy(hre, deployer, "UiHelper", {
     from: deployer,
     args: [],
     log: true,
@@ -34,6 +34,8 @@ const deployUiHelper: DeployFunction = async function (hre: HardhatRuntimeEnviro
  /* if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     await verifyContract(hre, uiHelper.address, []);
   }*/
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployUiHelper;

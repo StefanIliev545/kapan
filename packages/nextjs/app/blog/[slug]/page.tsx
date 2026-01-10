@@ -6,14 +6,17 @@ import BlogPostContent from "./BlogPostContent";
 import { getPostData, getSortedPostsData } from "~~/utils/blog";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
+// Static style for MDX images - extracted to avoid creating new object on each render
+const mdxImageStyle = { height: "auto", width: "100%" };
+
 // Custom MDX components
 const mdxComponents = {
-  h1: (props: any) => <h1 className="text-3xl font-bold mt-8 mb-4" {...props} />,
-  h2: (props: any) => <h2 className="text-2xl font-bold mt-8 mb-4" {...props} />,
-  h3: (props: any) => <h3 className="text-xl font-bold mt-6 mb-3" {...props} />,
+  h1: (props: any) => <h1 className="mb-4 mt-8 text-3xl font-bold" {...props} />,
+  h2: (props: any) => <h2 className="mb-4 mt-8 text-2xl font-bold" {...props} />,
+  h3: (props: any) => <h3 className="mb-3 mt-6 text-xl font-bold" {...props} />,
   p: (props: any) => <p className="my-4" {...props} />,
-  ul: (props: any) => <ul className="list-disc ml-6 my-4" {...props} />,
-  ol: (props: any) => <ol className="list-decimal ml-6 my-4" {...props} />,
+  ul: (props: any) => <ul className="my-4 ml-6 list-disc" {...props} />,
+  ol: (props: any) => <ol className="my-4 ml-6 list-decimal" {...props} />,
   li: (props: any) => <li className="my-1" {...props} />,
   strong: (props: any) => <strong className="font-bold" {...props} />,
   a: (props: any) => <a className="text-primary dark:text-accent hover:underline" {...props} />,
@@ -24,7 +27,7 @@ const mdxComponents = {
       width={props.width ?? 800}
       height={props.height ?? 450}
       sizes="(max-width: 768px) 100vw, 800px"
-      style={{ height: "auto", width: "100%" }}
+      style={mdxImageStyle}
     />
   ),
 };
@@ -99,11 +102,15 @@ export default async function BlogPostPage({
             : `${baseUrl}/thumbnail.png`,
     };
 
+    // Pre-compute dangerouslySetInnerHTML object
+    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- Server Component only runs once, no re-render concerns
+    const schemaHtml = { __html: JSON.stringify(articleSchema).replace(/</g, "\\u003c") };
+
     return (
       <>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema).replace(/</g, "\\u003c") }}
+          dangerouslySetInnerHTML={schemaHtml}
         />
         <BlogPostContent post={post} relatedPosts={relatedPosts} content={content} />
       </>

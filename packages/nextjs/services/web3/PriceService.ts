@@ -1,22 +1,26 @@
 import scaffoldConfig from "~~/scaffold.config";
+import { withRetry } from "~~/utils/retry";
 
 export const fetchPrice = async (retries = 3): Promise<number> => {
-  let attempt = 0;
-  while (attempt < retries) {
-    try {
-      const response = await fetch(`/api/price`);
-      const data = await response.json();
-      return data.starknet.usd;
-    } catch (error) {
-      console.error(`Attempt ${attempt + 1} - Error fetching STRK price from Coingecko: `, error);
-      attempt++;
-      if (attempt === retries) {
-        console.error(`Failed to fetch price after ${retries} attempts.`);
-        return 0;
+  try {
+    return await withRetry(
+      async () => {
+        const response = await fetch(`/api/price`);
+        const data = await response.json();
+        return data.starknet.usd as number;
+      },
+      {
+        retries,
+        baseDelay: 1000,
+        onRetry: (attempt, error) => {
+          console.error(`Attempt ${attempt} - Error fetching STRK price from Coingecko: `, error);
+        },
       }
-    }
+    );
+  } catch (error) {
+    console.error(`Failed to fetch price after ${retries + 1} attempts.`);
+    return 0;
   }
-  return 0;
 };
 
 class PriceService {
@@ -25,6 +29,7 @@ class PriceService {
   private listeners: Map<
     any,
     {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       setNativeCurrencyPrice: (price: number) => void;
     }
   > = new Map();

@@ -111,8 +111,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "Compound: base comet not found");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(token).approve(address(comet), 0);
-        IERC20(token).approve(address(comet), amount);
+        IERC20(token).forceApprove(address(comet), amount);
         comet.supplyTo(onBehalfOf, token, amount);
     }
 
@@ -125,8 +124,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         ICompoundComet comet = tokenToComet[market];
         require(address(comet) != address(0), "Compound: market comet not found");
         IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(collateral).approve(address(comet), 0);
-        IERC20(collateral).approve(address(comet), amount);
+        IERC20(collateral).forceApprove(address(comet), amount);
         comet.supplyTo(receiver, collateral, amount);
     }
 
@@ -156,8 +154,7 @@ contract CompoundGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyG
         ICompoundComet comet = tokenToComet[token];
         require(address(comet) != address(0), "Compound: base comet not found");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(token).approve(address(comet), 0);
-        IERC20(token).approve(address(comet), amount);
+        IERC20(token).forceApprove(address(comet), amount);
         comet.supplyTo(user, token, amount);
     }
 

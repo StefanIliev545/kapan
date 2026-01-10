@@ -15,7 +15,7 @@ import { useTransactor } from "../useTransactor";
 
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 
-import { Contract, RpcProvider } from "starknet";
+import { Contract } from "starknet";
 
 // Mock the external dependencies
 

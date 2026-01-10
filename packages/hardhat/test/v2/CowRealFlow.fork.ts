@@ -44,11 +44,11 @@ const BASE_MORPHO_WETH_USDC = {
 const USDC_WHALE = "0x3304E22DDaa22bCdC5fCa2269b418046aE7b566A"; // Circle
 const WETH_WHALE = "0x4200000000000000000000000000000000000006"; // WETH contract itself
 
-// Deployed contracts on Base
-const KAPAN_COW_ADAPTER = "0x2197f7f6369FeFDE4B461bF6CdE898fD730a3255";
-const KAPAN_ORDER_MANAGER = "0xE4b28de3AA865540Bbc1C71892b6b6Af24929858";
-const KAPAN_ORDER_HANDLER = "0xDB9432fB5F7573a0b0f73c85dF32B609c1841CdF";
-const KAPAN_ROUTER = "0x2302643bf7ceea3F7180547F90d5eA5a917e2b99";
+// Deployed contracts on Base (UPDATED Jan 2026)
+const KAPAN_COW_ADAPTER = "0xF6342053a12AdBc92C03831BF88029608dB4C0B6";
+const KAPAN_ORDER_MANAGER = "0x12F80f5Fff3C0CCC283c7b2A2cC9742ddf8c093A";
+const KAPAN_ORDER_HANDLER = "0x9a503a4489ebeb2e6f13adcd28f315e972b63371";
+const KAPAN_ROUTER = "0xFA3B0Efb7E26CDd22F8b467B153626Ce5d34D64F";
 
 const coder = AbiCoder.defaultAbiCoder();
 
@@ -1462,6 +1462,266 @@ describe("CoW Real Flash Loan Flow (HONEST Fork Test)", function () {
         
         if (error.data) {
           console.log(`Error data: ${error.data}`);
+        }
+        
+        throw error;
+      }
+    });
+
+    it("should solve CURRENT order 0xbe45e6ad... (WETH→wstETH leverage)", async function () {
+      /**
+       * CURRENT ORDER TO DEBUG
+       * Order: https://explorer.cow.fi/base/orders/0xbe45e6ad77fd0d3cc3df4bb79f93dfb43273ce8d10929619a1fd48270968625712f80f5fff3c0ccc283c7b2a2cc9742ddf8c093a6959bba2
+       * 
+       * Sell: 0.018399910693677945 WETH
+       * Buy: 0.0150185444392956 wstETH (min)
+       * Flash loan: 0.018399910693677945 WETH from Morpho
+       */
+      
+      const WSTETH = "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452";
+      
+      const CURRENT_ORDER = {
+        user: "0xa9b108038567f76f55219c630bb0e590b748790d",
+        salt: "0x8f724256abc0d74642bf4af5bc5305cd10010ba3156a3e5f37b11ba7a04b46d1",
+        sellAmount: 18399910693677945n, // 0.018399910693677945 WETH
+        buyAmount: 15018544439295600n, // 0.0150185444392956 wstETH
+        flashLoanAmount: 18399910693677945n,
+        appDataHash: "0xd954f6a2e3bbebf4ede7783337d06e11538aaac5d15e254beea99720284e87dc",
+        sellToken: WETH,
+        buyToken: WSTETH,
+        // Exact calldata from CoW Explorer
+        preHook1Calldata: "0xba4d4392000000000000000000000000420000000000000000000000000000000000000600000000000000000000000012f80f5fff3c0ccc283c7b2a2cc9742ddf8c093a00000000000000000000000000000000000000000000000000415e9f0ccbab79",
+        preHook2Calldata: "0x8009fb6a000000000000000000000000a9b108038567f76f55219c630bb0e590b748790d8f724256abc0d74642bf4af5bc5305cd10010ba3156a3e5f37b11ba7a04b46d1",
+        postHookCalldata: "0x2fbff5a4000000000000000000000000a9b108038567f76f55219c630bb0e590b748790d8f724256abc0d74642bf4af5bc5305cd10010ba3156a3e5f37b11ba7a04b46d1",
+      };
+
+      // Use DEPLOYED contracts on Base
+      const ORDER_MANAGER = "0x12F80f5Fff3C0CCC283c7b2A2cC9742ddf8c093A";
+      const ADAPTER = "0xF6342053a12AdBc92C03831BF88029608dB4C0B6";
+      const HANDLER = "0x9a503a4489ebeb2e6f13adcd28f315e972b63371";
+
+      console.log("\n=== Solving CURRENT Order 0xbe45e6ad... ===");
+      console.log(`User: ${CURRENT_ORDER.user}`);
+      console.log(`Salt: ${CURRENT_ORDER.salt}`);
+      console.log(`Sell: ${ethers.formatEther(CURRENT_ORDER.sellAmount)} WETH`);
+      console.log(`Min Buy: ${ethers.formatEther(CURRENT_ORDER.buyAmount)} wstETH`);
+
+      // Get contracts
+      const orderMgr = await ethers.getContractAt(ORDER_MANAGER_ABI, ORDER_MANAGER);
+      const wsteth = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", WSTETH);
+
+      // Check if order exists
+      const orderHash = await orderMgr.userSaltToOrderHash(CURRENT_ORDER.user, CURRENT_ORDER.salt);
+      console.log(`\nOrder hash: ${orderHash}`);
+      
+      if (orderHash === ethers.ZeroHash) {
+        console.log("Order not found - may not exist yet or wrong salt");
+        this.skip();
+        return;
+      }
+
+      const orderContext = await orderMgr.getOrder(orderHash);
+      console.log(`Order status: ${orderContext.status} (0=None, 1=Active, 2=Completed, 3=Cancelled)`);
+      
+      if (orderContext.status !== 1n) {
+        console.log("Order is not active");
+        this.skip();
+        return;
+      }
+
+      // Build hooks for HooksTrampoline
+      const preHook1 = hooksIface.encodeFunctionData("execute", [[{
+        target: ADAPTER,
+        callData: CURRENT_ORDER.preHook1Calldata,
+        gasLimit: 100000n,
+      }]]);
+
+      const preHook2 = hooksIface.encodeFunctionData("execute", [[{
+        target: ORDER_MANAGER,
+        callData: CURRENT_ORDER.preHook2Calldata,
+        gasLimit: 300000n,
+      }]]);
+
+      const postHook = hooksIface.encodeFunctionData("execute", [[{
+        target: ORDER_MANAGER,
+        callData: CURRENT_ORDER.postHookCalldata,
+        gasLimit: 800000n,
+      }]]);
+
+      // Build GPv2Order - receiver is ALWAYS OrderManager (for post-hook execution)
+      const validTo = Math.floor(Date.now() / 1000) + 3600;
+      const gpv2Order: GPv2OrderData = {
+        sellToken: CURRENT_ORDER.sellToken,
+        buyToken: CURRENT_ORDER.buyToken,
+        receiver: ORDER_MANAGER, // Always OrderManager - it runs the post-hook
+        sellAmount: CURRENT_ORDER.sellAmount,
+        buyAmount: CURRENT_ORDER.buyAmount,
+        validTo,
+        appData: CURRENT_ORDER.appDataHash,
+        feeAmount: 0n,
+        kind: GPV2_ORDER.KIND_SELL,
+        partiallyFillable: false,
+        sellTokenBalance: GPV2_ORDER.BALANCE_ERC20,
+        buyTokenBalance: GPV2_ORDER.BALANCE_ERC20,
+      };
+
+      // Build ERC-1271 signature
+      const signature = buildTradeSignature(
+        ORDER_MANAGER,
+        gpv2Order,
+        HANDLER,
+        CURRENT_ORDER.salt,
+        orderHash
+      );
+
+      // Build trade
+      const trade = {
+        sellTokenIndex: 0,
+        buyTokenIndex: 1,
+        receiver: ORDER_MANAGER,
+        sellAmount: CURRENT_ORDER.sellAmount,
+        buyAmount: CURRENT_ORDER.buyAmount,
+        validTo,
+        appData: CURRENT_ORDER.appDataHash,
+        feeAmount: 0n,
+        flags: TRADE_FLAGS.EIP1271 | TRADE_FLAGS.SELL_ORDER | TRADE_FLAGS.FILL_OR_KILL,
+        executedAmount: CURRENT_ORDER.sellAmount,
+        signature: signature,
+      };
+
+      // Build interactions
+      const preInteractions = [
+        { target: COW_PROTOCOL.hooksTrampoline, value: 0n, callData: preHook1 },
+        { target: COW_PROTOCOL.hooksTrampoline, value: 0n, callData: preHook2 },
+      ];
+
+      const postInteractions = [
+        { target: COW_PROTOCOL.hooksTrampoline, value: 0n, callData: postHook },
+      ];
+
+      // Check VaultRelayer allowance
+      const currentAllowance = await weth.allowance(ORDER_MANAGER, COW_PROTOCOL.vaultRelayer);
+      console.log(`\nOrderManager WETH allowance for VaultRelayer: ${ethers.formatEther(currentAllowance)}`);
+
+      // Build settlement calldata
+      const settlementCalldata = settlement.interface.encodeFunctionData("settle", [
+        [CURRENT_ORDER.sellToken, CURRENT_ORDER.buyToken],
+        [CURRENT_ORDER.buyAmount, CURRENT_ORDER.sellAmount], // clearing prices
+        [trade],
+        [preInteractions, [], postInteractions],
+      ]);
+
+      // Provide solver liquidity (wstETH)
+      // Find a wstETH holder
+      const WSTETH_HOLDER = "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452"; // Usually contract has some
+      const wstethBalance = await wsteth.balanceOf(WSTETH_HOLDER);
+      console.log(`wstETH holder balance: ${ethers.formatEther(wstethBalance)}`);
+      
+      // Get wstETH from somewhere (wrap some ETH via Lido if needed)
+      // For now, just fund settlement with wstETH from a large holder
+      await impersonateAndFund("0xBA12222222228d8Ba445958a75a0704d566BF2C8"); // Balancer vault often has tokens
+      const balancer = await ethers.getSigner("0xBA12222222228d8Ba445958a75a0704d566BF2C8");
+      const balancerWsteth = await wsteth.balanceOf("0xBA12222222228d8Ba445958a75a0704d566BF2C8");
+      console.log(`Balancer wstETH balance: ${ethers.formatEther(balancerWsteth)}`);
+      
+      if (balancerWsteth >= CURRENT_ORDER.buyAmount) {
+        await wsteth.connect(balancer).transfer(COW_PROTOCOL.settlement, CURRENT_ORDER.buyAmount * 110n / 100n);
+      } else {
+        console.log("Need to find wstETH liquidity...");
+        // Try AAVE aToken holders or DEX pools
+      }
+
+      const settlementWsteth = await wsteth.balanceOf(COW_PROTOCOL.settlement);
+      console.log(`Settlement wstETH (solver liquidity): ${ethers.formatEther(settlementWsteth)}`);
+
+      // Build flash loan config - this order uses WETH flash loan from Morpho
+      const loans = [{
+        amount: CURRENT_ORDER.flashLoanAmount,
+        borrower: ADAPTER,
+        lender: MORPHO_BLUE,
+        token: WETH,
+      }];
+
+      console.log("\n=== Flash Loan Config ===");
+      console.log(`Lender: ${MORPHO_BLUE} (Morpho Blue)`);
+      console.log(`Borrower: ${ADAPTER} (KapanCowAdapter)`);
+      console.log(`Token: WETH`);
+      console.log(`Amount: ${ethers.formatEther(CURRENT_ORDER.flashLoanAmount)} WETH`);
+
+      // Become a solver
+      const authenticator = await getAuthenticator();
+      const authManager = await authenticator.manager();
+      await impersonateAndFund(authManager);
+      const authManagerSigner = await ethers.getSigner(authManager);
+      await authenticator.connect(authManagerSigner).addSolver(await solver.getAddress());
+      console.log(`\nBecame solver: ${await solver.getAddress()}`);
+
+      console.log("\n=== Attempting to solve order ===");
+      
+      // First try calling settle directly (as solver) to get better error messages
+      console.log("\n=== Test 1: Direct settle() call (to get better errors) ===");
+      try {
+        // Fund OrderManager with WETH (simulating flash loan deposit)
+        await impersonateAndFund(WETH_WHALE);
+        const wethWhale2 = await ethers.getSigner(WETH_WHALE);
+        await wethWhale2.sendTransaction({ to: WETH, value: ethers.parseEther("0.1") });
+        const wethDeposit = await ethers.getContractAt(
+          ["function deposit() external payable", "function transfer(address,uint256) external returns (bool)"],
+          WETH
+        );
+        await wethDeposit.connect(wethWhale2).transfer(ORDER_MANAGER, CURRENT_ORDER.flashLoanAmount);
+        console.log(`Funded OrderManager with ${ethers.formatEther(CURRENT_ORDER.flashLoanAmount)} WETH`);
+        
+        // Try settle directly
+        const directTx = await settlement.connect(solver).settle(
+          [CURRENT_ORDER.sellToken, CURRENT_ORDER.buyToken],
+          [CURRENT_ORDER.buyAmount, CURRENT_ORDER.sellAmount],
+          [trade],
+          [preInteractions, [], postInteractions],
+          { gasLimit: 8000000 }
+        );
+        const directReceipt = await directTx.wait();
+        console.log(`Direct settle SUCCEEDED! Gas used: ${directReceipt.gasUsed}`);
+      } catch (directError: any) {
+        console.log(`Direct settle failed: ${directError.message?.slice(0, 2000)}`);
+      }
+      
+      console.log("\n=== Test 2: Full flash loan flow ===");
+
+      try {
+        const tx = await flashLoanRouter.connect(solver).flashLoanAndSettle(
+          loans,
+          settlementCalldata,
+          { gasLimit: 8000000 }
+        );
+        const txReceipt = await tx.wait();
+        console.log(`\nflashLoanAndSettle SUCCEEDED! Gas used: ${txReceipt.gasUsed}`);
+        
+        // Check order status
+        const orderAfter = await orderMgr.getOrder(orderHash);
+        console.log(`Order status after: ${orderAfter.status} (2=Completed)`);
+        
+        console.log("\n✅ ORDER SOLVED SUCCESSFULLY!");
+        
+      } catch (error: any) {
+        console.log(`\n=== Failed to solve order ===`);
+        console.log(`Error: ${error.message?.slice(0, 3000)}`);
+        
+        if (error.data) {
+          console.log(`Error data: ${error.data}`);
+        }
+        
+        // Try to decode the error
+        if (error.message?.includes("reverted")) {
+          console.log("\n=== Attempting to diagnose revert ===");
+          
+          // Check if adapter has Morpho as allowed lender
+          const adapter = await ethers.getContractAt(KAPAN_ADAPTER_ABI, ADAPTER);
+          const morphoAllowed = await adapter.allowedLenders(MORPHO_BLUE);
+          console.log(`Morpho allowed on adapter: ${morphoAllowed}`);
+          
+          const lenderType = await adapter.getLenderType(MORPHO_BLUE);
+          console.log(`Morpho lender type: ${lenderType} (2=Morpho)`);
         }
         
         throw error;

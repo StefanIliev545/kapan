@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Address, parseAbi, keccak256, toHex } from "viem";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
-import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
+import { FlashLoanProvider } from "~~/utils/flashLoan";
 import { usePublicClient } from "wagmi";
 
 export interface FlashLoanLiquidity {

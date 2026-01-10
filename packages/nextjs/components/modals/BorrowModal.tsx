@@ -1,5 +1,6 @@
 import { FC, useCallback } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
+import { BatchingPreference } from "./common/BatchingPreference";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
@@ -52,6 +53,17 @@ export const BorrowModal: FC<BorrowModalProps> = ({
 
   const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = batchingPreference;
 
+  const renderBatchingPreference = useCallback(
+    () => (
+      <BatchingPreference
+        enabled={preferBatching}
+        setEnabled={setPreferBatching}
+        isLoaded={isPreferenceLoaded}
+      />
+    ),
+    [preferBatching, setPreferBatching, isPreferenceLoaded],
+  );
+
   return (
     <TokenActionModal
       isOpen={isOpen}
@@ -68,19 +80,7 @@ export const BorrowModal: FC<BorrowModalProps> = ({
       chainId={chainId}
       position={position}
       onConfirm={handleBorrow}
-      renderExtraContent={() => isPreferenceLoaded ? (
-        <div className="pt-2 pb-1">
-          <label className="label cursor-pointer gap-2 justify-start">
-            <input
-              type="checkbox"
-              checked={preferBatching}
-              onChange={(e) => setPreferBatching(e.target.checked)}
-              className="checkbox checkbox-sm"
-            />
-            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
-          </label>
-        </div>
-      ) : null}
+      renderExtraContent={renderBatchingPreference}
     />
   );
 };

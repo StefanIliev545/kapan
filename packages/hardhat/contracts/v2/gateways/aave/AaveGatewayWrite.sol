@@ -79,8 +79,7 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         require(pool != address(0), "Pool not set");
         // Router should approve this gateway to pull from router balance
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(token).approve(pool, 0);
-        IERC20(token).approve(pool, amount);
+        IERC20(token).forceApprove(pool, amount);
         IPool(pool).supply(token, amount, onBehalfOf, REFERRAL_CODE);
     }
 
@@ -128,8 +127,7 @@ contract AaveGatewayWrite is IGateway, ProtocolGateway, ReentrancyGuard {
         require(pool != address(0), "Pool not set");
         uint256 pre = IERC20(token).balanceOf(address(this));
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(token).approve(pool, 0);
-        IERC20(token).approve(pool, amount);
+        IERC20(token).forceApprove(pool, amount);
         uint256 repaid = IPool(pool).repay(token, amount, 2, user);
         uint256 post = IERC20(token).balanceOf(address(this));
         // Prefer protocol's returned amount when available

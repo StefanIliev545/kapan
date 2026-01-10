@@ -1,4 +1,5 @@
 export * from "../common/useOutsideClick";
+export * from "../common/useCopyToClipboard";
 export * from "./useDeployedContractInfo";
 export * from "./useNetworkColor";
 export * from "../common/useAnimationConfig";

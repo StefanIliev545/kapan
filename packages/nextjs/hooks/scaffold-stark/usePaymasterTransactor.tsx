@@ -39,11 +39,12 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
   const shouldUsePaymaster = !isSelectedStrk && isSupportedPaymasterToken;
 
   // Setup paymaster transaction hook
+  // When shouldUsePaymaster is true, selectedAddr is guaranteed to exist (via isSupportedPaymasterToken check)
   const { sendAsync: sendPaymasterTransaction } = usePaymasterSendTransaction({
     calls: [], // Will be overridden in execution
     options: {
-      feeMode: shouldUsePaymaster
-        ? { mode: "default" as const, gasToken: selectedToken!.address }
+      feeMode: shouldUsePaymaster && selectedAddr
+        ? { mode: "default" as const, gasToken: selectedAddr }
         : { mode: "sponsored" as const },
     },
   });

@@ -1,4 +1,4 @@
-import React, { PropsWithChildren, useEffect, useRef, useState } from "react";
+import React, { PropsWithChildren, useEffect, useMemo, useRef, useState } from "react";
 
 type StableAreaProps = PropsWithChildren<{
   /**
@@ -72,13 +72,13 @@ export const StableArea = ({
       ? parseFloat(minHeight) * 16 
       : parseFloat(minHeight) || 0;
 
-  // Use actual height if content is loaded and shorter than minHeight, otherwise use minHeight
-  const style: React.CSSProperties = {
-    minHeight: isContentLoaded && actualHeight && actualHeight < minHeightPx 
-      ? `${actualHeight}px` 
+  // Memoize style to avoid creating new object on each render
+  const style = useMemo<React.CSSProperties>(() => ({
+    minHeight: isContentLoaded && actualHeight && actualHeight < minHeightPx
+      ? `${actualHeight}px`
       : minHeightValue,
     transition: "min-height 0.5s ease-in-out",
-  };
+  }), [isContentLoaded, actualHeight, minHeightPx, minHeightValue]);
 
   return (
     <Component className={className}>

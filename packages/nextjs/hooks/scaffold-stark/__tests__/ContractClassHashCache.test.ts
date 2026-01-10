@@ -1,9 +1,10 @@
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, type Mock } from "vitest";
 import { ContractClassHashCache } from "../ContractClassHashCache";
 import { ProviderInterface } from "starknet";
 
 describe("ContractClassHashCache", () => {
   let cache: ContractClassHashCache;
+  let mockGetClassHashAt: Mock;
 
   // Mock provider
   const mockProvider: Partial<ProviderInterface> = {
@@ -14,6 +15,7 @@ describe("ContractClassHashCache", () => {
     cache = ContractClassHashCache.getInstance();
     cache.clear();
     vi.clearAllMocks();
+    mockGetClassHashAt = mockProvider.getClassHashAt as Mock;
   });
 
   afterEach(() => {
@@ -30,7 +32,7 @@ describe("ContractClassHashCache", () => {
     const address = "0x123";
     const expectedHash = "0xabc";
 
-    vi.mocked(mockProvider.getClassHashAt)!.mockResolvedValueOnce(expectedHash);
+    mockGetClassHashAt.mockResolvedValueOnce(expectedHash);
 
     // First call should fetch from provider
     const result1 = await cache.getClassHash(
@@ -52,7 +54,7 @@ describe("ContractClassHashCache", () => {
   it("should handle provider errors", async () => {
     const address = "0x123";
 
-    vi.mocked(mockProvider.getClassHashAt)!.mockRejectedValueOnce(
+    mockGetClassHashAt.mockRejectedValueOnce(
       new Error("API Error"),
     );
 
@@ -69,7 +71,7 @@ describe("ContractClassHashCache", () => {
     const address = "0x123";
     const expectedHash = "0xabc";
 
-    vi.mocked(mockProvider.getClassHashAt)!.mockImplementation(
+    mockGetClassHashAt.mockImplementation(
       () =>
         new Promise((resolve) => setTimeout(() => resolve(expectedHash), 100)),
     );
@@ -94,7 +96,7 @@ describe("ContractClassHashCache", () => {
     const hash1 = "0xabc";
     const hash2 = "0xdef";
 
-    vi.mocked(mockProvider.getClassHashAt)!
+    mockGetClassHashAt
       .mockResolvedValueOnce(hash1)
       .mockResolvedValueOnce(hash2);
 
@@ -119,7 +121,7 @@ describe("ContractClassHashCache", () => {
     const address = "0x123";
     const expectedHash = "0xabc";
 
-    vi.mocked(mockProvider.getClassHashAt)!.mockResolvedValue(expectedHash);
+    mockGetClassHashAt.mockResolvedValue(expectedHash);
 
     // First call
     await cache.getClassHash(mockProvider as ProviderInterface, address);
@@ -139,7 +141,7 @@ describe("ContractClassHashCache", () => {
     const hash1 = "0xabc";
     const hash2 = "0xdef";
 
-    vi.mocked(mockProvider.getClassHashAt)!
+    mockGetClassHashAt
       .mockResolvedValueOnce(hash1)
       .mockResolvedValueOnce(hash2);
 

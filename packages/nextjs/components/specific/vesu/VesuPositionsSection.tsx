@@ -1,9 +1,10 @@
 import type { FC, MouseEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PlusIcon } from "@heroicons/react/24/outline";
 
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { SupplyPosition } from "~~/components/SupplyPosition";
+import { LoadingSpinner } from "~~/components/common/Loading";
 import { PositionManager } from "~~/utils/position";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import type { VesuPositionRow } from "~~/hooks/useVesuLendingPositions";
@@ -17,6 +18,7 @@ import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { isVesuContextV1, type VesuProtocolKey } from "~~/utils/vesu";
 import formatPercentage from "~~/utils/formatPercentage";
+import { useModal, useModalWithData } from "~~/hooks/useModal";
 
 interface BorrowSelectionRequest {
   tokens: AssetWithRates[];
@@ -24,6 +26,144 @@ interface BorrowSelectionRequest {
   vesuContext: VesuPositionRow["borrowContext"];
   position: PositionManager;
 }
+
+// Memoized constants for availableActions
+const AVAILABLE_ACTIONS_WITH_SWAP = { deposit: true, withdraw: true, move: false, swap: true } as const;
+const AVAILABLE_ACTIONS_NO_SWAP = { deposit: true, withdraw: true, move: false, swap: false } as const;
+const BORROW_ACTIONS_WITH_DEBT = { borrow: true, repay: true, move: true, close: true, swap: true } as const;
+const BORROW_ACTIONS_NO_DEBT = { borrow: true, repay: false, move: false, swap: false, close: false } as const;
+
+interface VesuPositionRowItemProps {
+  row: VesuPositionRow;
+  protocolName: string;
+  assetsWithRates: AssetWithRates[];
+  expandedRows: Record<string, boolean>;
+  toggleRowExpanded: (key: string) => void;
+  openSwapSelector: (type: "debt" | "collateral", row: VesuPositionRow) => void;
+  openCloseForRow: (row: VesuPositionRow) => void;
+  onBorrowRequest: (request: BorrowSelectionRequest) => void;
+}
+
+const VesuPositionRowItem: FC<VesuPositionRowItemProps> = ({
+  row,
+  protocolName,
+  assetsWithRates,
+  expandedRows,
+  toggleRowExpanded,
+  openSwapSelector,
+  openCloseForRow,
+  onBorrowRequest,
+}) => {
+  const positionManager = useMemo(
+    () => PositionManager.fromPositions([row.supply], row.borrow ? [row.borrow] : []),
+    [row.supply, row.borrow],
+  );
+
+  const ltvDisplayValue = row.ltvPercent != null ? `${formatPercentage(row.ltvPercent, 1)}%` : "--";
+
+  const availableBorrowTokens = useMemo(
+    () => assetsWithRates.filter(
+      asset => `0x${asset.address.toString(16).padStart(64, "0")}` !== row.supply.tokenAddress,
+    ),
+    [assetsWithRates, row.supply.tokenAddress],
+  );
+
+  const canInitiateBorrow = !row.hasDebt && Boolean(row.borrowContext) && availableBorrowTokens.length > 0;
+  const supportsPoolDependentActions = Boolean(row.borrowContext);
+  const borrowButtonDisabled = row.supply.actionsDisabled;
+
+  const handleBorrowFromSupply = useCallback((event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!canInitiateBorrow || !row.borrowContext) return;
+    onBorrowRequest({
+      tokens: availableBorrowTokens,
+      collateralAddress: row.supply.tokenAddress,
+      vesuContext: row.borrowContext,
+      position: positionManager,
+    });
+  }, [canInitiateBorrow, row.borrowContext, row.supply.tokenAddress, availableBorrowTokens, positionManager, onBorrowRequest]);
+
+  const handleToggleExpanded = useCallback(() => {
+    toggleRowExpanded(row.key);
+  }, [toggleRowExpanded, row.key]);
+
+  const handleSwapCollateral = useCallback(() => {
+    openSwapSelector("collateral", row);
+  }, [openSwapSelector, row]);
+
+  const handleSwapDebt = useCallback(() => {
+    openSwapSelector("debt", row);
+  }, [openSwapSelector, row]);
+
+  const handleClosePosition = useCallback(() => {
+    openCloseForRow(row);
+  }, [openCloseForRow, row]);
+
+  const extraStats = useMemo(() => [{ label: "LTV", value: ltvDisplayValue }], [ltvDisplayValue]);
+
+  const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
+
+  const borrowTitle = borrowButtonDisabled
+    ? row.supply.actionsDisabledReason
+    : canInitiateBorrow
+      ? "Borrow against this collateral"
+      : "No borrowable assets available";
+
+  return (
+    <div
+      key={row.key}
+      className="border-base-300 relative overflow-hidden rounded-md border"
+    >
+      <div className={`divide-base-300 grid divide-y md:divide-y-0 ${containerColumns}`}>
+        <SupplyPosition
+          {...row.supply}
+          protocolName={protocolName}
+          networkType="starknet"
+          position={positionManager}
+          disableMove
+          subtitle={row.isVtoken ? "vToken" : undefined}
+          containerClassName="rounded-none"
+          availableActions={supportsPoolDependentActions ? AVAILABLE_ACTIONS_WITH_SWAP : AVAILABLE_ACTIONS_NO_SWAP}
+          onSwap={supportsPoolDependentActions ? handleSwapCollateral : undefined}
+          controlledExpanded={!!expandedRows[row.key]}
+          onToggleExpanded={handleToggleExpanded}
+          extraStats={extraStats}
+          showExpandIndicator={false}
+        />
+        {row.borrow ? (
+          <BorrowPosition
+            {...row.borrow}
+            protocolName={protocolName}
+            networkType="starknet"
+            position={positionManager}
+            containerClassName="rounded-none"
+            availableActions={row.hasDebt ? BORROW_ACTIONS_WITH_DEBT : BORROW_ACTIONS_NO_DEBT}
+            showNoDebtLabel={!row.hasDebt}
+            onClosePosition={row.hasDebt && supportsPoolDependentActions ? handleClosePosition : undefined}
+            onSwap={row.hasDebt && supportsPoolDependentActions ? handleSwapDebt : undefined}
+            controlledExpanded={!!expandedRows[row.key]}
+            onToggleExpanded={handleToggleExpanded}
+          />
+        ) : (
+          <div className="border-base-300 bg-base-200/60 flex h-full items-center justify-between gap-3 border border-dashed p-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-base-content/70 text-sm font-semibold">No debt</span>
+              <span className="text-base-content/50 text-xs">You are not borrowing against this collateral yet.</span>
+            </div>
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={handleBorrowFromSupply}
+              disabled={!canInitiateBorrow || borrowButtonDisabled}
+              title={borrowTitle}
+            >
+              Borrow
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 interface VesuPositionsSectionProps {
   rows: VesuPositionRow[];
@@ -58,22 +198,20 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   netApyPercent,
   formatCurrency,
 }) => {
-  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
-  const [closeParams, setCloseParams] = useState<
-    | {
-      collateral: { name: string; address: string; decimals: number; icon: string };
-      debt: { name: string; address: string; decimals: number; icon: string };
-      collateralBalance: bigint;
-      debtBalance: bigint;
-      poolKey: string;
-      protocolKey: VesuProtocolKey;
-    }
-    | null
-  >(null);
+  // Close position modal state - uses useModalWithData for combined open/data state
+  type CloseParams = {
+    collateral: { name: string; address: string; decimals: number; icon: string };
+    debt: { name: string; address: string; decimals: number; icon: string };
+    collateralBalance: bigint;
+    debtBalance: bigint;
+    poolKey: string;
+    protocolKey: VesuProtocolKey;
+  };
+  const closeModal = useModalWithData<CloseParams>();
 
-  const openCloseForRow = (row: VesuPositionRow) => {
+  const openCloseForRow = useCallback((row: VesuPositionRow) => {
     if (!row.borrow || !row.borrowContext) return;
-    setCloseParams({
+    closeModal.openWithData({
       collateral: {
         name: row.supply.name,
         address: row.supply.tokenAddress,
@@ -91,22 +229,16 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       poolKey: row.poolKey,
       protocolKey: row.protocolKey,
     });
-    setIsCloseModalOpen(true);
-  };
+  }, [closeModal]);
 
-  const handleCloseModal = () => {
-    setIsCloseModalOpen(false);
-    setCloseParams(null);
-  };
-
-  // Swap state (debt or collateral)
-  const [isSwapSelectOpen, setIsSwapSelectOpen] = useState(false);
+  // Swap state (debt or collateral) - using consolidated modal hooks
+  const swapSelectModal = useModal();
+  const switchDebtModal = useModal();
+  const switchCollateralModal = useModal();
   const [swapType, setSwapType] = useState<"debt" | "collateral" | null>(null);
   const [swapRow, setSwapRow] = useState<VesuPositionRow | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<TokenWithRates | null>(null);
-  const [isSwitchDebtOpen, setIsSwitchDebtOpen] = useState(false);
-  const [isSwitchCollateralOpen, setIsSwitchCollateralOpen] = useState(false);
-  const [useNewSelector, setUseNewSelector] = useState(true);
+  const useNewSelector = true;
 
   const formatSignedPercentage = (value: number) => {
     const formatted = formatPercentage(Math.abs(value));
@@ -122,17 +254,13 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     return getTokenNameFallback(addr) ?? raw;
   }, [selectedTarget]);
 
-  const openSwapSelector = (type: "debt" | "collateral", row: VesuPositionRow) => {
+  const openSwapSelector = useCallback((type: "debt" | "collateral", row: VesuPositionRow) => {
     if (!row.borrowContext) return;
     setSwapType(type);
     setSwapRow(row);
     setSelectedTarget(null);
-    setIsSwapSelectOpen(true);
-  };
-
-  const closeSwapSelector = () => {
-    setIsSwapSelectOpen(false);
-  };
+    swapSelectModal.open();
+  }, [swapSelectModal]);
 
   const swapCandidateTokens = useMemo(() => {
     if (!swapRow) return [] as AssetWithRates[];
@@ -153,16 +281,16 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     });
   }, [assetsWithRates, swapRow, swapType]);
 
-  const handleSelectSwapTarget = (token: TokenWithRates) => {
+  const handleSelectSwapTarget = useCallback((token: TokenWithRates) => {
     setSelectedTarget(token);
-    setIsSwapSelectOpen(false);
+    swapSelectModal.close();
     if (!swapRow || !swapType) return;
     if (swapType === "debt") {
-      setIsSwitchDebtOpen(true);
+      switchDebtModal.open();
     } else {
-      setIsSwitchCollateralOpen(true);
+      switchCollateralModal.open();
     }
-  };
+  }, [swapSelectModal, swapRow, swapType, switchDebtModal, switchCollateralModal]);
 
   // Shared expand state per row.key
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -205,22 +333,138 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     });
   }, [rows, expandedRows, defaultExpandedKey, hasUserInteracted]);
 
-  const toggleRowExpanded = (key: string) => {
+  const toggleRowExpanded = useCallback((key: string) => {
     setHasUserInteracted(true);
     setExpandedRows(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  }, []);
+
+  // Memoized props for SwitchTokenSelectModalStark
+  const switchTokenCurrentToken = useMemo(() => {
+    if (!swapRow || !swapType) return null;
+    // For debt swaps, borrow must exist
+    if (swapType === "debt" && !swapRow.borrow) return null;
+    const borrowData = swapRow.borrow;
+    return {
+      address: swapType === "debt" && borrowData ? borrowData.tokenAddress : swapRow.supply.tokenAddress,
+      symbol: swapType === "debt" && borrowData ? borrowData.name : swapRow.supply.name,
+      name: swapType === "debt" && borrowData ? borrowData.name : swapRow.supply.name,
+      icon: swapType === "debt" && borrowData ? borrowData.icon : swapRow.supply.icon,
+      decimals: swapType === "debt" && borrowData ? (borrowData.tokenDecimals || 18) : (swapRow.supply.tokenDecimals || 18),
+    };
+  }, [swapRow, swapType]);
+
+  const switchTokenOptions = useMemo(() => {
+    return swapCandidateTokens.map(asset => {
+      const symbol = feltToString(asset.symbol);
+      return {
+        address: `0x${asset.address.toString(16).padStart(64, "0")}`,
+        symbol,
+        name: symbol,
+        icon: tokenNameToLogo(symbol.toLowerCase()),
+        decimals: asset.decimals || 18,
+      };
+    });
+  }, [swapCandidateTokens]);
+
+  const handleSwitchTokenSelect = useCallback((opt: { address: string }) => {
+    const match = swapCandidateTokens.find(a => `0x${a.address.toString(16).padStart(64, "0")}` === opt.address);
+    if (!match) return;
+    handleSelectSwapTarget({
+      address: match.address,
+      symbol: feltToString(match.symbol),
+      decimals: match.decimals || 18,
+      borrowAPR: match.borrowAPR,
+      supplyAPY: match.supplyAPY,
+    } as unknown as TokenWithRates);
+  }, [swapCandidateTokens, handleSelectSwapTarget]);
+
+  // Memoized props for TokenSelectModalStark
+  const tokenSelectTokens = useMemo(() => {
+    return swapCandidateTokens.map(asset => ({
+      ...asset,
+      borrowAPR: asset.borrowAPR,
+      supplyAPY: asset.supplyAPY,
+    })) as TokenWithRates[];
+  }, [swapCandidateTokens]);
+
+  const tokenSelectPosition = useMemo(() => {
+    if (!swapRow) return null;
+    return PositionManager.fromPositions([swapRow.supply], swapRow.borrow ? [swapRow.borrow] : []);
+  }, [swapRow]);
+
+  // Memoized props for SwitchDebtModalStark
+  const switchDebtCollateral = useMemo(() => {
+    if (!swapRow) return null;
+    return {
+      name: swapRow.supply.name,
+      address: swapRow.supply.tokenAddress,
+      decimals: swapRow.supply.tokenDecimals || 18,
+      icon: swapRow.supply.icon,
+    };
+  }, [swapRow]);
+
+  const switchDebtCurrentDebt = useMemo(() => {
+    if (!swapRow?.borrow) return null;
+    return {
+      name: swapRow.borrow.name,
+      address: swapRow.borrow.tokenAddress,
+      decimals: swapRow.borrow.tokenDecimals || 18,
+      icon: swapRow.borrow.icon,
+    };
+  }, [swapRow]);
+
+  const switchDebtTargetDebt = useMemo(() => {
+    if (!selectedTarget) return null;
+    return {
+      name: selectedSymbolStr,
+      address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
+      decimals: selectedTarget.decimals,
+      icon: tokenNameToLogo(selectedSymbolStr.toLowerCase()),
+    };
+  }, [selectedTarget, selectedSymbolStr]);
+
+  // Memoized props for SwitchCollateralModalStark
+  const switchCollateralCurrentCollateral = useMemo(() => {
+    if (!swapRow) return null;
+    return {
+      name: swapRow.supply.name,
+      address: swapRow.supply.tokenAddress,
+      decimals: swapRow.supply.tokenDecimals || 18,
+      icon: swapRow.supply.icon,
+    };
+  }, [swapRow]);
+
+  const switchCollateralTargetCollateral = useMemo(() => {
+    if (!selectedTarget) return null;
+    return {
+      name: selectedSymbolStr,
+      address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
+      decimals: selectedTarget.decimals,
+      icon: tokenNameToLogo(selectedSymbolStr.toLowerCase()),
+    };
+  }, [selectedTarget, selectedSymbolStr]);
+
+  const switchCollateralDebtToken = useMemo(() => {
+    if (!swapRow) return null;
+    return {
+      name: swapRow.borrow?.name || "",
+      address: swapRow.borrow?.tokenAddress || "0x0",
+      decimals: swapRow.borrow?.tokenDecimals || 18,
+      icon: swapRow.borrow?.icon || "",
+    };
+  }, [swapRow]);
   const renderPositions = () => {
     if (accountStatus === "connecting" || (userAddress && !hasLoadedOnce)) {
       return (
         <div className="flex justify-center py-6">
-          <span className="loading loading-spinner loading-md" />
+          <LoadingSpinner size="md" />
         </div>
       );
     }
 
     if (!userAddress) {
       return (
-        <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+        <div className="bg-base-200/60 text-base-content/70 rounded-md p-4 text-center text-sm">
           Connect your Starknet wallet to view your Vesu positions
         </div>
       );
@@ -228,107 +472,25 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
     if (rows.length === 0) {
       return (
-        <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+        <div className="bg-base-200/60 text-base-content/70 rounded-md p-4 text-center text-sm">
           No positions found
         </div>
       );
     }
 
-    return rows.map(row => {
-      const positionManager = PositionManager.fromPositions([row.supply], row.borrow ? [row.borrow] : []);
-      const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
-      const ltvDisplayValue = row.ltvPercent != null ? `${formatPercentage(row.ltvPercent, 1)}%` : "--";
-
-      const availableBorrowTokens = assetsWithRates.filter(
-        asset => `0x${asset.address.toString(16).padStart(64, "0")}` !== row.supply.tokenAddress,
-      );
-      const canInitiateBorrow = !row.hasDebt && Boolean(row.borrowContext) && availableBorrowTokens.length > 0;
-      const borrowPoolContext = row.borrowContext;
-      const supportsPoolDependentActions = Boolean(borrowPoolContext);
-      const borrowButtonDisabled = row.supply.actionsDisabled;
-
-      const handleBorrowFromSupply = (event: MouseEvent<HTMLButtonElement>) => {
-        event.stopPropagation();
-        if (!canInitiateBorrow || !row.borrowContext) return;
-        onBorrowRequest({
-          tokens: availableBorrowTokens,
-          collateralAddress: row.supply.tokenAddress,
-          vesuContext: row.borrowContext,
-          position: positionManager,
-        });
-      };
-
-      return (
-        <div
-          key={row.key}
-          className="relative overflow-hidden rounded-md border border-base-300"
-        >
-          <div className={`grid divide-y divide-base-300 md:divide-y-0 ${containerColumns}`}>
-            <SupplyPosition
-              {...row.supply}
-              protocolName={protocolName}
-              networkType="starknet"
-              position={positionManager}
-              disableMove
-              subtitle={row.isVtoken ? "vToken" : undefined}
-              containerClassName="rounded-none"
-              availableActions={{ deposit: true, withdraw: true, move: false, swap: supportsPoolDependentActions }}
-              onSwap={supportsPoolDependentActions ? () => openSwapSelector("collateral", row) : undefined}
-              controlledExpanded={!!expandedRows[row.key]}
-              onToggleExpanded={() => toggleRowExpanded(row.key)}
-              extraStats={[{ label: "LTV", value: ltvDisplayValue }]}
-              showExpandIndicator={false}
-            />
-            {row.borrow ? (
-              <BorrowPosition
-                {...row.borrow}
-                protocolName={protocolName}
-                networkType="starknet"
-                position={positionManager}
-                containerClassName="rounded-none"
-                availableActions={
-                  row.hasDebt
-                    ? {
-                      borrow: true,
-                      repay: true,
-                      move: supportsPoolDependentActions,
-                      close: supportsPoolDependentActions,
-                      swap: supportsPoolDependentActions,
-                    }
-                    : { borrow: true, repay: false, move: false, swap: false, close: false }
-                }
-                showNoDebtLabel={!row.hasDebt}
-                onClosePosition={row.hasDebt && supportsPoolDependentActions ? () => openCloseForRow(row) : undefined}
-                onSwap={row.hasDebt && supportsPoolDependentActions ? () => openSwapSelector("debt", row) : undefined}
-                controlledExpanded={!!expandedRows[row.key]}
-                onToggleExpanded={() => toggleRowExpanded(row.key)}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-between gap-3 border border-dashed border-base-300 bg-base-200/60 p-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold text-base-content/70">No debt</span>
-                  <span className="text-xs text-base-content/50">You are not borrowing against this collateral yet.</span>
-                </div>
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={handleBorrowFromSupply}
-                  disabled={!canInitiateBorrow || borrowButtonDisabled}
-                  title={
-                    borrowButtonDisabled
-                      ? row.supply.actionsDisabledReason
-                      : canInitiateBorrow
-                        ? "Borrow against this collateral"
-                        : "No borrowable assets available"
-                  }
-                >
-                  Borrow
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    });
+    return rows.map(row => (
+      <VesuPositionRowItem
+        key={row.key}
+        row={row}
+        protocolName={protocolName}
+        assetsWithRates={assetsWithRates}
+        expandedRows={expandedRows}
+        toggleRowExpanded={toggleRowExpanded}
+        openSwapSelector={openSwapSelector}
+        openCloseForRow={openCloseForRow}
+        onBorrowRequest={onBorrowRequest}
+      />
+    ));
   };
 
   return (
@@ -338,7 +500,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
           <div className="flex flex-col gap-1">
             <h2 className="card-title text-lg">{title}</h2>
             {userAddress && (
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/70">
+              <div className="text-base-content/70 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                 <span className="flex items-center gap-1">
                   <span>Balance:</span>
                   <span className={`font-semibold ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
@@ -368,8 +530,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
             )}
           </div>
           {isUpdating && userAddress && (
-            <div className="flex items-center text-xs text-base-content/60">
-              <span className="loading loading-spinner loading-xs mr-1" /> Updating
+            <div className="text-base-content/60 flex items-center text-xs">
+              <LoadingSpinner size="xs" label="Updating" />
             </div>
           )}
         </div>
@@ -377,16 +539,16 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
         <div className="space-y-4">
           {renderPositions()}
 
-          <div className="overflow-hidden rounded-2xl border border-dashed border-base-300">
-            <div className="grid grid-cols-1 divide-y divide-base-300 md:grid-cols-2 md:divide-x md:divide-y-0">
-              <div className="flex h-full flex-col justify-center bg-base-200/60 p-3">
+          <div className="border-base-300 overflow-hidden rounded-2xl border border-dashed">
+            <div className="divide-base-300 grid grid-cols-1 divide-y md:grid-cols-2 md:divide-x md:divide-y-0">
+              <div className="bg-base-200/60 flex h-full flex-col justify-center p-3">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-base-content/70">Add collateral</span>
-                    <span className="text-xs text-base-content/50">Supply assets to start or grow your borrowing power.</span>
+                    <span className="text-base-content/70 text-sm font-semibold">Add collateral</span>
+                    <span className="text-base-content/50 text-xs">Supply assets to start or grow your borrowing power.</span>
                   </div>
                   <button className="btn btn-sm btn-outline" onClick={onDepositRequest} disabled={assetsWithRates.length === 0}>
-                    <PlusIcon className="h-4 w-4" />
+                    <PlusIcon className="size-4" />
                     <span>Deposit</span>
                   </button>
                 </div>
@@ -396,68 +558,39 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
           </div>
         </div>
       </div>
-      {closeParams && (
+      {closeModal.data && (
         <ClosePositionModalStark
-          isOpen={isCloseModalOpen}
-          onClose={handleCloseModal}
-          collateral={closeParams.collateral}
-          debt={closeParams.debt}
-          collateralBalance={closeParams.collateralBalance}
-          debtBalance={closeParams.debtBalance}
-          poolKey={closeParams.poolKey}
-          protocolKey={closeParams.protocolKey}
+          isOpen={closeModal.isOpen}
+          onClose={closeModal.close}
+          collateral={closeModal.data.collateral}
+          debt={closeModal.data.debt}
+          collateralBalance={closeModal.data.collateralBalance}
+          debtBalance={closeModal.data.debtBalance}
+          poolKey={closeModal.data.poolKey}
+          protocolKey={closeModal.data.protocolKey}
         />
       )}
 
       {/* Token selector for swap target */}
-      {swapRow && swapType && useNewSelector ? (
+      {swapRow && swapType && useNewSelector && switchTokenCurrentToken ? (
         <SwitchTokenSelectModalStark
-          isOpen={isSwapSelectOpen}
-          onClose={closeSwapSelector}
+          isOpen={swapSelectModal.isOpen}
+          onClose={swapSelectModal.close}
           kind={swapType}
-          currentToken={{
-            address: swapType === "debt" ? swapRow.borrow!.tokenAddress : swapRow.supply.tokenAddress,
-            symbol: swapType === "debt" ? swapRow.borrow!.name : swapRow.supply.name,
-            name: swapType === "debt" ? swapRow.borrow!.name : swapRow.supply.name,
-            icon: swapType === "debt" ? swapRow.borrow!.icon : swapRow.supply.icon,
-            decimals: swapType === "debt" ? (swapRow.borrow!.tokenDecimals || 18) : (swapRow.supply.tokenDecimals || 18),
-          }}
-          options={swapCandidateTokens.map(asset => {
-            const symbol = feltToString(asset.symbol);
-            return {
-              address: `0x${asset.address.toString(16).padStart(64, "0")}`,
-              symbol,
-              name: symbol,
-              icon: tokenNameToLogo(symbol.toLowerCase()),
-              decimals: asset.decimals || 18,
-            };
-          })}
-          onSelect={opt => {
-            const match = swapCandidateTokens.find(a => `0x${a.address.toString(16).padStart(64, "0")}` === opt.address);
-            if (!match) return;
-            handleSelectSwapTarget({
-              address: match.address,
-              symbol: feltToString(match.symbol),
-              decimals: match.decimals || 18,
-              borrowAPR: match.borrowAPR,
-              supplyAPY: match.supplyAPY,
-            } as unknown as TokenWithRates);
-          }}
+          currentToken={switchTokenCurrentToken}
+          options={switchTokenOptions}
+          onSelect={handleSwitchTokenSelect}
         />
       ) : (
-        swapRow && swapType && swapRow.borrowContext && isVesuContextV1(swapRow.borrowContext) && (
+        swapRow && swapType && swapRow.borrowContext && isVesuContextV1(swapRow.borrowContext) && tokenSelectPosition && (
           <TokenSelectModalStark
-            isOpen={isSwapSelectOpen}
-            onClose={closeSwapSelector}
-            tokens={swapCandidateTokens.map(asset => ({
-              ...asset,
-              borrowAPR: asset.borrowAPR,
-              supplyAPY: asset.supplyAPY,
-            })) as TokenWithRates[]}
+            isOpen={swapSelectModal.isOpen}
+            onClose={swapSelectModal.close}
+            tokens={tokenSelectTokens}
             protocolName={protocolName}
             collateralAsset={swapRow.supply.tokenAddress}
-            vesuContext={swapType === "debt" ? swapRow.borrowContext : swapRow.borrowContext}
-            position={PositionManager.fromPositions([swapRow.supply], swapRow.borrow ? [swapRow.borrow] : [])}
+            vesuContext={swapRow.borrowContext}
+            position={tokenSelectPosition}
             action={swapType === "debt" ? "borrow" : "deposit"}
             onSelectToken={handleSelectSwapTarget}
             suppressActionModals
@@ -466,60 +599,30 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
       )}
 
       {/* Switch debt modal */}
-      {swapType === "debt" && swapRow && selectedTarget && swapRow.borrowContext && (
+      {swapType === "debt" && swapRow && swapRow.borrow && selectedTarget && swapRow.borrowContext && switchDebtCollateral && switchDebtCurrentDebt && switchDebtTargetDebt && (
         <SwitchDebtModalStark
-          isOpen={isSwitchDebtOpen}
-          onClose={() => setIsSwitchDebtOpen(false)}
+          isOpen={switchDebtModal.isOpen}
+          onClose={switchDebtModal.close}
           poolKey={swapRow.poolKey}
           protocolKey={swapRow.protocolKey}
-          collateral={{
-            name: swapRow.supply.name,
-            address: swapRow.supply.tokenAddress,
-            decimals: swapRow.supply.tokenDecimals || 18,
-            icon: swapRow.supply.icon,
-          }}
-          currentDebt={{
-            name: swapRow.borrow!.name,
-            address: swapRow.borrow!.tokenAddress,
-            decimals: swapRow.borrow!.tokenDecimals || 18,
-            icon: swapRow.borrow!.icon,
-          }}
-          targetDebt={{
-            name: selectedSymbolStr,
-            address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
-            decimals: selectedTarget.decimals,
-            icon: tokenNameToLogo(selectedSymbolStr.toLowerCase()),
-          }}
-          debtBalance={swapRow.borrow!.tokenBalance}
+          collateral={switchDebtCollateral}
+          currentDebt={switchDebtCurrentDebt}
+          targetDebt={switchDebtTargetDebt}
+          debtBalance={swapRow.borrow.tokenBalance}
           collateralBalance={swapRow.supply.tokenBalance}
         />
       )}
 
       {/* Switch collateral modal */}
-      {swapType === "collateral" && swapRow && selectedTarget && swapRow.borrowContext && (
+      {swapType === "collateral" && swapRow && selectedTarget && swapRow.borrowContext && switchCollateralCurrentCollateral && switchCollateralTargetCollateral && switchCollateralDebtToken && (
         <SwitchCollateralModalStark
-          isOpen={isSwitchCollateralOpen}
-          onClose={() => setIsSwitchCollateralOpen(false)}
+          isOpen={switchCollateralModal.isOpen}
+          onClose={switchCollateralModal.close}
           poolKey={swapRow.poolKey}
           protocolKey={swapRow.protocolKey}
-          currentCollateral={{
-            name: swapRow.supply.name,
-            address: swapRow.supply.tokenAddress,
-            decimals: swapRow.supply.tokenDecimals || 18,
-            icon: swapRow.supply.icon,
-          }}
-          targetCollateral={{
-            name: selectedSymbolStr,
-            address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
-            decimals: selectedTarget.decimals,
-            icon: tokenNameToLogo(selectedSymbolStr.toLowerCase()),
-          }}
-          debtToken={{
-            name: swapRow.borrow?.name || "",
-            address: swapRow.borrow?.tokenAddress || "0x0",
-            decimals: swapRow.borrow?.tokenDecimals || 18,
-            icon: swapRow.borrow?.icon || "",
-          }}
+          currentCollateral={switchCollateralCurrentCollateral}
+          targetCollateral={switchCollateralTargetCollateral}
+          debtToken={switchCollateralDebtToken}
           collateralBalance={swapRow.supply.tokenBalance}
           debtBalance={swapRow.borrow?.tokenBalance || 0n}
         />

@@ -19,13 +19,13 @@ export interface CallToActionProps {
 }
 
 const TwitterIcon = () => (
-  <div className="bg-fuchsia-600 p-1 rounded-full mr-2 flex items-center justify-center">
+  <div className="mr-2 flex items-center justify-center rounded-full bg-fuchsia-600 p-1">
     <Image src="/logos/x-logo.svg" alt="X Logo" width={10} height={10} className="brightness-150 invert" />
   </div>
 );
 
 const GitcoinIcon = () => (
-  <div className="bg-fuchsia-600 p-1 rounded-full mr-2 flex items-center justify-center">
+  <div className="mr-2 flex items-center justify-center rounded-full bg-fuchsia-600 p-1">
     <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="brightness-150 invert">
       <path d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm4 5.6L9.3 8.7c-.4.4-1 .4-1.4 0l-1.5-1.5C5.6 6.4 4.5 7.5 5.3 8.3L7.6 10.6c.2.2.5.2.7 0l4-4c.9-.9-.1-1.9-1.1-1z" fill="white"/>
     </svg>
@@ -123,20 +123,20 @@ const CallToAction = ({
           animation: gradientAnimation 6s ease infinite;
         }
       `}</style>
-      <div className={`animate-gradient bg-gradient-to-r ${fromClass} ${viaClass} ${toClass} text-white rounded-lg shadow-md overflow-hidden my-4 w-full`}>
-        <div className={`grid grid-cols-1 ${gridColumnsClass} divide-y md:divide-y-0 md:divide-x divide-white/20`}>
+      <div className={`animate-gradient bg-gradient-to-r ${fromClass} ${viaClass} ${toClass} my-4 w-full overflow-hidden rounded-lg text-white shadow-md`}>
+        <div className={`grid grid-cols-1 ${gridColumnsClass} divide-y divide-white/20 md:divide-x md:divide-y-0`}>
           {sections.map((section, index) => (
             <div key={index} className="flex flex-col items-center p-4 text-center">
-              <h3 className="font-bold text-sm md:text-base mb-1">
+              <h3 className="mb-1 text-sm font-bold md:text-base">
                 {section.emoji || ''}{section.title}
               </h3>
-              <p className="text-xs text-white/80 mb-3">{section.description}</p>
+              <p className="mb-3 text-xs text-white/80">{section.description}</p>
               
               <a 
                 href={section.buttonLink} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className={`bg-white ${buttonColorClass} hover:bg-gray-100 whitespace-nowrap text-sm px-4 py-1.5 rounded-full font-medium flex items-center shadow-sm hover:shadow transform hover:-translate-y-0.5 transition-all duration-200`}
+                className={`bg-white ${buttonColorClass} flex transform items-center whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-gray-100 hover:shadow`}
               >
                 {section.icon}
                 {section.buttonText}

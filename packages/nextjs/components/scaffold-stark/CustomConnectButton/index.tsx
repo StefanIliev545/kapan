@@ -2,7 +2,6 @@
 
 // @refresh reset
 import { useEffect, useMemo, useState } from "react";
-import { Balance } from "../Balance";
 import { AddressInfoDropdown } from "./AddressInfoDropdown";
 import { AddressQRCodeModal } from "./AddressQRCodeModal";
 import ConnectModal from "./ConnectModal";
@@ -19,7 +18,7 @@ import { getBlockExplorerAddressLink } from "~~/utils/scaffold-stark";
 export const CustomConnectButton = () => {
   const { connector } = useConnect();
   const { targetNetwork } = useTargetNetwork();
-  const { account, status, address: accountAddress } = useAccount();
+  const { status, address: accountAddress } = useAccount();
   const { chain } = useNetwork();
 
   const [accountChainId, setAccountChainId] = useState<bigint>(0n);

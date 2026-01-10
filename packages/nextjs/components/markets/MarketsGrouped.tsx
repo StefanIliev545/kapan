@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useMemo, useState } from "react";
+import { FC, useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ContractResponse } from "../specific/vesu/VesuMarkets";
@@ -20,18 +20,7 @@ import { useVesuV2Assets } from "~~/hooks/useVesuV2Assets";
 import { arbitrum, base, linea, optimism } from "wagmi/chains";
 import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates } from "~~/utils/protocols";
 import formatPercentage from "~~/utils/formatPercentage";
-
-// Helper: Aave rate conversion
-const convertAaveRate = (rate: bigint): number => Number(rate) / 1e25;
-
-// Helper: Venus rate conversion
-const convertVenusRate = (ratePerBlock: bigint): number => {
-  const ethMantissa = 1e18;
-  const blocksPerDay = 60 * 60 * 24;
-  const daysPerYear = 365;
-  const ratePerBlockNum = Number(ratePerBlock) / ethMantissa;
-  return (Math.pow(ratePerBlockNum * blocksPerDay + 1, daysPerYear - 1) - 1) * 100;
-};
+import { aaveRateToAPY, venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
 
 const TOKEN_ALIASES: Record<string, string> = {
   usdt: "USDT",
@@ -42,16 +31,8 @@ const TOKEN_ALIASES: Record<string, string> = {
 
 const canonicalizeTokenName = (name: string) => TOKEN_ALIASES[name.toLowerCase()] || name;
 
-const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
-  [arbitrum.id]: "arbitrum",
-  [base.id]: "base",
-  [optimism.id]: "optimism",
-  [linea.id]: "linea",
-};
-
 const AAVE_CHAIN_IDS = [arbitrum.id, base.id, optimism.id, linea.id];
 const ZEROLEND_CHAIN_IDS = [base.id, linea.id];
-const VENUS_CHAIN_IDS = [arbitrum.id, base.id];
 
 const useAaveLikeData = (
   contractName: "AaveGatewayView" | "ZeroLendGatewayView",
@@ -87,6 +68,7 @@ const useAaveLikeData = (
         },
       ];
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [arbInfo.data, baseInfo.data, lineaInfo.data, optInfo.data, chainIds, connectedAddress]);
 
   const { data: results } = useReadContracts({
@@ -106,8 +88,8 @@ const useAaveLikeData = (
       const chainId = contracts[index]?.chainId;
       const network = (chainId && CHAIN_ID_TO_NETWORK[chainId]) || "arbitrum";
       return (result.result as any[]).map(token => {
-        const supplyAPY = convertAaveRate(token.supplyRate);
-        const borrowAPY = convertAaveRate(token.borrowRate);
+        const supplyAPY = aaveRateToAPY(token.supplyRate);
+        const borrowAPY = aaveRateToAPY(token.borrowRate);
         const price = Number(formatUnits(token.price, 8));
         const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
         return {
@@ -229,8 +211,8 @@ const useVenusData = (): MarketData[] => {
 
       tokens.forEach((token: string, i: number) => {
         if (token === "0x0000000000000000000000000000000000000000") return;
-        const supplyAPY = convertVenusRate(supplyRates[i]);
-        const borrowAPY = convertVenusRate(borrowRates[i]);
+        const supplyAPY = venusRateToAPY(supplyRates[i]);
+        const borrowAPY = venusRateToAPY(borrowRates[i]);
         const price = Number(formatUnits(prices[i], 18 + (18 - decimals[i])));
         const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
         aggregated.push({
@@ -252,14 +234,22 @@ const useVenusData = (): MarketData[] => {
   }, [venusArbMarkets.data, venusArbRates.data, venusBaseMarkets.data, venusBaseRates.data]);
 };
 
-const useVesuData = (): MarketData[] => {
-  const v1Pools = [
-    { poolName: "Genesis", poolId: VESU_V1_POOLS.Genesis },
-    { poolName: "CarmineRunes", poolId: VESU_V1_POOLS.CarmineRunes },
-    { poolName: "Re7StarknetEcosystem", poolId: VESU_V1_POOLS.Re7StarknetEcosystem },
-    { poolName: "Re7xSTRK", poolId: VESU_V1_POOLS.Re7xSTRK },
-  ] as const;
+const VESU_V1_POOL_CONFIGS = [
+  { poolName: "Genesis", poolId: VESU_V1_POOLS.Genesis },
+  { poolName: "CarmineRunes", poolId: VESU_V1_POOLS.CarmineRunes },
+  { poolName: "Re7StarknetEcosystem", poolId: VESU_V1_POOLS.Re7StarknetEcosystem },
+  { poolName: "Re7xSTRK", poolId: VESU_V1_POOLS.Re7xSTRK },
+] as const;
 
+const VESU_V2_POOL_CONFIGS = [
+  { poolName: "Prime", address: VESU_V2_POOLS.Prime },
+  { poolName: "Re7xBTC", address: VESU_V2_POOLS.Re7xBTC },
+  { poolName: "Re7USDCCore", address: VESU_V2_POOLS.Re7USDCCore },
+  { poolName: "Re7USDCPrime", address: VESU_V2_POOLS.Re7USDCPrime },
+  { poolName: "Re7USDCStableCore", address: VESU_V2_POOLS.Re7USDCStableCore },
+] as const;
+
+const useVesuData = (): MarketData[] => {
   const vesuGenesis = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_assets_ui",
@@ -285,31 +275,24 @@ const useVesuData = (): MarketData[] => {
     refetchInterval: 0,
   });
 
-  const v1Assets = [vesuGenesis, vesuCarmineRunes, vesuRe7StarknetEcosystem, vesuRe7xSTRK];
-
-  const v2Pools = [
-    { poolName: "Prime", address: VESU_V2_POOLS.Prime },
-    { poolName: "Re7xBTC", address: VESU_V2_POOLS.Re7xBTC },
-    { poolName: "Re7USDCCore", address: VESU_V2_POOLS.Re7USDCCore },
-    { poolName: "Re7USDCPrime", address: VESU_V2_POOLS.Re7USDCPrime },
-    { poolName: "Re7USDCStableCore", address: VESU_V2_POOLS.Re7USDCStableCore },
-  ] as const;
-
   const vesuPrime = useVesuV2Assets(VESU_V2_POOLS.Prime);
   const vesuRe7xBTC = useVesuV2Assets(VESU_V2_POOLS.Re7xBTC);
   const vesuRe7USDCCore = useVesuV2Assets(VESU_V2_POOLS.Re7USDCCore);
   const vesuRe7USDCPrime = useVesuV2Assets(VESU_V2_POOLS.Re7USDCPrime);
   const vesuRe7USDCStableCore = useVesuV2Assets(VESU_V2_POOLS.Re7USDCStableCore);
 
-  const v2Assets = [vesuPrime, vesuRe7xBTC, vesuRe7USDCCore, vesuRe7USDCPrime, vesuRe7USDCStableCore];
   const allowDeposit = false;
 
   return useMemo(() => {
     const markets: MarketData[] = [];
 
+    // Build arrays inside useMemo to avoid dependency array issues
+    const v1Assets = [vesuGenesis, vesuCarmineRunes, vesuRe7StarknetEcosystem, vesuRe7xSTRK];
+    const v2Assets = [vesuPrime, vesuRe7xBTC, vesuRe7USDCCore, vesuRe7USDCPrime, vesuRe7USDCStableCore];
+
     v1Assets.forEach(({ data }, index) => {
       if (!data) return;
-      const poolName = getV1PoolDisplay(v1Pools[index].poolName as any).name;
+      const poolName = getV1PoolDisplay(VESU_V1_POOL_CONFIGS[index].poolName as any).name;
       (data as unknown as ContractResponse).forEach(asset => {
         const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
         const raw = typeof (asset as any).symbol === "bigint" ? feltToString((asset as any).symbol) : String((asset as any).symbol ?? "");
@@ -339,7 +322,7 @@ const useVesuData = (): MarketData[] => {
     });
 
     v2Assets.forEach(({ assetsWithRates }, index) => {
-      const { name: poolName } = getV2PoolDisplay(v2Pools[index].poolName as any);
+      const { name: poolName } = getV2PoolDisplay(VESU_V2_POOL_CONFIGS[index].poolName as any);
       assetsWithRates.forEach(asset => {
         const address = `0x${asset.address.toString(16).padStart(64, "0")}`;
         const rawSymbol = typeof asset.symbol === "bigint" ? feltToString(asset.symbol) : String(asset.symbol ?? "");
@@ -364,7 +347,11 @@ const useVesuData = (): MarketData[] => {
     });
 
     return markets;
-  }, [allowDeposit, v1Assets, v1Pools, v2Assets, v2Pools]);
+  }, [
+    allowDeposit,
+    vesuGenesis, vesuCarmineRunes, vesuRe7StarknetEcosystem, vesuRe7xSTRK,
+    vesuPrime, vesuRe7xBTC, vesuRe7USDCCore, vesuRe7USDCPrime, vesuRe7USDCStableCore,
+  ]);
 };
 
 export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
@@ -435,7 +422,7 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     Record<string, { column: "supply" | "borrow"; direction: "asc" | "desc" }>
   >({});
 
-  const toggleGroupSort = (name: string, column: "supply" | "borrow") => {
+  const toggleGroupSort = useCallback((name: string, column: "supply" | "borrow") => {
     setGroupSorts(prev => {
       const current = prev[name] || { column: "borrow", direction: "asc" };
       return {
@@ -446,7 +433,17 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
             : { column, direction: "asc" },
       };
     });
-  };
+  }, []);
+
+  // Memoized handlers for sort buttons
+  const handleSortBySupply = useCallback(() => setSortBy("supply"), []);
+  const handleSortByBorrow = useCallback(() => setSortBy("borrow"), []);
+
+  // Factory for group sort handlers
+  const createGroupSortHandler = useCallback(
+    (name: string, column: "supply" | "borrow") => () => toggleGroupSort(name, column),
+    [toggleGroupSort],
+  );
 
   const networkIcons: Record<MarketData["network"], string> = {
     arbitrum: "/logos/arb.svg",
@@ -487,31 +484,31 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
       {/* Sort Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-medium">Sort by best</span>
-          <div className="flex rounded-lg bg-base-200/50 p-0.5">
+          <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-widest">Sort by best</span>
+          <div className="bg-base-200/50 flex rounded-lg p-0.5">
             <button
-              className={`px-3 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
-                sortBy === "supply" 
-                  ? "bg-success/20 text-success shadow-sm" 
+              className={`rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
+                sortBy === "supply"
+                  ? "bg-success/20 text-success shadow-sm"
                   : "text-base-content/50 hover:text-base-content/80"
               }`}
-              onClick={() => setSortBy("supply")}
+              onClick={handleSortBySupply}
             >
               Supply APY
             </button>
             <button
-              className={`px-3 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-md transition-all duration-200 ${
-                sortBy === "borrow" 
-                  ? "bg-error/20 text-error shadow-sm" 
+              className={`rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
+                sortBy === "borrow"
+                  ? "bg-error/20 text-error shadow-sm"
                   : "text-base-content/50 hover:text-base-content/80"
               }`}
-              onClick={() => setSortBy("borrow")}
+              onClick={handleSortByBorrow}
             >
               Borrow APR
             </button>
           </div>
         </div>
-        <span className="text-[10px] text-base-content/30">{filtered.length} tokens</span>
+        <span className="text-base-content/30 text-[10px]">{filtered.length} tokens</span>
       </div>
 
       {/* Market Groups */}
@@ -525,19 +522,19 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
             return sortInfo.direction === "asc" ? aVal - bVal : bVal - aVal;
           });
           return (
-            <details key={group.name} className="group rounded-xl overflow-hidden">
-              <summary className="list-none cursor-pointer">
-                <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-base-100 to-base-100/80 border border-base-200/60 hover:border-base-300 hover:shadow-lg transition-all duration-300">
+            <details key={group.name} className="group overflow-hidden rounded-xl">
+              <summary className="cursor-pointer list-none">
+                <div className="from-base-100 to-base-100/80 border-base-200/60 hover:border-base-300 flex items-center gap-4 rounded-xl border bg-gradient-to-r p-4 transition-all duration-300 hover:shadow-lg">
                   {/* Token Icon & Name */}
-                  <div className="flex items-center gap-3 min-w-[120px]">
-                    <div className="w-10 h-10 relative rounded-xl bg-base-200/60 p-1.5 ring-1 ring-base-300/30 shadow-sm">
+                  <div className="flex min-w-[120px] items-center gap-3">
+                    <div className="bg-base-200/60 ring-base-300/30 relative size-10 rounded-xl p-1.5 shadow-sm ring-1">
                       <Image src={group.icon} alt={group.name} fill className="rounded-lg object-contain" />
                     </div>
-                    <span className="font-bold text-lg tracking-tight">{group.name}</span>
+                    <span className="text-lg font-bold tracking-tight">{group.name}</span>
                   </div>
 
                   {/* Rates */}
-                  <div className="flex-1 flex items-center justify-center gap-6 md:gap-12">
+                  <div className="flex flex-1 items-center justify-center gap-6 md:gap-12">
                     <RatePill
                       variant="supply"
                       label="Supply Rate"
@@ -558,12 +555,12 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
 
                   {/* Markets count & expand indicator */}
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] uppercase tracking-wider text-base-content/40 font-medium">
+                    <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-wider">
                       {group.markets.length} {group.markets.length === 1 ? "market" : "markets"}
                     </span>
-                    <div className="w-6 h-6 rounded-lg bg-base-200/50 flex items-center justify-center group-open:bg-primary/20 transition-colors">
+                    <div className="bg-base-200/50 group-open:bg-primary/20 flex size-6 items-center justify-center rounded-lg transition-colors">
                       <svg 
-                        className="w-3.5 h-3.5 text-base-content/50 group-open:text-primary group-open:rotate-180 transition-all duration-200" 
+                        className="text-base-content/50 group-open:text-primary size-3.5 transition-all duration-200 group-open:rotate-180" 
                         fill="none" 
                         viewBox="0 0 24 24" 
                         stroke="currentColor"
@@ -576,50 +573,50 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
               </summary>
 
               {/* Expanded Content */}
-              <div className="mt-2 rounded-xl bg-base-200/30 border border-base-200/50 overflow-hidden">
+              <div className="bg-base-200/30 border-base-200/50 mt-2 overflow-hidden rounded-xl border">
                 {/* Table Header */}
-                <div className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-base-200/50">
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-semibold">Network</span>
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-semibold">Protocol</span>
-                  <span className="text-[10px] uppercase tracking-widest text-base-content/40 font-semibold text-center">Utilization</span>
+                <div className="border-base-200/50 grid grid-cols-5 gap-4 border-b px-4 py-3">
+                  <span className="text-base-content/40 text-[10px] font-semibold uppercase tracking-widest">Network</span>
+                  <span className="text-base-content/40 text-[10px] font-semibold uppercase tracking-widest">Protocol</span>
+                  <span className="text-base-content/40 text-center text-[10px] font-semibold uppercase tracking-widest">Utilization</span>
                   <button
                     type="button"
-                    className={`text-[10px] uppercase tracking-widest font-semibold text-center transition-colors ${
+                    className={`text-center text-[10px] font-semibold uppercase tracking-widest transition-colors ${
                       sortInfo.column === "supply" ? "text-success" : "text-base-content/40 hover:text-base-content/60"
                     }`}
-                    onClick={() => toggleGroupSort(group.name, "supply")}
+                    onClick={createGroupSortHandler(group.name, "supply")}
                   >
                     Supply APY {sortInfo.column === "supply" && (sortInfo.direction === "asc" ? "↑" : "↓")}
                   </button>
                   <button
                     type="button"
-                    className={`text-[10px] uppercase tracking-widest font-semibold text-center transition-colors ${
+                    className={`text-center text-[10px] font-semibold uppercase tracking-widest transition-colors ${
                       sortInfo.column === "borrow" ? "text-error" : "text-base-content/40 hover:text-base-content/60"
                     }`}
-                    onClick={() => toggleGroupSort(group.name, "borrow")}
+                    onClick={createGroupSortHandler(group.name, "borrow")}
                   >
                     Borrow APR {sortInfo.column === "borrow" && (sortInfo.direction === "asc" ? "↑" : "↓")}
                   </button>
                 </div>
 
                 {/* Table Rows */}
-                <div className="divide-y divide-base-200/30">
+                <div className="divide-base-200/30 divide-y">
                   {sortedMarkets.map((m, idx) => (
                     <div
                       key={`${m.protocol}-${m.network}-${m.address}${m.poolName ? `-${m.poolName}` : ""}`}
-                      className={`grid grid-cols-5 items-center gap-4 px-4 py-3 hover:bg-base-200/30 transition-colors ${
+                      className={`hover:bg-base-200/30 grid grid-cols-5 items-center gap-4 px-4 py-3 transition-colors ${
                         idx === 0 ? "bg-base-100/50" : ""
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 relative">
+                        <div className="relative size-5">
                           <Image src={networkIcons[m.network]} alt={m.network} fill className="object-contain" />
                         </div>
                         <span className="text-sm font-medium">{networkNames[m.network]}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 relative">
-                          <Image src={protocolIcons[m.protocol]} alt={m.protocol} fill className="object-contain rounded" />
+                        <div className="relative size-5">
+                          <Image src={protocolIcons[m.protocol]} alt={m.protocol} fill className="rounded object-contain" />
                         </div>
                         <span className="text-sm font-medium">
                           {protocolNames[m.protocol]}
@@ -627,13 +624,13 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                         </span>
                       </div>
                       <div className="text-center">
-                        <span className="text-sm font-mono font-medium tabular-nums text-base-content/70">{m.utilization}%</span>
+                        <span className="text-base-content/70 font-mono text-sm font-medium tabular-nums">{m.utilization}%</span>
                       </div>
                       <div className="text-center">
-                        <span className="text-sm font-mono font-semibold tabular-nums text-success">{m.supplyRate}</span>
+                        <span className="text-success font-mono text-sm font-semibold tabular-nums">{m.supplyRate}</span>
                       </div>
                       <div className="text-center">
-                        <span className="text-sm font-mono font-semibold tabular-nums text-error">{m.borrowRate}</span>
+                        <span className="text-error font-mono text-sm font-semibold tabular-nums">{m.borrowRate}</span>
                       </div>
                     </div>
                   ))}
@@ -647,8 +644,8 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
       {/* Empty State */}
       {filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-base-200/50 flex items-center justify-center mb-4">
-            <MagnifyingGlassIcon className="w-8 h-8 text-base-content/30" />
+          <div className="bg-base-200/50 mb-4 flex size-16 items-center justify-center rounded-2xl">
+            <MagnifyingGlassIcon className="text-base-content/30 size-8" />
           </div>
           <p className="text-base-content/50 text-sm">No markets found</p>
         </div>

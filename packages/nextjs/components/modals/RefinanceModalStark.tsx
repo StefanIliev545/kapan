@@ -7,7 +7,6 @@ import React, {
   useRef,
 } from "react";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
-import { formatUnits } from "viem";
 import { useAccount } from "~~/hooks/useAccount";
 import { useCollateral as useStarkCollateral } from "~~/hooks/scaffold-stark/useCollateral";
 import { useVesuPools } from "~~/hooks/useStarknetMovePosition";
@@ -19,33 +18,17 @@ import { useStarknetCollateralSupport } from "~~/hooks/useStarknetCollateralSupp
 import { useMovePositionState } from "~~/hooks/useMovePositionState";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { RefinanceModalContent } from "./RefinanceModalContent";
-
-/* ------------------------------ Helpers ------------------------------ */
-const addrKey = (a?: string) => (a ?? "").toLowerCase();
+import {
+  useMergedCollaterals,
+  usePreselectedCollateralsEffect,
+  useStableProtocolSelection,
+  useDebtInputFocus,
+  type CollateralFromHook,
+  type RefinanceModalStarkProps,
+} from "./common";
 
 /* ---------------------------- Component ------------------------------ */
-type RefinanceModalStarkProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  fromProtocol: string;
-  position: {
-    name: string;
-    tokenAddress: string;
-    decimals: number;
-    balance?: number | bigint;
-    poolId?: bigint | string;
-    type: "borrow" | "supply";
-  };
-  preSelectedCollaterals?: Array<{
-    token: string;
-    symbol: string;
-    decimals: number;
-    amount?: bigint;
-    maxAmount?: bigint;
-    inputValue?: string;
-  }>;
-  disableCollateralSelection?: boolean;
-};
+export { type RefinanceModalStarkProps };
 
 export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   isOpen,
@@ -118,7 +101,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   });
 
   // Use source collaterals for Starknet
-  const effectiveCollateralsFromHook = starkSourceCollaterals.map(c => ({
+  const effectiveCollateralsFromHook: CollateralFromHook[] = starkSourceCollaterals.map(c => ({
     address: c.address,
     symbol: c.symbol,
     icon: tokenNameToLogo(c.symbol.toLowerCase()),
@@ -127,50 +110,13 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     balance: c.balance,
   }));
 
-  // Merge preselected collaterals with collaterals from hook
-  const collaterals = useMemo(() => {
-    const sortByAddress = (list: typeof effectiveCollateralsFromHook) =>
-      [...list].sort((a, b) => addrKey(a.address).localeCompare(addrKey(b.address)));
-
-    if (!preSelectedCollaterals || preSelectedCollaterals.length === 0) {
-      return sortByAddress(effectiveCollateralsFromHook);
-    }
-
-    const existingMap = new Map(effectiveCollateralsFromHook.map(c => [addrKey(c.address), c]));
-    const merged = [...effectiveCollateralsFromHook];
-
-    preSelectedCollaterals.forEach(pc => {
-      const key = addrKey(pc.token);
-      if (!existingMap.has(key)) {
-        const rawBalance = pc.maxAmount || pc.amount || 0n;
-        merged.push({
-          address: pc.token,
-          symbol: pc.symbol,
-          icon: tokenNameToLogo(pc.symbol.toLowerCase()),
-          decimals: pc.decimals,
-          rawBalance: rawBalance,
-          balance: rawBalance ? Number(formatUnits(rawBalance, pc.decimals)) : 0,
-        });
-      } else {
-        const existing = existingMap.get(key);
-        if (existing && (pc.maxAmount || pc.amount)) {
-          const preselectedBalance = pc.maxAmount || pc.amount || 0n;
-          if (preselectedBalance > existing.rawBalance) {
-            const index = merged.findIndex(c => addrKey(c.address) === key);
-            if (index >= 0) {
-              merged[index] = {
-                ...existing,
-                rawBalance: preselectedBalance,
-                balance: Number(formatUnits(preselectedBalance, pc.decimals)),
-              };
-            }
-          }
-        }
-      }
-    });
-
-    return sortByAddress(merged);
-  }, [effectiveCollateralsFromHook, preSelectedCollaterals]);
+  // Merge preselected collaterals with collaterals from hook using shared utility
+  const collaterals = useMergedCollaterals({
+    collateralsFromHook: effectiveCollateralsFromHook,
+    preSelectedCollaterals,
+    disableCollateralSelection,
+    sortByAddress: true, // Starknet sorts by address for consistency
+  });
 
   /* --------------------------- State management --------------------------- */
   const state = useMovePositionState(isOpen);
@@ -232,54 +178,28 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     }
   );
 
-  const effectiveSupportedMap = starknetSupportedMap;
+  const effectiveSupportedMapMemo = useMemo(() => starknetSupportedMap ?? {}, [starknetSupportedMap]);
 
   const debtInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize preselected collaterals
-  useEffect(() => {
-    if (isOpen && preSelectedCollaterals && preSelectedCollaterals.length > 0 && collaterals.length > 0) {
-      const firstPreselected = preSelectedCollaterals[0];
-      const firstPreselectedKey = addrKey(firstPreselected.token);
-      const meta = collaterals.find(col => addrKey(col.address) === firstPreselectedKey);
+  // Initialize preselected collaterals using shared hook
+  usePreselectedCollateralsEffect({
+    isOpen,
+    preSelectedCollaterals,
+    collaterals,
+    expandedCollateral,
+    setExpandedCollateral,
+    setTempAmount,
+    setTempIsMax, // Starknet uses setTempIsMax for MAX tracking
+  });
 
-      if (meta && !expandedCollateral) {
-        setExpandedCollateral(firstPreselectedKey);
-
-        if (firstPreselected.amount) {
-          const amount = formatUnits(firstPreselected.amount, firstPreselected.decimals);
-          setTempAmount(amount);
-          try {
-            // If the provided amount equals full raw balance, mark as MAX by default
-            const providedRaw = firstPreselected.amount;
-            if (providedRaw === meta.rawBalance) {
-              setTempIsMax(true);
-            }
-          } catch {}
-        } else if (firstPreselected.inputValue) {
-          setTempAmount(firstPreselected.inputValue);
-        } else {
-          // Default to full balance and mark as MAX until edited
-          setTempAmount(formatUnits(meta.rawBalance, meta.decimals));
-          setTempIsMax(true);
-        }
-      }
-    }
-  }, [isOpen, preSelectedCollaterals, collaterals, expandedCollateral, setExpandedCollateral, setTempAmount]);
-
-  /* -------------------------- Stable selections ------------------------- */
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!selectedProtocol && filteredDestinationProtocols.length > 0) {
-      setSelectedProtocol(filteredDestinationProtocols[0].name);
-    } else if (
-      selectedProtocol &&
-      filteredDestinationProtocols.length > 0 &&
-      !filteredDestinationProtocols.some(p => p.name === selectedProtocol)
-    ) {
-      setSelectedProtocol(filteredDestinationProtocols[0].name);
-    }
-  }, [isOpen, filteredDestinationProtocols, selectedProtocol, setSelectedProtocol]);
+  // Maintain stable protocol selection using shared hook
+  useStableProtocolSelection({
+    isOpen,
+    filteredDestinationProtocols,
+    selectedProtocol,
+    setSelectedProtocol,
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -310,11 +230,8 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     }
   }, [isOpen, selectedProtocol, selectedVersion, starkVesuPools, setSelectedPoolId, setSelectedV2PoolAddress]);
 
-  useEffect(() => {
-    if (!(isOpen && !debtConfirmed)) return;
-    const t = setTimeout(() => debtInputRef.current?.focus(), 100);
-    return () => clearTimeout(t);
-  }, [isOpen, debtConfirmed]);
+  // Auto-focus debt input using shared hook
+  useDebtInputFocus({ isOpen, debtConfirmed, debtInputRef });
 
   useEffect(() => {
     resetState();
@@ -332,7 +249,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   const debtUsd = 0;
   const ltv = "0.0";
   const refiHF = 999; // Safe default for Starknet
-  const hfColor = { tone: "text-success", badge: "badge-success" };
+  const hfColor = useMemo(() => ({ tone: "text-success", badge: "badge-success" }), []);
 
   /* --------------------------- Starknet execution --------------------------- */
   const legacy = useStarknetMovePositionLegacy({
@@ -356,7 +273,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   /* --------------------------- Action Handlers --------------------------- */
   const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0;
 
-  const handleExecuteMove = async () => {
+  const handleExecuteMove = useCallback(async () => {
     if (!debtConfirmed || !selectedProtocol) return;
 
     try {
@@ -407,7 +324,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [debtConfirmed, selectedProtocol, fromProtocol, position.name, position.tokenAddress, position.type, sendStarkAsync, setIsSubmitting, onClose]);
 
   // Handle Starknet errors
   useEffect(() => {
@@ -450,7 +367,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
       setSelectedProvider={setSelectedProvider}
       collaterals={collaterals}
       isLoadingCollaterals={isLoadingCollaterals}
-      effectiveSupportedMap={effectiveSupportedMap ?? {}}
+      effectiveSupportedMap={effectiveSupportedMapMemo}
       addedCollaterals={addedCollaterals}
       expandedCollateral={expandedCollateral}
       tempAmount={tempAmount}

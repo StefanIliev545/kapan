@@ -26,25 +26,25 @@ export const RatePill: FC<RatePillProps> = ({ variant, rate, protocol, showIcons
   return (
     <div className="flex flex-col items-center gap-1">
       {/* Label */}
-      <span className="text-[9px] uppercase tracking-widest text-base-content/35 font-medium">
+      <span className="text-base-content/35 text-[9px] font-medium uppercase tracking-widest">
         {isSupply ? "Best Supply" : "Best Borrow"}
       </span>
       
       {/* Rate with protocol icon */}
       <div className="flex items-center gap-1.5">
-        <span className={`text-lg font-mono font-bold tabular-nums tracking-tight ${
+        <span className={`font-mono text-lg font-bold tabular-nums tracking-tight ${
           isSupply ? "text-success" : "text-error"
         }`}>
           {rate}
         </span>
         {showIcons && (
-          <div className="w-4 h-4 relative opacity-60">
-            <Image src={protocolIcons[protocol]} alt={protocol} fill className="object-contain rounded" />
+          <div className="relative size-4 opacity-60">
+            <Image src={protocolIcons[protocol]} alt={protocol} fill className="rounded object-contain" />
           </div>
         )}
       </div>
       {poolName && (
-        <span className="text-[10px] text-base-content/50 leading-none">{poolName}</span>
+        <span className="text-base-content/50 text-[10px] leading-none">{poolName}</span>
       )}
     </div>
   );

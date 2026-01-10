@@ -95,7 +95,9 @@ export function useMorphoMarketSupport({
     const supported: Record<string, boolean> = {};
 
     for (const market of relevantMarkets) {
-      const collAddr = market.collateralAsset!.address.toLowerCase();
+      // collateralAsset is guaranteed to exist due to filter above
+      const collAddr = market.collateralAsset?.address?.toLowerCase();
+      if (!collAddr) continue;
       if (!byCollateral[collAddr]) byCollateral[collAddr] = [];
       byCollateral[collAddr].push(market);
       supported[collAddr] = true;

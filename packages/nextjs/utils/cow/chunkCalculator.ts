@@ -188,7 +188,7 @@ function makeResult(
   initialBorrowCapacityUsd: bigint,
   geometricRatio: number,
   explanation: string,
-  recommendFlashLoan: boolean = false
+  recommendFlashLoan = false
 ): ChunkCalculationResult {
   return {
     numChunks,

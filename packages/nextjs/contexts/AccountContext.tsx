@@ -1,6 +1,4 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -13,13 +11,15 @@ import {
 import { AccountInterface, constants } from "starknet";
 import { useSearchParams } from "next/navigation";
 import { normalizeUserAddress } from "~~/utils/address";
+import { createSafeContext } from "./createSafeContext";
 
 export type EnhancedUseAccountResult = UseAccountResult & {
   viewingAddress?: `0x${string}`;
   isViewingOtherAddress: boolean;
 };
 
-const AccountContext = createContext<EnhancedUseAccountResult | null>(null);
+const { Context: AccountContext, useContextValue } =
+  createSafeContext<EnhancedUseAccountResult>("Account");
 
 type AccountProviderProps = {
   children: ReactNode;
@@ -70,7 +70,8 @@ export const AccountProvider = ({ children }: AccountProviderProps) => {
         if (!ignore && chainId) {
           setAccountChainId(BigInt(chainId.toString()));
         }
-      } catch (error) {
+      } catch {
+        // Silently fall back to mainnet chain ID
         if (!ignore) {
           setAccountChainId(BigInt(constants.StarknetChainId.SN_MAIN));
         }
@@ -154,12 +155,4 @@ export const AccountProvider = ({ children }: AccountProviderProps) => {
   );
 };
 
-export const useAccountContext = (): EnhancedUseAccountResult => {
-  const context = useContext(AccountContext);
-
-  if (!context) {
-    throw new Error("useAccount must be used within an AccountProvider");
-  }
-
-  return context;
-};
+export const useAccountContext = useContextValue;

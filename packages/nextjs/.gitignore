@@ -13,6 +13,8 @@
 /out/
 .vercel
 
+/storybook-static/**/*
+
 # production
 /build
 

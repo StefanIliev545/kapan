@@ -35,7 +35,7 @@ const ConnectModal = () => {
     <button
       onClick={connectWallet}
       disabled={isConnecting}
-      className="flex items-center gap-2 text-sm font-semibold text-primary dark:text-accent hover:opacity-80 transition-opacity duration-200 cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+      className="text-primary dark:text-accent flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm font-semibold transition-opacity duration-200 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {isConnecting && <span className="loading loading-spinner loading-xs"></span>}
       <span>Connect Starknet</span>

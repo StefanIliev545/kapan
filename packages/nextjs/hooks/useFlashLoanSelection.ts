@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { FlashLoanProviderOption } from "./useMovePositionData";
 import { useFlashLoanLiquidity } from "./useFlashLoanLiquidity";
-import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
+import {
+  type FlashLoanProviderOption,
+  FLASH_LOAN_PRIORITY,
+} from "~~/utils/flashLoan";
 
 interface UseFlashLoanSelectionProps {
     flashLoanProviders: FlashLoanProviderOption[];
@@ -65,18 +67,9 @@ export const useFlashLoanSelection = ({
         if (userHasSelected.current) return;
         if (!liquidityData.length || amount === 0n) return;
 
-        // Priority: Zero-fee providers first, then by reliability
-        // Fees: BalancerV2=0%, Morpho=0%, BalancerV3=0%, Aave=0.05%, ZeroLend=0.05%
-        const priority = [
-            FlashLoanProvider.BalancerV2,  // 0% fee, most liquid
-            FlashLoanProvider.Morpho,      // 0% fee
-            FlashLoanProvider.BalancerV3,  // 0% fee
-            FlashLoanProvider.Aave,        // 0.05% fee
-            FlashLoanProvider.ZeroLend,    // 0.05% fee (Aave fork)
-        ];
-
+        // Use centralized priority order: zero-fee providers first, then by reliability
         // Find the best provider with sufficient liquidity
-        const bestProviderEnum = priority.find(p => {
+        const bestProviderEnum = FLASH_LOAN_PRIORITY.find(p => {
             const data = liquidityData.find(d => d.provider === p);
             return data && data.hasLiquidity;
         });

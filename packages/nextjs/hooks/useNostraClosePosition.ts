@@ -106,7 +106,7 @@ export const useNostraClosePosition = ({
         if (meaningfulRepays.length === 0) throw new Error("Debt amount is too small for the selected collateral");
 
         const planResults: SwapPlan[] = [];
-        for (const [index, plan] of meaningfulRepays.entries()) {
+        for (const plan of meaningfulRepays) {
           const repayAmount = plan.repayAmount;
           const quoteRequest = {
             sellTokenAddress: plan.collateral.address,

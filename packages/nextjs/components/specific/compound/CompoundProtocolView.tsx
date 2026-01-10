@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
 import { CompoundCollateralView } from "./CompoundCollateralView";
 import { Address, formatUnits } from "viem";
@@ -10,7 +10,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SwapAsset } from "../../modals/SwapModalShell";
 import { useGlobalState } from "~~/services/store/store";
 import { useRiskParams } from "~~/hooks/useRiskParams";
-import { sanitizeSymbol } from "~~/utils/tokenSymbols";
+import { sanitizeSymbol, filterPositionsByWalletStatus } from "~~/utils/tokenSymbols";
+import { compoundRateToAPR, decimalsFromScale, STABLECOIN_SYMBOLS } from "~~/utils/protocolRates";
+import { useTxCompletedListener } from "~~/hooks/common";
 
 // Minimal ERC20 read ABI for symbol
 const ERC20_META_ABI = [
@@ -19,15 +21,6 @@ const ERC20_META_ABI = [
 
 // Define a constant for zero address
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
-// Helper: derive decimals from a priceScale bigint (e.g., 1e8 -> 8)
-const decimalsFromScale = (scale: bigint) => {
-  if (scale <= 1n) return 0;
-  let s = scale;
-  let d = 0;
-  while (s % 10n === 0n) { s /= 10n; d++; }
-  return d;
-};
 
 // (collateral value is computed via batch reads in the component below)
 
@@ -73,20 +66,12 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
   const baseTokenDecimals: number[] = useMemo(() => (baseTokenDecimalsRaw || []).map((d: any) => Number(d)), [baseTokenDecimalsRaw]);
 
   // Refetch contract reads when a transaction completes
-  useEffect(() => {
-    const handler = () => {
-      queryClient.refetchQueries({ queryKey: [chainId, "readContract"], type: "active" });
-      queryClient.refetchQueries({ queryKey: [chainId, "readContracts"], type: "active" });
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("txCompleted", handler);
-    }
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("txCompleted", handler);
-      }
-    };
+  const handleTxCompleted = useCallback(() => {
+    queryClient.refetchQueries({ queryKey: [chainId, "readContract"], type: "active" });
+    queryClient.refetchQueries({ queryKey: [chainId, "readContracts"], type: "active" });
   }, [chainId, queryClient]);
+
+  useTxCompletedListener(handleTxCompleted);
 
   // Batch market data getCompoundData(baseToken, user)
   const compoundCalls = useMemo(() => {
@@ -221,17 +206,6 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     },
   });
 
-  const stableSymbols = useMemo(
-    () => new Set(["usdc", "usdc.e", "usdt", "dai", "gusd", "susd", "lusd", "usdp", "busd"]),
-    [],
-  );
-
-  // Helper: Convert Compound's per-second rate to an APR percentage.
-  const convertRateToAPR = (ratePerSecond: bigint): number => {
-    const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
-    return (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / 1e18;
-  };
-
   // Aggregate positions dynamically
   const { suppliedPositions, borrowedPositions } = useMemo(() => {
     const supplied: ProtocolPosition[] = [];
@@ -259,15 +233,15 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
         && ethUsdPrice > 0
         && fallbackPrice > 0
         && fallbackPrice < 5
-        && stableSymbols.has(symbolKey);
+        && STABLECOIN_SYMBOLS.has(symbolKey);
       // API returns 0 when price is not found, so > 0 check is appropriate for fallback
       const price = typeof apiUsdPrice === "number" && apiUsdPrice > 0
         ? apiUsdPrice
         : shouldConvertFromEth
           ? fallbackPrice * ethUsdPrice
           : fallbackPrice;
-      const supplyAPR = convertRateToAPR(supplyRate ?? 0n);
-      const borrowAPR = convertRateToAPR(borrowRate ?? 0n);
+      const supplyAPR = compoundRateToAPR(supplyRate ?? 0n);
+      const borrowAPR = compoundRateToAPR(borrowRate ?? 0n);
 
       const tokenBalance = Number(formatUnits(balanceRaw ?? 0n, decimals));
       const usdBalance = tokenBalance * price;
@@ -386,14 +360,8 @@ export const CompoundProtocolView: FC<{ chainId?: number; enabledFeatures?: { sw
     chainId,
   ]);
 
-  const tokenFilter = new Set(["BTC", "ETH", "WETH", "USDC", "USDT", "USDC.E"]);
-
-  const filteredSuppliedPositions = isWalletConnected
-    ? suppliedPositions
-    : suppliedPositions.filter(p => tokenFilter.has(sanitizeSymbol(p.name)));
-  const filteredBorrowedPositions = isWalletConnected
-    ? borrowedPositions
-    : borrowedPositions.filter(p => tokenFilter.has(sanitizeSymbol(p.name)));
+  const filteredSuppliedPositions = filterPositionsByWalletStatus(suppliedPositions, isWalletConnected);
+  const filteredBorrowedPositions = filterPositionsByWalletStatus(borrowedPositions, isWalletConnected);
 
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 

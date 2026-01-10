@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { Address } from "viem";
 import { fetch1inchSwap, OneInchSwapResponse } from "../utils/1inch";
 import { getEffectiveChainId } from "../utils/forkChain";
 import { useDebounceValue } from "usehooks-ts";
 import { is1inchSupported } from "../utils/chainFeatures";
+import { queryOptions, queryKeys, DebounceTiming, hasValidAmount, isQueryEnabled } from "../lib/queryConfig";
 
 type Use1inchQuoteProps = {
     chainId: number;
@@ -25,14 +25,14 @@ export const use1inchQuote = ({
     slippage = 1,
     enabled = true,
 }: Use1inchQuoteProps) => {
-    const [debouncedAmount] = useDebounceValue(amount, 500);
-    
+    const [debouncedAmount] = useDebounceValue(amount, DebounceTiming.STANDARD);
+
     // Check if 1inch is supported on this chain - this is the ultimate failsafe
     const chainSupported = is1inchSupported(chainId);
-    const isEnabled = chainSupported && enabled && BigInt(debouncedAmount || "0") > 0n && !!src && !!dst && !!from;
+    const isEnabled = isQueryEnabled(chainSupported, enabled, hasValidAmount(debouncedAmount), src, dst, from);
 
     return useQuery<OneInchSwapResponse, Error>({
-        queryKey: ["1inch-quote", chainId, src, dst, debouncedAmount, from, slippage],
+        queryKey: queryKeys.oneInchQuote(chainId, src, dst, debouncedAmount, from, slippage),
         queryFn: async () => {
             // Double-check chain support before making request
             if (!is1inchSupported(chainId)) {
@@ -48,6 +48,7 @@ export const use1inchQuote = ({
                         from,
                         slippage,
                         disableEstimate: true, // Always disable for adapter flow
+                        includeTokensInfo: true, // Include USD values for price impact calculation
                     }
                 );
             } catch (e) {
@@ -56,7 +57,6 @@ export const use1inchQuote = ({
             }
         },
         enabled: isEnabled,
-        refetchInterval: 10000, // Poll every 10s
-        retry: false,
+        ...queryOptions.quote,
     });
 };

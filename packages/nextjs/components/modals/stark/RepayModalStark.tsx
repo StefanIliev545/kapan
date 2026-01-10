@@ -1,10 +1,10 @@
 import { FC } from "react";
+import { REPAY_MODAL_CONFIG, ensureTokenDecimals, useRepayModal } from "../common/useRepayModal";
 import { TokenActionModal, TokenInfo } from "../TokenActionModal";
-import { formatUnits } from "viem";
 import { useLendingAction } from "~~/hooks/useLendingAction";
-import type { VesuContext } from "~~/utils/vesu";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
 import { PositionManager } from "~~/utils/position";
+import type { VesuContext } from "~~/utils/vesu";
 
 interface RepayModalStarkProps {
   isOpen: boolean;
@@ -26,33 +26,39 @@ export const RepayModalStark: FC<RepayModalStarkProps> = ({
   position,
 }) => {
   const { balance, decimals } = useTokenBalance(token.address, "stark", undefined, token.decimals);
-  const decimalsForAction = decimals ?? token.decimals ?? 18;
+
+  // Use shared hook for common repay calculations
+  const { before, maxInput, effectiveDecimals } = useRepayModal({
+    token,
+    debtBalance,
+    walletBalance: balance,
+    decimals,
+  });
+
   const { execute, buildCalls } = useLendingAction(
     "stark",
     "Repay",
     token.address,
     protocolName,
-    decimalsForAction,
+    effectiveDecimals,
     vesuContext,
     debtBalance,
     balance,
   );
-  if (token.decimals == null) {
-    token.decimals = decimalsForAction;
-  }
-  const before = decimalsForAction ? Number(formatUnits(debtBalance, decimalsForAction)) : 0;
-  const bump = (debtBalance * 101n) / 100n;
-  const maxInput = balance < bump ? balance : bump;
+
+  // Ensure token has decimals set (backwards compatibility)
+  ensureTokenDecimals(token, effectiveDecimals);
+
   return (
     <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
-      action="Repay"
+      action={REPAY_MODAL_CONFIG.action}
       token={token}
       protocolName={protocolName}
-      apyLabel="Borrow APY"
+      apyLabel={REPAY_MODAL_CONFIG.apyLabel}
       apy={token.currentRate}
-      metricLabel="Total debt"
+      metricLabel={REPAY_MODAL_CONFIG.metricLabel}
       before={before}
       balance={balance}
       percentBase={debtBalance}

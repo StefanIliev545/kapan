@@ -1,0 +1,1 @@
+import{j}from"./jsx-runtime-CcWEvojh.js";const x=({src:t,alt:o,width:e,height:m,className:n,style:r,...s})=>{const i=typeof t=="object"&&t!==null&&"src"in t?t.src:t;return j.jsx("img",{src:i,alt:o,width:e,height:m,className:n,style:r,...s})};export{x as I};

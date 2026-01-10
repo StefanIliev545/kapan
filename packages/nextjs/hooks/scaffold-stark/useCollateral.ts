@@ -1,6 +1,5 @@
 import { useScaffoldReadContract } from "./useScaffoldReadContract";
 import { CollateralToken } from "~~/components/specific/collateral/CollateralSelector";
-import { Uint256 } from "starknet";
 import { feltToString } from "~~/utils/protocols";
 import { useEffect, useRef, useState } from "react";
 

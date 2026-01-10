@@ -27,7 +27,8 @@ export const useEvmTransactionFlow = ({
   chainId,
   onClose,
   buildFlow,
-  successMessage,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  successMessage: _successMessage,
   emptyFlowErrorMessage = "Failed to build transaction instructions",
   chainSwitchErrorMessage = "Please switch to the selected network to proceed",
   simulateWhenBatching = false,

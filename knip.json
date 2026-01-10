@@ -1,0 +1,42 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    "packages/nextjs": {
+      "entry": [
+        "app/**/*.{ts,tsx}",
+        "pages/**/*.{ts,tsx}"
+      ],
+      "project": ["**/*.{ts,tsx}"],
+      "ignore": [
+        "**/*.test.{ts,tsx}",
+        "contracts/**",
+        ".next/**"
+      ],
+      "ignoreDependencies": [
+        "autoprefixer",
+        "postcss",
+        "tailwindcss",
+        "@types/*"
+      ]
+    },
+    "packages/hardhat": {
+      "entry": [
+        "hardhat.config.ts",
+        "deploy/**/*.ts",
+        "scripts/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "project": ["**/*.ts"],
+      "ignore": [
+        "typechain-types/**",
+        "artifacts/**",
+        "cache/**"
+      ]
+    },
+    "packages/snfoundry": {
+      "entry": ["scripts-ts/**/*.ts"],
+      "project": ["scripts-ts/**/*.ts"]
+    }
+  },
+  "ignoreWorkspaces": ["packages/snfoundry/contracts"]
+}

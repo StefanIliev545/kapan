@@ -1,9 +1,8 @@
-import { renderHook, act } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { useTargetNetwork } from "../useTargetNetwork";
 import { useAccount } from "~~/hooks/useAccount";
 import { useGlobalState } from "~~/services/store/store";
-import scaffoldConfig from "~~/scaffold.config";
 
 // Mock dependencies
 vi.mock("~~/hooks/useAccount");

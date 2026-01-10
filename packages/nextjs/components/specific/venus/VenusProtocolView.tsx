@@ -32,9 +32,10 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import { formatUnits, Address } from "viem";
 import { useAccount } from "wagmi";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useGlobalState } from "~~/services/store/store";
+import { useProtocolTotalsFromPositions } from "~~/hooks/common";
 import { useRiskParams } from "~~/hooks/useRiskParams";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { filterPositionsByWalletStatus } from "~~/utils/tokenSymbols";
 
 // Create a Venus supply position type
 type VenusSupplyPosition = SupplyPositionProps;
@@ -268,45 +269,30 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
     };
   }, [vTokenAddresses, marketDetails, ratesData, userBalances, collateralStatus, connectedAddress, convertRateToAPY, comptrollerAddress, getTokenDisplay]);
 
-  const tokenFilter = ["BTC", "ETH", "USDC", "USDT"];
-  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z]/g, "").toUpperCase();
+  const filteredSuppliedPositions = filterPositionsByWalletStatus(
+    suppliedPositions as SupplyPositionProps[],
+    isWalletConnected,
+  );
+  const filteredBorrowedPositions = filterPositionsByWalletStatus(borrowedPositions, isWalletConnected);
 
-  const filteredSuppliedPositions = isWalletConnected
-    ? (suppliedPositions as SupplyPositionProps[])
-    : (suppliedPositions as SupplyPositionProps[]).filter(p => tokenFilter.includes(sanitize(p.name)));
-  const filteredBorrowedPositions = isWalletConnected
-    ? borrowedPositions
-    : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+  // Determine if data is ready for totals calculation
+  const isDataReady = !!(
+    vTokenAddresses &&
+    marketDetails &&
+    ratesData &&
+    !isLoadingVTokens &&
+    !isLoadingMarketDetails &&
+    !isLoadingRates &&
+    (!connectedAddress || (!isLoadingBalances && !isLoadingCollateral))
+  );
 
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
-
-  useEffect(() => {
-    if (!vTokenAddresses || !marketDetails || !ratesData) return;
-    if (isLoadingVTokens || isLoadingMarketDetails || isLoadingRates) return;
-    if (connectedAddress && (isLoadingBalances || isLoadingCollateral)) return;
-
-    const totalSupplied = filteredSuppliedPositions.reduce((sum, position) => sum + position.balance, 0);
-    const totalBorrowed = filteredBorrowedPositions.reduce(
-      (sum, position) => sum + (position.balance < 0 ? -position.balance : 0),
-      0,
-    );
-
-    setProtocolTotals("Venus", totalSupplied, totalBorrowed);
-  }, [
-    connectedAddress,
-    filteredBorrowedPositions,
+  // Use the shared hook to update protocol totals in global state
+  useProtocolTotalsFromPositions(
+    "Venus",
     filteredSuppliedPositions,
-    isLoadingBalances,
-    isLoadingCollateral,
-    isLoadingMarketDetails,
-    isLoadingRates,
-    isLoadingVTokens,
-    marketDetails,
-    ratesData,
-    setProtocolTotals,
-    vTokenAddresses,
-    chainId,
-  ]);
+    filteredBorrowedPositions,
+    isDataReady
+  );
 
   const lltvValue = useMemo(() => (lltvBps > 0n ? lltvBps : ltvBps), [lltvBps, ltvBps]);
 

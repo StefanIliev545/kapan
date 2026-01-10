@@ -5,7 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -59,7 +59,7 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
   const WAIT = getWaitConfirmations(chainId);
 
   // Reusing AaveGatewayWrite contract for now, but naming the deployment ZeroLendGatewayWrite
-  const zeroLendGatewayWrite = await deploy("ZeroLendGatewayWrite", {
+  const zeroLendGatewayWrite = await safeDeploy(hre, deployer, "ZeroLendGatewayWrite", {
     contract: "AaveGatewayWrite",
     from: deployer,
     args: [kapanRouter.address, POOL_ADDRESSES_PROVIDER, REFERRAL_CODE],
@@ -72,7 +72,7 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
   console.log(`ZeroLendGatewayWrite deployed to: ${zeroLendGatewayWrite.address}`);
 
   // Reusing AaveGatewayView contract for now, but naming the deployment ZeroLendGatewayView
-  const zeroLendGatewayView = await deploy("ZeroLendGatewayView", {
+  const zeroLendGatewayView = await safeDeploy(hre, deployer, "ZeroLendGatewayView", {
     contract: "AaveGatewayViewBase",
     from: deployer,
     args: [POOL_ADDRESSES_PROVIDER, UI_POOL_DATA_PROVIDER],
@@ -117,6 +117,8 @@ const deployZeroLendGatewayWrite: DeployFunction = async function (hre: HardhatR
     POOL_ADDRESSES_PROVIDER,
     UI_POOL_DATA_PROVIDER,
   ]);
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployZeroLendGatewayWrite;

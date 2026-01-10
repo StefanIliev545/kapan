@@ -2,12 +2,18 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 /**
  * Get recommended wait confirmations for a chain.
- * Mainnet uses 1 for faster deployments, other chains use 3 for safety.
+ * Different chains have different block times and finality guarantees.
  */
 export function getWaitConfirmations(chainId: number): number {
-  // Mainnet: 1 confirmation (faster deployments)
+  // Mainnet: 1 confirmation (12s blocks, strong finality)
   if (chainId === 1) return 1;
-  // Other chains: 3 confirmations (safer)
+  // Arbitrum: 5 confirmations (fast blocks ~0.25s, RPC can lag behind)
+  if (chainId === 42161) return 5;
+  // Base/Optimism: 3 confirmations (2s blocks)
+  if (chainId === 8453 || chainId === 10) return 3;
+  // Linea: 3 confirmations
+  if (chainId === 59144) return 3;
+  // Default: 3 confirmations
   return 3;
 }
 
@@ -16,9 +22,10 @@ export function getWaitConfirmations(chainId: number): number {
  * 
  * hardhat-deploy's execute() uses 'latest' nonce by default, which can cause
  * "nonce already used" errors when multiple transactions are sent in sequence.
- * This wrapper fetches the pending nonce before each call.
+ * This wrapper fetches the pending nonce before each call and waits for
+ * the transaction to be confirmed before returning.
  * 
- * Wait confirmations are chain-aware: mainnet uses 1, other chains use 3.
+ * Wait confirmations are chain-aware: Arbitrum uses 5 (fast blocks), others use 1-3.
  */
 export async function safeExecute(
   hre: HardhatRuntimeEnvironment,
@@ -40,8 +47,8 @@ export async function safeExecute(
   // Use chain-aware default if not explicitly provided
   const chainId = Number(await hre.getChainId());
   const defaultWait = getWaitConfirmations(chainId);
-    
-  return await execute(
+  
+  const result = await execute(
     contractName,
     { 
       from: deployer, 
@@ -52,6 +59,12 @@ export async function safeExecute(
     methodName,
     ...args
   );
+  
+  // Wait for pending transactions to clear after execution
+  // This ensures the nonce is updated before any subsequent calls
+  await waitForPendingTxs(hre, deployer, 15000);
+  
+  return result;
 }
 
 /**
@@ -87,4 +100,40 @@ export async function waitForPendingTxs(
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Safe deploy wrapper that waits for pending transactions and uses correct nonce.
+ * 
+ * hardhat-deploy's deploy() can have nonce issues on fast chains like Arbitrum.
+ * This wrapper ensures pending txs are cleared and passes the correct nonce.
+ */
+export async function safeDeploy(
+  hre: HardhatRuntimeEnvironment,
+  deployer: string,
+  contractName: string,
+  deployOptions: any
+): Promise<any> {
+  const { deployments, ethers } = hre;
+  const { deploy } = deployments;
+  
+  // Wait for any pending transactions to clear
+  await waitForPendingTxs(hre, deployer, 15000);
+  
+  // Small delay to ensure RPC is synced
+  await sleep(2000);
+  
+  // Get the current pending nonce
+  const nonce = await ethers.provider.getTransactionCount(deployer, "pending");
+  
+  // Deploy with explicit nonce
+  const result = await deploy(contractName, {
+    ...deployOptions,
+    nonce,
+  });
+  
+  // Wait for deployment to be confirmed before returning
+  await waitForPendingTxs(hre, deployer, 15000);
+  
+  return result;
 }

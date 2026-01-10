@@ -3,7 +3,6 @@ import { useTargetNetwork } from "./useTargetNetwork";
 import { Abi, useNetwork } from "@starknet-react/core";
 import { Contract as StarknetJsContract } from "starknet";
 import { useDeployedContractInfo, useSmartTransactor } from "~~/hooks/scaffold-stark";
-import { notification } from "~~/utils/scaffold-stark";
 import {
   ContractAbi,
   ContractName,

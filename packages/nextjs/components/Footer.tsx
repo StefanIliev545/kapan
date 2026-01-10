@@ -7,7 +7,7 @@ import Link from "next/link";
 export const Footer = () => {
   return (
     <footer className="w-full py-6 text-center">
-      <div className="flex justify-center gap-6 text-[10px] uppercase tracking-wider text-base-content/30">
+      <div className="text-base-content/30 flex justify-center gap-6 text-[10px] uppercase tracking-wider">
         <Link href="/blog" className="hover:text-base-content/50 transition-colors">
           Blog
         </Link>

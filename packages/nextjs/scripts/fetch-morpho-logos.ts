@@ -136,7 +136,7 @@ function getExistingLogos(): Set<string> {
  * - YT-USDe-27MAR2025 -> ytusde
  */
 function normalizeSymbol(symbol: string): string {
-  let result = symbol.toLowerCase();
+  const result = symbol.toLowerCase();
   
   // Handle PT tokens: remove "pt-" prefix, then strip date/timestamp suffixes
   if (result.startsWith("pt-")) {
@@ -182,7 +182,8 @@ function isValidSymbol(symbol: string): boolean {
   return true;
 }
 
-async function checkLogoExists(url: string): Promise<boolean> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function _checkLogoExists(url: string): Promise<boolean> {
   return new Promise((resolve) => {
     https.get(url, (res) => {
       resolve(res.statusCode === 200);

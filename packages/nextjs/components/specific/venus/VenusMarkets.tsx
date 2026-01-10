@@ -4,15 +4,7 @@ import { MarketsSection, MarketData } from "~~/components/markets/MarketsSection
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 import formatPercentage from "~~/utils/formatPercentage";
-
-// Convert Venus per-block rates to APY percentage
-const convertRateToAPY = (ratePerBlock: bigint): number => {
-  const ethMantissa = 1e18;
-  const blocksPerDay = 60 * 60 * 24;
-  const daysPerYear = 365;
-  const ratePerBlockNum = Number(ratePerBlock) / ethMantissa;
-  return (Math.pow(ratePerBlockNum * blocksPerDay + 1, daysPerYear - 1) - 1) * 100;
-};
+import { venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
 
 // Overrides for gm assets
 const tokenOverrides: Record<string, { name: string; logo: string }> = {
@@ -23,11 +15,6 @@ const tokenOverrides: Record<string, { name: string; logo: string }> = {
 const getTokenDisplay = (tokenAddress: string, originalSymbol: string) => {
   const override = tokenOverrides[tokenAddress];
   return override ? { displayName: override.name, logo: override.logo } : { displayName: originalSymbol, logo: tokenNameToLogo(originalSymbol) };
-};
-
-const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
-  42161: "arbitrum",
-  8453: "base",
 };
 
 interface VenusMarketsProps {
@@ -61,8 +48,8 @@ export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search, chainId 
       .map((token: string, i: number) => {
         if (token === "0x0000000000000000000000000000000000000000") return null;
         const { displayName, logo } = getTokenDisplay(token, symbols[i]);
-        const supplyAPY = convertRateToAPY(supplyRates[i]);
-        const borrowAPY = convertRateToAPY(borrowRates[i]);
+        const supplyAPY = venusRateToAPY(supplyRates[i]);
+        const borrowAPY = venusRateToAPY(borrowRates[i]);
         const price = Number(formatUnits(prices[i], 18 + (18 - decimals[i])));
         const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
         return {

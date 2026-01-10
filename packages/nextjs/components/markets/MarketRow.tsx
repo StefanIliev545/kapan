@@ -1,24 +1,11 @@
-import { FC, useState } from "react";
+import { FC } from "react";
 import Image from "next/image";
 import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark";
 import { InterestPillRow } from "./InterestPillRow";
+import { MarketProps } from "./types";
+import { useMarketDeposit } from "./useMarketDeposit";
 
-type MarketRowProps = {
-  icon: string;
-  name: string;
-  supplyRate: string;
-  borrowRate: string;
-  price: string;
-  utilization: string;
-  address: string;
-  networkType: "evm" | "starknet";
-  protocol: string;
-  network: "arbitrum" | "base" | "optimism" | "linea" | "starknet";
-  poolName?: string;
-  allowDeposit?: boolean;
-};
-
-export const MarketRow: FC<MarketRowProps> = ({
+export const MarketRow: FC<MarketProps> = ({
   icon,
   name,
   supplyRate,
@@ -30,24 +17,31 @@ export const MarketRow: FC<MarketRowProps> = ({
   protocol,
   allowDeposit = false,
 }) => {
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const { isModalOpen, openModal, closeModal, showDepositButton, tokenData } = useMarketDeposit({
+    name,
+    icon,
+    address,
+    supplyRate,
+    allowDeposit,
+    networkType,
+  });
 
   return (
     <>
-      <div className="p-4 bg-base-100 hover:bg-base-200/60 border border-transparent hover:border-base-content/10 rounded-lg transition-all cursor-pointer">
+      <div className="bg-base-100 hover:bg-base-200/60 hover:border-base-content/10 cursor-pointer rounded-lg border border-transparent p-4 transition-all">
         {/* Large screen view */}
-        <div className="hidden lg:flex items-center justify-between">
-          <div className="flex items-center gap-3 w-1/5">
+        <div className="hidden items-center justify-between lg:flex">
+          <div className="flex w-1/5 items-center gap-3">
             <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
             <span className="font-medium">{name}</span>
           </div>
-          <div className="flex items-center flex-1">
-            <div className="flex flex-col items-center w-1/5">
-              <div className="text-sm text-base-content/70">Price</div>
+          <div className="flex flex-1 items-center">
+            <div className="flex w-1/5 flex-col items-center">
+              <div className="text-base-content/70 text-sm">Price</div>
               <div className="font-medium">${price}</div>
             </div>
-            <div className="flex flex-col items-center w-1/5">
-              <div className="text-sm text-base-content/70 mb-1">Utilization</div>
+            <div className="flex w-1/5 flex-col items-center">
+              <div className="text-base-content/70 mb-1 text-sm">Utilization</div>
               <span className="font-medium">{utilization}%</span>
             </div>
             <div className="w-2/5">
@@ -60,11 +54,8 @@ export const MarketRow: FC<MarketRowProps> = ({
                 labels="center"
               />
             </div>
-            {allowDeposit && networkType === "starknet" && (
-              <button
-                className="btn btn-sm btn-primary ml-auto"
-                onClick={() => setIsDepositModalOpen(true)}
-              >
+            {showDepositButton && (
+              <button className="btn btn-sm btn-primary ml-auto" onClick={openModal}>
                 Deposit
               </button>
             )}
@@ -73,16 +64,13 @@ export const MarketRow: FC<MarketRowProps> = ({
 
         {/* Medium screen view */}
         <div className="hidden md:block lg:hidden">
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
               <span className="font-medium">{name}</span>
             </div>
-            {allowDeposit && networkType === "starknet" && (
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => setIsDepositModalOpen(true)}
-              >
+            {showDepositButton && (
+              <button className="btn btn-sm btn-primary" onClick={openModal}>
                 Deposit
               </button>
             )}
@@ -97,12 +85,12 @@ export const MarketRow: FC<MarketRowProps> = ({
             labels="center"
           />
           <div className="flex flex-wrap gap-3">
-            <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
-              <div className="text-sm text-base-content/70">Price</div>
+            <div className="bg-base-200/50 min-w-[140px] flex-1 rounded-md p-2">
+              <div className="text-base-content/70 text-sm">Price</div>
               <div className="font-medium">${price}</div>
             </div>
-            <div className="bg-base-200/50 p-2 rounded-md flex-1 min-w-[140px]">
-              <div className="text-sm text-base-content/70 mb-1">Utilization</div>
+            <div className="bg-base-200/50 min-w-[140px] flex-1 rounded-md p-2">
+              <div className="text-base-content/70 mb-1 text-sm">Utilization</div>
               <span className="font-medium">{utilization}%</span>
             </div>
           </div>
@@ -110,16 +98,13 @@ export const MarketRow: FC<MarketRowProps> = ({
 
         {/* Small screen view */}
         <div className="md:hidden">
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
               <span className="font-medium">{name}</span>
             </div>
-            {allowDeposit && networkType === "starknet" && (
-              <button
-                className="btn btn-xs btn-primary"
-                onClick={() => setIsDepositModalOpen(true)}
-              >
+            {showDepositButton && (
+              <button className="btn btn-xs btn-primary" onClick={openModal}>
                 Deposit
               </button>
             )}
@@ -134,28 +119,23 @@ export const MarketRow: FC<MarketRowProps> = ({
             labels="center"
           />
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-base-200/50 p-2 rounded-md">
-              <div className="text-xs text-base-content/70">Price</div>
-              <div className="font-medium text-sm">${price}</div>
+            <div className="bg-base-200/50 rounded-md p-2">
+              <div className="text-base-content/70 text-xs">Price</div>
+              <div className="text-sm font-medium">${price}</div>
             </div>
-            <div className="bg-base-200/50 p-2 rounded-md">
-              <div className="text-xs text-base-content/70 mb-1">Utilization</div>
-              <span className="font-medium text-sm">{utilization}%</span>
+            <div className="bg-base-200/50 rounded-md p-2">
+              <div className="text-base-content/70 mb-1 text-xs">Utilization</div>
+              <span className="text-sm font-medium">{utilization}%</span>
             </div>
           </div>
         </div>
       </div>
 
-      {allowDeposit && networkType === "starknet" && (
+      {showDepositButton && (
         <DepositModalStark
-          isOpen={isDepositModalOpen}
-          onClose={() => setIsDepositModalOpen(false)}
-          token={{
-            name,
-            icon,
-            address,
-            currentRate: parseFloat(supplyRate.replace("%", "")),
-          }}
+          isOpen={isModalOpen}
+          onClose={closeModal}
+          token={tokenData}
           protocolName={protocol}
         />
       )}

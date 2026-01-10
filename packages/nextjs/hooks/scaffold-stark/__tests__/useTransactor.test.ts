@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-duplicate-string */
 import { describe, it, expect, vi, beforeEach, Mock } from "vitest";
 import { renderHook, act, render } from "@testing-library/react";
 import { useTransactor } from "../useTransactor";

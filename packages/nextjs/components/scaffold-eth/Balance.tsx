@@ -1,6 +1,7 @@
 "use client";
 
 import { Address, formatEther } from "viem";
+import { BalanceError, BalanceSkeleton } from "~~/components/common";
 import { useDisplayUsdMode } from "~~/hooks/scaffold-eth/useDisplayUsdMode";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { useWatchBalance } from "~~/hooks/scaffold-eth/useWatchBalance";
@@ -31,42 +32,31 @@ export const Balance = ({ address, className = "", usdMode }: BalanceProps) => {
   const { displayUsdMode, toggleDisplayUsdMode } = useDisplayUsdMode({ defaultUsdMode: usdMode });
 
   if (!address || isLoading || balance === null || (isNativeCurrencyPriceFetching && nativeCurrencyPrice === 0)) {
-    return (
-      <div className="animate-pulse flex space-x-4">
-        <div className="rounded-md bg-slate-300 h-6 w-6"></div>
-        <div className="flex items-center space-y-6">
-          <div className="h-2 w-28 bg-slate-300 rounded"></div>
-        </div>
-      </div>
-    );
+    return <BalanceSkeleton />;
   }
 
   if (isError) {
-    return (
-      <div className="border-2 border-base-content/30 rounded-md px-2 flex flex-col items-center max-w-fit cursor-pointer">
-        <div className="text-warning">Error</div>
-      </div>
-    );
+    return <BalanceError />;
   }
 
   const formattedBalance = balance ? Number(formatEther(balance.value)) : 0;
 
   return (
     <button
-      className={`btn btn-sm btn-ghost flex flex-col font-normal items-center hover:bg-transparent ${className}`}
+      className={`btn btn-sm btn-ghost flex flex-col items-center font-normal hover:bg-transparent ${className}`}
       onClick={toggleDisplayUsdMode}
       type="button"
     >
-      <div className="w-full flex items-center justify-center">
+      <div className="flex w-full items-center justify-center">
         {displayUsdMode ? (
           <>
-            <span className="text-[0.8em] font-bold mr-1">$</span>
+            <span className="mr-1 text-[0.8em] font-bold">$</span>
             <span>{(formattedBalance * nativeCurrencyPrice).toFixed(2)}</span>
           </>
         ) : (
           <>
             <span>{formattedBalance.toFixed(4)}</span>
-            <span className="text-[0.8em] font-bold ml-1">{targetNetwork.nativeCurrency.symbol}</span>
+            <span className="ml-1 text-[0.8em] font-bold">{targetNetwork.nativeCurrency.symbol}</span>
           </>
         )}
       </div>

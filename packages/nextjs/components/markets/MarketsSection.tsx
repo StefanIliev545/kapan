@@ -45,7 +45,7 @@ export const MarketsSection: FC<MarketsSectionProps> = ({ title, markets, viewMo
   return (
     <div className="card bg-base-100 shadow-md">
       <div className="card-body p-4">
-        <h2 className="card-title text-lg mb-4">{title}</h2>
+        <h2 className="card-title mb-4 text-lg">{title}</h2>
         {extra}
         <div className={viewMode === "grid" ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3" : "space-y-2"}>
           {marketItems}

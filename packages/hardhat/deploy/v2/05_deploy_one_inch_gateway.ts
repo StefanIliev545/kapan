@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { ethers } from "hardhat";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs } from "../../utils/safeExecute";
 
 const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts } = hre;
@@ -35,7 +35,7 @@ const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntime
     }
 
     console.log("Deploying OneInchGateway...");
-    const gateway = await deploy("OneInchGateway", {
+    const gateway = await safeDeploy(hre, deployer, "OneInchGateway", {
         from: deployer,
         args: [router.address, deployer],
         log: true,
@@ -45,7 +45,7 @@ const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntime
     });
 
     console.log("Deploying OneInchAdapter...");
-    const adapter = await deploy("OneInchAdapter", {
+    const adapter = await safeDeploy(hre, deployer, "OneInchAdapter", {
         from: deployer,
         args: [gateway.address, oneInchRouter],
         log: true,
@@ -69,6 +69,8 @@ const deployOneInchGateway: DeployFunction = async function (hre: HardhatRuntime
 
     console.log("OneInch integration deployed!");
     // Gateway sync is handled by 99_sync_authorization_helper.ts to avoid nonce race conditions
+
+    await waitForPendingTxs(hre, deployer);
 };
 
 export default deployOneInchGateway;

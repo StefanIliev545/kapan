@@ -1,20 +1,12 @@
 import { useEffect, useState } from "react";
 import { useScaffoldReadContract } from "./useScaffoldReadContract";
 import { ContractName } from "~~/utils/scaffold-eth/contract";
+import { getGatewayContractName } from "./gatewayContracts";
 
 interface CollateralSupportResult {
   isLoading: boolean;
   supportedCollaterals: Record<string, boolean>; // Address -> supported mapping
 }
-
-// Map protocol names to gateway view contract names
-const PROTOCOL_TO_GATEWAY_MAP: Record<string, "AaveGatewayView" | "CompoundGatewayView" | "VenusGatewayView" | "ZeroLendGatewayView" | "SparkGatewayView"> = {
-  aave: "AaveGatewayView",
-  compound: "CompoundGatewayView",
-  venus: "VenusGatewayView",
-  zerolend: "ZeroLendGatewayView",
-  spark: "SparkGatewayView",
-};
 
 /**
  * Hook to check which collaterals are supported in a target protocol
@@ -34,9 +26,8 @@ export const useCollateralSupport = (
 ): CollateralSupportResult => {
   const [supportedCollaterals, setSupportedCollaterals] = useState<Record<string, boolean>>({});
 
-  // Normalize protocol name and get gateway contract name
-  const normalizedProtocol = protocolName.toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
-  const gatewayContractName = PROTOCOL_TO_GATEWAY_MAP[normalizedProtocol] || "AaveGatewayView";
+  // Get gateway contract name using shared utility
+  const gatewayContractName = getGatewayContractName(protocolName);
 
   // Get all supported collaterals for the target protocol
   const { data: supportedCollateralsList, isLoading } = useScaffoldReadContract({

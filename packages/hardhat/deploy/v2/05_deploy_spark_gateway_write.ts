@@ -5,7 +5,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Gate deployment by a per-chain address map only.
@@ -42,7 +42,7 @@ const deploySparkGatewayWrite: DeployFunction = async function (hre: HardhatRunt
 
   // Use AaveGatewayWrite contract since Spark is an Aave fork
   // Deploy with name "SparkGatewayWrite" to keep it separate from Aave deployments
-  const sparkGatewayWrite = await deploy("SparkGatewayWrite", {
+  const sparkGatewayWrite = await safeDeploy(hre, deployer, "SparkGatewayWrite", {
     from: deployer,
     args: [kapanRouter.address, POOL_ADDRESSES_PROVIDER, REFERRAL_CODE],
     log: true,
@@ -56,7 +56,7 @@ const deploySparkGatewayWrite: DeployFunction = async function (hre: HardhatRunt
 
   // Use AaveGatewayViewBase contract since Spark may have UiPoolDataProvider struct differences
   // Deploy with name "SparkGatewayView" to keep it separate from Aave deployments
-  const sparkGatewayView = await deploy("SparkGatewayView", {
+  const sparkGatewayView = await safeDeploy(hre, deployer, "SparkGatewayView", {
     from: deployer,
     args: [POOL_ADDRESSES_PROVIDER, UI_POOL_DATA_PROVIDER],
     log: true,
@@ -83,6 +83,8 @@ const deploySparkGatewayWrite: DeployFunction = async function (hre: HardhatRunt
       UI_POOL_DATA_PROVIDER,
     ]);
   }
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deploySparkGatewayWrite;

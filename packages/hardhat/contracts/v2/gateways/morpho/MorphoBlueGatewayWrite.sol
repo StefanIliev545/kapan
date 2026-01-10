@@ -149,16 +149,14 @@ contract MorphoBlueGatewayWrite is IGateway, ProtocolGateway, Ownable, Reentranc
 
     function _supply(MarketParams memory params, uint256 amount, address onBehalfOf) internal {
         IERC20(params.loanToken).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(params.loanToken).approve(address(morpho), 0);
-        IERC20(params.loanToken).approve(address(morpho), amount);
+        IERC20(params.loanToken).forceApprove(address(morpho), amount);
 
         morpho.supply(params, amount, 0, onBehalfOf, "");
     }
 
     function _supplyCollateral(MarketParams memory params, uint256 amount, address onBehalfOf) internal {
         IERC20(params.collateralToken).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(params.collateralToken).approve(address(morpho), 0);
-        IERC20(params.collateralToken).approve(address(morpho), amount);
+        IERC20(params.collateralToken).forceApprove(address(morpho), amount);
 
         morpho.supplyCollateral(params, amount, onBehalfOf, "");
     }
@@ -194,8 +192,7 @@ contract MorphoBlueGatewayWrite is IGateway, ProtocolGateway, Ownable, Reentranc
         uint256 pre = loanToken.balanceOf(address(this));
 
         loanToken.safeTransferFrom(msg.sender, address(this), amount);
-        loanToken.approve(address(morpho), 0);
-        loanToken.approve(address(morpho), amount);
+        loanToken.forceApprove(address(morpho), amount);
 
         // Get user's actual debt to decide repay strategy
         bytes32 marketId = params.id();

@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useMemo } from "react";
+import { FC, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useReadContract } from "@starknet-react/core";
@@ -9,6 +9,16 @@ import { universalErc20Abi } from "~~/utils/Constants";
 import { feltToString, formatTokenAmount } from "~~/utils/protocols";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
+import { truncateAddress } from "~~/utils/address";
+
+// Static animation variants - extracted to module level to avoid recreation
+const BUTTON_HOVER = { y: -1 };
+const BUTTON_TAP = { scale: 0.98 };
+const SELECTED_INDICATOR_INITIAL = { scale: 0 };
+const SELECTED_INDICATOR_ANIMATE = { scale: 1 };
+
+// Static fallback icon path
+const FALLBACK_ICON = '/logos/x-logo.svg';
 
 interface GasTokenComponentProps {
   address: string;
@@ -133,7 +143,7 @@ functionName: "symbol",
     };
   }, [nameRaw, symbolRaw, balanceRaw, address, decimals]);
 
-  const handleSelect = () => {
+  const handleSelect = useCallback(() => {
     const newToken = {
       address,
       symbol: token.symbol,
@@ -145,20 +155,31 @@ functionName: "symbol",
     updateSelectedToken(newToken);
     // Call the local onSelect callback
     onSelect();
-  };
+  }, [address, token.symbol, token.name, token.icon, token.balance, updateSelectedToken, onSelect]);
+
+  // Memoized image error handler
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    target.src = FALLBACK_ICON;
+  }, []);
+
+  // Memoized animation variants based on token selectability
+  const whileHover = token.isSelectable ? BUTTON_HOVER : undefined;
+  const whileTap = token.isSelectable ? BUTTON_TAP : undefined;
+  const handleClick = token.isSelectable ? handleSelect : undefined;
 
   // Show loading state if still fetching data
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center p-2 rounded-lg border bg-base-200 border-base-300/30">
-        <div className="w-6 h-6 mb-1 flex items-center justify-center">
+      <div className="bg-base-200 border-base-300/30 flex flex-col items-center rounded-lg border p-2">
+        <div className="mb-1 flex size-6 items-center justify-center">
           <span className="loading loading-spinner loading-xs"></span>
         </div>
-        <div className="text-xs font-medium text-base-content/50 mb-1">
+        <div className="text-base-content/50 mb-1 text-xs font-medium">
           Loading...
         </div>
-        <div className="text-xs text-base-content/30">
-          {address.slice(0, 6)}...
+        <div className="text-base-content/30 text-xs">
+          {truncateAddress(address, 6, 0)}
         </div>
       </div>
     );
@@ -167,15 +188,15 @@ functionName: "symbol",
   // Show error state if failed to load
   if (hasError) {
     return (
-      <div className="flex flex-col items-center p-2 rounded-lg border bg-error/10 border-error/30">
-        <div className="w-6 h-6 mb-1 flex items-center justify-center text-error">
+      <div className="bg-error/10 border-error/30 flex flex-col items-center rounded-lg border p-2">
+        <div className="text-error mb-1 flex size-6 items-center justify-center">
           ⚠️
         </div>
-        <div className="text-xs font-medium text-error mb-1">
+        <div className="text-error mb-1 text-xs font-medium">
           Error
         </div>
-        <div className="text-xs text-error/70">
-          {address.slice(0, 6)}...
+        <div className="text-error/70 text-xs">
+          {truncateAddress(address, 6, 0)}
         </div>
       </div>
     );
@@ -184,47 +205,44 @@ functionName: "symbol",
   return (
     <motion.button
       className={`
-        flex flex-col items-center p-2 rounded-lg border transition-all duration-200 ${token.isSelectable ? 'hover:scale-[1.02]' : ''}
-        ${isSelected 
-          ? 'bg-primary/10 border-primary/30 shadow-sm' 
-          : token.isSelectable ? 'bg-base-200 border-base-300/30 hover:bg-base-300' : 'bg-base-200 border-base-300/30 opacity-60 cursor-not-allowed'
+        flex flex-col items-center rounded-lg border p-2 transition-all duration-200 ${token.isSelectable ? 'hover:scale-[1.02]' : ''}
+        ${isSelected
+          ? 'bg-primary/10 border-primary/30 shadow-sm'
+          : token.isSelectable ? 'bg-base-200 border-base-300/30 hover:bg-base-300' : 'bg-base-200 border-base-300/30 cursor-not-allowed opacity-60'
         }
       `}
-      onClick={token.isSelectable ? handleSelect : undefined}
+      onClick={handleClick}
       disabled={!token.isSelectable}
-      whileHover={token.isSelectable ? { y: -1 } : undefined}
-      whileTap={token.isSelectable ? { scale: 0.98 } : undefined}
+      whileHover={whileHover}
+      whileTap={whileTap}
     >
       {/* Token Icon */}
-      <div className="w-6 h-6 relative mb-1">
+      <div className="relative mb-1 size-6">
         <Image
           src={token.icon}
           alt={token.name}
           fill
           className="object-contain"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = '/logos/x-logo.svg';
-          }}
+          onError={handleImageError}
         />
       </div>
 
       {/* Token Name */}
-      <div className="text-xs font-medium text-base-content mb-1">
+      <div className="text-base-content mb-1 text-xs font-medium">
         {token.symbol}
       </div>
 
       {/* Balance */}
-      <div className="text-xs text-base-content/60">
+      <div className="text-base-content/60 text-xs">
         {token.balance}
       </div>
 
       {/* Selected Indicator */}
       {isSelected && (
         <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full"
+          initial={SELECTED_INDICATOR_INITIAL}
+          animate={SELECTED_INDICATOR_ANIMATE}
+          className="bg-primary absolute right-1 top-1 size-2 rounded-full"
         />
       )}
     </motion.button>
