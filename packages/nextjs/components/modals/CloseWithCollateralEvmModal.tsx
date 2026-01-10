@@ -50,6 +50,12 @@ import {
 // We add a small buffer (10 bps total) to ensure swap covers repayment
 const AAVE_FLASH_LOAN_FEE_BPS = 10n;
 
+// Buffer for max limit orders to account for interest accrual.
+// 1 basis point (0.01%) is roughly equivalent to 1 hour of interest at ~87% APY,
+// which is more than enough buffer for typical DeFi rates (3-20% APY).
+// For a 10% APY position, this covers about 8 hours of interest accrual.
+const MAX_LIMIT_ORDER_BUFFER_BPS = 1n;
+
 interface CloseWithCollateralEvmModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -277,6 +283,15 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         return result.value ?? 0n;
     }, [amountIn, debtDecimals]);
 
+    // For max limit orders, add a small buffer to account for interest accrual
+    // between quote time and order fill time. The buffer ensures we buy enough
+    // debt tokens to fully repay even if interest accrues. Any excess is refunded.
+    const limitOrderBuyAmount = useMemo(() => {
+        if (!isMax || executionType !== "limit") return repayAmountRaw;
+        // Add buffer: repayAmount * (1 + buffer/10000)
+        return repayAmountRaw + (repayAmountRaw * MAX_LIMIT_ORDER_BUFFER_BPS) / 10000n;
+    }, [repayAmountRaw, isMax, executionType]);
+
     // Flash Loan selection - we flash loan the DEBT token to repay
     const { selectedProvider, setSelectedProvider } = useFlashLoanSelection({
         flashLoanProviders,
@@ -379,13 +394,14 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
 
     // ============ Limit Order: CoW Quote ============
+    // Use limitOrderBuyAmount which includes buffer for isMax orders
     const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
         sellToken: selectedTo?.address || "",       // Collateral to sell
         buyToken: debtToken,                         // Debt to receive
-        buyAmount: repayAmountRaw.toString(),       // Exact debt amount we need
+        buyAmount: limitOrderBuyAmount.toString(),  // Debt amount (buffered for isMax)
         kind: "buy",                                 // KIND_BUY: exact buy, max sell
         from: userAddress || "",
-        enabled: cowAvailable && executionType === "limit" && repayAmountRaw > 0n && !!selectedTo && !!userAddress && isOpen,
+        enabled: cowAvailable && executionType === "limit" && limitOrderBuyAmount > 0n && !!selectedTo && !!userAddress && isOpen,
     });
 
     // ============ Limit Order: Collateral from CoW Quote ============
@@ -424,7 +440,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         return buildCowChunkInstructions({
             selectedTo,
             userAddress,
-            repayAmountRaw,
+            repayAmountRaw: limitOrderBuyAmount, // Use buffered amount for isMax orders
             orderManagerAddress,
             protocolName,
             context,
@@ -433,8 +449,9 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             debtDecimals,
             cowFlashLoanInfo,
             limitOrderConfig,
+            isMax, // When true, adds PushToken to return any repay refund to user
         });
-    }, [selectedTo, userAddress, repayAmountRaw, orderManagerAddress, protocolName, context, debtToken, debtName, debtDecimals, cowFlashLoanInfo, limitOrderConfig]);
+    }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtToken, debtName, debtDecimals, cowFlashLoanInfo, limitOrderConfig, isMax]);
 
     const buildFlow = () => {
         if (!swapQuote || !selectedTo || !hasAdapter || requiredCollateral === 0n) return [];
@@ -548,11 +565,12 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             });
 
             // Build limit order calls
+            // Use limitOrderBuyAmount which includes buffer for isMax orders
             const callParams = buildLimitOrderCallParams({
                 selectedTo,
                 debtToken,
                 limitOrderCollateral,
-                repayAmountRaw,
+                repayAmountRaw: limitOrderBuyAmount,
                 cowFlashLoanInfo,
                 buildCowInstructions,
                 limitOrderConfig,
@@ -622,7 +640,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         } finally {
             setIsLimitSubmitting(false);
         }
-    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, debtDecimals, limitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, useBatchedTx, sendCallsAsync, setBatchId, setSuppressBatchNotifications, onClose]);
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, limitOrderBuyAmount, debtDecimals, limitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, useBatchedTx, sendCallsAsync, setBatchId, setSuppressBatchNotifications, onClose]);
 
     // Can submit based on execution type
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter;

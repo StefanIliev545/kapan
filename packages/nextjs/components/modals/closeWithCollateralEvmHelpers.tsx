@@ -10,6 +10,7 @@ import {
     createProtocolInstruction,
     encodeApprove,
     encodePullToken,
+    encodePushToken,
     encodeAdd,
     encodeLendingInstruction,
     LendingOp,
@@ -79,6 +80,8 @@ export interface CowChunkParams {
     debtDecimals: number;
     cowFlashLoanInfo: FlashLoanInfo;
     limitOrderConfig: LimitOrderResult | null;
+    /** When true, adds a small buffer to handle interest accrual and pushes any refund to user */
+    isMax?: boolean;
 }
 
 // ============ Analytics Helpers ============
@@ -183,6 +186,7 @@ export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstruct
         debtDecimals,
         cowFlashLoanInfo,
         limitOrderConfig,
+        isMax,
     } = params;
 
     // Early return for invalid state
@@ -231,6 +235,18 @@ export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstruct
         // Flash loan repay is implicit via flashLoanRepaymentUtxoIndex
     ];
 
+    // For isMax orders: push any refund from Repay (UTXO[4]) back to user.
+    // When user requests max close, we buy slightly more debt tokens than current debt
+    // to account for interest accrual. Any excess after repay goes back to user.
+    // This must come AFTER the Add instruction to preserve the flash loan repayment UTXO index.
+    if (isMax) {
+        // UTXO[4] = refund from Repay (debt token). Push it back to user.
+        // Note: If there's no refund (amount = 0), the PushToken is a no-op.
+        postInstructions.push(
+            createRouterInstruction(encodePushToken(4, userAddress as Address))
+        );
+    }
+
     logCowInstructions({
         selectedTo,
         debtName,
@@ -239,6 +255,7 @@ export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstruct
         chunkBuyAmount,
         cowFlashLoanInfo,
         numChunks,
+        isMax,
     });
 
     // Return N identical chunks - each processes per-chunk amounts
@@ -257,7 +274,11 @@ function logCowInstructions(params: {
     chunkBuyAmount: bigint;
     cowFlashLoanInfo: FlashLoanInfo;
     numChunks: number;
+    isMax?: boolean;
 }): void {
+    const baseFlow = "pullDebt -> approve -> repay -> withdraw(Y) -> add(Y, X-Y) -> implicit:push(X->adapter)";
+    const flow = params.isMax ? `${baseFlow} -> push(refund->user)` : baseFlow;
+
     console.log("[buildCowInstructions] Close with Collateral (KIND_BUY):", {
         sellToken: params.selectedTo.symbol,
         buyToken: params.debtName,
@@ -266,8 +287,9 @@ function logCowInstructions(params: {
         flashLoanToken: params.selectedTo.symbol,
         flashLoanAmount: formatUnits(params.cowFlashLoanInfo.amount, params.selectedTo.decimals),
         numChunks: params.numChunks,
-        utxoLayout: "UTXO[0]=actualSell(Y), UTXO[1]=leftover(X-Y), UTXO[5]=withdrawn(Y), UTXO[6]=Y+(X-Y)=X",
-        flow: "pullDebt -> approve -> repay -> withdraw(Y) -> add(Y, X-Y) -> implicit:push(X->adapter)",
+        isMax: params.isMax ?? false,
+        utxoLayout: "UTXO[0]=actualSell(Y), UTXO[1]=leftover(X-Y), UTXO[4]=repayRefund, UTXO[5]=withdrawn(Y), UTXO[6]=Y+(X-Y)=X",
+        flow,
     });
 }
 

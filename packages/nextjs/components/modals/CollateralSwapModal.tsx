@@ -25,6 +25,7 @@ import {
   createProtocolInstruction,
   encodeApprove,
   encodeLendingInstruction,
+  encodePushToken,
   LendingOp,
   normalizeProtocolName,
 } from "~~/utils/v2/instructionHelpers";
@@ -98,6 +99,8 @@ async function buildLimitOrder(params: LimitOrderParams): Promise<BuildOrderResu
     const chunkMinBuyAmount = minBuyAmount.raw / BigInt(numChunks);
     const chunkFlashLoanAmount = chunkSellAmount;
 
+    // All postInstructions are included for authorization.
+    // The gateway's authorize() adds buffer to GetSupplyBalance for dust clearing.
     const result = await buildLimitOrderCalls({
         sellToken: selectedFrom.address as Address,
         buyToken: selectedTo.address as Address,
@@ -687,16 +690,22 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     /**
      * Build CoW limit order instructions for collateral swap.
-     * 
+     *
      * Collateral Swap Flow (KIND_SELL):
      * - Flash loan: old collateral (what we're swapping out)
-     * - Sell: old collateral → Buy: new collateral
+     * - Sell: old collateral -> Buy: new collateral
      * - Post-hook:
      *   UTXO[0] = swap output (new collateral, from OrderManager ToOutput prepend)
-     *   [0] Approve(0, protocol) → UTXO[1] 
-     *   [1] Deposit(newCollateral, input=0) → consumed
-     *   [2] Withdraw(oldCollateral, per-chunk amount + fee) → UTXO[2]
-     *   [3] PushToken(2, borrower) → repay flash loan (appended by hook)
+     *   [0] Approve(0, protocol) -> UTXO[1] (dummy output, token=0, amount=0)
+     *   [1] Deposit(newCollateral, input=0) -> NO NEW UTXO (0 outputs)
+     *   [2] Withdraw(oldCollateral, per-chunk amount + fee) -> UTXO[2]
+     *
+     *   For isMax (dust clearing):
+     *   [3] GetSupplyBalance(oldCollateral) -> UTXO[3] (remaining dust amount)
+     *   [4] WithdrawCollateral(oldCollateral, input=3) -> UTXO[4] (withdrawn dust)
+     *   [5] PushToken(4, userAddress) -> sends dust to user
+     *
+     *   [N] PushToken(2, borrower) -> repay flash loan (appended by hook)
      */
     const buildCowInstructions = useMemo((): ChunkInstructions[] => {
         if (!selectedFrom || !selectedTo || !userAddress || amountInBigInt === 0n || !orderManagerAddress || !cowFlashLoanInfo) {
@@ -710,7 +719,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         const chunkSellAmount = amountInBigInt / BigInt(numChunks);
         const chunkFlashLoanFee = cowFlashLoanInfo.fee / BigInt(numChunks);
         const chunkWithdrawAmount = chunkSellAmount + chunkFlashLoanFee;
-        
+
         console.log("[buildCowInstructions] Collateral swap (KIND_SELL):", {
             sellToken: selectedFrom.symbol,
             buyToken: selectedTo.symbol,
@@ -719,28 +728,30 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             numChunks,
             chunkSellAmount: formatUnits(chunkSellAmount, selectedFrom.decimals),
             chunkWithdrawAmount: formatUnits(chunkWithdrawAmount, selectedFrom.decimals),
-            flow: "swap[0] → approve[1] → deposit → withdraw[2] → (hook appends push)",
+            isMax,
+            flow: isMax
+                ? "swap[0] -> approve[1] -> deposit -> withdraw[2] -> getSupply[3] -> withdrawDust[4] -> pushDust(4) -> (hook appends pushRepay[2])"
+                : "swap[0] -> approve[1] -> deposit -> withdraw[2] -> (hook appends pushRepay[2])",
         });
 
         // Build chunks - each chunk has same instructions but processes per-chunk amounts
         return Array(numChunks).fill(null).map(() => {
             // Post-hook instructions (UTXO tracking after OrderManager prepends ToOutput as UTXO[0])
             // UTXO[0] = swap output (new collateral)
-            // [0] Approve(0, protocol) → UTXO[1]
-            // [1] Deposit(newCollateral, input=0) → consumed
-            // [2] Withdraw(oldCollateral, chunkWithdrawAmount) → UTXO[2]
-            // [3] PushToken(2, borrower) → appended by hook via flashLoanRepaymentUtxoIndex
+            // Approve(0, protocol) -> UTXO[1] (dummy)
+            // Deposit(newCollateral, input=0) -> NO NEW UTXO
+            // Withdraw(oldCollateral, chunkWithdrawAmount) -> UTXO[2]
             const postInstructions: ProtocolInstruction[] = [
-                // 1. Approve new collateral for deposit → UTXO[1]
+                // 1. Approve new collateral for deposit -> UTXO[1] (dummy)
                 createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-                
-                // 2. Deposit new collateral (no UTXO created, consumed)
+
+                // 2. Deposit new collateral (no UTXO created)
                 createProtocolInstruction(
                     normalizedProtocol,
                     encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, context || "0x", 0)
                 ),
-                
-                // 3. Withdraw old collateral to repay flash loan → UTXO[2]
+
+                // 3. Withdraw old collateral to repay flash loan -> UTXO[2]
                 // Use per-chunk amount (chunkSellAmount + fee), NOT total amount
                 createProtocolInstruction(
                     normalizedProtocol,
@@ -748,13 +759,43 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 ),
             ];
 
+            // For isMax: Add dust clearing instructions AFTER the main withdraw
+            // This clears any remaining supply balance (dust) from rounding/interest accrual
+            if (isMax) {
+                // [3] GetSupplyBalance(oldCollateral) -> UTXO[3] (remaining dust amount)
+                postInstructions.push(
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.GetSupplyBalance, selectedFrom.address, userAddress, 0n, context || "0x", 999)
+                    )
+                );
+
+                // [4] WithdrawCollateral(oldCollateral, input=3) -> UTXO[4] (withdraw the dust)
+                // inputIndex=3 references the GetSupplyBalance output (UTXO[3])
+                postInstructions.push(
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, context || "0x", 3)
+                    )
+                );
+
+                // [5] PushToken(4, userAddress) -> send dust to user
+                // This sends UTXO[4] (withdrawn dust) directly to the user
+                postInstructions.push(
+                    createRouterInstruction(encodePushToken(4, userAddress))
+                );
+            }
+
             return {
                 preInstructions: [], // Empty - flash loan transfer hooks are in appData
                 postInstructions,
-                flashLoanRepaymentUtxoIndex: 2, // UTXO[2] = Withdraw output
+                flashLoanRepaymentUtxoIndex: 2, // UTXO[2] = Withdraw output (for flash loan repay)
+                // Note: All instructions are included in authorization.
+                // The gateway's authorize() adds 0.1% buffer to GetSupplyBalance simulation,
+                // ensuring the second WithdrawCollateral gets proper authorization for dust.
             };
         });
-    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, numChunks]);
+    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, numChunks, isMax]);
 
     const buildFlow = () => {
         if (!selectedFrom || !selectedTo) return [];

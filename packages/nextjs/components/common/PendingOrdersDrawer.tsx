@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAccount, useChainId } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import { formatUnits, type Address } from "viem";
 import { useCowOrder } from "~~/hooks/useCowOrder";
 import { useMultipleChunkExecutedEvents } from "~~/hooks/useChunkExecutedEvents";
@@ -60,23 +61,77 @@ function UsdValue({ symbol, amount }: { symbol: string; amount: number }) {
 export function PendingOrdersDrawer() {
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
+  const queryClient = useQueryClient();
   const { getUserOrdersWithDetails, cancelOrder, isCancelling, isAvailable } = useCowOrder();
-  
+
   const [isOpen, setIsOpen] = useState(false);
   const [orders, setOrders] = useState<OrderWithHash[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [cancellingHash, setCancellingHash] = useState<string | null>(null);
-  
+
+  // Track previous order states to detect progress/completion
+  const prevOrderStates = useRef<Map<string, { status: number; iterations: bigint }>>(new Map());
+
   // Track which user+chain combo we've fetched for to detect changes
   const [fetchedFor, setFetchedFor] = useState<string | null>(null);
   const currentKey = userAddress && chainId ? `${userAddress}-${chainId}` : null;
   const hasFetched = fetchedFor === currentKey;
+
+  // Refresh protocol data when orders progress or complete
+  const refreshProtocolData = useCallback(() => {
+    console.log("[PendingOrdersDrawer] Order state changed, refreshing protocol data...");
+    Promise.all([
+      queryClient.refetchQueries({ queryKey: ['readContract'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['morpho-positions'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['morpho-markets-support'], type: 'active' }),
+    ]).catch(e => console.warn("[PendingOrdersDrawer] Refetch error:", e));
+
+    // Also dispatch txCompleted event for any other listeners
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("txCompleted"));
+    }
+  }, [queryClient]);
 
   const fetchOrders = useCallback(async () => {
     if (!userAddress || !isAvailable || !currentKey) return;
     setIsLoading(true);
     try {
       const userOrders = await getUserOrdersWithDetails();
+
+      // Check if any order progressed or completed
+      let hasChanges = false;
+      for (const order of userOrders) {
+        const prev = prevOrderStates.current.get(order.orderHash);
+        if (prev) {
+          const statusChanged = prev.status !== order.context.status;
+          const iterationsIncreased = order.context.iterationCount > prev.iterations;
+          if (statusChanged || iterationsIncreased) {
+            hasChanges = true;
+            console.log(`[PendingOrdersDrawer] Order ${order.orderHash.slice(0, 10)}... changed:`, {
+              statusChanged,
+              iterationsIncreased,
+              oldStatus: prev.status,
+              newStatus: order.context.status,
+              oldIterations: prev.iterations.toString(),
+              newIterations: order.context.iterationCount.toString(),
+            });
+          }
+        }
+        // Update tracked state
+        prevOrderStates.current.set(order.orderHash, {
+          status: order.context.status,
+          iterations: order.context.iterationCount,
+        });
+      }
+
+      // Refresh protocol data if any order changed
+      if (hasChanges) {
+        refreshProtocolData();
+      }
+
       setOrders(userOrders);
       setFetchedFor(currentKey);
     } catch (error) {
@@ -85,7 +140,7 @@ export function PendingOrdersDrawer() {
     } finally {
       setIsLoading(false);
     }
-  }, [userAddress, isAvailable, getUserOrdersWithDetails, currentKey]);
+  }, [userAddress, isAvailable, getUserOrdersWithDetails, currentKey, refreshProtocolData]);
 
   // Reset state when user or chain changes
   useEffect(() => {
@@ -135,12 +190,13 @@ export function PendingOrdersDrawer() {
     setIsOpen(false);
   }, []);
 
-  // Filter to recent orders (past 7 days) and sort newest first
+  // Filter to recent orders (past 7 days), exclude cancelled, sort newest first
   const now = Math.floor(Date.now() / 1000);
-  
+
   const recentOrders = useMemo(() => {
     return orders
       .filter(o => now - Number(o.context.createdAt) < SEVEN_DAYS_SECONDS)
+      .filter(o => o.context.status !== OrderStatus.Cancelled) // Exclude cancelled orders
       .sort((a, b) => Number(b.context.createdAt) - Number(a.context.createdAt));
   }, [orders, now]);
   
@@ -338,32 +394,49 @@ export function PendingOrdersDrawer() {
 
                   return (
                     <div key={orderHash} className={`hover:bg-base-50 px-4 py-3 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
-                      {/* Row 0: Operation type + Protocol */}
-                      {(operationType !== "unknown" || protocolName) && (
-                        <div className="mb-1.5 flex items-center gap-2">
+                      {/* Row 0: Protocol (left) | Operation type + Order kind + Status (right) */}
+                      <div className="mb-1.5 flex items-center justify-between">
+                        {/* Left: Protocol */}
+                        <div className="flex items-center gap-1">
+                          {protocolName && protocolLogo && (
+                            <Image
+                              src={protocolLogo}
+                              alt={protocolName}
+                              width={14}
+                              height={14}
+                              className="rounded-sm"
+                            />
+                          )}
+                          {protocolName && (
+                            <span className="text-base-content/50 text-[10px]">{protocolName}</span>
+                          )}
+                        </div>
+                        {/* Right: Tags grouped */}
+                        <div className="flex items-center gap-1.5">
+                          {/* Operation type badge */}
                           {operationType !== "unknown" && (
                             <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${operationColorClass}`}>
                               {operationLabel}
                             </span>
                           )}
-                          {protocolName && (
-                            <div className="flex items-center gap-1">
-                              {protocolLogo && (
-                                <Image 
-                                  src={protocolLogo} 
-                                  alt={protocolName} 
-                                  width={14} 
-                                  height={14} 
-                                  className="rounded-sm"
-                                />
-                              )}
-                              <span className="text-base-content/50 text-[10px]">{protocolName}</span>
-                            </div>
-                          )}
+                          {/* Order kind badge */}
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            params.isKindBuy ? 'bg-info/20 text-info' : 'bg-secondary/20 text-secondary'
+                          }`}>
+                            {params.isKindBuy ? 'BUY' : 'SELL'}
+                          </span>
+                          {/* Status badge */}
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            isActive ? 'bg-warning/20 text-warning' :
+                            isCompleted ? 'bg-success/20 text-success' :
+                            'bg-error/20 text-error'
+                          }`}>
+                            {isActive ? 'Active' : isCompleted ? 'Done' : 'Cancelled'}
+                          </span>
                         </div>
-                      )}
-                      
-                      {/* Row 1: Token pair, status, time */}
+                      </div>
+
+                      {/* Row 1: Token pair + time */}
                       <div className="mb-2 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="flex items-center -space-x-1">
@@ -371,13 +444,6 @@ export function PendingOrdersDrawer() {
                             <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={24} height={24} className="ring-base-100 rounded-full ring-2" />
                           </div>
                           <span className="text-sm font-medium">{sellSymbol} → {buySymbol}</span>
-                          <span className={`rounded px-1.5 py-0.5 text-xs ${
-                            isActive ? 'bg-warning/20 text-warning' :
-                            isCompleted ? 'bg-success/20 text-success' :
-                            'bg-error/20 text-error'
-                          }`}>
-                            {isActive ? 'Active' : isCompleted ? 'Done' : 'Cancelled'}
-                          </span>
                         </div>
                         <span className="text-base-content/40 text-xs">{timeAgo(createdAt, true)}</span>
                       </div>
@@ -396,26 +462,39 @@ export function PendingOrdersDrawer() {
                         </div>
                       </div>
 
-                      {/* Row 3: Amounts */}
-                      <div className="mb-2 flex justify-between text-sm">
-                        <div>
-                          <span className="text-base-content/50">Sell </span>
-                          <span className="font-medium">{formatAmount(params.preTotalAmount, sellDecimals)}</span>
-                          <span className="text-base-content/50 ml-1">{sellSymbol}</span>
-                          <span className="ml-2"><UsdValue symbol={sellSymbol} amount={sellAmountNum} /></span>
+                      {/* Row 3: Amounts - Sell/Buy with expected amounts */}
+                      {/* KIND_SELL: Exact sell amount, minimum buy amount */}
+                      {/* KIND_BUY: Maximum sell amount, exact buy amount */}
+                      <div className="mb-2 space-y-1 text-sm">
+                        {/* Sell row */}
+                        <div className="flex justify-between">
+                          <div>
+                            <span className="text-base-content/50">{params.isKindBuy ? 'Sell up to ' : 'Sell '}</span>
+                            <span className="font-medium">{formatAmount(params.preTotalAmount, sellDecimals)}</span>
+                            <span className="text-base-content/50 ml-1">{sellSymbol}</span>
+                          </div>
+                          <UsdValue symbol={sellSymbol} amount={sellAmountNum} />
                         </div>
-                        <div className="text-right">
-                          <span className="text-base-content/50">Got </span>
-                          <span className={`font-medium ${hasExecutionData ? 'text-success' : 'text-base-content/40'}`}>
-                            {hasExecutionData ? formatAmount(totalReceived, buyDecimals) : '-'}
-                          </span>
-                          {hasExecutionData && (
-                            <>
+                        {/* Buy row - expected buy amount */}
+                        <div className="flex justify-between">
+                          <div>
+                            <span className="text-base-content/50">{params.isKindBuy ? 'Buy ' : 'Get at least '}</span>
+                            <span className="font-medium">{formatAmount(params.minBuyPerChunk * params.targetValue, buyDecimals)}</span>
+                            <span className="text-base-content/50 ml-1">{buySymbol}</span>
+                          </div>
+                          <UsdValue symbol={buySymbol} amount={parseFloat(formatUnits(params.minBuyPerChunk * params.targetValue, buyDecimals))} />
+                        </div>
+                        {/* Got row - actual received amount */}
+                        {hasExecutionData && (
+                          <div className="flex justify-between">
+                            <div>
+                              <span className="text-base-content/50">Got </span>
+                              <span className="text-success font-medium">{formatAmount(totalReceived, buyDecimals)}</span>
                               <span className="text-base-content/50 ml-1">{buySymbol}</span>
-                              <span className="ml-2"><UsdValue symbol={buySymbol} amount={receivedAmountNum} /></span>
-                            </>
-                          )}
-                        </div>
+                            </div>
+                            <UsdValue symbol={buySymbol} amount={receivedAmountNum} />
+                          </div>
+                        )}
                       </div>
 
                       {/* Row 4: Surplus (if any) */}

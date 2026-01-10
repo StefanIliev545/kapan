@@ -45,6 +45,7 @@ import {
     shouldSwitchSwapRouter,
     calculateRequiredNewDebt,
     calculateLimitOrderNewDebt,
+    calculateDustBuffer,
 } from "./debtSwapEvmHelpers";
 
 interface DebtSwapEvmModalProps {
@@ -264,6 +265,16 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         return result.value ?? 0n;
     }, [amountIn, debtFromDecimals]);
 
+    // For limit orders with max: apply dust buffer to buy slightly more than current debt
+    // This accounts for interest accrual between order creation and execution
+    const limitOrderBuyAmount = useMemo(() => {
+        if (executionType !== "limit" || !isMax) {
+            return repayAmountRaw;
+        }
+        // Apply dust buffer (~1 hour of interest) for max repayments
+        return calculateDustBuffer(repayAmountRaw);
+    }, [executionType, isMax, repayAmountRaw]);
+
     // Step 1: Get unit quote (1 newDebt -> X currentDebt) to estimate exchange rate
     const unitQuoteAmount = useMemo(() => {
         if (!selectedTo) return "0";
@@ -373,13 +384,14 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         : false;
 
     // ============ Limit Order: CoW Quote ============
+    // Use limitOrderBuyAmount which includes dust buffer when isMax is true
     const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
         sellToken: selectedTo?.address || "",        // newDebt to sell
         buyToken: debtFromToken,                      // oldDebt to receive (exact)
-        buyAmount: repayAmountRaw.toString(),        // Exact old debt amount we need
+        buyAmount: limitOrderBuyAmount.toString(),   // Buffered amount when isMax (covers interest accrual)
         kind: "buy",                                  // KIND_BUY: exact buy, max sell
         from: userAddress || "",
-        enabled: cowAvailable && executionType === "limit" && repayAmountRaw > 0n && !!selectedTo && !!userAddress && isOpen,
+        enabled: cowAvailable && executionType === "limit" && limitOrderBuyAmount > 0n && !!selectedTo && !!userAddress && isOpen,
     });
 
     // ============ Limit Order: New Debt Amount from CoW Quote ============
@@ -400,7 +412,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         return buildCowChunkInstructions({
             selectedTo,
             userAddress,
-            repayAmountRaw,
+            repayAmountRaw: limitOrderBuyAmount,  // Use buffered amount for max repayments
             orderManagerAddress,
             protocolName,
             context,
@@ -409,8 +421,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             debtFromDecimals,
             cowFlashLoanInfo,
             limitOrderConfig,
+            isMax,  // Enable dust clearing (refund to user) when max is selected
         });
-    }, [selectedTo, userAddress, repayAmountRaw, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderConfig]);
+    }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderConfig, isMax]);
 
     // amountOut = required new debt (what user will borrow)
     const amountOut = useMemo(() => {
@@ -528,11 +541,12 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             });
 
             // Build limit order calls
+            // Use limitOrderBuyAmount which includes dust buffer when isMax
             const callParams = buildLimitOrderCallParams({
                 selectedTo,
                 debtFromToken,
                 limitOrderNewDebt,
-                repayAmountRaw,
+                repayAmountRaw: limitOrderBuyAmount,
                 cowFlashLoanInfo,
                 buildCowInstructions,
                 limitOrderConfig,
@@ -594,7 +608,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         } finally {
             setIsLimitSubmitting(false);
         }
-    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, limitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, useBatchedTx, sendCallsAsync, setSuppressBatchNotifications, setBatchId, onClose]);
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, limitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, useBatchedTx, sendCallsAsync, setSuppressBatchNotifications, setBatchId, onClose, limitOrderBuyAmount]);
 
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && requiredNewDebt > 0n && hasAdapter;
     const canSubmitLimit = executionType === "limit" && limitOrderReady && !!cowFlashLoanInfo &&

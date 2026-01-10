@@ -48,12 +48,19 @@ export interface ChunkInstructions {
   preInstructions: ProtocolInstruction[];
   /** Instructions to run after the swap (UTXO[0] = buyToken amount from swap) */
   postInstructions: ProtocolInstruction[];
-  /** 
+  /**
    * For flash loan mode: UTXO index to push for flash loan repayment.
    * If set, the hook automatically appends PushToken(index, borrowerAddress) to postInstructions.
    * The borrower address is resolved automatically based on the flash loan config.
    */
   flashLoanRepaymentUtxoIndex?: number;
+  /**
+   * Number of postInstructions that need authorization.
+   * Instructions beyond this count (e.g., dust clearing) use dynamic input references
+   * and should NOT be included in authorization checks.
+   * If not set, all postInstructions are used for authorization.
+   */
+  authInstructionCount?: number;
 }
 
 /**
@@ -251,9 +258,15 @@ function flattenInstructions(
     }
   }
 
-  // Include chunk instructions
+  // Include chunk instructions (respecting authInstructionCount for authorization)
   for (const chunk of chunks) {
-    for (const inst of [...chunk.preInstructions, ...chunk.postInstructions]) {
+    // For postInstructions, only include those needed for authorization
+    // Instructions beyond authInstructionCount use dynamic input references and don't need auth
+    const authPostInstructions = chunk.authInstructionCount !== undefined
+      ? chunk.postInstructions.slice(0, chunk.authInstructionCount)
+      : chunk.postInstructions;
+
+    for (const inst of [...chunk.preInstructions, ...authPostInstructions]) {
       const key = `${inst.protocolName}:${inst.data}`;
       if (!seen.has(key)) {
         seen.add(key);

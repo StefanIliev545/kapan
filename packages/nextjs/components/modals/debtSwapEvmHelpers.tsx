@@ -10,6 +10,7 @@ import {
     createProtocolInstruction,
     encodeApprove,
     encodePullToken,
+    encodePushToken,
     encodeAdd,
     encodeLendingInstruction,
     LendingOp,
@@ -57,6 +58,8 @@ export interface CowChunkParams {
     debtFromDecimals: number;
     cowFlashLoanInfo: FlashLoanInfo;
     limitOrderConfig: LimitOrderResult | null;
+    /** Whether user selected "max" - enables dust clearing with refund to user */
+    isMax?: boolean;
 }
 
 export interface LimitOrderSubmitParams {
@@ -170,6 +173,40 @@ export function buildCowFlashLoanInfo(
     };
 }
 
+// ============ Dust Buffer Calculation ============
+
+/**
+ * Calculate dust buffer for max debt repayment.
+ *
+ * When repaying max debt via limit order, we need to buy slightly more oldDebt than
+ * the current balance to account for interest that accrues between order creation
+ * and execution. Any excess is refunded to the user via a PushToken instruction.
+ *
+ * We use ~1 hour of interest at typical DeFi rates (10% APY as conservative estimate):
+ * - 10% APY = 0.0001142% per hour (10 / 365 / 24 = 0.00114%)
+ * - Rounded up to 0.0002% (2 basis points) for safety margin
+ *
+ * @param amount - The debt amount to buffer
+ * @returns The buffered amount (amount + dust buffer)
+ */
+export function calculateDustBuffer(amount: bigint): bigint {
+    // Add 0.0002% (2 basis points) = multiply by 10002/10000
+    // This covers ~1 hour of interest at 17.5% APY with safety margin
+    const DUST_BUFFER_NUMERATOR = 10002n;
+    const DUST_BUFFER_DENOMINATOR = 10000n;
+
+    return (amount * DUST_BUFFER_NUMERATOR) / DUST_BUFFER_DENOMINATOR;
+}
+
+/**
+ * Calculate the amount of extra debt to buy for dust clearing.
+ * @param amount - The base debt amount
+ * @returns The extra amount (buffer - original)
+ */
+export function getDustBufferAmount(amount: bigint): bigint {
+    return calculateDustBuffer(amount) - amount;
+}
+
 // ============ CoW Instructions Builder ============
 
 export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstructions[] {
@@ -185,6 +222,7 @@ export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstruct
         debtFromDecimals,
         cowFlashLoanInfo,
         limitOrderConfig,
+        isMax,
     } = params;
 
     // Early return for invalid state
@@ -209,7 +247,7 @@ export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstruct
         // [1] Approve oldDebt for lending protocol (using UTXO[2]) -> UTXO[3]
         createRouterInstruction(encodeApprove(2, normalizedProtocol)),
 
-        // [2] Repay user's oldDebt using UTXO[2] -> UTXO[4]
+        // [2] Repay user's oldDebt using UTXO[2] -> UTXO[4] (refund if over-repaying)
         createProtocolInstruction(
             normalizedProtocol,
             encodeLendingInstruction(LendingOp.Repay, debtFromToken as Address, userAddress as Address, chunkBuyAmount, context || "0x", 2)
@@ -231,8 +269,20 @@ export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstruct
         // [4] Add: borrowed (UTXO[5]) + leftover (UTXO[1]) -> UTXO[6]
         createRouterInstruction(encodeAdd(5, 1)),
 
-        // Flash loan repay is implicit via flashLoanRepaymentUtxoIndex
+        // Flash loan repay is implicit via flashLoanRepaymentUtxoIndex (pushes UTXO[6])
     ];
+
+    // For max repayments: Push any refund from Repay (UTXO[4]) back to user
+    // This handles the case where we bought slightly more oldDebt than needed
+    // (dust buffer) and the Repay instruction returns the excess
+    if (isMax) {
+        // UTXO[4] is the refund from Repay - push it to user
+        // This is added AFTER the Add instruction but the hook appends flash loan
+        // repayment (PushToken for UTXO[6]) last, so order is preserved
+        postInstructions.push(
+            createRouterInstruction(encodePushToken(4, userAddress))
+        );
+    }
 
     logCowInstructions({
         selectedTo,
@@ -243,6 +293,7 @@ export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstruct
         cowFlashLoanInfo,
         chunkFlashLoanAmount,
         numChunks,
+        isMax,
     });
 
     // Return N identical chunks - each processes per-chunk amounts
@@ -262,6 +313,7 @@ function logCowInstructions(params: {
     cowFlashLoanInfo: FlashLoanInfo;
     chunkFlashLoanAmount: bigint;
     numChunks: number;
+    isMax?: boolean;
 }): void {
     console.log("[buildCowInstructions] Debt Swap (KIND_BUY):", {
         sellToken: params.selectedTo.symbol,
@@ -272,7 +324,9 @@ function logCowInstructions(params: {
         totalFlashLoanAmount: formatUnits(params.cowFlashLoanInfo.amount, params.selectedTo.decimals),
         chunkFlashLoanAmount: formatUnits(params.chunkFlashLoanAmount, params.selectedTo.decimals),
         numChunks: params.numChunks,
-        utxoLayout: "UTXO[0]=actualSell, UTXO[1]=leftover, UTXO[5]=borrowed, UTXO[6]=borrowed+leftover",
+        isMax: params.isMax ?? false,
+        dustClearing: params.isMax ? "enabled (UTXO[4] refund pushed to user)" : "disabled",
+        utxoLayout: "UTXO[0]=actualSell, UTXO[1]=leftover, UTXO[4]=repayRefund, UTXO[5]=borrowed, UTXO[6]=borrowed+leftover",
     });
 }
 
