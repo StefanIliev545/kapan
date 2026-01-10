@@ -108,7 +108,7 @@ export const InfoShorthand: StoryObj<typeof InfoDisplay> = {
 export const ErrorObject: Story = {
   render: () => (
     <div className="w-80">
-      <ErrorDisplay message={new Error("Error object message is extracted")} />
+      <ErrorDisplay message={{ message: "Error object message is extracted" } as Error} />
     </div>
   ),
 };

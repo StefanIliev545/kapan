@@ -9,13 +9,14 @@ import { LoadingSpinner } from "~~/components/common/Loading";
 import { PositionManager } from "~~/utils/position";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import formatPercentage from "~~/utils/formatPercentage";
-import { encodeMorphoContext } from "~~/utils/v2/instructionHelpers";
+import { encodeMorphoContext, type MorphoMarketContextForEncoding } from "~~/utils/v2/instructionHelpers";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
 import { ExternalLink } from "lucide-react";
 import { isPTToken, PTYield } from "~~/hooks/usePendlePTYields";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { formatSignedPercent } from "../utils";
+import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
 
 interface MorphoPositionsSectionProps {
   title: string;
@@ -46,8 +47,20 @@ const TEXT_SUCCESS = "text-success";
 const TEXT_ERROR = "text-error";
 
 // Static available actions objects (can be reused across renders)
-const SUPPLY_ACTIONS_WITH_MOVE = { deposit: true, withdraw: true, move: true, swap: false } as const;
-const SUPPLY_ACTIONS_WITHOUT_MOVE = { deposit: true, withdraw: true, move: false, swap: false } as const;
+const SUPPLY_ACTIONS_WITH_MOVE = { deposit: true, withdraw: true, move: true, swap: true } as const;
+const SUPPLY_ACTIONS_WITHOUT_MOVE = { deposit: true, withdraw: true, move: false, swap: true } as const;
+
+// Swap modal state for a position
+interface SwapModalState {
+  isOpen: boolean;
+  morphoContext: MorphoMarketContextForEncoding | null;
+  debtTokenAddress: string;
+  collateralAddress: string;
+  collateralSymbol: string;
+  collateralDecimals: number;
+  collateralBalance: bigint;
+  collateralBalanceUsd: number;
+}
 
 // Memoized position row component to avoid recreating inline objects on each render
 interface MorphoPositionRowProps {
@@ -57,6 +70,7 @@ interface MorphoPositionRowProps {
   onToggleExpanded: () => void;
   yieldsByAddress?: Map<string, PTYield>;
   yieldsBySymbol?: Map<string, PTYield>;
+  onSwapRequest?: (state: SwapModalState) => void;
 }
 
 const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
@@ -66,6 +80,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
   onToggleExpanded,
   yieldsByAddress,
   yieldsBySymbol,
+  onSwapRequest,
 }) => {
   // Pre-encode the Morpho market context for modals
   const protocolContext = useMemo(() => encodeMorphoContext(row.context), [row.context]);
@@ -173,6 +188,21 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
 
   // Select appropriate supply actions based on collateral status
   const supplyAvailableActions = row.hasCollateral ? SUPPLY_ACTIONS_WITH_MOVE : SUPPLY_ACTIONS_WITHOUT_MOVE;
+
+  // Handle swap button click - opens collateral swap modal
+  const handleSwapClick = useCallback(() => {
+    if (!onSwapRequest || !row.hasCollateral) return;
+    onSwapRequest({
+      isOpen: true,
+      morphoContext: row.context,
+      debtTokenAddress: row.market.loanAsset.address,
+      collateralAddress: row.market.collateralAsset?.address || "",
+      collateralSymbol: row.collateralSymbol,
+      collateralDecimals: row.collateralDecimals,
+      collateralBalance: row.collateralBalance,
+      collateralBalanceUsd: row.collateralBalanceUsd,
+    });
+  }, [onSwapRequest, row]);
 
   const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
 
@@ -282,6 +312,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
           onToggleExpanded={onToggleExpanded}
           extraStats={extraStats}
           showExpandIndicator={false}
+          onSwap={row.hasCollateral ? handleSwapClick : undefined}
         />
 
         {/* Right: Debt (Borrow) */}
@@ -317,6 +348,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 }) => {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
+  // Swap modal state
+  const [swapModalState, setSwapModalState] = useState<SwapModalState | null>(null);
+
   const toggleRowExpanded = useCallback((key: string) => {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
@@ -325,6 +359,16 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   const getToggleHandler = useCallback((key: string) => {
     return () => toggleRowExpanded(key);
   }, [toggleRowExpanded]);
+
+  // Handle swap modal open request
+  const handleSwapRequest = useCallback((state: SwapModalState) => {
+    setSwapModalState(state);
+  }, []);
+
+  // Handle swap modal close
+  const handleCloseSwapModal = useCallback(() => {
+    setSwapModalState(null);
+  }, []);
 
   const renderPositions = () => {
     if (!userAddress) {
@@ -360,28 +404,71 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
         onToggleExpanded={getToggleHandler(row.key)}
         yieldsByAddress={yieldsByAddress}
         yieldsBySymbol={yieldsBySymbol}
+        onSwapRequest={handleSwapRequest}
       />
     ));
   };
 
+  // Build available assets for swap modal from current position
+  const swapAvailableAssets = useMemo(() => {
+    if (!swapModalState) return [];
+    return [{
+      symbol: swapModalState.collateralSymbol,
+      address: swapModalState.collateralAddress,
+      decimals: swapModalState.collateralDecimals,
+      rawBalance: swapModalState.collateralBalance,
+      balance: swapModalState.collateralBalanceUsd,
+      icon: tokenNameToLogo(swapModalState.collateralSymbol.toLowerCase()),
+    }];
+  }, [swapModalState]);
+
+  // Build position prop for swap modal
+  const swapPosition = useMemo(() => {
+    if (!swapModalState) return null;
+    return {
+      name: swapModalState.collateralSymbol,
+      tokenAddress: swapModalState.collateralAddress,
+      decimals: swapModalState.collateralDecimals,
+      balance: swapModalState.collateralBalanceUsd,
+      type: "supply" as const,
+    };
+  }, [swapModalState]);
+
   return (
-    <div className="space-y-4">
-      {/* Header with title and badge */}
-      <div className="border-base-200/50 mb-1 flex items-center justify-between border-b pb-3">
-        <div className="flex items-center gap-2">
-          <div className="bg-primary h-5 w-1 rounded-full" />
-          <span className="text-base-content/60 text-[11px] font-semibold uppercase tracking-widest">{title}</span>
-        </div>
-        {rows.length > 0 && (
-          <div className="bg-primary/10 text-primary flex items-center gap-1.5 rounded-full px-2 py-0.5">
-            <span className="font-mono text-xs font-bold">{rows.length}</span>
-            <span className="text-[10px] uppercase tracking-wider opacity-70">{rows.length === 1 ? "market" : "markets"}</span>
+    <>
+      <div className="space-y-4">
+        {/* Header with title and badge */}
+        <div className="border-base-200/50 mb-1 flex items-center justify-between border-b pb-3">
+          <div className="flex items-center gap-2">
+            <div className="bg-primary h-5 w-1 rounded-full" />
+            <span className="text-base-content/60 text-[11px] font-semibold uppercase tracking-widest">{title}</span>
           </div>
-        )}
+          {rows.length > 0 && (
+            <div className="bg-primary/10 text-primary flex items-center gap-1.5 rounded-full px-2 py-0.5">
+              <span className="font-mono text-xs font-bold">{rows.length}</span>
+              <span className="text-[10px] uppercase tracking-wider opacity-70">{rows.length === 1 ? "market" : "markets"}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Positions list */}
+        <div className="space-y-3">{renderPositions()}</div>
       </div>
 
-      {/* Positions list */}
-      <div className="space-y-3">{renderPositions()}</div>
-    </div>
+      {/* Collateral Swap Modal */}
+      {swapModalState && swapPosition && (
+        <CollateralSwapModal
+          isOpen={swapModalState.isOpen}
+          onClose={handleCloseSwapModal}
+          protocolName="morpho-blue"
+          availableAssets={swapAvailableAssets}
+          initialFromTokenAddress={swapModalState.collateralAddress}
+          chainId={chainId}
+          position={swapPosition}
+          morphoContext={swapModalState.morphoContext ?? undefined}
+          debtTokenAddress={swapModalState.debtTokenAddress}
+        />
+      )}
+    </>
   );
 };

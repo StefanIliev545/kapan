@@ -15,6 +15,10 @@ export interface ExecutionTypeToggleProps {
     limitReady?: boolean;
     /** Optional tooltip for disabled limit button */
     limitDisabledReason?: string;
+    /** Whether market orders are available */
+    marketAvailable?: boolean;
+    /** Optional tooltip for disabled market button */
+    marketDisabledReason?: string;
     /** Additional class name */
     className?: string;
 }
@@ -25,11 +29,15 @@ export const ExecutionTypeToggle: FC<ExecutionTypeToggleProps> = ({
     limitAvailable = true,
     limitReady = true,
     limitDisabledReason,
+    marketAvailable = true,
+    marketDisabledReason,
     className = "",
 }) => {
     const handleMarketClick = useCallback(() => {
-        onChange("market");
-    }, [onChange]);
+        if (marketAvailable) {
+            onChange("market");
+        }
+    }, [onChange, marketAvailable]);
 
     const handleLimitClick = useCallback(() => {
         onChange("limit");
@@ -40,6 +48,7 @@ export const ExecutionTypeToggle: FC<ExecutionTypeToggleProps> = ({
     }
 
     const isLimitDisabled = !limitReady;
+    const isMarketDisabled = !marketAvailable;
 
     return (
         <div className={`bg-base-200/60 mx-auto flex w-fit gap-0.5 rounded-lg p-0.5 ${className}`}>
@@ -49,7 +58,9 @@ export const ExecutionTypeToggle: FC<ExecutionTypeToggleProps> = ({
                     value === "market"
                         ? "bg-base-100 text-base-content shadow-sm"
                         : "text-base-content/60 hover:text-base-content"
-                }`}
+                } ${isMarketDisabled ? "cursor-not-allowed opacity-50" : ""}`}
+                disabled={isMarketDisabled}
+                title={isMarketDisabled ? marketDisabledReason : "Execute instantly via flash loan"}
             >
                 Market
             </button>

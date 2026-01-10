@@ -40,6 +40,66 @@ const KNOWN_ERRORS: Record<string, string> = {
   // Unknown errors we've seen (will be improved with more logging)
   "0x00b284f2": "Withdrawal failed - check Aave pool status and your collateral balance",
   "0xf0dbeea5": "Transaction failed - check protocol status and try again",
+
+  // ========================================================================
+  // Kapan Router Errors
+  // ========================================================================
+  "0xef3ff4ae": "BadIndex - invalid UTXO reference in instruction sequence",
+  "0x5104a0b8": "GatewayAlreadyExists - gateway already registered for this protocol",
+  "0xbb2b1516": "GatewayNotFound - no gateway registered for this protocol",
+  "0xea8e4eb5": "NotAuthorized - caller not authorized for this action",
+  "0xad1991f5": "ZeroToken - token address cannot be zero",
+  "0x1f2a2005": "ZeroAmount - amount cannot be zero",
+  "0xf2365b5b": "NoValue - operation requires a value",
+  "0x12227519": "FractionTooLarge - split fraction exceeds maximum",
+  "0x936bb5ad": "TokenMismatch - token address does not match expected",
+  "0xcaccb6d9": "Underflow - arithmetic underflow in calculation",
+  "0x5049b049": "FlashLoanRequiresTransientStack - flash loan needs transient storage",
+  "0x882f8103": "UnsupportedFlashLoanProvider - flash loan provider not supported",
+  "0x3e6ad70a": "UniswapV3RequiresPoolAddress - Uniswap V3 flash loan requires pool address",
+  "0xabd2d467": "AavePoolNotRegistered - Aave pool address not configured",
+  "0xd6fd6fc3": "ZeroLendPoolNotRegistered - ZeroLend pool address not configured",
+
+  // ========================================================================
+  // Morpho Gateway Errors
+  // ========================================================================
+  "0xa8148603": "MarketNotRegistered - Morpho market not registered in gateway",
+  "0x494e7807": "InvalidMarketParams - invalid Morpho market parameters",
+
+  // ========================================================================
+  // Flash Loan Errors
+  // ========================================================================
+  "0x0a3fad83": "FlashLoanNotEnabled - flash loans not enabled on this deployment",
+  "0xc884f6ae": "UnauthorizedFlashCaller - flash loan callback from unauthorized caller",
+  "0x88aac56f": "NestedFlashNotAllowed - cannot nest flash loans",
+  "0xfb211cb6": "ProviderNotConfigured - flash loan provider not configured",
+  "0x331eb0f0": "InvalidFlashParams - invalid flash loan parameters",
+  "0x06ef72f2": "BadInitiator - flash loan initiator mismatch",
+  "0x2083cd40": "InvalidPool - flash loan pool address invalid",
+  "0x07326195": "TokenNotInPool - token not available in flash loan pool",
+
+  // ========================================================================
+  // CoW Protocol / Order Manager Errors
+  // ========================================================================
+  "0x9e41bdd7": "OnlyRouter - only router can call this function",
+  "0x15b31976": "OnlySettlement - only CoW settlement contract can call",
+  "0x1a4a635d": "OnlyDuringSettlement - can only be called during CoW settlement",
+  "0x21eeab00": "InvalidLender - flash loan lender address invalid",
+  "0xdb360fce": "FlashLoanInProgress - flash loan already in progress",
+  "0x5c427cd9": "UnauthorizedCaller - caller not authorized",
+  "0x50652932": "InvalidOrderManager - order manager address invalid",
+  "0x1d4ecc5b": "OrderNotActive - order is not in active state",
+  "0xd36d8965": "OrderNotFound - order does not exist",
+  "0x966753c5": "OrderAlreadyExists - order with this ID already exists",
+  "0xd8f59fa5": "InvalidHandler - order handler address invalid",
+  "0x72ce59fc": "NotHooksTrampoline - caller is not the hooks trampoline",
+  "0x1c65ea76": "HookExecutionFailed - CoW hook execution failed",
+  "0x82b42900": "Unauthorized - caller not authorized",
+  "0xac494dfc": "InvalidOrderState - order is in an invalid state for this action",
+  "0xd92e233d": "ZeroAddress - address cannot be zero",
+  "0xe617d131": "PreHookAlreadyExecuted - pre-hook has already been executed",
+  "0x7fae2de4": "PreHookNotExecuted - pre-hook must be executed first",
+  "0x13e916e5": "CannotCancelMidExecution - cannot cancel order during execution",
 };
 
 /**

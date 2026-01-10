@@ -1,6 +1,6 @@
 import { FC, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { track } from "@vercel/analytics";
-import { formatUnits, parseUnits, Address, PublicClient, WalletClient } from "viem";
+import { formatUnits, parseUnits, Address, PublicClient, WalletClient, encodeAbiParameters } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { parseAmount } from "~~/utils/validation";
 
@@ -24,11 +24,18 @@ import {
   createRouterInstruction,
   createProtocolInstruction,
   encodeApprove,
+  encodeFlashLoan,
   encodeLendingInstruction,
   encodePushToken,
+  encodeToOutput,
   LendingOp,
   normalizeProtocolName,
+  encodeMorphoContext,
+  type MorphoMarketContextForEncoding,
 } from "~~/utils/v2/instructionHelpers";
+import { useMorphoCollateralSwapMarkets, marketToContext } from "~~/hooks/useMorphoCollateralSwapMarkets";
+import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { CompletionType, getCowExplorerAddressUrl, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
@@ -405,6 +412,10 @@ interface CollateralSwapModalProps {
         balance?: number | bigint;
         type: "borrow" | "supply";
     };
+    /** Morpho-specific: Raw market context for encoding (required for Morpho collateral swap) */
+    morphoContext?: MorphoMarketContextForEncoding;
+    /** Morpho-specific: Debt token address for finding compatible markets */
+    debtTokenAddress?: string;
 }
 
 export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
@@ -416,8 +427,46 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     chainId,
     context,
     position,
+    morphoContext,
+    debtTokenAddress,
 }) => {
     const { buildCollateralSwapFlow } = useKapanRouterV2();
+    const isMorpho = normalizeProtocolName(protocolName) === "morpho-blue";
+
+    // Morpho: Fetch compatible target markets (same debt, different collateral)
+    const { targetMarkets: morphoTargetMarkets, isLoading: isMorphoMarketsLoading } = useMorphoCollateralSwapMarkets({
+        chainId,
+        debtTokenAddress: debtTokenAddress || "",
+        currentCollateralAddress: initialFromTokenAddress || "",
+        enabled: isMorpho && isOpen && !!debtTokenAddress,
+    });
+
+    // Morpho: Selected target market state
+    const [selectedMorphoMarket, setSelectedMorphoMarket] = useState<MorphoMarket | null>(null);
+
+    // Auto-select first market when markets load
+    useEffect(() => {
+        if (isMorpho && morphoTargetMarkets.length > 0 && !selectedMorphoMarket) {
+            setSelectedMorphoMarket(morphoTargetMarkets[0]);
+        }
+    }, [isMorpho, morphoTargetMarkets, selectedMorphoMarket]);
+
+    // Morpho: Compute new market context from selected market
+    const newMorphoContext = useMemo(() => {
+        if (!selectedMorphoMarket) return null;
+        return marketToContext(selectedMorphoMarket);
+    }, [selectedMorphoMarket]);
+
+    // Morpho: Encode contexts for instructions
+    const oldMorphoContextEncoded = useMemo(() => {
+        if (!morphoContext) return undefined;
+        return encodeMorphoContext(morphoContext);
+    }, [morphoContext]);
+
+    const newMorphoContextEncoded = useMemo(() => {
+        if (!newMorphoContext) return undefined;
+        return encodeMorphoContext(newMorphoContext);
+    }, [newMorphoContext]);
 
     // Check swap router availability and get adapter info directly from deployed contracts
     const oneInchAvailable = is1inchSupported(chainId);
@@ -508,10 +557,48 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const [numChunks, setNumChunks] = useState(1);
 
     // Filter "To" assets (exclude selected "From")
-    const targetAssets = useMemo(() =>
-        availableAssets.filter(a => a.address.toLowerCase() !== selectedFrom?.address.toLowerCase()) as SwapAsset[],
-        [availableAssets, selectedFrom]
-    );
+    // For Morpho: derive from compatible target markets (same debt, different collateral)
+    // Deduplicate by collateral address (pick first/best market for each collateral)
+    const targetAssets = useMemo(() => {
+        if (isMorpho && morphoTargetMarkets.length > 0) {
+            // Build SwapAsset array from Morpho target markets
+            // Markets are already sorted by borrow APY, so first occurrence is best
+            const seenAddresses = new Set<string>();
+            return morphoTargetMarkets
+                .filter(m => {
+                    const addr = m.collateralAsset?.address?.toLowerCase();
+                    if (!addr || seenAddresses.has(addr)) return false;
+                    seenAddresses.add(addr);
+                    return true;
+                })
+                .map(m => ({
+                    symbol: m.collateralAsset?.symbol || "???",
+                    address: (m.collateralAsset?.address || "") as Address,
+                    decimals: m.collateralAsset?.decimals || 18,
+                    rawBalance: 0n, // No existing balance for new collateral
+                    balance: 0, // Formatted balance (0 for target markets)
+                    icon: tokenNameToLogo(m.collateralAsset?.symbol?.toLowerCase() || ""),
+                    price: m.collateralAsset?.priceUsd
+                        ? BigInt(Math.round(Number(m.collateralAsset.priceUsd) * 1e8))
+                        : undefined,
+                    // Extra info for display
+                    borrowApy: m.state.borrowApy,
+                    marketId: m.uniqueKey,
+                } as SwapAsset));
+        }
+        return availableAssets.filter(a => a.address.toLowerCase() !== selectedFrom?.address.toLowerCase()) as SwapAsset[];
+    }, [isMorpho, morphoTargetMarkets, availableAssets, selectedFrom]);
+
+    // Sync selectedMorphoMarket when user selects a "to" asset
+    useEffect(() => {
+        if (!isMorpho || !selectedTo) return;
+        const matchingMarket = morphoTargetMarkets.find(
+            m => m.collateralAsset?.address?.toLowerCase() === selectedTo.address.toLowerCase()
+        );
+        if (matchingMarket && matchingMarket.uniqueKey !== selectedMorphoMarket?.uniqueKey) {
+            setSelectedMorphoMarket(matchingMarket);
+        }
+    }, [isMorpho, selectedTo, morphoTargetMarkets, selectedMorphoMarket]);
 
     // Auto-switch to Pendle when a PT token is involved in the swap
     useEffect(() => {
@@ -574,9 +661,11 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     });
 
     // Unified quote data
-    const isQuoteLoading = executionType === "limit" 
-        ? isCowQuoteLoading 
-        : (swapRouter === "1inch" ? is1inchLoading : isPendleLoading);
+    // Include Morpho markets loading for Morpho protocol
+    const isQuoteLoading = (executionType === "limit"
+        ? isCowQuoteLoading
+        : (swapRouter === "1inch" ? is1inchLoading : isPendleLoading))
+        || (isMorpho && isMorphoMarketsLoading);
     const quoteError = swapRouter === "1inch" ? oneInchError : pendleError;
     
     // Get best quote from available sources (for limit orders, use CoW quote)
@@ -720,6 +809,88 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         const chunkFlashLoanFee = cowFlashLoanInfo.fee / BigInt(numChunks);
         const chunkWithdrawAmount = chunkSellAmount + chunkFlashLoanFee;
 
+        // ========================================================================
+        // MORPHO (Pair-Isolated): Different instruction flow
+        // Must borrow from new market to repay old market before withdrawing
+        // ========================================================================
+        if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && debtTokenAddress) {
+            console.log("[buildCowInstructions] Morpho collateral swap (PAIR-ISOLATED):", {
+                sellToken: selectedFrom.symbol,
+                buyToken: selectedTo.symbol,
+                debtToken: debtTokenAddress,
+                oldMarket: morphoContext?.marketId,
+                newMarket: newMorphoContext?.marketId,
+                chunkWithdrawAmount: formatUnits(chunkWithdrawAmount, selectedFrom.decimals),
+                flow: "swap[0] -> approve[1] -> deposit(NEW) -> getBorrowBal[2] -> borrow(NEW)[3] -> approve[4] -> repay(OLD)[5] -> withdraw(OLD)[6]",
+            });
+
+            // For Morpho pair-isolated, we need to get the debt amount to migrate
+            // This should match the user's current borrow position
+            // For now, we'll use GetBorrowBalance to get the exact amount
+            return Array(numChunks).fill(null).map(() => {
+                /**
+                 * Morpho Pair-Isolated Collateral Swap (Limit Order):
+                 *
+                 * UTXO Layout (OrderManager prepends ToOutput for swap result):
+                 * [0] = swap output (new collateral, from OrderManager ToOutput prepend)
+                 * [1] Approve(0, morpho) -> dummy
+                 *     DepositCollateral(input=0, NEW_MARKET) -> NO OUTPUT
+                 * [2] GetBorrowBalance(OLD_MARKET) -> debt amount to migrate
+                 * [3] Borrow(input=2, NEW_MARKET) -> borrowed debt tokens
+                 * [4] Approve(3, morpho) -> dummy (gateway needs approval to pull tokens)
+                 * [5] Repay(input=2, OLD_MARKET) -> refund (uses GetBorrowBalance for amount)
+                 * [6] WithdrawCollateral(OLD_MARKET) -> withdrawn collateral
+                 * [N] PushToken(6, borrower) -> repay flash loan (appended by hook)
+                 */
+                const postInstructions: ProtocolInstruction[] = [
+                    // 1. Approve new collateral for deposit -> [1]
+                    createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+
+                    // 2. Deposit new collateral into NEW market -> NO OUTPUT
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, newMorphoContextEncoded, 0)
+                    ),
+
+                    // 3. GetBorrowBalance on OLD market -> [2]
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.GetBorrowBalance, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 999)
+                    ),
+
+                    // 4. Borrow from NEW market (amount from [2]) -> [3]
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.Borrow, debtTokenAddress, userAddress, 0n, newMorphoContextEncoded, 2)
+                    ),
+
+                    // 5. Approve gateway to spend borrowed tokens ([3]) -> [4]
+                    createRouterInstruction(encodeApprove(3, normalizedProtocol)),
+
+                    // 6. Repay on OLD market (amount from [2], uses tokens from Borrow) -> [5]
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.Repay, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 2)
+                    ),
+
+                    // 7. Withdraw old collateral from OLD market -> [6]
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, chunkWithdrawAmount, oldMorphoContextEncoded, 999)
+                    ),
+                ];
+
+                return {
+                    preInstructions: [],
+                    postInstructions,
+                    flashLoanRepaymentUtxoIndex: 6, // [6] = Withdraw output (for flash loan repay)
+                };
+            });
+        }
+
+        // ========================================================================
+        // Standard flow (Aave, Compound, Venus) - shared pool model
+        // ========================================================================
         console.log("[buildCowInstructions] Collateral swap (KIND_SELL):", {
             sellToken: selectedFrom.symbol,
             buyToken: selectedTo.symbol,
@@ -795,15 +966,15 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 // ensuring the second WithdrawCollateral gets proper authorization for dust.
             };
         });
-    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, numChunks, isMax]);
+    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, numChunks, isMax, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, debtTokenAddress, morphoContext, newMorphoContext]);
 
     const buildFlow = () => {
-        if (!selectedFrom || !selectedTo) return [];
-        
+        if (!selectedFrom || !selectedTo || !userAddress) return [];
+
         // Get swap data based on selected router
         let swapData: string;
         let minOut: string;
-        
+
         if (swapRouter === "1inch") {
             if (!oneInchQuote || !oneInchAdapter) return [];
             swapData = oneInchQuote.tx.data;
@@ -815,7 +986,119 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         }
 
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
+        const swapProtocol = swapRouter === "1inch" ? "oneinch" : "pendle";
 
+        // ========================================================================
+        // MORPHO (Pair-Isolated): Custom instruction flow
+        // Must borrow from new market to repay old market before withdrawing
+        // ========================================================================
+        if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && debtTokenAddress) {
+            const minAmountOutBigInt = BigInt(minOut);
+            const swapContext = encodeAbiParameters(
+                [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+                [selectedTo.address as Address, minAmountOutBigInt, swapData as `0x${string}`]
+            );
+
+            /**
+             * Morpho Pair-Isolated Collateral Swap (Market Order):
+             *
+             * UTXO Layout (each instruction creates outputs as noted):
+             * 0. ToOutput(amountIn, oldColl) -> [0]
+             * 1. FlashLoan(provider, input=0) -> [1] (flash loaned tokens)
+             * 2. Approve(1, swap) -> [2] (dummy)
+             * 3. Swap(oldColl -> newColl, input=1) -> [3] newColl, [4] refund
+             * 4. Approve(3, morpho) -> [5] (dummy)
+             * 5. DepositCollateral(newColl, input=3, NEW_MARKET) -> NO OUTPUT
+             * 6. GetBorrowBalance(debt, OLD_MARKET) -> [6]
+             * 7. Borrow(debt, input=6, NEW_MARKET) -> [7] (borrowed tokens go to router)
+             * 8. Approve(7, morpho) -> [8] (approve gateway to spend borrowed tokens)
+             * 9. Repay(debt, input=6, OLD_MARKET) -> [9] (refund)
+             * 10. WithdrawCollateral(oldColl, amount, OLD_MARKET) -> [10]
+             * [Implicit: Router uses [10] to repay flash loan]
+             */
+            const instructions: ProtocolInstruction[] = [];
+
+            // 0. Create UTXO for flash loan amount reference -> [0]
+            instructions.push(
+                createRouterInstruction(encodeToOutput(amountInBigInt, selectedFrom.address))
+            );
+
+            // 1. Flash Loan old collateral (references [0]) -> [1]
+            instructions.push(
+                createRouterInstruction(encodeFlashLoan(providerEnum, 0))
+            );
+
+            // 2. Approve swap protocol for old collateral ([1]) -> [2]
+            instructions.push(
+                createRouterInstruction(encodeApprove(1, swapProtocol))
+            );
+
+            // 3. Swap old -> new collateral (input=1) -> [3] newColl, [4] refund
+            instructions.push(
+                createProtocolInstruction(
+                    swapProtocol,
+                    encodeLendingInstruction(LendingOp.Swap, selectedFrom.address, userAddress, 0n, swapContext, 1)
+                )
+            );
+
+            // 4. Approve Morpho for new collateral ([3]) -> [5]
+            instructions.push(
+                createRouterInstruction(encodeApprove(3, "morpho-blue"))
+            );
+
+            // 5. Deposit new collateral to NEW market (input=3) -> NO OUTPUT
+            instructions.push(
+                createProtocolInstruction(
+                    "morpho-blue",
+                    encodeLendingInstruction(LendingOp.DepositCollateral, selectedTo.address, userAddress, 0n, newMorphoContextEncoded, 3)
+                )
+            );
+
+            // 6. GetBorrowBalance from OLD market -> [6]
+            instructions.push(
+                createProtocolInstruction(
+                    "morpho-blue",
+                    encodeLendingInstruction(LendingOp.GetBorrowBalance, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 999)
+                )
+            );
+
+            // 7. Borrow from NEW market (amount from [6]) -> [7]
+            instructions.push(
+                createProtocolInstruction(
+                    "morpho-blue",
+                    encodeLendingInstruction(LendingOp.Borrow, debtTokenAddress, userAddress, 0n, newMorphoContextEncoded, 6)
+                )
+            );
+
+            // 8. Approve gateway to spend borrowed tokens ([7]) -> [8]
+            instructions.push(
+                createRouterInstruction(encodeApprove(7, "morpho-blue"))
+            );
+
+            // 9. Repay OLD market (amount from [6], uses tokens from Borrow) -> [9]
+            instructions.push(
+                createProtocolInstruction(
+                    "morpho-blue",
+                    encodeLendingInstruction(LendingOp.Repay, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 6)
+                )
+            );
+
+            // 10. Withdraw old collateral from OLD market -> [10]
+            // Use amountInBigInt + small buffer for flash loan fee (if any)
+            const withdrawAmount = amountInBigInt + (amountInBigInt / 1000n); // 0.1% buffer
+            instructions.push(
+                createProtocolInstruction(
+                    "morpho-blue",
+                    encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, withdrawAmount, oldMorphoContextEncoded, 999)
+                )
+            );
+
+            return instructions;
+        }
+
+        // ========================================================================
+        // Standard flow (Aave, Compound, Venus) - shared pool model
+        // ========================================================================
         return buildCollateralSwapFlow(
             protocolName,
             selectedFrom.address,
@@ -828,7 +1111,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             isMax,
             providerEnum,
             false, // isExactOut
-            swapRouter === "1inch" ? "oneinch" : "pendle"
+            swapProtocol
         );
     };
 

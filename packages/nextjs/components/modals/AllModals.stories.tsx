@@ -82,6 +82,7 @@ export const DepositUSDC_Aave: Story = {
       balance={BigInt("5000000000")}
       hf={2.5}
       ltv={45}
+      network="evm"
       utilization={65}
     />
   ),
@@ -101,6 +102,7 @@ export const DepositWETH_Compound: Story = {
       balance={BigInt("1500000000000000000")}
       hf={3.2}
       ltv={35}
+      network="evm"
       utilization={55}
     />
   ),
@@ -120,6 +122,7 @@ export const DepositWBTC_Morpho: Story = {
       balance={BigInt("5000000")}
       hf={4.0}
       ltv={25}
+      network="evm"
       utilization={40}
     />
   ),
@@ -141,6 +144,7 @@ export const WithdrawUSDC_Aave: Story = {
       balance={BigInt("10000000000")}
       hf={2.1}
       ltv={52}
+      network="evm"
       utilization={70}
     />
   ),
@@ -160,6 +164,7 @@ export const WithdrawWETH_Compound: Story = {
       balance={BigInt("5000000000000000000")}
       hf={2.8}
       ltv={40}
+      network="evm"
       utilization={60}
     />
   ),
@@ -181,6 +186,7 @@ export const BorrowUSDC_Aave: Story = {
       balance={BigInt("3000000000")}
       hf={1.8}
       ltv={60}
+      network="evm"
       utilization={75}
     />
   ),
@@ -200,6 +206,7 @@ export const BorrowWETH_Morpho: Story = {
       balance={BigInt("2000000000000000000")}
       hf={1.9}
       ltv={55}
+      network="evm"
       utilization={68}
     />
   ),
@@ -219,6 +226,7 @@ export const BorrowDAI_Venus: Story = {
       balance={BigInt("5000000000000000000000")}
       hf={2.2}
       ltv={48}
+      network="evm"
       utilization={62}
     />
   ),
@@ -240,6 +248,7 @@ export const RepayUSDC_Aave: Story = {
       balance={BigInt("3000000000")}
       hf={1.5}
       ltv={72}
+      network="evm"
       utilization={85}
     />
   ),
@@ -259,6 +268,7 @@ export const RepayWETH_Compound: Story = {
       balance={BigInt("2000000000000000000")}
       hf={1.7}
       ltv={65}
+      network="evm"
       utilization={78}
     />
   ),
@@ -280,6 +290,7 @@ export const LowHealthFactor: Story = {
       balance={BigInt("6000000000")}
       hf={1.15}
       ltv={85}
+      network="evm"
       utilization={92}
     />
   ),
@@ -299,6 +310,7 @@ export const HighHealthFactor: Story = {
       balance={BigInt("5000000000000000000")}
       hf={5.5}
       ltv={18}
+      network="evm"
       utilization={25}
     />
   ),
@@ -318,6 +330,7 @@ export const MaxedOutPosition: Story = {
       balance={BigInt("500000000")}
       hf={1.25}
       ltv={80}
+      network="evm"
       utilization={95}
     />
   ),

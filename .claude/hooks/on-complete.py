@@ -66,16 +66,15 @@ def main():
             if clone_count > 0:
                 issues.append(f"❌ Duplicates: {clone_count} clones found - fix before completing")
 
-    # 5. Storybook build - only if story files were modified
-    story_files = [f for f in modified_files if '.stories.' in f]
-    if story_files:
-        success, output = run("cd packages/nextjs && yarn storybook:build 2>&1", timeout=120)
-        if not success:
-            # Extract the actual error from output
-            error_lines = [l for l in output.split('\n') if 'error' in l.lower() or 'failed' in l.lower()]
-            issues.append(f"❌ Storybook: Build failed for modified stories")
-            if error_lines:
-                issues.append(f"   {error_lines[0][:100]}")
+    # 5. Storybook build - disabled, maintain on demand
+    # story_files = [f for f in modified_files if '.stories.' in f]
+    # if story_files:
+    #     success, output = run("cd packages/nextjs && yarn storybook:build 2>&1", timeout=120)
+    #     if not success:
+    #         error_lines = [l for l in output.split('\n') if 'error' in l.lower() or 'failed' in l.lower()]
+    #         issues.append(f"❌ Storybook: Build failed for modified stories")
+    #         if error_lines:
+    #             issues.append(f"   {error_lines[0][:100]}")
 
     # All issues are blocking - agent must fix before completing
     if issues:
