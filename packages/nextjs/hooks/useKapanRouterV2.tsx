@@ -221,17 +221,33 @@ const shouldRevokeOnChain = (chainId: number, revokePermissions?: boolean): bool
 };
 
 /**
- * Filter authorization calls to remove invalid/zero-amount approvals
+ * Filter authorization calls to remove invalid/zero-amount approvals and deduplicate
  */
 const filterValidAuthCalls = (authCalls: AuthorizationCall[]): AuthorizationCall[] => {
-  return authCalls.filter(call => !shouldSkipAuthCall(call));
+  const seen = new Set<string>();
+  return authCalls.filter(call => {
+    if (shouldSkipAuthCall(call)) return false;
+    // Deduplicate by (target, data) pair
+    const key = `${call.target.toLowerCase()}:${call.data.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 /**
- * Filter deauthorization calls to remove invalid ones
+ * Filter deauthorization calls to remove invalid ones and deduplicate
  */
 const filterValidDeauthCalls = (deauthCalls: AuthorizationCall[]): AuthorizationCall[] => {
-  return deauthCalls.filter(({ target, data }) => target && data && data.length > 0);
+  const seen = new Set<string>();
+  return deauthCalls.filter(({ target, data }) => {
+    if (!target || !data || data.length === 0) return false;
+    // Deduplicate by (target, data) pair
+    const key = `${target.toLowerCase()}:${data.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 /**

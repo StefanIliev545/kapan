@@ -574,6 +574,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 cowFlashLoanInfo,
                 buildCowInstructions,
                 limitOrderConfig,
+                protocolName,
             });
 
             const limitOrderResult = await buildLimitOrderCalls(callParams);

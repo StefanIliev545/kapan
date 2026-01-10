@@ -363,6 +363,7 @@ export interface LimitOrderCallParams {
     cowFlashLoanInfo: FlashLoanInfo;
     buildCowInstructions: ChunkInstructions[];
     limitOrderConfig: LimitOrderResult;
+    protocolName: string;
 }
 
 export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
@@ -380,8 +381,9 @@ export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
     preOrderInstructions: never[];
     isKindBuy: boolean;
     operationType: "debt-swap";
+    protocolName: string;
 } {
-    const { selectedTo, debtFromToken, limitOrderNewDebt, repayAmountRaw, cowFlashLoanInfo, buildCowInstructions, limitOrderConfig } = params;
+    const { selectedTo, debtFromToken, limitOrderNewDebt, repayAmountRaw, cowFlashLoanInfo, buildCowInstructions, limitOrderConfig, protocolName } = params;
     const numChunks = limitOrderConfig?.numChunks ?? 1;
     const chunkSellAmount = limitOrderNewDebt / BigInt(numChunks);
     const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
@@ -406,6 +408,7 @@ export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
         preOrderInstructions: [],
         isKindBuy: true,
         operationType: "debt-swap",
+        protocolName,
     };
 }
 

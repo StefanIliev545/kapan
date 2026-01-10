@@ -17,6 +17,8 @@ import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { formatSignedPercent } from "../utils";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
+import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
+import type { Address } from "viem";
 
 interface MorphoPositionsSectionProps {
   title: string;
@@ -50,7 +52,7 @@ const TEXT_ERROR = "text-error";
 const SUPPLY_ACTIONS_WITH_MOVE = { deposit: true, withdraw: true, move: true, swap: true } as const;
 const SUPPLY_ACTIONS_WITHOUT_MOVE = { deposit: true, withdraw: true, move: false, swap: true } as const;
 
-// Swap modal state for a position
+// Collateral Swap modal state for a position
 interface SwapModalState {
   isOpen: boolean;
   morphoContext: MorphoMarketContextForEncoding | null;
@@ -62,6 +64,22 @@ interface SwapModalState {
   collateralBalanceUsd: number;
 }
 
+// Debt Swap modal state for a position
+interface DebtSwapModalState {
+  isOpen: boolean;
+  morphoContext: MorphoMarketContextForEncoding | null;
+  debtTokenAddress: string;
+  debtTokenSymbol: string;
+  debtTokenDecimals: number;
+  debtBalance: bigint;
+  debtBalanceUsd: number;
+  debtTokenPrice: bigint;
+  collateralTokenAddress: string;
+  collateralTokenSymbol: string;
+  collateralBalance: bigint;
+  collateralDecimals: number;
+}
+
 // Memoized position row component to avoid recreating inline objects on each render
 interface MorphoPositionRowProps {
   row: MorphoPositionRow;
@@ -71,6 +89,7 @@ interface MorphoPositionRowProps {
   yieldsByAddress?: Map<string, PTYield>;
   yieldsBySymbol?: Map<string, PTYield>;
   onSwapRequest?: (state: SwapModalState) => void;
+  onDebtSwapRequest?: (state: DebtSwapModalState) => void;
 }
 
 const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
@@ -81,6 +100,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
   yieldsByAddress,
   yieldsBySymbol,
   onSwapRequest,
+  onDebtSwapRequest,
 }) => {
   // Pre-encode the Morpho market context for modals
   const protocolContext = useMemo(() => encodeMorphoContext(row.context), [row.context]);
@@ -165,8 +185,27 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
     repay: row.hasDebt,
     move: row.hasDebt,
     close: row.hasDebt && row.hasCollateral,
-    swap: false,
+    swap: row.hasDebt && row.hasCollateral, // Enable debt swap when user has both debt and collateral
   }), [row.hasDebt, row.hasCollateral]);
+
+  // Handle debt swap button click - opens debt swap modal
+  const handleDebtSwapClick = useCallback(() => {
+    if (!onDebtSwapRequest || !row.hasDebt || !row.hasCollateral) return;
+    onDebtSwapRequest({
+      isOpen: true,
+      morphoContext: row.context,
+      debtTokenAddress: row.market.loanAsset.address,
+      debtTokenSymbol: row.loanSymbol,
+      debtTokenDecimals: row.borrowDecimals,
+      debtBalance: row.borrowBalance,
+      debtBalanceUsd: row.borrowBalanceUsd,
+      debtTokenPrice: BigInt(Math.floor((row.market.loanAsset?.priceUsd || 0) * 1e8)),
+      collateralTokenAddress: row.market.collateralAsset?.address || "",
+      collateralTokenSymbol: row.collateralSymbol,
+      collateralBalance: row.collateralBalance,
+      collateralDecimals: row.collateralDecimals,
+    });
+  }, [onDebtSwapRequest, row]);
 
   // Memoized move support
   const moveSupport = useMemo(() => ({
@@ -330,6 +369,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
             showNoDebtLabel={!row.hasDebt}
             controlledExpanded={isExpanded}
             onToggleExpanded={onToggleExpanded}
+            onSwap={row.hasDebt && row.hasCollateral ? handleDebtSwapClick : undefined}
           />
         ) : null}
       </div>
@@ -348,8 +388,11 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 }) => {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
-  // Swap modal state
+  // Collateral Swap modal state
   const [swapModalState, setSwapModalState] = useState<SwapModalState | null>(null);
+
+  // Debt Swap modal state
+  const [debtSwapModalState, setDebtSwapModalState] = useState<DebtSwapModalState | null>(null);
 
   const toggleRowExpanded = useCallback((key: string) => {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -368,6 +411,23 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   // Handle swap modal close
   const handleCloseSwapModal = useCallback(() => {
     setSwapModalState(null);
+  }, []);
+
+  // Handle debt swap modal open request
+  const handleDebtSwapRequest = useCallback((state: DebtSwapModalState) => {
+    console.log("[MorphoPositionsSection] Opening debt swap modal with state:", {
+      debtTokenAddress: state.debtTokenAddress,
+      debtTokenSymbol: state.debtTokenSymbol,
+      collateralTokenAddress: state.collateralTokenAddress,
+      collateralTokenSymbol: state.collateralTokenSymbol,
+      hasContext: !!state.morphoContext,
+    });
+    setDebtSwapModalState(state);
+  }, []);
+
+  // Handle debt swap modal close
+  const handleCloseDebtSwapModal = useCallback(() => {
+    setDebtSwapModalState(null);
   }, []);
 
   const renderPositions = () => {
@@ -405,6 +465,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
         yieldsByAddress={yieldsByAddress}
         yieldsBySymbol={yieldsBySymbol}
         onSwapRequest={handleSwapRequest}
+        onDebtSwapRequest={handleDebtSwapRequest}
       />
     ));
   };
@@ -467,6 +528,28 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
           position={swapPosition}
           morphoContext={swapModalState.morphoContext ?? undefined}
           debtTokenAddress={swapModalState.debtTokenAddress}
+        />
+      )}
+
+      {/* Debt Swap Modal */}
+      {debtSwapModalState && (
+        <DebtSwapEvmModal
+          isOpen={debtSwapModalState.isOpen}
+          onClose={handleCloseDebtSwapModal}
+          protocolName="morpho-blue"
+          chainId={chainId}
+          debtFromToken={debtSwapModalState.debtTokenAddress as Address}
+          debtFromName={debtSwapModalState.debtTokenSymbol}
+          debtFromIcon={tokenNameToLogo(debtSwapModalState.debtTokenSymbol.toLowerCase())}
+          debtFromDecimals={debtSwapModalState.debtTokenDecimals}
+          debtFromPrice={debtSwapModalState.debtTokenPrice}
+          currentDebtBalance={debtSwapModalState.debtBalance}
+          availableAssets={[]}
+          morphoContext={debtSwapModalState.morphoContext ?? undefined}
+          collateralTokenAddress={debtSwapModalState.collateralTokenAddress as Address}
+          collateralTokenSymbol={debtSwapModalState.collateralTokenSymbol}
+          collateralBalance={debtSwapModalState.collateralBalance}
+          collateralDecimals={debtSwapModalState.collateralDecimals}
         />
       )}
     </>

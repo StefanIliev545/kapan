@@ -326,6 +326,7 @@ export interface LimitOrderCallParams {
     cowFlashLoanInfo: FlashLoanInfo;
     buildCowInstructions: ChunkInstructions[];
     limitOrderConfig: LimitOrderResult;
+    protocolName: string;
 }
 
 export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
@@ -343,8 +344,9 @@ export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
     preOrderInstructions: never[];
     isKindBuy: boolean;
     operationType: "close-position";
+    protocolName: string;
 } {
-    const { selectedTo, debtToken, limitOrderCollateral, repayAmountRaw, cowFlashLoanInfo, buildCowInstructions, limitOrderConfig } = params;
+    const { selectedTo, debtToken, limitOrderCollateral, repayAmountRaw, cowFlashLoanInfo, buildCowInstructions, limitOrderConfig, protocolName } = params;
     const numChunks = limitOrderConfig?.numChunks ?? 1;
     const chunkSellAmount = limitOrderCollateral / BigInt(numChunks);
     const chunkBuyAmount = repayAmountRaw / BigInt(numChunks);
@@ -369,6 +371,7 @@ export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
         preOrderInstructions: [],                    // Empty - fundOrder handles collateral transfer
         isKindBuy: true,                             // KIND_BUY: exact buyAmount, max sellAmount
         operationType: "close-position",
+        protocolName,
     };
 }
 

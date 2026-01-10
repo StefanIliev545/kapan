@@ -181,7 +181,8 @@ function getClickHandlers(config: ClickHandlers) {
   return {
     handleBorrowClick: onBorrow ?? borrowModalOpen,
     handleCloseClick: networkType === "evm" ? closeWithCollateralModalOpen : (onClosePosition ?? noop),
-    handleSwapClick: networkType === "evm" ? debtSwapModalOpen : (onSwap ?? noop),
+    // Prefer custom onSwap handler if provided (e.g., Morpho), otherwise use internal modal for EVM
+    handleSwapClick: onSwap ?? (networkType === "evm" ? debtSwapModalOpen : noop),
   };
 }
 

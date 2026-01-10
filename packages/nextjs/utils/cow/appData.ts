@@ -62,22 +62,62 @@ export type KapanOperationType =
   | "collateral-swap";
 
 /**
- * Build the appCode string with operation type
- * Format: "kapan:operation-type" or just "kapan" if no type specified
+ * Lending protocol identifiers for appCode
  */
-export function buildAppCode(operationType?: KapanOperationType): string {
-  return operationType ? `kapan:${operationType}` : "kapan";
+export type KapanProtocol =
+  | "aave"
+  | "compound"
+  | "venus"
+  | "morpho";
+
+/**
+ * Build the appCode string with operation type and optional protocol
+ * Format: "kapan:operation-type/protocol" or "kapan:operation-type" or just "kapan"
+ * Examples: "kapan:collateral-swap/morpho", "kapan:debt-swap/aave", "kapan:leverage-up"
+ */
+export function buildAppCode(operationType?: KapanOperationType, protocol?: KapanProtocol): string {
+  if (!operationType) return "kapan";
+  if (!protocol) return `kapan:${operationType}`;
+  return `kapan:${operationType}/${protocol}`;
 }
 
 /**
- * Parse operation type from appCode
+ * Normalize protocol name to KapanProtocol
+ */
+export function normalizeProtocolForAppCode(protocolName: string): KapanProtocol | undefined {
+  const lower = protocolName.toLowerCase();
+  if (lower.includes("morpho")) return "morpho";
+  if (lower.includes("aave")) return "aave";
+  if (lower.includes("compound")) return "compound";
+  if (lower.includes("venus")) return "venus";
+  return undefined;
+}
+
+/**
+ * Parse operation type and protocol from appCode
  * Returns undefined if not a kapan appCode or no operation type encoded
  */
 export function parseOperationTypeFromAppCode(appCode: string): KapanOperationType | undefined {
   if (!appCode.startsWith("kapan:")) return undefined;
-  const type = appCode.slice(6) as KapanOperationType;
+  // Handle format "kapan:operation-type/protocol" or "kapan:operation-type"
+  const rest = appCode.slice(6);
+  const type = rest.split("/")[0] as KapanOperationType;
   const validTypes: KapanOperationType[] = ["leverage-up", "close-position", "debt-swap", "collateral-swap"];
   return validTypes.includes(type) ? type : undefined;
+}
+
+/**
+ * Parse protocol from appCode
+ * Returns undefined if not present
+ */
+export function parseProtocolFromAppCode(appCode: string): KapanProtocol | undefined {
+  if (!appCode.startsWith("kapan:")) return undefined;
+  const rest = appCode.slice(6);
+  const parts = rest.split("/");
+  if (parts.length < 2) return undefined;
+  const protocol = parts[1] as KapanProtocol;
+  const validProtocols: KapanProtocol[] = ["aave", "compound", "venus", "morpho"];
+  return validProtocols.includes(protocol) ? protocol : undefined;
 }
 
 /**
@@ -294,6 +334,8 @@ export function buildKapanAppData(
     slippageBps?: number;
     /** Operation type for order categorization */
     operationType?: KapanOperationType;
+    /** Lending protocol (e.g., "aave", "morpho") for appCode tagging */
+    protocol?: KapanProtocol;
     /** Flash loan configuration for single-tx leverage */
     flashLoan?: {
       /** Flash loan liquidity provider (Aave pool) */
@@ -403,7 +445,7 @@ export function buildKapanAppData(
   // Use version 1.10.0 to match working Aave implementation
   const appData: AppDataDocument = {
     version: "1.10.0",
-    appCode: buildAppCode(options?.operationType),
+    appCode: buildAppCode(options?.operationType, options?.protocol),
     metadata: {
       hooks: {
         pre: preHooks,

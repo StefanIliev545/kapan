@@ -19,6 +19,7 @@ import {
   CompletionType,
   getKapanCowAdapter,
   getCowBorrower,
+  normalizeProtocolForAppCode,
   type KapanOperationType,
 } from "~~/utils/cow";
 import { 
@@ -139,6 +140,12 @@ export interface CowLimitOrderInput {
    * This allows deriving order type from on-chain data without localStorage.
    */
   operationType?: KapanOperationType;
+
+  /**
+   * Lending protocol name for appData tagging (e.g., "aave", "morpho").
+   * Used to create appCode like "kapan:collateral-swap/morpho".
+   */
+  protocolName?: string;
 }
 
 /**
@@ -392,6 +399,7 @@ export function useCowLimitOrder() {
       // 2. Build and register appData
       const appDataOptions: Parameters<typeof buildAndRegisterAppData>[4] = {
         operationType: input.operationType,
+        protocol: input.protocolName ? normalizeProtocolForAppCode(input.protocolName) : undefined,
       };
       if (input.flashLoan) {
         appDataOptions.flashLoan = {
@@ -487,9 +495,15 @@ export function useCowLimitOrder() {
       );
       if (allInstructions.length > 0) {
         const rawAuthCalls = await getAuthorizations(allInstructions);
+        // Deduplicate auth calls by (target, data) pair
+        const seenAuthCalls = new Set<string>();
         for (const { target, data } of rawAuthCalls) {
           if (target && data && data.length > 0) {
-            calls.push({ to: target as Address, data: data as Hex });
+            const key = `${target.toLowerCase()}:${data.toLowerCase()}`;
+            if (!seenAuthCalls.has(key)) {
+              seenAuthCalls.add(key);
+              calls.push({ to: target as Address, data: data as Hex });
+            }
           }
         }
       }

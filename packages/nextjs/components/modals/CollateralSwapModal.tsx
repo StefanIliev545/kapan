@@ -91,7 +91,7 @@ interface OrderExecutionParams {
 async function buildLimitOrder(params: LimitOrderParams): Promise<BuildOrderResult> {
     const {
         selectedFrom, selectedTo, amountInBigInt, minBuyAmount,
-        cowFlashLoanInfo, buildCowInstructions, numChunks, buildLimitOrderCalls
+        cowFlashLoanInfo, buildCowInstructions, numChunks, protocolName, buildLimitOrderCalls
     } = params;
 
     console.log("[Limit Order] Building collateral swap order:", {
@@ -127,6 +127,7 @@ async function buildLimitOrder(params: LimitOrderParams): Promise<BuildOrderResu
         preOrderInstructions: buildCowInstructions[0]?.postInstructions || [],
         isKindBuy: false,
         operationType: "collateral-swap",
+        protocolName,
     });
 
     if (!result) {

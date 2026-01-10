@@ -17,7 +17,26 @@ import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { useCowLimitOrder } from "~~/hooks/useCowLimitOrder";
 import { useCowQuote } from "~~/hooks/useCowQuote";
-import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
+import {
+    FlashLoanProvider,
+    ProtocolInstruction,
+    createRouterInstruction,
+    createProtocolInstruction,
+    encodeApprove,
+    encodeFlashLoan,
+    encodeLendingInstruction,
+    encodePushToken,
+    encodePullToken,
+    encodeToOutput,
+    encodeAdd,
+    LendingOp,
+    encodeMorphoContext,
+    type MorphoMarketContextForEncoding,
+} from "~~/utils/v2/instructionHelpers";
+import { useMorphoDebtSwapMarkets, marketToContext } from "~~/hooks/useMorphoDebtSwapMarkets";
+import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { encodeAbiParameters } from "viem";
 import { getCowExplorerAddressUrl, getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
@@ -66,6 +85,26 @@ interface DebtSwapEvmModalProps {
     context?: string;
     // Position data for health factor / LTV display
     position?: PositionManager;
+    // ========================================================================
+    // Morpho-specific props (pair-isolated markets require moving collateral)
+    // ========================================================================
+    /** Morpho: Raw market context for encoding (OLD market) */
+    morphoContext?: {
+        marketId: string;
+        loanToken: string;
+        collateralToken: string;
+        oracle: string;
+        irm: string;
+        lltv: bigint;
+    };
+    /** Morpho: Collateral token address (same across old and new markets) */
+    collateralTokenAddress?: Address;
+    /** Morpho: Collateral token symbol */
+    collateralTokenSymbol?: string;
+    /** Morpho: Current collateral balance */
+    collateralBalance?: bigint;
+    /** Morpho: Collateral decimals */
+    collateralDecimals?: number;
 }
 
 export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
@@ -81,13 +120,56 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     currentDebtBalance,
     availableAssets,
     context,
+    // Morpho-specific props
+    morphoContext,
+    collateralTokenAddress,
+    collateralTokenSymbol: _collateralTokenSymbol,
+    collateralBalance,
+    collateralDecimals: _collateralDecimals,
 }) => {
+    // Prefixed with _ to indicate intentionally unused (reserved for future display)
+    void _collateralTokenSymbol;
+    void _collateralDecimals;
     const {
         buildDebtSwapFlow,
         setBatchId,
         setSuppressBatchNotifications,
         isBatchConfirmed,
     } = useKapanRouterV2();
+
+    // ========================================================================
+    // Morpho Detection & Market Discovery
+    // ========================================================================
+    const isMorpho = protocolName.toLowerCase().includes("morpho");
+    const { address: userAddress } = useAccount();
+
+    // Fetch compatible Morpho markets (same collateral, different debt)
+    const { targetMarkets: morphoTargetMarkets } = useMorphoDebtSwapMarkets({
+        chainId,
+        collateralTokenAddress: collateralTokenAddress || "",
+        currentDebtAddress: debtFromToken,
+        enabled: isMorpho && isOpen && !!collateralTokenAddress,
+    });
+
+    // Track selected new Morpho market
+    const [selectedMorphoMarket, setSelectedMorphoMarket] = useState<MorphoMarket | null>(null);
+
+    // Encode OLD market context (current position)
+    const oldMorphoContextEncoded = useMemo(() => {
+        if (!isMorpho || !morphoContext) return undefined;
+        return encodeMorphoContext(morphoContext as MorphoMarketContextForEncoding);
+    }, [isMorpho, morphoContext]);
+
+    // Encode NEW market context (selected target)
+    const newMorphoContext = useMemo(() => {
+        if (!selectedMorphoMarket) return undefined;
+        return marketToContext(selectedMorphoMarket);
+    }, [selectedMorphoMarket]);
+
+    const newMorphoContextEncoded = useMemo(() => {
+        if (!newMorphoContext) return undefined;
+        return encodeMorphoContext(newMorphoContext as MorphoMarketContextForEncoding);
+    }, [newMorphoContext]);
 
     // Check swap router availability and get adapter info directly from deployed contracts
     const oneInchAvailable = is1inchSupported(chainId);
@@ -168,7 +250,6 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const [useCustomBuyAmount, setUseCustomBuyAmount] = useState(false);
 
     // Wallet hooks for limit order
-    const { address: userAddress } = useAccount();
     const { data: walletClient } = useWalletClient();
     const publicClient = usePublicClient();
     const { sendCallsAsync } = useSendCalls();
@@ -221,10 +302,60 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     }, [selectedFrom, debtFromToken, fromAsset]);
 
     // Filter "To" assets (exclude current debt)
-    const toAssets = useMemo(() =>
-        (availableAssets || []).filter(a => a.address.toLowerCase() !== debtFromToken.toLowerCase()),
-        [availableAssets, debtFromToken]
-    );
+    // For Morpho: derive from compatible target markets (same collateral, different debt)
+    const toAssets = useMemo(() => {
+        console.log("[DebtSwapEvmModal] Building toAssets:", {
+            isMorpho,
+            morphoTargetMarketsCount: morphoTargetMarkets.length,
+            availableAssetsCount: availableAssets?.length,
+            collateralTokenAddress,
+            debtFromToken,
+        });
+
+        if (isMorpho && morphoTargetMarkets.length > 0) {
+            // Build SwapAsset array from Morpho target markets
+            // Markets are already sorted by borrow APY
+            const seenAddresses = new Set<string>();
+            const result = morphoTargetMarkets
+                .filter(m => {
+                    const addr = m.loanAsset?.address?.toLowerCase();
+                    if (!addr || seenAddresses.has(addr)) return false;
+                    seenAddresses.add(addr);
+                    return true;
+                })
+                .map(m => ({
+                    symbol: m.loanAsset?.symbol || "???",
+                    address: (m.loanAsset?.address || "") as Address,
+                    decimals: m.loanAsset?.decimals || 18,
+                    rawBalance: 0n,
+                    balance: 0,
+                    icon: tokenNameToLogo(m.loanAsset?.symbol?.toLowerCase() || ""),
+                    price: m.loanAsset?.priceUsd
+                        ? BigInt(Math.round(Number(m.loanAsset.priceUsd) * 1e8))
+                        : undefined,
+                    borrowApy: m.state.borrowApy,
+                    marketId: m.uniqueKey,
+                } as SwapAsset));
+
+            console.log("[DebtSwapEvmModal] Morpho toAssets:", result.map(a => ({ symbol: a.symbol, address: a.address })));
+            return result;
+        }
+        const fallback = (availableAssets || []).filter(a => a.address.toLowerCase() !== debtFromToken.toLowerCase());
+        console.log("[DebtSwapEvmModal] Fallback toAssets:", fallback.map(a => ({ symbol: a.symbol, address: a.address })));
+        return fallback;
+    }, [isMorpho, morphoTargetMarkets, availableAssets, debtFromToken, collateralTokenAddress]);
+
+    // Sync selectedMorphoMarket when user selects a "to" asset
+    useEffect(() => {
+        if (!isMorpho || !selectedTo) {
+            setSelectedMorphoMarket(null);
+            return;
+        }
+        const market = morphoTargetMarkets.find(
+            m => m.loanAsset?.address?.toLowerCase() === selectedTo.address.toLowerCase()
+        );
+        setSelectedMorphoMarket(market || null);
+    }, [isMorpho, selectedTo, morphoTargetMarkets]);
 
     // Auto-switch to Pendle when a PT token is involved in the swap
     useEffect(() => {
@@ -409,6 +540,89 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         if (!selectedTo || !userAddress || !orderManagerAddress || !cowFlashLoanInfo) {
             return [{ preInstructions: [], postInstructions: [] }];
         }
+
+        // ========================================================================
+        // MORPHO (Pair-Isolated): Must move collateral between markets
+        // ========================================================================
+        if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && collateralTokenAddress && collateralBalance) {
+            const numChunks = limitOrderConfig?.numChunks ?? 1;
+            const chunkCollateralAmount = collateralBalance / BigInt(numChunks);
+            const chunkBuyAmount = limitOrderBuyAmount / BigInt(numChunks);
+
+            return Array(numChunks).fill(null).map(() => {
+                /**
+                 * Morpho Pair-Isolated Debt Swap (Limit Order) - KIND_BUY:
+                 *
+                 * UTXO Layout (hook prepends implicit UTXOs for buy orders):
+                 * [0] = actual sell amount used (newDebt, from fundOrder ToOutput)
+                 * [1] = leftover from flash loan (newDebt refund)
+                 * --- Post-hook instructions start here ---
+                 * [2] PullToken(oldDebt from OM) -> pulled oldDebt
+                 * [3] Approve(2, morpho) -> dummy
+                 * [4] Repay(input=2, OLD_MARKET) -> refund
+                 * [5] WithdrawCollateral(OLD_MARKET) -> collateral
+                 * [6] Approve(5, morpho) -> dummy
+                 *     DepositCollateral(input=5, NEW_MARKET) -> NO OUTPUT
+                 * [7] Borrow(input=0, NEW_MARKET) -> newDebt for flash loan repay
+                 * [8] Add(7, 1) -> borrowed + leftover for flash loan repay
+                 * flashLoanRepaymentUtxoIndex: 8
+                 */
+                const postInstructions: ProtocolInstruction[] = [
+                    // 1. PullToken: pull oldDebt from OrderManager -> [2]
+                    createRouterInstruction(encodePullToken(chunkBuyAmount, debtFromToken as Address, orderManagerAddress as Address)),
+
+                    // 2. Approve oldDebt for Morpho gateway -> [3]
+                    createRouterInstruction(encodeApprove(2, "morpho-blue")),
+
+                    // 3. Repay oldDebt on OLD market (input=2) -> [4] (refund)
+                    createProtocolInstruction(
+                        "morpho-blue",
+                        encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, 0n, oldMorphoContextEncoded, 2)
+                    ),
+
+                    // 4. Withdraw collateral from OLD market -> [5]
+                    createProtocolInstruction(
+                        "morpho-blue",
+                        encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralTokenAddress, userAddress, chunkCollateralAmount, oldMorphoContextEncoded, 999)
+                    ),
+
+                    // 5. Approve collateral for Morpho gateway -> [6]
+                    createRouterInstruction(encodeApprove(5, "morpho-blue")),
+
+                    // 6. Deposit collateral to NEW market (input=5) -> NO OUTPUT
+                    createProtocolInstruction(
+                        "morpho-blue",
+                        encodeLendingInstruction(LendingOp.DepositCollateral, collateralTokenAddress, userAddress, 0n, newMorphoContextEncoded, 5)
+                    ),
+
+                    // 7. Borrow newDebt from NEW market (amount from [0]) -> [7]
+                    createProtocolInstruction(
+                        "morpho-blue",
+                        encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress, 0n, newMorphoContextEncoded, 0)
+                    ),
+
+                    // 8. Add: borrowed ([7]) + leftover ([1]) -> [8] for flash loan repay
+                    createRouterInstruction(encodeAdd(7, 1)),
+                ];
+
+                // For max repayments: Push any refund from Repay ([4]) back to user
+                if (isMax) {
+                    postInstructions.push(
+                        createRouterInstruction(encodePushToken(4, userAddress))
+                    );
+                }
+
+                return {
+                    preInstructions: [],
+                    postInstructions,
+                    flashLoanRepaymentUtxoIndex: 8, // [8] = Add output (borrowed + leftover)
+                };
+            });
+        }
+
+        // ========================================================================
+        // Standard flow (Aave, Compound, Venus) - shared pool model
+        // ========================================================================
         return buildCowChunkInstructions({
             selectedTo,
             userAddress,
@@ -423,7 +637,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             limitOrderConfig,
             isMax,  // Enable dust clearing (refund to user) when max is selected
         });
-    }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderConfig, isMax]);
+    }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderConfig, isMax, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance]);
 
     // amountOut = required new debt (what user will borrow)
     const amountOut = useMemo(() => {
@@ -436,11 +650,118 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             : requiredNewDebtFormatted;
     }, [executionType, useCustomBuyAmount, customBuyAmount, limitOrderNewDebt, selectedTo, requiredNewDebtFormatted]);
 
-    const buildFlow = () => {
+    const buildFlow = (): ProtocolInstruction[] => {
         if (!swapQuote || !selectedTo || !hasAdapter || requiredNewDebt === 0n) return [];
 
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
+        const swapProtocol = swapRouter === "1inch" ? "oneinch" : "pendle";
 
+        // ========================================================================
+        // MORPHO (Pair-Isolated): Must move collateral between markets
+        // ========================================================================
+        if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && collateralTokenAddress && collateralBalance) {
+            const minAmountOutBigInt = repayAmountRaw; // For SwapExactOut, this is the exact output we want
+            const swapContext = encodeAbiParameters(
+                [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+                [debtFromToken as Address, minAmountOutBigInt, swapQuote.tx.data as `0x${string}`]
+            );
+
+            /**
+             * Morpho Pair-Isolated Debt Swap (Market Order):
+             *
+             * UTXO Layout:
+             * [0] ToOutput(maxNewDebt) -> amount ref
+             * [1] FlashLoan(0) -> new debt tokens
+             * [2] Approve(1, swap) -> dummy
+             * [3],[4] SwapExactOut(1) -> oldDebt, newDebt refund
+             * [5] Approve(3, morpho) -> dummy
+             * [6] Repay(3, OLD_MARKET) -> repay refund
+             * [7] WithdrawCollateral(collateralBalance, OLD_MARKET) -> collateral
+             * [8] Approve(7, morpho) -> dummy
+             *     DepositCollateral(7, NEW_MARKET) -> NO OUTPUT
+             * [9] Borrow(0, NEW_MARKET) -> to repay flash loan
+             */
+            const instructions: ProtocolInstruction[] = [];
+
+            // 0. ToOutput(maxNewDebt) -> [0]
+            instructions.push(
+                createRouterInstruction(encodeToOutput(requiredNewDebt, selectedTo.address))
+            );
+
+            // 1. FlashLoan(0) -> [1]
+            instructions.push(
+                createRouterInstruction(encodeFlashLoan(providerEnum, 0))
+            );
+
+            // 2. Approve swap protocol for new debt ([1]) -> [2]
+            instructions.push(
+                createRouterInstruction(encodeApprove(1, swapProtocol))
+            );
+
+            // 3. SwapExactOut new debt -> old debt (input=1) -> [3] oldDebt, [4] newDebt refund
+            instructions.push(
+                createProtocolInstruction(
+                    swapProtocol,
+                    encodeLendingInstruction(LendingOp.SwapExactOut, selectedTo.address, userAddress!, 0n, swapContext, 1)
+                )
+            );
+
+            // 4. Approve Morpho for old debt ([3]) -> [5]
+            instructions.push(
+                createRouterInstruction(encodeApprove(3, "morpho-blue"))
+            );
+
+            // 5. Repay old debt on OLD market (input=3) -> [6]
+            instructions.push(
+                createProtocolInstruction(
+                    "morpho-blue",
+                    encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress!, 0n, oldMorphoContextEncoded, 3)
+                )
+            );
+
+            // 6. Withdraw ALL collateral from OLD market -> [7]
+            instructions.push(
+                createProtocolInstruction(
+                    "morpho-blue",
+                    encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralTokenAddress, userAddress!, collateralBalance, oldMorphoContextEncoded, 999)
+                )
+            );
+
+            // 7. Approve Morpho for collateral ([7]) -> [8]
+            instructions.push(
+                createRouterInstruction(encodeApprove(7, "morpho-blue"))
+            );
+
+            // 8. Deposit collateral to NEW market (input=7) -> NO OUTPUT
+            instructions.push(
+                createProtocolInstruction(
+                    "morpho-blue",
+                    encodeLendingInstruction(LendingOp.DepositCollateral, collateralTokenAddress, userAddress!, 0n, newMorphoContextEncoded, 7)
+                )
+            );
+
+            // 9. Borrow new debt from NEW market (amount from [0]) -> stays in router for flash loan repay
+            instructions.push(
+                createProtocolInstruction(
+                    "morpho-blue",
+                    encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress!, 0n, newMorphoContextEncoded, 0)
+                )
+            );
+
+            // 10. Push refunds to user
+            instructions.push(
+                createRouterInstruction(encodePushToken(6, userAddress!)) // repay refund
+            );
+            instructions.push(
+                createRouterInstruction(encodePushToken(4, userAddress!)) // swap refund
+            );
+
+            return instructions;
+        }
+
+        // ========================================================================
+        // Standard flow (Aave, Compound, Venus) - shared pool model
+        // ========================================================================
         return buildDebtSwapFlow(
             protocolName,
             debtFromToken,           // currentDebt (to repay)
@@ -451,7 +772,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             providerEnum,
             context,
             isMax,                   // if true, uses GetBorrowBalance for exact debt amount on-chain
-            swapRouter === "1inch" ? "oneinch" : "pendle",  // map "1inch" -> "oneinch"
+            swapProtocol,
         );
     };
 
@@ -550,6 +871,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 cowFlashLoanInfo,
                 buildCowInstructions,
                 limitOrderConfig,
+                protocolName,
             });
 
             const limitOrderResult = await buildLimitOrderCalls(callParams);
