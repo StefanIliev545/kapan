@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { usePublicClient, useChainId } from "wagmi";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { usePublicClient, useChainId, useWatchContractEvent } from "wagmi";
 import { type Address, type PublicClient } from "viem";
 import { getKapanOrderManagerAddress } from "~~/utils/constants";
 import { logger } from "~~/utils/logger";
@@ -272,4 +272,48 @@ export function useMultipleChunkExecutedEvents(
   }, [publicClient, orderManagerAddress, chainId, orders]);
 
   return dataMap;
+}
+
+/**
+ * Watch for live ChunkExecuted events on-chain.
+ * Calls onChunkExecuted callback when a chunk is filled for any of the watched order hashes.
+ */
+export function useWatchChunkExecuted(
+  orderHashes: string[],
+  onChunkExecuted: (orderHash: string, chunkIndex: number, sellAmount: bigint, buyAmount: bigint) => void,
+  enabled = true
+): void {
+  const chainId = useChainId();
+  const orderManagerAddress = getKapanOrderManagerAddress(chainId);
+
+  // Use ref to avoid re-creating the watcher when callback changes
+  const callbackRef = useRef(onChunkExecuted);
+  callbackRef.current = onChunkExecuted;
+
+  const orderHashSet = useRef(new Set<string>());
+  orderHashSet.current = new Set(orderHashes.map(h => h.toLowerCase()));
+
+  useWatchContractEvent({
+    address: orderManagerAddress,
+    abi: CHUNK_EXECUTED_EVENT_ABI,
+    eventName: "ChunkExecuted",
+    enabled: enabled && !!orderManagerAddress && orderHashes.length > 0,
+    onLogs: (logs) => {
+      for (const log of logs) {
+        const hash = (log.args.orderHash as string)?.toLowerCase();
+        if (hash && orderHashSet.current.has(hash)) {
+          logger.info("[useWatchChunkExecuted] Chunk filled!", {
+            orderHash: hash,
+            chunkIndex: log.args.chunkIndex,
+          });
+          callbackRef.current(
+            hash,
+            Number(log.args.chunkIndex ?? 0),
+            log.args.sellAmount ?? 0n,
+            log.args.buyAmount ?? 0n
+          );
+        }
+      }
+    },
+  });
 }

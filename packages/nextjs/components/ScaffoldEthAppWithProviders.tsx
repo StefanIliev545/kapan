@@ -24,7 +24,6 @@ import { Fordefi } from "starknetkit/fordefi";
 import { Keplr } from "starknetkit/keplr";
 import { MetaMask } from "starknetkit/metamask";
 import { WagmiProvider } from "wagmi";
-import FloatingSocials from "~~/components/FloatingSocials";
 import { PendingOrdersDrawer } from "~~/components/common/PendingOrdersDrawer";
 import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
@@ -95,7 +94,6 @@ const ScaffoldEthApp = ({
           <main className="relative flex flex-1 flex-col">{children}</main>
           <Footer />
         </div>
-        {!isLandingRoute && <FloatingSocials />}
         {isAppExperience && <PendingOrdersDrawer />}
         <Toaster position="bottom-right" />
       </LandingSectionProvider>

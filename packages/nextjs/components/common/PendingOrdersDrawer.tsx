@@ -7,7 +7,7 @@ import { useAccount, useChainId } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatUnits, type Address } from "viem";
 import { useCowOrder } from "~~/hooks/useCowOrder";
-import { useMultipleChunkExecutedEvents } from "~~/hooks/useChunkExecutedEvents";
+import { useMultipleChunkExecutedEvents, useWatchChunkExecuted } from "~~/hooks/useChunkExecutedEvents";
 import { useTokenInfo } from "~~/hooks/useTokenInfo";
 import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
 import { OrderStatus, calculateExecutionSummary } from "~~/utils/cow";
@@ -202,7 +202,25 @@ export function PendingOrdersDrawer() {
   
   const hasOlderOrders = orders.length > recentOrders.length;
   const activeOrders = recentOrders.filter(o => o.context.status === OrderStatus.Active);
+  const pastOrders = recentOrders.filter(o => o.context.status !== OrderStatus.Active);
   const activeCount = activeOrders.length;
+
+  // Get active order hashes for live event watching
+  const activeOrderHashes = useMemo(
+    () => activeOrders.map(o => o.orderHash),
+    [activeOrders]
+  );
+
+  // Watch for live ChunkExecuted events and refresh when chunks fill
+  const handleChunkExecuted = useCallback((orderHash: string, chunkIndex: number) => {
+    console.log(`[PendingOrdersDrawer] Chunk ${chunkIndex} filled for order ${orderHash.slice(0, 10)}...`);
+    // Refetch orders to get updated iteration counts
+    fetchOrders();
+    // Also refresh protocol data since positions changed
+    refreshProtocolData();
+  }, [fetchOrders, refreshProtocolData]);
+
+  useWatchChunkExecuted(activeOrderHashes, handleChunkExecuted, activeCount > 0);
 
   const ordersForEvents = useMemo(() =>
     recentOrders.map(o => ({
@@ -355,18 +373,50 @@ export function PendingOrdersDrawer() {
               </div>
             ) : (
               <div className="divide-base-200 divide-y">
-                {recentOrders.map((order) => {
+                {/* Active orders first */}
+                {activeOrders.map((order) => renderOrderItem(order))}
+
+                {/* Past orders section */}
+                {pastOrders.length > 0 && (
+                  <>
+                    {/* Separator with PAST header */}
+                    <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">Past Orders</span>
+                    </div>
+                    {pastOrders.map((order) => renderOrderItem(order))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          {recentOrders.length > 0 && (
+            <div className="border-base-200 text-base-content/40 flex justify-between border-t px-4 py-2 text-xs">
+              <span>{activeCount} active{hasOlderOrders ? ` · ${orders.length - recentOrders.length} older` : ''}</span>
+              <Link href="/orders" className="text-primary hover:underline">
+                View all
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  // Helper function to render an order item
+  function renderOrderItem(order: OrderWithHash) {
                   const { orderHash, context } = order;
                   const { params, status, iterationCount, createdAt } = context;
                   const isActive = status === OrderStatus.Active;
                   const isCompleted = status === OrderStatus.Completed;
                   const isCancellingThis = cancellingHash === orderHash;
-                  
+
                   const sellSymbol = getTokenSymbol(params.sellToken);
                   const buySymbol = getTokenSymbol(params.buyToken);
                   const sellDecimals = getTokenDecimals(params.sellToken);
                   const buyDecimals = getTokenDecimals(params.buyToken);
-                  
+
                   const totalChunks = Number(params.targetValue);
                   const completedChunks = Number(iterationCount);
                   const progressPercent = totalChunks > 0 ? (completedChunks / totalChunks) * 100 : 0;
@@ -376,12 +426,14 @@ export function PendingOrdersDrawer() {
                   const executionSummary = hasExecutionData
                     ? calculateExecutionSummary(executionData, params.minBuyPerChunk, sellDecimals, buyDecimals)
                     : null;
-                  
+
                   const totalReceived = executionData?.totalReceived ?? 0n;
+                  const totalSold = executionData?.totalSold ?? 0n;
                   const hasSurplus = executionSummary && executionSummary.surplusAmount > 0n;
-                  
+
                   const sellAmountNum = parseFloat(formatUnits(params.preTotalAmount, sellDecimals));
                   const receivedAmountNum = parseFloat(formatUnits(totalReceived, buyDecimals));
+                  const actualSoldAmountNum = parseFloat(formatUnits(totalSold, sellDecimals));
                   const surplusAmountNum = executionSummary ? parseFloat(formatUnits(executionSummary.surplusAmount, buyDecimals)) : 0;
 
                   // Get order note for operation type and protocol
@@ -484,15 +536,30 @@ export function PendingOrdersDrawer() {
                           </div>
                           <UsdValue symbol={buySymbol} amount={parseFloat(formatUnits(params.minBuyPerChunk * params.targetValue, buyDecimals))} />
                         </div>
-                        {/* Got row - actual received amount */}
+                        {/* Execution result row - shows the floating side (what actually varied) */}
+                        {/* KIND_SELL: "Got X" (buy amount varied), KIND_BUY: "Sold X" (sell amount varied) */}
                         {hasExecutionData && (
                           <div className="flex justify-between">
                             <div>
-                              <span className="text-base-content/50">Got </span>
-                              <span className="text-success font-medium">{formatAmount(totalReceived, buyDecimals)}</span>
-                              <span className="text-base-content/50 ml-1">{buySymbol}</span>
+                              {params.isKindBuy ? (
+                                <>
+                                  <span className="text-base-content/50">Sold </span>
+                                  <span className="text-success font-medium">{formatAmount(totalSold, sellDecimals)}</span>
+                                  <span className="text-base-content/50 ml-1">{sellSymbol}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-base-content/50">Got </span>
+                                  <span className="text-success font-medium">{formatAmount(totalReceived, buyDecimals)}</span>
+                                  <span className="text-base-content/50 ml-1">{buySymbol}</span>
+                                </>
+                              )}
                             </div>
-                            <UsdValue symbol={buySymbol} amount={receivedAmountNum} />
+                            {params.isKindBuy ? (
+                              <UsdValue symbol={sellSymbol} amount={actualSoldAmountNum} />
+                            ) : (
+                              <UsdValue symbol={buySymbol} amount={receivedAmountNum} />
+                            )}
                           </div>
                         )}
                       </div>
@@ -523,22 +590,5 @@ export function PendingOrdersDrawer() {
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          {recentOrders.length > 0 && (
-            <div className="border-base-200 text-base-content/40 flex justify-between border-t px-4 py-2 text-xs">
-              <span>{activeCount} active{hasOlderOrders ? ` · ${orders.length - recentOrders.length} older` : ''}</span>
-              <Link href="/orders" className="text-primary hover:underline">
-                View all
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  );
+  }
 }
