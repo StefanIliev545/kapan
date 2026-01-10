@@ -9,7 +9,7 @@ import { useCowOrder } from "~~/hooks/useCowOrder";
 import { useMultipleChunkExecutedEvents } from "~~/hooks/useChunkExecutedEvents";
 import { useTokenInfo } from "~~/hooks/useTokenInfo";
 import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
-import { OrderStatus, calculateExecutionSummary } from "~~/utils/cow";
+import { OrderStatus, calculateExecutionSummary, fetchAppData, parseOperationTypeFromAppCode, type KapanOperationType } from "~~/utils/cow";
 import type { OrderContext } from "~~/utils/cow";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { getOrderNote, getOperationLabel, getOperationColorClass, findPendingNoteForOrder, linkNoteToOrderHash, type OperationType } from "~~/utils/orderNotes";
@@ -35,6 +35,68 @@ function formatUsd(amount: number): string {
 interface OrderWithHash {
   orderHash: string;
   context: OrderContext;
+}
+
+/**
+ * Map KapanOperationType to OperationType for display
+ */
+function mapKapanOperationType(kapanType: KapanOperationType): OperationType {
+  switch (kapanType) {
+    case "leverage-up": return "leverage_up";
+    case "close-position": return "close_position";
+    case "debt-swap": return "debt_swap";
+    case "collateral-swap": return "collateral_swap";
+  }
+}
+
+/**
+ * Hook to fetch operation types from appData for multiple orders
+ * Returns a map of orderHash -> OperationType
+ */
+function useAppDataOperationTypes(orders: OrderWithHash[], chainId: number): Map<string, OperationType> {
+  const [operationTypes, setOperationTypes] = useState<Map<string, OperationType>>(new Map());
+
+  useEffect(() => {
+    if (orders.length === 0) return;
+
+    const fetchTypes = async () => {
+      const newTypes = new Map<string, OperationType>();
+
+      // Fetch appData for each order that has an appDataHash
+      await Promise.all(
+        orders.map(async ({ orderHash, context }) => {
+          const appDataHash = context.params.appDataHash;
+          if (!appDataHash || appDataHash === "0x0000000000000000000000000000000000000000000000000000000000000000") {
+            return;
+          }
+
+          try {
+            const appData = await fetchAppData(chainId, appDataHash);
+            if (appData) {
+              const kapanType = parseOperationTypeFromAppCode(appData.appCode);
+              if (kapanType) {
+                newTypes.set(orderHash, mapKapanOperationType(kapanType));
+              }
+            }
+          } catch {
+            // Silently ignore fetch errors - will fall back to localStorage
+          }
+        })
+      );
+
+      if (newTypes.size > 0) {
+        setOperationTypes(prev => {
+          const merged = new Map(prev);
+          newTypes.forEach((value, key) => merged.set(key, value));
+          return merged;
+        });
+      }
+    };
+
+    fetchTypes();
+  }, [orders, chainId]);
+
+  return operationTypes;
 }
 
 function UsdValue({ symbol, amount }: { symbol: string; amount: number }) {
@@ -94,6 +156,9 @@ export default function OrdersPage() {
   }, [orders]);
 
   const tokenInfoMap = useTokenInfo(tokenAddresses, chainId);
+
+  // Fetch operation types from appData (falls back to localStorage notes in OrderRow)
+  const appDataOperationTypes = useAppDataOperationTypes(orders, chainId);
 
   const handleBack = useCallback(() => {
     window.history.back();
@@ -187,13 +252,14 @@ export default function OrdersPage() {
                 </h2>
                 <div className="space-y-3">
                   {activeOrders.map((order) => (
-                    <OrderRow 
+                    <OrderRow
                       key={order.orderHash}
                       order={order}
                       executionDataMap={executionDataMap}
                       getTokenSymbol={getTokenSymbol}
                       getTokenDecimals={getTokenDecimals}
                       chainId={chainId}
+                      appDataOperationType={appDataOperationTypes.get(order.orderHash)}
                     />
                   ))}
                 </div>
@@ -208,13 +274,14 @@ export default function OrdersPage() {
                 </h2>
                 <div className="space-y-3">
                   {completedOrders.map((order) => (
-                    <OrderRow 
+                    <OrderRow
                       key={order.orderHash}
                       order={order}
                       executionDataMap={executionDataMap}
                       getTokenSymbol={getTokenSymbol}
                       getTokenDecimals={getTokenDecimals}
                       chainId={chainId}
+                      appDataOperationType={appDataOperationTypes.get(order.orderHash)}
                     />
                   ))}
                 </div>
@@ -229,13 +296,14 @@ export default function OrdersPage() {
                 </h2>
                 <div className="space-y-3">
                   {cancelledOrders.map((order) => (
-                    <OrderRow 
+                    <OrderRow
                       key={order.orderHash}
                       order={order}
                       executionDataMap={executionDataMap}
                       getTokenSymbol={getTokenSymbol}
                       getTokenDecimals={getTokenDecimals}
                       chainId={chainId}
+                      appDataOperationType={appDataOperationTypes.get(order.orderHash)}
                       dimmed
                     />
                   ))}
@@ -255,6 +323,7 @@ function OrderRow({
   getTokenSymbol,
   getTokenDecimals,
   chainId,
+  appDataOperationType,
   dimmed = false
 }: {
   order: OrderWithHash;
@@ -262,6 +331,7 @@ function OrderRow({
   getTokenSymbol: (address: string) => string;
   getTokenDecimals: (address: string) => number;
   chainId: number;
+  appDataOperationType?: OperationType;
   dimmed?: boolean;
 }) {
   const { orderHash, context } = order;
@@ -293,10 +363,11 @@ function OrderRow({
   
   const receivedAmountNum = parseFloat(formatUnits(totalReceived, buyDecimals));
 
-  // Look up order note by orderHash for operation type
-  // First try direct lookup, then try to match pending notes by order parameters
+  // Determine operation type:
+  // 1. First try appData (derived from on-chain appDataHash)
+  // 2. Fall back to localStorage notes
   let orderNote = getOrderNote(orderHash);
-  
+
   // If no note found, try to find and link a pending note
   if (!orderNote) {
     const pendingNote = findPendingNoteForOrder(
@@ -305,15 +376,16 @@ function OrderRow({
       chainId,
       Number(createdAt)
     );
-    
+
     if (pendingNote && pendingNote.salt) {
       // Link the pending note to this orderHash for future lookups
       linkNoteToOrderHash(pendingNote.salt, orderHash);
       orderNote = pendingNote;
     }
   }
-  
-  const operationType: OperationType = orderNote?.operationType ?? "unknown";
+
+  // Prefer appData-derived type, fall back to localStorage note, then "unknown"
+  const operationType: OperationType = appDataOperationType ?? orderNote?.operationType ?? "unknown";
   const operationLabel = getOperationLabel(operationType);
   const operationColorClass = getOperationColorClass(operationType);
   const protocolName = orderNote?.protocol;

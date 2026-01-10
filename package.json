@@ -67,7 +67,8 @@
     "agent:postflight": "./scripts/agent-postflight.sh",
     "agent:postflight:strict": "./scripts/agent-postflight.sh --strict",
     "oxlint": "oxlint packages/nextjs --quiet",
-    "oxlint:file": "oxlint --quiet"
+    "oxlint:file": "oxlint --quiet",
+    "storybook": "yarn workspace @se-2/nextjs storybook"
   },
   "devDependencies": {
     "dependency-cruiser": "^17.3.6",

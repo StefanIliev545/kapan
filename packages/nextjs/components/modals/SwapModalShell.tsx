@@ -26,17 +26,19 @@ const formatUsdDisplay = (value: number): string =>
 
 // --- Sub-components extracted to reduce cognitive complexity ---
 
-interface ProviderSelectorsProps {
+// Provider selectors - exported for use in customStats
+export interface ProviderSelectorsProps {
     flashLoanProviders?: FlashLoanProviderOption[];
     selectedProvider?: FlashLoanProviderOption | null;
     flashLoanLiquidityData?: Array<{ provider: number; liquidity: bigint; hasLiquidity: boolean }>;
     swapRouter?: SwapRouter;
     setSwapRouter?: (router: SwapRouter) => void;
-    onFlashLoanProviderChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-    onSwapRouterChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+    onFlashLoanProviderChange: (provider: FlashLoanProviderOption) => void;
+    onSwapRouterChange: (router: SwapRouter) => void;
+    className?: string;
 }
 
-const ProviderSelectors: FC<ProviderSelectorsProps> = ({
+export const ProviderSelectors: FC<ProviderSelectorsProps> = ({
     flashLoanProviders,
     selectedProvider,
     flashLoanLiquidityData,
@@ -44,6 +46,7 @@ const ProviderSelectors: FC<ProviderSelectorsProps> = ({
     setSwapRouter,
     onFlashLoanProviderChange,
     onSwapRouterChange,
+    className = "",
 }) => {
     const hasMultipleProviders = flashLoanProviders && flashLoanProviders.length > 1;
     const hasSingleProvider = flashLoanProviders && flashLoanProviders.length === 1 && selectedProvider;
@@ -51,47 +54,63 @@ const ProviderSelectors: FC<ProviderSelectorsProps> = ({
 
     if (!showSelectors) return null;
 
+    const handleSwapRouterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        onSwapRouterChange(e.target.value as SwapRouter);
+    };
+
+    const handleFlashLoanChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const provider = flashLoanProviders?.find(p => p.name === e.target.value);
+        if (provider) onFlashLoanProviderChange(provider);
+    };
+
     return (
-        <div className="mb-[-10px] flex justify-end gap-2">
+        <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${className}`}>
             {/* Swap Router Selector */}
             {setSwapRouter && (
-                <select
-                    className="select select-xs select-ghost text-base-content/60 font-normal"
-                    value={swapRouter || "1inch"}
-                    onChange={onSwapRouterChange}
-                >
-                    {SWAP_ROUTER_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>
-                            Swap: {opt.label}
-                        </option>
-                    ))}
-                </select>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-base-content/50">Router:</span>
+                    <select
+                        className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 font-medium"
+                        value={swapRouter || "1inch"}
+                        onChange={handleSwapRouterChange}
+                    >
+                        {SWAP_ROUTER_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             )}
 
             {/* Flash Loan Provider Selector - dropdown for multiple */}
             {hasMultipleProviders && (
-                <select
-                    className="select select-xs select-ghost text-base-content/60 font-normal"
-                    value={selectedProvider?.name || ""}
-                    onChange={onFlashLoanProviderChange}
-                >
-                    {flashLoanProviders.map(p => {
-                        const liq = flashLoanLiquidityData?.find(l => l.provider === p.providerEnum);
-                        const hasLiquidity = liq?.hasLiquidity ?? true;
-                        return (
-                            <option key={p.name} value={p.name}>
-                                Flash Loan: {p.name} {liq ? (hasLiquidity ? "✓" : "⚠️") : ""}
-                            </option>
-                        );
-                    })}
-                </select>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-base-content/50">Flash Loan:</span>
+                    <select
+                        className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 font-medium"
+                        value={selectedProvider?.name || ""}
+                        onChange={handleFlashLoanChange}
+                    >
+                        {flashLoanProviders.map(p => {
+                            const liq = flashLoanLiquidityData?.find(l => l.provider === p.providerEnum);
+                            const hasLiquidity = liq?.hasLiquidity ?? true;
+                            return (
+                                <option key={p.name} value={p.name}>
+                                    {p.name} {liq ? (hasLiquidity ? "✓" : "⚠️") : ""}
+                                </option>
+                            );
+                        })}
+                    </select>
+                </div>
             )}
 
             {/* Read-only flash loan provider when only one is available */}
             {hasSingleProvider && !hasMultipleProviders && (
-                <span className="text-base-content/60 py-1 text-xs">
-                    Flash Loan: {selectedProvider.name}
-                </span>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-base-content/50">Flash Loan:</span>
+                    <span className="text-base-content/80 font-medium">{selectedProvider.name}</span>
+                </div>
             )}
         </div>
     );
@@ -124,29 +143,33 @@ const TokenSection: FC<TokenSectionProps> = ({
     onValueChange,
     onSetMax,
 }) => (
-    <div className="space-y-2">
-        <div className="flex items-center justify-between">
-            <span className="text-base-content/80 text-sm">{label}</span>
+    <div className="bg-base-200/50 border-base-300/50 rounded-lg border px-3 py-2">
+        <div className="text-base-content/50 mb-1 flex items-center justify-between text-[10px]">
+            <span className="uppercase tracking-wide">{label}</span>
             {showAvailable && (
-                <span className="text-base-content/60 text-xs">
-                    Available: {asset ? formatUnits(asset.rawBalance, asset.decimals) : "0"}
-                </span>
+                <button
+                    onClick={onSetMax}
+                    className="hover:text-primary cursor-pointer transition-colors"
+                    title="Click to use max"
+                >
+                    Available: {asset ? Number(formatUnits(asset.rawBalance, asset.decimals)).toLocaleString(undefined, { maximumFractionDigits: 4 }) : "0"}
+                </button>
             )}
         </div>
 
-        <div className="flex items-center gap-3">
-            {asset && (
-                <div className="relative size-8 flex-shrink-0">
-                    <Image src={asset.icon} alt={asset.symbol} fill className="rounded-full object-contain" />
-                </div>
-            )}
-
-            {isReadOnly ? (
-                <div className="font-medium">{asset?.symbol || "-"}</div>
-            ) : (
-                <div className="relative min-w-[100px]">
+        <div className="flex items-center justify-between">
+            {/* Token selector */}
+            <div className="flex items-center gap-1.5">
+                {asset && (
+                    <div className="relative size-5 flex-shrink-0">
+                        <Image src={asset.icon} alt={asset.symbol} fill className="rounded-full object-contain" />
+                    </div>
+                )}
+                {isReadOnly ? (
+                    <span className="text-sm font-medium">{asset?.symbol || "-"}</span>
+                ) : (
                     <select
-                        className="select select-ghost select-sm w-full max-w-xs pl-0 font-medium focus:outline-none"
+                        className="select select-ghost select-xs h-auto min-h-0 bg-transparent pl-0 text-sm font-medium focus:outline-none"
                         value={asset?.symbol || ""}
                         onChange={onTokenChange}
                     >
@@ -154,46 +177,43 @@ const TokenSection: FC<TokenSectionProps> = ({
                             <option key={t.address} value={t.symbol}>{t.symbol}</option>
                         ))}
                     </select>
-                </div>
-            )}
+                )}
+            </div>
 
-            <div className="relative flex-1">
+            {/* Amount input */}
+            <div className="flex items-center gap-1.5">
                 {onValueChange ? (
                     <>
-                        <input
-                            type="number"
-                            value={value}
-                            onChange={onValueChange}
-                            placeholder="0.00"
-                            className="border-base-300 w-full border-0 border-b-2 bg-transparent px-2 py-1 pr-16 text-right font-medium outline-none"
-                        />
-                        {onSetMax && (
-                            <button
-                                onClick={onSetMax}
-                                className="text-primary hover:text-primary-focus absolute right-0 top-1/2 -translate-y-1/2 text-xs font-bold"
-                            >
-                                MAX
-                            </button>
-                        )}
-                    </>
-                ) : (
-                    <div className="border-base-300 flex min-h-[32px] w-full items-center justify-end border-0 border-b-2 bg-transparent px-2 py-1 text-right font-medium outline-none">
                         {isLoading ? (
                             <span className="loading loading-dots loading-xs"></span>
                         ) : (
-                            parseFloat(value || "0").toFixed(6)
+                            <input
+                                type="text"
+                                inputMode="decimal"
+                                value={value}
+                                onChange={onValueChange}
+                                placeholder="0.00"
+                                className="placeholder:text-base-content/30 w-[100px] bg-transparent text-right text-sm font-medium outline-none"
+                            />
                         )}
-                    </div>
+                    </>
+                ) : (
+                    <span className="text-sm font-medium">
+                        {isLoading ? (
+                            <span className="loading loading-dots loading-xs"></span>
+                        ) : (
+                            Number(value || "0").toLocaleString(undefined, { maximumFractionDigits: 6 })
+                        )}
+                    </span>
                 )}
+                <span className="text-base-content/40 text-[10px]">
+                    ≈${formatUsdDisplay(usdValue)}
+                </span>
             </div>
-        </div>
-        <div className="flex justify-end">
-            <span className="text-base-content/60 text-xs">
-                ≈ ${formatUsdDisplay(usdValue)}
-            </span>
         </div>
     </div>
 );
+
 
 interface StatsGridProps {
     slippage: number;
@@ -345,13 +365,6 @@ export interface SwapModalShellProps {
     slippage: number;
     setSlippage: (v: number) => void;
 
-    // Flash Loan Providers (optional)
-    flashLoanProviders?: FlashLoanProviderOption[];
-    selectedProvider?: FlashLoanProviderOption | null;
-    setSelectedProvider?: (p: FlashLoanProviderOption) => void;
-    // Flash loan liquidity data (optional, for showing availability)
-    flashLoanLiquidityData?: Array<{ provider: number; liquidity: bigint; hasLiquidity: boolean }>;
-
     // Batching preference (optional)
     preferBatching?: boolean;
     setPreferBatching?: (fn: (prev: boolean) => boolean) => void;
@@ -382,12 +395,20 @@ export interface SwapModalShellProps {
     // Hide the default stats grid
     hideDefaultStats?: boolean;
 
-    // Swap router selection (optional - for choosing between 1inch/Pendle)
-    swapRouter?: SwapRouter;
-    setSwapRouter?: (router: SwapRouter) => void;
-
     // Price impact (optional - for display in default stats)
     priceImpact?: number | null;
+
+    // Right panel for order settings (optional - for Market/Limit toggle and settings)
+    rightPanel?: ReactNode;
+
+    // After metrics content (optional - displayed after stats, before warnings)
+    afterMetrics?: ReactNode;
+
+    // For limit orders: make output amount editable
+    onAmountOutChange?: (value: string) => void;
+
+    // Limit price adjustment buttons (shown below TO section when provided)
+    limitPriceButtons?: ReactNode;
 }
 
 export const SwapModalShell: FC<SwapModalShellProps> = ({
@@ -409,10 +430,6 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
     quoteError,
     slippage,
     setSlippage,
-    flashLoanProviders,
-    selectedProvider,
-    setSelectedProvider,
-    flashLoanLiquidityData,
     preferBatching,
     setPreferBatching,
     onSubmit,
@@ -427,9 +444,11 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
     toReadOnly = false,
     customStats,
     hideDefaultStats = false,
-    swapRouter,
-    setSwapRouter,
     priceImpact,
+    rightPanel,
+    afterMetrics,
+    onAmountOutChange,
+    limitPriceButtons,
 }) => {
     const [activeTab, setActiveTab] = useState<"swap" | "info">("swap");
 
@@ -466,21 +485,6 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
     // Tab handlers
     const handleSetSwapTab = useCallback(() => setActiveTab("swap"), []);
     const handleSetInfoTab = useCallback(() => setActiveTab("info"), []);
-
-    // Swap router handler
-    const handleSwapRouterChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        if (setSwapRouter) {
-            setSwapRouter(e.target.value as SwapRouter);
-        }
-    }, [setSwapRouter]);
-
-    // Flash loan provider handler
-    const handleFlashLoanProviderChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        if (flashLoanProviders && setSelectedProvider) {
-            const p = flashLoanProviders.find(provider => provider.name === e.target.value);
-            if (p) setSelectedProvider(p);
-        }
-    }, [flashLoanProviders, setSelectedProvider]);
 
     // From token selector handler
     const handleFromTokenChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -580,52 +584,53 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
 
     // Render the swap tab content
     const renderSwapTab = () => (
-        <div className="space-y-6">
-            <ProviderSelectors
-                flashLoanProviders={flashLoanProviders}
-                selectedProvider={selectedProvider}
-                flashLoanLiquidityData={flashLoanLiquidityData}
-                swapRouter={swapRouter}
-                setSwapRouter={setSwapRouter}
-                onFlashLoanProviderChange={handleFlashLoanProviderChange}
-                onSwapRouterChange={handleSwapRouterChange}
-            />
+        <div className="space-y-3">
 
-            {/* FROM Section */}
-            <TokenSection
-                label={fromLabel}
-                asset={selectedFrom}
-                assets={fromAssets}
-                isReadOnly={fromReadOnly}
-                showAvailable={true}
-                value={amountIn}
-                usdValue={usdValueIn}
-                onTokenChange={handleFromTokenChange}
-                onValueChange={handleAmountInChange}
-                onSetMax={handleSetMax}
-            />
+            {/* Token swap sections with overlapping arrow - wrapped to avoid space-y gap */}
+            <div className="relative space-y-0.5">
+                {/* FROM Section */}
+                <TokenSection
+                    label={fromLabel}
+                    asset={selectedFrom}
+                    assets={fromAssets}
+                    isReadOnly={fromReadOnly}
+                    showAvailable={true}
+                    value={amountIn}
+                    usdValue={usdValueIn}
+                    onTokenChange={handleFromTokenChange}
+                    onValueChange={handleAmountInChange}
+                    onSetMax={handleSetMax}
+                />
 
-            {/* Arrow Divider */}
-            <div className="relative z-10 -my-2 flex justify-center">
-                <div className="bg-base-100 border-base-300 rounded-full border p-2">
-                    <ArrowDownIcon className="text-base-content/60 size-4" />
+                {/* TO Section */}
+                <TokenSection
+                    label={toLabel}
+                    asset={selectedTo}
+                    assets={toAssets}
+                    isReadOnly={toReadOnly}
+                    value={amountOut}
+                    isLoading={isQuoteLoading}
+                    usdValue={usdValueOut}
+                    onTokenChange={handleToTokenChange}
+                    onValueChange={onAmountOutChange ? (e) => onAmountOutChange(e.target.value) : undefined}
+                />
+
+                {/* Limit price adjustment buttons (for limit orders) */}
+                {limitPriceButtons}
+
+                {/* Arrow - absolutely positioned to overlap boundary between FROM and TO */}
+                <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+                    <div className="bg-base-100 border-base-300 rounded border p-1 shadow-sm">
+                        <ArrowDownIcon className="text-base-content/60 size-3" />
+                    </div>
                 </div>
             </div>
 
-            {/* TO Section */}
-            <TokenSection
-                label={toLabel}
-                asset={selectedTo}
-                assets={toAssets}
-                isReadOnly={toReadOnly}
-                value={amountOut}
-                isLoading={isQuoteLoading}
-                usdValue={usdValueOut}
-                onTokenChange={handleToTokenChange}
-            />
-
             {/* Stats Grid */}
             {renderStats()}
+
+            {/* After Metrics (optional custom content) */}
+            {afterMetrics}
 
             {/* Warnings/Errors */}
             {quoteError && (
@@ -647,32 +652,46 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
         </div>
     );
 
+    // Determine modal width based on right panel presence
+    const modalMaxWidth = rightPanel ? "max-w-3xl" : "max-w-2xl";
+
     return (
         <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
             <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-            <div className="modal-box bg-base-100 border-base-300/50 relative flex max-w-2xl flex-col rounded-xl border p-5">
-                <div className="mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <h3 className="text-base-content text-lg font-semibold">{title}</h3>
-                        <div className="bg-base-200/50 flex items-center gap-1 rounded-lg p-1">
-                            <button
-                                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${activeTab === "swap" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
-                                onClick={handleSetSwapTab}
-                            >
-                                Swap
-                            </button>
-                            <button
-                                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${activeTab === "info" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
-                                onClick={handleSetInfoTab}
-                            >
-                                Info
-                            </button>
+            <div className={`modal-box bg-base-100 border-base-300/50 relative ${modalMaxWidth} overflow-hidden rounded-xl border p-0`}>
+                <div className="flex flex-col md:flex-row">
+                    {/* Main Content */}
+                    <div className="flex-1 p-5">
+                        <div className="mb-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <h3 className="text-base-content text-lg font-semibold">{title}</h3>
+                                <div className="bg-base-200/50 flex items-center gap-1 rounded-lg p-1">
+                                    <button
+                                        className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${activeTab === "swap" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
+                                        onClick={handleSetSwapTab}
+                                    >
+                                        Swap
+                                    </button>
+                                    <button
+                                        className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${activeTab === "info" ? "bg-base-100 text-base-content shadow-sm" : "text-base-content/50"}`}
+                                        onClick={handleSetInfoTab}
+                                    >
+                                        Info
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <button className="text-base-content/40 hover:text-base-content hover:bg-base-200 rounded-lg p-1.5 transition-colors" onClick={onClose}>✕</button>
-                </div>
 
-                {activeTab === "info" ? renderInfoTab() : renderSwapTab()}
+                        {activeTab === "info" ? renderInfoTab() : renderSwapTab()}
+                    </div>
+
+                    {/* Right Panel (Order Settings) - optional */}
+                    {rightPanel && (
+                        <div className="bg-base-200/30 border-base-300/50 w-64 flex-shrink-0 border-l p-4">
+                            {rightPanel}
+                        </div>
+                    )}
+                </div>
             </div>
         </dialog>
     );

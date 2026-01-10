@@ -32,11 +32,7 @@ import { LoadingOverlay, LoadingSpinner } from "~~/components/common/Loading";
 import { getBlockExplorerTxLink } from "~~/utils/scaffold-eth";
 import { formatDateTime } from "~~/utils/deadline";
 import { truncateAddress } from "~~/utils/address";
-
-const ORDER_MANAGER_ADDRESSES: Record<number, Address | undefined> = {
-  42161: "0x8F94351Ac17B4B5fb0923D229319805bB52616CD",
-  8453: "0xE4b28de3AA865540Bbc1C71892b6b6Af24929858",
-};
+import { getKapanOrderManagerAddress } from "~~/utils/constants";
 
 // ----- Formatting utilities -----
 
@@ -748,7 +744,7 @@ function useOrderData(orderHash: string, chainId: number) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const orderManagerAddress = ORDER_MANAGER_ADDRESSES[chainId];
+  const orderManagerAddress = getKapanOrderManagerAddress(chainId);
 
   useEffect(() => {
     if (!orderHash || !publicClient || !orderManagerAddress) {

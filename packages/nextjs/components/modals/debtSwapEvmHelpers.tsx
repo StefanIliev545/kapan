@@ -325,6 +325,7 @@ export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
     flashLoan: { lender: Address; token: Address; amount: bigint };
     preOrderInstructions: never[];
     isKindBuy: boolean;
+    operationType: "debt-swap";
 } {
     const { selectedTo, debtFromToken, limitOrderNewDebt, repayAmountRaw, cowFlashLoanInfo, buildCowInstructions, limitOrderConfig } = params;
     const numChunks = limitOrderConfig?.numChunks ?? 1;
@@ -350,6 +351,7 @@ export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
         },
         preOrderInstructions: [],
         isKindBuy: true,
+        operationType: "debt-swap",
     };
 }
 

@@ -19,6 +19,7 @@ import {
   CompletionType,
   getKapanCowAdapter,
   getCowBorrower,
+  type KapanOperationType,
 } from "~~/utils/cow";
 import { 
   ProtocolInstruction,
@@ -116,14 +117,21 @@ export interface CowLimitOrderInput {
   preOrderInstructions?: ProtocolInstruction[];
   
   // === Order kind ===
-  /** 
+  /**
    * If true, creates a KIND_BUY order instead of KIND_SELL.
    * KIND_SELL (default): chunkSize = exact sell, minBuyPerChunk = min buy (slippage)
    * KIND_BUY: chunkSize = max sell (slippage), minBuyPerChunk = exact buy amount
-   * 
+   *
    * Use KIND_BUY for close-with-collateral where you know exact debt to repay.
    */
   isKindBuy?: boolean;
+
+  // === Operation type (for order categorization) ===
+  /**
+   * Operation type encoded in appData for order history display.
+   * This allows deriving order type from on-chain data without localStorage.
+   */
+  operationType?: KapanOperationType;
 }
 
 /**
@@ -362,20 +370,22 @@ export function useCowLimitOrder() {
       logger.debug("[useCowLimitOrder] Generated salt:", salt);
 
       // 2. Build and register appData
+      const appDataOptions: Parameters<typeof buildAndRegisterAppData>[4] = {
+        operationType: input.operationType,
+      };
+      if (input.flashLoan) {
+        appDataOptions.flashLoan = {
+          lender: input.flashLoan.lender,
+          token: input.flashLoan.token,
+          amount: input.flashLoan.amount,
+        };
+      }
       const appDataResult = await buildAndRegisterAppData(
         chainId,
         orderManagerAddress,
         userAddress,
         salt,
-        input.flashLoan
-          ? {
-              flashLoan: {
-                lender: input.flashLoan.lender,
-                token: input.flashLoan.token,
-                amount: input.flashLoan.amount,
-              },
-            }
-          : undefined
+        appDataOptions
       );
 
       if (!appDataResult.registered) {

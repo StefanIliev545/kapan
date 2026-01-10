@@ -4,7 +4,6 @@ import { formatUnits, parseUnits, Address, PublicClient, WalletClient } from "vi
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { parseAmount } from "~~/utils/validation";
 
-import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useCowQuote } from "~~/hooks/useCowQuote";
@@ -37,10 +36,8 @@ import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 import {
     ExecutionTypeToggle,
     type ExecutionType,
-    MarketSwapStats,
-    LimitOrderSection,
-    LimitOrderInfoNote,
 } from "./common";
+import { Tooltip } from "@radix-ui/themes";
 import { WarningDisplay } from "~~/components/common/ErrorDisplay";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
@@ -60,7 +57,7 @@ interface LimitOrderParams {
     minBuyAmount: { raw: bigint; formatted: string };
     cowFlashLoanInfo: { lender: Address; provider: string; fee: bigint };
     buildCowInstructions: ChunkInstructions[];
-    limitOrderConfig: LimitOrderResult | null;
+    numChunks: number;
     protocolName: string;
     chainId: number;
     buildLimitOrderCalls: ReturnType<typeof useCowLimitOrder>["buildOrderCalls"];
@@ -86,7 +83,7 @@ interface OrderExecutionParams {
 async function buildLimitOrder(params: LimitOrderParams): Promise<BuildOrderResult> {
     const {
         selectedFrom, selectedTo, amountInBigInt, minBuyAmount,
-        cowFlashLoanInfo, buildCowInstructions, limitOrderConfig, buildLimitOrderCalls
+        cowFlashLoanInfo, buildCowInstructions, numChunks, buildLimitOrderCalls
     } = params;
 
     console.log("[Limit Order] Building collateral swap order:", {
@@ -97,7 +94,6 @@ async function buildLimitOrder(params: LimitOrderParams): Promise<BuildOrderResu
         flashLoanLender: cowFlashLoanInfo.lender,
     });
 
-    const numChunks = limitOrderConfig?.numChunks ?? 1;
     const chunkSellAmount = amountInBigInt / BigInt(numChunks);
     const chunkMinBuyAmount = minBuyAmount.raw / BigInt(numChunks);
     const chunkFlashLoanAmount = chunkSellAmount;
@@ -120,6 +116,7 @@ async function buildLimitOrder(params: LimitOrderParams): Promise<BuildOrderResu
         },
         preOrderInstructions: buildCowInstructions[0]?.postInstructions || [],
         isKindBuy: false,
+        operationType: "collateral-swap",
     });
 
     if (!result) {
@@ -487,6 +484,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     // CoW limit order specific state
     const [limitSlippage, setLimitSlippage] = useState<number>(0.1);
     const [hasAutoSetLimitSlippage, setHasAutoSetLimitSlippage] = useState(false);
+    // Custom buy amount for limit orders (user-editable)
+    const [customBuyAmount, setCustomBuyAmount] = useState<string>("");
+    const [useCustomBuyAmount, setUseCustomBuyAmount] = useState(false);
     const cowAvailable = isCowProtocolSupported(chainId);
     
     // Check if we're in a dev environment
@@ -501,22 +501,8 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     // CoW order hooks
     const { buildOrderCalls: buildLimitOrderCalls, isReady: limitOrderReady, orderManagerAddress } = useCowLimitOrder();
 
-    // Limit order config from LimitOrderConfig component
-    const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
-    
-    // Callback for when LimitOrderConfig reports changes
-    const handleLimitOrderConfigChange = useCallback((config: LimitOrderResult) => {
-        setLimitOrderConfig(config);
-    }, []);
-
-    // Memoize sellToken for LimitOrderConfig to prevent infinite re-renders
-    const limitOrderSellToken = useMemo(() =>
-        selectedFrom ? {
-            symbol: selectedFrom.symbol,
-            decimals: selectedFrom.decimals,
-            address: selectedFrom.address,
-        } : null,
-    [selectedFrom]);
+    // Number of chunks for limit orders
+    const [numChunks, setNumChunks] = useState(1);
 
     // Filter "To" assets (exclude selected "From")
     const targetAssets = useMemo(() =>
@@ -596,10 +582,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         [oneInchQuote, pendleQuote, cowQuote]
     );
 
-    const amountOut = useMemo(
-        () => calculateAmountOut(executionType, bestQuote, swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals || 18),
-        [executionType, bestQuote, swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals]
-    );
+    const amountOut = useMemo(() => {
+        // For limit orders, use custom buy amount if user has set one
+        if (executionType === "limit" && useCustomBuyAmount && customBuyAmount) {
+            return customBuyAmount;
+        }
+        return calculateAmountOut(executionType, bestQuote, swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals || 18);
+    }, [executionType, bestQuote, swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals, useCustomBuyAmount, customBuyAmount]);
 
     // Market rate from best quote
     const marketRate = useMemo(() => {
@@ -663,29 +652,38 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     // Calculate min output for limit orders with slippage
     const minBuyAmount = useMemo(() => {
         if (!selectedTo || !bestQuote) return { raw: 0n, formatted: "0" };
-        
+
+        // For limit orders, use custom buy amount if user has set one
+        if (executionType === "limit" && useCustomBuyAmount && customBuyAmount) {
+            const customParsed = parseFloat(customBuyAmount);
+            if (!isNaN(customParsed) && customParsed > 0) {
+                const rawCustom = BigInt(Math.floor(customParsed * (10 ** selectedTo.decimals)));
+                return { raw: rawCustom, formatted: customBuyAmount };
+            }
+        }
+
         const slippageToUse = executionType === "limit" ? limitSlippage : slippage;
         const bufferBps = BigInt(Math.round(slippageToUse * 100));
         const minRaw = (bestQuote.amount * (10000n - bufferBps)) / 10000n;
         return { raw: minRaw, formatted: formatUnits(minRaw, selectedTo.decimals) };
-    }, [selectedTo, bestQuote, executionType, limitSlippage, slippage]);
+    }, [selectedTo, bestQuote, executionType, limitSlippage, slippage, useCustomBuyAmount, customBuyAmount]);
 
-    // Flash loan info for CoW limit orders - uses selected provider from LimitOrderConfig
+    // Flash loan info for CoW limit orders - uses selected provider from flash loan selection
     const cowFlashLoanInfo = useMemo(() => {
         if (executionType !== "limit" || !selectedFrom) return null;
-        
-        // Use provider from LimitOrderConfig if available
-        const providerType = limitOrderConfig?.selectedProvider?.provider;
+
+        // Use provider from flash loan selection
+        const providerType = selectedProvider?.name as "morpho" | "balancerV2" | "balancerV3" | "aaveV3" | undefined;
         const lenderInfo = getPreferredFlashLoanLender(chainId, providerType);
         if (!lenderInfo) return null;
-        
+
         const fee = calculateFlashLoanFee(amountInBigInt, lenderInfo.provider);
         return {
             lender: lenderInfo.address as Address,
             provider: lenderInfo.provider,
             fee,
         };
-    }, [executionType, selectedFrom, chainId, amountInBigInt, limitOrderConfig]);
+    }, [executionType, selectedFrom, chainId, amountInBigInt, selectedProvider]);
 
     /**
      * Build CoW limit order instructions for collateral swap.
@@ -707,9 +705,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
         const normalizedProtocol = normalizeProtocolName(protocolName);
         const depositOp = getDepositOperation(protocolName);
-        
-        const numChunks = limitOrderConfig?.numChunks ?? 1;
-        
+
         // Calculate per-chunk amounts
         const chunkSellAmount = amountInBigInt / BigInt(numChunks);
         const chunkFlashLoanFee = cowFlashLoanInfo.fee / BigInt(numChunks);
@@ -758,7 +754,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 flashLoanRepaymentUtxoIndex: 2, // UTXO[2] = Withdraw output
             };
         });
-    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, limitOrderConfig?.numChunks]);
+    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, numChunks]);
 
     const buildFlow = () => {
         if (!selectedFrom || !selectedTo) return [];
@@ -826,7 +822,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             minBuyAmount,
             cowFlashLoanInfo,
             buildCowInstructions,
-            limitOrderConfig,
+            numChunks,
             protocolName,
             chainId,
             buildLimitOrderCalls,
@@ -1042,14 +1038,8 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         </>
     ), [swapRouter, oneInchQuote, oneInchAdapter, pendleAdapter, isOpen]);
 
-    // Handler for limit slippage change
-    const handleLimitSlippageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        setLimitSlippage(parseFloat(e.target.value));
-        setHasAutoSetLimitSlippage(true);
-    }, []);
-
-    // Custom stats section with execution type toggle
-    const customStats = useMemo(() => (
+    // Right panel with Market/Limit toggle and settings
+    const rightPanel = useMemo(() => (
         <div className="space-y-3">
             {/* Execution Type Toggle */}
             <ExecutionTypeToggle
@@ -1066,89 +1056,170 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 }
             />
 
-            {/* Limit Order Pricing Section */}
-            {executionType === "limit" && (
-                <div className="bg-base-200/60 border-base-300/30 rounded-lg border p-3 text-xs">
-                    {/* Market Rate Display */}
-                    <div className="mb-2 flex items-center justify-between">
-                        <span className="text-base-content/60">Market Rate</span>
-                        <div className="flex items-center gap-1.5">
-                            {isQuoteLoading ? (
-                                <span className="loading loading-dots loading-xs" />
-                            ) : marketRate ? (
-                                <>
-                                    <span className="font-medium">1 {selectedFrom?.symbol} = {marketRate.toFixed(6)} {selectedTo?.symbol}</span>
-                                    <span className="text-base-content/40 text-[10px]">({bestQuote?.source})</span>
-                                </>
-                            ) : (
-                                <span className="text-base-content/40">-</span>
-                            )}
+            {/* Market Order Settings */}
+            {executionType === "market" && (
+                <div className="space-y-2 text-xs">
+                    {/* Dropdowns row */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-base-content/50">Slippage</span>
+                            <select
+                                className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+                                value={slippage}
+                                onChange={(e) => setSlippage(parseFloat(e.target.value))}
+                            >
+                                {[0.05, 0.1, 0.3, 0.5, 1, 2, 3, 5].map(s => (
+                                    <option key={s} value={s}>{s}%</option>
+                                ))}
+                            </select>
                         </div>
+                        {oneInchAvailable && pendleAvailable && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Router</span>
+                                <select
+                                    className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+                                    value={swapRouter}
+                                    onChange={(e) => setSwapRouter(e.target.value as SwapRouter)}
+                                >
+                                    <option value="1inch">1inch</option>
+                                    <option value="pendle">Pendle</option>
+                                </select>
+                            </div>
+                        )}
+                        {flashLoanProviders && flashLoanProviders.length > 1 && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Flash Loan</span>
+                                <select
+                                    className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+                                    value={selectedProvider?.name || ""}
+                                    onChange={(e) => {
+                                        const p = flashLoanProviders.find(provider => provider.name === e.target.value);
+                                        if (p) setSelectedProvider(p);
+                                    }}
+                                >
+                                    {flashLoanProviders.map(p => {
+                                        const liq = liquidityData?.find(l => l.provider === p.providerEnum);
+                                        return (
+                                            <option key={p.name} value={p.name}>
+                                                {p.name} {liq ? (liq.hasLiquidity ? "✓" : "⚠️") : ""}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Slippage Slider */}
-                    <div className="mb-2">
-                        <div className="mb-1 flex items-center justify-between">
-                            <span className="text-base-content/60">Max Slippage</span>
-                            <span className="text-warning font-medium">
-                                {limitSlippage < 0.1 ? limitSlippage.toFixed(2) : limitSlippage.toFixed(1)}%
-                            </span>
-                        </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="5"
-                            step="0.01"
-                            value={limitSlippage}
-                            onChange={handleLimitSlippageChange}
-                            className="range range-warning range-xs w-full"
-                        />
-                        <div className="text-base-content/40 mt-0.5 flex justify-between text-[10px]">
-                            <span>0%</span>
-                            <span>0.1%</span>
-                            <span>1%</span>
-                            <span>5%</span>
-                        </div>
+                    {/* Stats section */}
+                    <div className="border-base-300/30 space-y-1 border-t pt-2">
+                        {priceImpact !== undefined && priceImpact !== null && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Price Impact</span>
+                                <span className={priceImpact > 1 ? "text-warning" : priceImpact > 3 ? "text-error" : "text-base-content/80"}>
+                                    {priceImpact.toFixed(2)}%
+                                </span>
+                            </div>
+                        )}
+                        {amountOut && parseFloat(amountOut) > 0 && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Min Output</span>
+                                <span className="text-base-content/80">
+                                    {(parseFloat(amountOut) * (1 - slippage / 100)).toFixed(4)} {selectedTo?.symbol}
+                                </span>
+                            </div>
+                        )}
                     </div>
-
-                    {/* Min Output */}
-                    <div className="border-base-300/30 flex items-center justify-between border-t py-2">
-                        <span className="text-base-content/60">Min Output</span>
-                        <span className="text-success font-medium">
-                            {minBuyAmount.raw > 0n ? (
-                                `${Number(minBuyAmount.formatted).toFixed(6)} ${selectedTo?.symbol}`
-                            ) : (
-                                "-"
-                            )}
-                        </span>
-                    </div>
-
-                    {/* Flash Loan Provider Selection with Limit Order Config */}
-                    {selectedFrom && limitOrderSellToken && (
-                        <LimitOrderSection
-                            chainId={chainId}
-                            sellToken={limitOrderSellToken}
-                            totalAmount={amountInBigInt}
-                            onConfigChange={handleLimitOrderConfigChange}
-                            limitOrderConfig={limitOrderConfig}
-                            className="border-base-300/30 border-t pt-2"
-                        />
-                    )}
-
-                    {/* Info note */}
-                    <LimitOrderInfoNote numChunks={limitOrderConfig?.numChunks ?? 1} />
                 </div>
             )}
 
-            {/* Default stats for market orders */}
-            {executionType === "market" && (
-                <MarketSwapStats
-                    slippage={slippage}
-                    setSlippage={setSlippage}
-                    priceImpact={priceImpact}
-                    formattedPriceImpact={priceImpact !== undefined && priceImpact !== null ? `${priceImpact.toFixed(2)}%` : undefined}
-                    expectedOutput={amountOut && parseFloat(amountOut) > 0 ? (parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6) : undefined}
-                />
+            {/* Limit Order Settings */}
+            {executionType === "limit" && (
+                <div className="space-y-2 text-xs">
+                    {/* Order Type Indicator */}
+                    <div className="flex items-center justify-between">
+                        <span className="text-base-content/50">Order Type</span>
+                        <Tooltip content="You are selling your current collateral to buy new collateral. The order executes when someone is willing to buy your collateral at your specified price or better.">
+                            <span className="text-base-content/80 flex cursor-help items-center gap-1 font-medium">
+                                Sell Order
+                                <InformationCircleIcon className="text-base-content/40 size-3.5" />
+                            </span>
+                        </Tooltip>
+                    </div>
+
+                    {/* Flash Loan Provider dropdown */}
+                    {flashLoanProviders && flashLoanProviders.length > 0 && (
+                        <div className="flex items-center justify-between">
+                            <span className="text-base-content/50">Flash Loan</span>
+                            <select
+                                className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+                                value={selectedProvider?.name || ""}
+                                onChange={(e) => {
+                                    const provider = flashLoanProviders.find(p => p.name === e.target.value);
+                                    if (provider) setSelectedProvider(provider);
+                                }}
+                            >
+                                {flashLoanProviders.map(p => (
+                                    <option key={p.name} value={p.name}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Limit Price vs Market comparison */}
+                    <div className="bg-base-200/50 space-y-1 rounded p-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-base-content/50">Limit Price</span>
+                            <span className="text-base-content/80 font-medium">
+                                {isQuoteLoading ? (
+                                    <span className="loading loading-dots loading-xs" />
+                                ) : marketRate && minBuyAmount.raw > 0n ? (
+                                    `1 ${selectedFrom?.symbol} = ${(Number(minBuyAmount.formatted) / Number(formatUnits(amountInBigInt, selectedFrom?.decimals ?? 18))).toFixed(4)} ${selectedTo?.symbol}`
+                                ) : "-"}
+                            </span>
+                        </div>
+                        {marketRate && minBuyAmount.raw > 0n && (
+                            <div className="text-center text-[10px]">
+                                {(() => {
+                                    const limitRate = Number(minBuyAmount.formatted) / Number(formatUnits(amountInBigInt, selectedFrom?.decimals ?? 18));
+                                    const pctDiff = ((limitRate - marketRate) / marketRate) * 100;
+                                    const isAbove = pctDiff > 0;
+                                    const absDiff = Math.abs(pctDiff);
+                                    if (absDiff < 0.01) return <span className="text-base-content/40">at market price</span>;
+                                    return (
+                                        <span className={isAbove ? "text-success" : "text-warning"}>
+                                            {absDiff.toFixed(2)}% {isAbove ? "above" : "below"} market
+                                        </span>
+                                    );
+                                })()}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Chunks */}
+                    {selectedFrom && selectedTo && (
+                        <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Chunks</span>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    className="border-base-300 bg-base-200 text-base-content/80 w-14 rounded border px-2 py-0.5 text-right text-xs font-medium"
+                                    value={numChunks}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value) || 1;
+                                        setNumChunks(Math.max(1, Math.min(100, val)));
+                                    }}
+                                />
+                            </div>
+                            {numChunks > 1 && minBuyAmount.raw > 0n && amountInBigInt > 0n && (
+                                <div className="text-base-content/50 text-[10px]">
+                                    Min {formatUnits(minBuyAmount.raw / BigInt(numChunks), selectedTo.decimals).slice(0, 8)} {selectedTo.symbol} per chunk
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     ), [
@@ -1161,19 +1232,91 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         marketRate,
         selectedFrom,
         selectedTo,
-        bestQuote,
         limitSlippage,
-        handleLimitSlippageChange,
+        setLimitSlippage,
         minBuyAmount,
-        limitOrderSellToken,
-        chainId,
-        handleLimitOrderConfigChange,
-        limitOrderConfig,
+        numChunks,
+        setNumChunks,
+        amountInBigInt,
         slippage,
         setSlippage,
         priceImpact,
         amountOut,
+        flashLoanProviders,
+        selectedProvider,
+        liquidityData,
+        swapRouter,
+        setSwapRouter,
+        oneInchAvailable,
+        pendleAvailable,
+        setSelectedProvider,
     ]);
+
+    // Handler for when user edits the output amount (limit orders)
+    const handleAmountOutChange = useCallback((value: string) => {
+        setCustomBuyAmount(value);
+        setUseCustomBuyAmount(true);
+    }, []);
+
+    // Limit price adjustment buttons (shown below "Swap To" for limit orders)
+    const limitPriceButtons = useMemo(() => {
+        if (executionType !== "limit") return null;
+
+        const adjustByPercent = (delta: number) => {
+            if (!bestQuote || !selectedTo) return;
+            const marketAmount = Number(formatUnits(bestQuote.amount, selectedTo.decimals));
+            const newAmount = marketAmount * (1 + delta / 100);
+            setCustomBuyAmount(newAmount.toFixed(6));
+            setUseCustomBuyAmount(true);
+        };
+
+        const resetToMarket = () => {
+            if (!bestQuote || !selectedTo) return;
+            // Set to exact market quote (no slippage adjustment)
+            const marketAmount = formatUnits(bestQuote.amount, selectedTo.decimals);
+            setCustomBuyAmount(marketAmount);
+            setUseCustomBuyAmount(true);
+        };
+
+        return (
+            <div className="flex flex-wrap items-center justify-center gap-1 py-1">
+                {[-1, -0.5, -0.1].map(delta => (
+                    <button
+                        key={delta}
+                        onClick={() => adjustByPercent(delta)}
+                        className="bg-base-300/50 hover:bg-base-300 rounded px-2 py-0.5 text-[10px]"
+                    >
+                        {delta}%
+                    </button>
+                ))}
+                <button
+                    onClick={resetToMarket}
+                    className="bg-primary/20 text-primary hover:bg-primary/30 rounded px-2 py-0.5 text-[10px] font-medium"
+                >
+                    Market
+                </button>
+                {[0.1, 0.5, 1].map(delta => (
+                    <button
+                        key={delta}
+                        onClick={() => adjustByPercent(delta)}
+                        className="bg-base-300/50 hover:bg-base-300 rounded px-2 py-0.5 text-[10px]"
+                    >
+                        +{delta}%
+                    </button>
+                ))}
+            </div>
+        );
+    }, [executionType, bestQuote, selectedTo]);
+
+    // Prefer Morpho for limit orders
+    useEffect(() => {
+        if (executionType === "limit" && flashLoanProviders && flashLoanProviders.length > 0) {
+            const morphoProvider = flashLoanProviders.find(p => p.name.toLowerCase().includes("morpho"));
+            if (morphoProvider && selectedProvider?.name !== morphoProvider.name) {
+                setSelectedProvider(morphoProvider);
+            }
+        }
+    }, [executionType, flashLoanProviders, selectedProvider, setSelectedProvider]);
 
     return (
         <SwapModalShell
@@ -1197,10 +1340,6 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             quoteError={executionType === "market" ? quoteError : null}
             slippage={executionType === "limit" ? limitSlippage : slippage}
             setSlippage={executionType === "limit" ? setLimitSlippage : setSlippage}
-            flashLoanProviders={executionType === "market" ? flashLoanProviders : undefined}
-            selectedProvider={executionType === "market" ? selectedProvider : undefined}
-            setSelectedProvider={executionType === "market" ? setSelectedProvider : undefined}
-            flashLoanLiquidityData={executionType === "market" ? liquidityData : undefined}
             preferBatching={executionType === "market" ? preferBatching : undefined}
             setPreferBatching={executionType === "market" ? setPreferBatching : undefined}
             onSubmit={handleSwapWrapper}
@@ -1211,11 +1350,11 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             warnings={warnings}
             fromLabel="Swap From"
             toLabel="Swap To"
-            swapRouter={executionType === "market" ? swapRouter : undefined}
-            setSwapRouter={executionType === "market" && oneInchAvailable && pendleAvailable ? setSwapRouter : undefined}
             priceImpact={executionType === "market" ? priceImpact : undefined}
-            customStats={customStats}
             hideDefaultStats={true}
+            rightPanel={rightPanel}
+            onAmountOutChange={executionType === "limit" ? handleAmountOutChange : undefined}
+            limitPriceButtons={limitPriceButtons}
         />
     );
 };

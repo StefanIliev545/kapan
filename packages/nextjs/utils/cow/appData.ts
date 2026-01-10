@@ -53,6 +53,34 @@ export interface FlashLoanMetadata {
 }
 
 /**
+ * Operation types for Kapan orders - encoded in appCode for on-chain derivation
+ */
+export type KapanOperationType =
+  | "leverage-up"
+  | "close-position"
+  | "debt-swap"
+  | "collateral-swap";
+
+/**
+ * Build the appCode string with operation type
+ * Format: "kapan:operation-type" or just "kapan" if no type specified
+ */
+export function buildAppCode(operationType?: KapanOperationType): string {
+  return operationType ? `kapan:${operationType}` : "kapan";
+}
+
+/**
+ * Parse operation type from appCode
+ * Returns undefined if not a kapan appCode or no operation type encoded
+ */
+export function parseOperationTypeFromAppCode(appCode: string): KapanOperationType | undefined {
+  if (!appCode.startsWith("kapan:")) return undefined;
+  const type = appCode.slice(6) as KapanOperationType;
+  const validTypes: KapanOperationType[] = ["leverage-up", "close-position", "debt-swap", "collateral-swap"];
+  return validTypes.includes(type) ? type : undefined;
+}
+
+/**
  * AppData document structure for CoW Protocol
  * @see https://docs.cow.fi/cow-protocol/reference/sdks/app-data
  */
@@ -264,6 +292,8 @@ export function buildKapanAppData(
     partnerFeeRecipient?: string;
     /** Slippage tolerance in basis points */
     slippageBps?: number;
+    /** Operation type for order categorization */
+    operationType?: KapanOperationType;
     /** Flash loan configuration for single-tx leverage */
     flashLoan?: {
       /** Flash loan liquidity provider (Aave pool) */
@@ -373,7 +403,7 @@ export function buildKapanAppData(
   // Use version 1.10.0 to match working Aave implementation
   const appData: AppDataDocument = {
     version: "1.10.0",
-    appCode: "KapanFinance",
+    appCode: buildAppCode(options?.operationType),
     metadata: {
       hooks: {
         pre: preHooks,
@@ -646,4 +676,63 @@ export function buildFlashLoanOptions(
     token,
     amount,
   };
+}
+
+/**
+ * Fetch appData document from CoW API by hash
+ * Uses the local API proxy to avoid CORS issues
+ *
+ * @param chainId - Chain ID
+ * @param appDataHash - The appData hash to look up
+ * @returns The appData document or null if not found
+ */
+export async function fetchAppData(
+  chainId: number,
+  appDataHash: string
+): Promise<AppDataDocument | null> {
+  try {
+    const response = await fetch(`/api/cow/${chainId}/app-data?hash=${appDataHash}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      console.warn(`[fetchAppData] API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // CoW API returns { fullAppData: { appCode, metadata, ... } } structure
+    if (data.fullAppData) {
+      return data.fullAppData as AppDataDocument;
+    }
+
+    // Or it might return the document directly
+    if (data.appCode && data.metadata) {
+      return data as AppDataDocument;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn("[fetchAppData] Fetch failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Fetch and parse operation type from appData
+ *
+ * @param chainId - Chain ID
+ * @param appDataHash - The appData hash to look up
+ * @returns The operation type or undefined if not found/parseable
+ */
+export async function fetchOperationTypeFromAppData(
+  chainId: number,
+  appDataHash: string
+): Promise<KapanOperationType | undefined> {
+  const appData = await fetchAppData(chainId, appDataHash);
+  if (!appData) return undefined;
+
+  return parseOperationTypeFromAppCode(appData.appCode);
 }

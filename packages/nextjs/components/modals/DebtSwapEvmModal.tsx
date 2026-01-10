@@ -4,6 +4,8 @@ import { formatUnits, parseUnits, Address } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { useSendCalls } from "wagmi/experimental";
 import { parseAmount } from "~~/utils/validation";
+import { PositionManager } from "~~/utils/position";
+import * as Tooltip from "@radix-ui/react-tooltip";
 
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { use1inchQuoteOnly } from "~~/hooks/use1inchQuoteOnly";
@@ -14,9 +16,9 @@ import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { useCowLimitOrder } from "~~/hooks/useCowLimitOrder";
-import { useCowQuote, getCowQuoteSellAmount } from "~~/hooks/useCowQuote";
+import { useCowQuote } from "~~/hooks/useCowQuote";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
-import { getCowExplorerAddressUrl } from "~~/utils/cow";
+import { getCowExplorerAddressUrl, getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
@@ -24,8 +26,6 @@ import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import {
     ExecutionTypeToggle,
     type ExecutionType,
-    MarketSwapStats,
-    LimitOrderSection,
 } from "./common";
 import { WarningDisplay } from "~~/components/common/ErrorDisplay";
 import { notification } from "~~/utils/scaffold-stark/notification";
@@ -63,6 +63,8 @@ interface DebtSwapEvmModalProps {
     availableAssets: SwapAsset[];
     /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
     context?: string;
+    // Position data for health factor / LTV display
+    position?: PositionManager;
 }
 
 export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
@@ -154,11 +156,15 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     // ============ Limit Order State ============
     const [executionType, setExecutionType] = useState<ExecutionType>("market");
     const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
+    const [numChunks, setNumChunks] = useState(1);
     const [isLimitSubmitting, setIsLimitSubmitting] = useState(false);
     const [useBatchedTx] = useState<boolean>(false);
     const [lastOrderSalt, setLastOrderSalt] = useState<string | null>(null);
     const [limitOrderNotificationId, setLimitOrderNotificationId] = useState<string | number | null>(null);
     const cowAvailable = isCowProtocolSupported(chainId);
+    // Custom buy amount for limit orders (user-editable)
+    const [customBuyAmount, setCustomBuyAmount] = useState<string>("");
+    const [useCustomBuyAmount, setUseCustomBuyAmount] = useState(false);
 
     // Wallet hooks for limit order
     const { address: userAddress } = useAccount();
@@ -173,18 +179,37 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         orderManagerAddress
     } = useCowLimitOrder();
 
-    // Callback for LimitOrderConfig
-    const handleLimitOrderConfigChange = useCallback((config: LimitOrderResult) => {
-        setLimitOrderConfig(config);
-    }, []);
 
-    // Memoize sellToken for LimitOrderConfig
-    // For debt swap, we flash loan the NEW DEBT (sellToken)
-    const limitOrderSellToken = useMemo(() => selectedTo ? ({
-        symbol: selectedTo.symbol,
-        decimals: selectedTo.decimals,
-        address: selectedTo.address,
-    }) : null, [selectedTo]);
+    // Initialize limitOrderConfig with default provider when switching to limit mode
+    useEffect(() => {
+        if (executionType !== "limit" || limitOrderConfig?.selectedProvider) return;
+
+        const providers = getCowFlashLoanProviders(chainId);
+        if (providers.length === 0) return;
+
+        // Default to Morpho if available, otherwise first provider
+        const morphoProvider = providers.find(p => p.provider === "morpho");
+        const defaultProvider = morphoProvider || providers[0];
+        const lenderInfo = getPreferredFlashLoanLender(chainId, defaultProvider.provider);
+
+        setLimitOrderConfig({
+            selectedProvider: defaultProvider,
+            useFlashLoan: true,
+            numChunks: 1,
+            chunkSize: 0n,
+            chunkSizes: [0n],
+            flashLoanLender: lenderInfo?.address || null,
+            flashLoanFee: calculateFlashLoanFee(0n, defaultProvider.provider),
+            explanation: "Single tx execution",
+        });
+    }, [executionType, chainId, limitOrderConfig?.selectedProvider]);
+
+    // Sync numChunks state to limitOrderConfig
+    useEffect(() => {
+        if (limitOrderConfig && limitOrderConfig.numChunks !== numChunks) {
+            setLimitOrderConfig({ ...limitOrderConfig, numChunks });
+        }
+    }, [numChunks, limitOrderConfig]);
 
     // Ensure "From" is always the debt token
     useEffect(() => {
@@ -280,7 +305,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     }, [oneInchUnitQuote, pendleUnitQuote, selectedTo, repayAmountRaw, debtFromDecimals, slippage]);
 
     // Flash Loan selection - check liquidity for the NEW debt token we're flash loaning
-    const { selectedProvider, setSelectedProvider, liquidityData } = useFlashLoanSelection({
+    const { selectedProvider, setSelectedProvider } = useFlashLoanSelection({
         flashLoanProviders,
         defaultProvider: defaultFlashLoanProvider,
         tokenAddress: selectedTo?.address,  // NEW debt token (what we flash loan)
@@ -388,9 +413,15 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     }, [selectedTo, userAddress, repayAmountRaw, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderConfig]);
 
     // amountOut = required new debt (what user will borrow)
-    const amountOut = executionType === "limit"
-        ? (limitOrderNewDebt > 0n && selectedTo ? formatUnits(limitOrderNewDebt, selectedTo.decimals) : "0")
-        : requiredNewDebtFormatted;
+    const amountOut = useMemo(() => {
+        // For limit orders, use custom buy amount if user has set one
+        if (executionType === "limit" && useCustomBuyAmount && customBuyAmount) {
+            return customBuyAmount;
+        }
+        return executionType === "limit"
+            ? (limitOrderNewDebt > 0n && selectedTo ? formatUnits(limitOrderNewDebt, selectedTo.decimals) : "0")
+            : requiredNewDebtFormatted;
+    }, [executionType, useCustomBuyAmount, customBuyAmount, limitOrderNewDebt, selectedTo, requiredNewDebtFormatted]);
 
     const buildFlow = () => {
         if (!swapQuote || !selectedTo || !hasAdapter || requiredNewDebt === 0n) return [];
@@ -588,7 +619,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     }, [debtFromPrice, expectedOutput]);
 
     // Auto-slippage and price impact calculation
-    const { priceImpact, priceImpactColorClass, formattedPriceImpact } = useAutoSlippage({
+    const { priceImpact, formattedPriceImpact } = useAutoSlippage({
         slippage,
         setSlippage,
         oneInchQuote: oneInchSwapQuote,
@@ -599,24 +630,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         dstUsdFallback,
     });
 
-    // Memoized extraContent for LimitOrderSection
-    const limitOrderExtraContent = useMemo(() => {
-        if (!cowQuote || !selectedTo) return null;
-        return (
-            <div className="text-base-content/60 border-base-300 border-t pt-1 text-xs">
-                CoW quote: sell ~{formatUnits(getCowQuoteSellAmount(cowQuote), selectedTo.decimals)} {selectedTo.symbol}
-                {limitOrderNewDebt > getCowQuoteSellAmount(cowQuote) && (
-                    <span className="text-warning ml-1">
-                        (+{slippage}% buffer)
-                    </span>
-                )}
-            </div>
-        );
-    }, [cowQuote, selectedTo, limitOrderNewDebt, slippage]);
-
-    // Custom stats for debt swap - using shared components
-    const customStatsWithToggle = useMemo(() => (
-        <div className="space-y-2">
+    // Right panel for debt swap - Market/Limit settings
+    const rightPanel = useMemo(() => (
+        <div className="space-y-3">
             {/* Execution Type Toggle */}
             <ExecutionTypeToggle
                 value={executionType}
@@ -625,48 +641,184 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 limitReady={limitOrderReady}
             />
 
-            {/* Market order stats */}
+            {/* Market Order Settings */}
             {executionType === "market" && (
-                <>
-                    <MarketSwapStats
-                        slippage={slippage}
-                        setSlippage={setSlippage}
-                        priceImpact={priceImpact}
-                        priceImpactClass={priceImpactColorClass}
-                        formattedPriceImpact={formattedPriceImpact}
-                        exchangeRate={parseFloat(exchangeRate).toFixed(4)}
-                        fromSymbol={selectedTo?.symbol}
-                        toSymbol={debtFromName}
-                        expectedOutput={swapQuote ? parseFloat(expectedOutput).toFixed(4) : undefined}
-                        outputCoversRequired={outputCoversRepay}
-                    />
-                    {/* Show USD values if available */}
-                    {srcUsdFallback !== undefined && dstUsdFallback !== undefined && (
-                        <div className="text-base-content/60 flex justify-between px-1 text-xs">
-                            <span>New debt: ~${srcUsdFallback.toFixed(2)}</span>
-                            <span>Repaying: ~${dstUsdFallback.toFixed(2)}</span>
+                <div className="space-y-2 text-xs">
+                    {/* Dropdowns */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-base-content/50">Slippage</span>
+                            <select
+                                className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+                                value={slippage}
+                                onChange={(e) => setSlippage(parseFloat(e.target.value))}
+                            >
+                                {[0.05, 0.1, 0.3, 0.5, 1, 2, 3, 5].map(s => (
+                                    <option key={s} value={s}>{s}%</option>
+                                ))}
+                            </select>
                         </div>
-                    )}
-                </>
+                        {oneInchAvailable && pendleAvailable && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Router</span>
+                                <select
+                                    className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+                                    value={swapRouter}
+                                    onChange={(e) => setSwapRouter(e.target.value as SwapRouter)}
+                                >
+                                    <option value="1inch">1inch</option>
+                                    <option value="pendle">Pendle</option>
+                                </select>
+                            </div>
+                        )}
+                        {flashLoanProviders && flashLoanProviders.length > 1 && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Flash Loan</span>
+                                <select
+                                    className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+                                    value={selectedProvider?.name || ""}
+                                    onChange={(e) => {
+                                        const p = flashLoanProviders.find(provider => provider.name === e.target.value);
+                                        if (p) setSelectedProvider(p);
+                                    }}
+                                >
+                                    {flashLoanProviders.map(p => (
+                                        <option key={p.name} value={p.name}>{p.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Stats */}
+                    <div className="border-base-300/30 space-y-1 border-t pt-2">
+                        {priceImpact !== undefined && priceImpact !== null && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Price Impact</span>
+                                <span className={priceImpact > 1 ? "text-warning" : priceImpact > 3 ? "text-error" : "text-base-content/80"}>
+                                    {formattedPriceImpact || `${priceImpact.toFixed(2)}%`}
+                                </span>
+                            </div>
+                        )}
+                        {exchangeRate && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Rate</span>
+                                <span className="text-base-content/80">
+                                    1:{parseFloat(exchangeRate).toFixed(4)}
+                                </span>
+                            </div>
+                        )}
+                        {swapQuote && expectedOutput && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Output</span>
+                                <span className={outputCoversRepay === false ? "text-warning" : outputCoversRepay === true ? "text-success" : "text-base-content/80"}>
+                                    {parseFloat(expectedOutput).toFixed(4)} {debtFromName}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </div>
             )}
 
-            {/* Limit order stats */}
-            {executionType === "limit" && selectedTo && limitOrderSellToken && (
-                <LimitOrderSection
-                    chainId={chainId}
-                    sellToken={limitOrderSellToken}
-                    totalAmount={limitOrderNewDebt || requiredNewDebt}
-                    onConfigChange={handleLimitOrderConfigChange}
-                    limitOrderConfig={limitOrderConfig}
-                    isCowQuoteLoading={isCowQuoteLoading}
-                    slippage={slippage}
-                    setSlippage={setSlippage}
-                    showSlippage={true}
-                    extraContent={limitOrderExtraContent}
-                />
+            {/* Limit Order Settings */}
+            {executionType === "limit" && selectedTo && (
+                <div className="space-y-2 text-xs">
+                    {/* Order Type Indicator */}
+                    <div className="flex items-center justify-between">
+                        <span className="text-base-content/50">Order Type</span>
+                        <Tooltip.Provider delayDuration={200}>
+                            <Tooltip.Root>
+                                <Tooltip.Trigger asChild>
+                                    <span className="text-primary flex cursor-help items-center gap-1 font-medium">
+                                        Buy Order
+                                        <InformationCircleIcon className="size-3.5" />
+                                    </span>
+                                </Tooltip.Trigger>
+                                <Tooltip.Portal>
+                                    <Tooltip.Content
+                                        className="bg-base-300 text-base-content z-50 max-w-[280px] rounded-lg px-3 py-2 text-xs shadow-lg"
+                                        sideOffset={5}
+                                    >
+                                        You are buying new debt tokens by selling repayment tokens. The order executes when someone is willing to sell you the new debt tokens at your specified price or better.
+                                        <Tooltip.Arrow className="fill-base-300" />
+                                    </Tooltip.Content>
+                                </Tooltip.Portal>
+                            </Tooltip.Root>
+                        </Tooltip.Provider>
+                    </div>
+
+                    {/* Flash Loan Provider */}
+                    {limitOrderConfig?.selectedProvider && (
+                        <div className="flex items-center justify-between">
+                            <span className="text-base-content/50">Flash Loan</span>
+                            <span className="text-base-content/80 font-medium">
+                                {limitOrderConfig.selectedProvider.provider}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Limit Price vs Market comparison */}
+                    {selectedTo && limitOrderNewDebt > 0n && repayAmountRaw > 0n && (
+                        <div className="bg-base-200/50 space-y-1 rounded p-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Limit Price</span>
+                                <span className="text-base-content/80 font-medium">
+                                    {isCowQuoteLoading ? (
+                                        <span className="loading loading-dots loading-xs" />
+                                    ) : (
+                                        `1 ${debtFromName} = ${(Number(formatUnits(limitOrderNewDebt, selectedTo.decimals)) / Number(formatUnits(repayAmountRaw, debtFromDecimals))).toFixed(4)} ${selectedTo.symbol}`
+                                    )}
+                                </span>
+                            </div>
+                            {exchangeRate && (
+                                <div className="text-center text-[10px]">
+                                    {(() => {
+                                        const limitRate = Number(formatUnits(limitOrderNewDebt, selectedTo.decimals)) / Number(formatUnits(repayAmountRaw, debtFromDecimals));
+                                        const marketRate = parseFloat(exchangeRate);
+                                        const pctDiff = ((limitRate - marketRate) / marketRate) * 100;
+                                        const isAbove = pctDiff > 0;
+                                        const absDiff = Math.abs(pctDiff);
+                                        if (absDiff < 0.01) return <span className="text-base-content/40">at market price</span>;
+                                        return (
+                                            <span className={isAbove ? "text-warning" : "text-success"}>
+                                                {absDiff.toFixed(2)}% {isAbove ? "above" : "below"} market
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Chunks */}
+                    {selectedTo && (
+                        <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Chunks</span>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    className="border-base-300 bg-base-200 text-base-content/80 w-14 rounded border px-2 py-0.5 text-right text-xs font-medium"
+                                    value={numChunks}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value) || 1;
+                                        setNumChunks(Math.max(1, Math.min(100, val)));
+                                    }}
+                                />
+                            </div>
+                            {numChunks > 1 && limitOrderNewDebt > 0n && (
+                                <div className="text-base-content/50 text-[10px]">
+                                    Max {formatUnits(limitOrderNewDebt / BigInt(numChunks), selectedTo.decimals).slice(0, 8)} {selectedTo.symbol} per chunk
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                </div>
             )}
         </div>
-    ), [executionType, setExecutionType, cowAvailable, limitOrderReady, slippage, setSlippage, priceImpact, priceImpactColorClass, formattedPriceImpact, exchangeRate, selectedTo, debtFromName, swapQuote, expectedOutput, outputCoversRepay, srcUsdFallback, dstUsdFallback, chainId, limitOrderSellToken, limitOrderNewDebt, requiredNewDebt, handleLimitOrderConfigChange, limitOrderConfig, isCowQuoteLoading, limitOrderExtraContent]);
+    ), [executionType, setExecutionType, cowAvailable, limitOrderReady, slippage, setSlippage, priceImpact, formattedPriceImpact, exchangeRate, selectedTo, debtFromName, swapQuote, expectedOutput, outputCoversRepay, flashLoanProviders, selectedProvider, setSelectedProvider, oneInchAvailable, pendleAvailable, swapRouter, setSwapRouter, limitOrderConfig, numChunks, setNumChunks, limitOrderNewDebt, isCowQuoteLoading, repayAmountRaw, debtFromDecimals]);
 
     // Info content
     const infoContent = executionType === "market" ? (
@@ -698,18 +850,76 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const isMarketExecution = executionType === "market";
     const quoteLoadingProp = isMarketExecution ? isQuoteLoading : isCowQuoteLoading;
     const quoteErrorProp = isMarketExecution ? quoteError : null;
-    const flashLoanProvidersProp = isMarketExecution ? flashLoanProviders : undefined;
-    const selectedProviderProp = isMarketExecution ? selectedProvider : undefined;
-    const setSelectedProviderProp = isMarketExecution ? setSelectedProvider : undefined;
-    const liquidityDataProp = isMarketExecution ? liquidityData : undefined;
-    const swapRouterProp = isMarketExecution ? swapRouter : undefined;
-    const canSetSwapRouter = isMarketExecution && oneInchAvailable && pendleAvailable;
-    const setSwapRouterProp = canSetSwapRouter ? setSwapRouter : undefined;
     const preferBatchingProp = isMarketExecution ? preferBatching : undefined;
     const setPreferBatchingProp = isMarketExecution ? setPreferBatching : undefined;
     const onSubmitHandler = isMarketExecution ? handleSwapWrapper : handleLimitOrderSubmit;
     const isSubmittingProp = isMarketExecution ? isSubmitting : isLimitSubmitting;
     const submitLabelProp = isMarketExecution ? "Swap Debt" : "Create Limit Order";
+
+    // Handler for when user edits the output amount (limit orders)
+    const handleAmountOutChange = useCallback((value: string) => {
+        setCustomBuyAmount(value);
+        setUseCustomBuyAmount(true);
+    }, []);
+
+    // Limit price adjustment buttons (shown below "New Debt" for limit orders)
+    const limitPriceButtons = useMemo(() => {
+        if (executionType !== "limit" || !selectedTo || limitOrderNewDebt === 0n) return null;
+
+        const marketAmount = Number(formatUnits(limitOrderNewDebt, selectedTo.decimals));
+
+        const adjustByPercent = (delta: number) => {
+            const newAmount = marketAmount * (1 + delta / 100);
+            setCustomBuyAmount(newAmount.toFixed(6));
+            setUseCustomBuyAmount(true);
+        };
+
+        const resetToMarket = () => {
+            // Set to exact market quote (no slippage adjustment)
+            const exactMarket = formatUnits(limitOrderNewDebt, selectedTo.decimals);
+            setCustomBuyAmount(exactMarket);
+            setUseCustomBuyAmount(true);
+        };
+
+        return (
+            <div className="flex flex-wrap items-center justify-center gap-1 py-1">
+                {[-1, -0.5, -0.1].map(delta => (
+                    <button
+                        key={delta}
+                        onClick={() => adjustByPercent(delta)}
+                        className="bg-base-300/50 hover:bg-base-300 rounded px-2 py-0.5 text-[10px]"
+                    >
+                        {delta}%
+                    </button>
+                ))}
+                <button
+                    onClick={resetToMarket}
+                    className="bg-primary/20 text-primary hover:bg-primary/30 rounded px-2 py-0.5 text-[10px] font-medium"
+                >
+                    Market
+                </button>
+                {[0.1, 0.5, 1].map(delta => (
+                    <button
+                        key={delta}
+                        onClick={() => adjustByPercent(delta)}
+                        className="bg-base-300/50 hover:bg-base-300 rounded px-2 py-0.5 text-[10px]"
+                    >
+                        +{delta}%
+                    </button>
+                ))}
+            </div>
+        );
+    }, [executionType, selectedTo, limitOrderNewDebt]);
+
+    // Prefer Morpho for limit orders
+    useEffect(() => {
+        if (executionType === "limit" && flashLoanProviders && flashLoanProviders.length > 0) {
+            const morphoProvider = flashLoanProviders.find(p => p.name.toLowerCase().includes("morpho"));
+            if (morphoProvider && selectedProvider?.name !== morphoProvider.name) {
+                setSelectedProvider(morphoProvider);
+            }
+        }
+    }, [executionType, flashLoanProviders, selectedProvider, setSelectedProvider]);
 
     return (
         <SwapModalShell
@@ -733,12 +943,6 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             quoteError={quoteErrorProp}
             slippage={slippage}
             setSlippage={setSlippage}
-            flashLoanProviders={flashLoanProvidersProp}
-            selectedProvider={selectedProviderProp}
-            setSelectedProvider={setSelectedProviderProp}
-            flashLoanLiquidityData={liquidityDataProp}
-            swapRouter={swapRouterProp}
-            setSwapRouter={setSwapRouterProp}
             preferBatching={preferBatchingProp}
             setPreferBatching={setPreferBatchingProp}
             onSubmit={onSubmitHandler}
@@ -750,7 +954,10 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             fromLabel="Repay Debt"
             toLabel="New Debt"
             fromReadOnly={true}
-            customStats={customStatsWithToggle}
+            hideDefaultStats={true}
+            rightPanel={rightPanel}
+            onAmountOutChange={executionType === "limit" ? handleAmountOutChange : undefined}
+            limitPriceButtons={limitPriceButtons}
         />
     );
 };

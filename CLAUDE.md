@@ -250,3 +250,72 @@ Agents should:
 | `yarn agent:postflight:strict` | Ready | Warnings (block) | Errors (block) |
 
 Quality reports are saved to `.quality/` directory when using `--report` flag.
+
+## Visual Verification (Storybook)
+
+Storybook is configured for visual component testing. Agents can capture and view rendered components.
+
+### Building and Serving
+
+```bash
+cd packages/nextjs
+yarn storybook:build              # Build static Storybook
+yarn storybook:serve              # Serve on http://localhost:6006
+yarn storybook                    # Dev mode with hot reload
+```
+
+### Capturing Screenshots
+
+Use the capture script to take screenshots of specific stories:
+
+```bash
+node scripts/capture-story.mjs <story-id> [output-path]
+
+# Examples:
+node scripts/capture-story.mjs common-loading--spinner
+node scripts/capture-story.mjs common-loading--spinner /tmp/my-screenshot.png
+```
+
+The script:
+- Automatically starts the server if not running (reuses existing on port 6006)
+- Builds Storybook if `storybook-static/` doesn't exist
+- Saves to `/tmp/storybook-screenshots/` by default
+- Multiple agents can share the same server instance
+
+### Viewing Screenshots
+
+After capturing, view with the Read tool:
+```
+Read tool: /tmp/storybook-screenshots/common-loading--spinner.png
+```
+
+### Available Stories
+
+List all available story IDs:
+```bash
+node scripts/capture-story.mjs
+# Shows: common-loading--spinner, common-loading--large, etc.
+```
+
+### Adding New Stories
+
+Create `*.stories.tsx` files in `packages/nextjs/components/`:
+
+```typescript
+import type { Meta, StoryObj } from "@storybook/react";
+import { MyComponent } from "./MyComponent";
+
+const meta: Meta<typeof MyComponent> = {
+  title: "Category/MyComponent",
+  component: MyComponent,
+};
+export default meta;
+
+type Story = StoryObj<typeof MyComponent>;
+
+export const Default: Story = {
+  args: { prop: "value" },
+};
+```
+
+After adding stories, rebuild: `yarn storybook:build`

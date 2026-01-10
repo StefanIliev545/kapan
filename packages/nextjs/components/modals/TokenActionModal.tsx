@@ -11,7 +11,6 @@ import { useGasEstimate } from "~~/hooks/useGasEstimate";
 import type { Network } from "~~/hooks/useTokenBalance";
 import { useAccount as useStarkAccount } from "~~/hooks/useAccount";
 import formatPercentage from "~~/utils/formatPercentage";
-import { formatRate } from "~~/utils/protocols";
 import { PositionManager } from "~~/utils/position";
 import {
   parseAmount,
@@ -203,7 +202,7 @@ function useTokenActionState({
 }
 
 // --- Shared component for After metrics grid ---
-interface AfterMetricsGridProps {
+export interface AfterMetricsGridProps {
   action: TokenAction;
   afterHf: number;
   afterLtv: number;
@@ -216,7 +215,7 @@ interface AfterMetricsGridProps {
  * Renders the "After" metrics grid showing Health Factor, Loan To Value, and Debt/Balance.
  * Used by both TokenActionModal and TokenActionCard.
  */
-const AfterMetricsGrid: FC<AfterMetricsGridProps> = ({
+export const AfterMetricsGrid: FC<AfterMetricsGridProps> = ({
   action,
   afterHf,
   afterLtv,
@@ -639,7 +638,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
             </div>
             <div className="text-base-content/70 flex items-center justify-between text-xs">
               <span>
-                {apyLabel} {formatRate(apy)}%
+                {apyLabel} {formatPercentage(apy)}%
               </span>
               <span>Balance: {format(Number(formatUnits(balance, decimals)))}</span>
             </div>
@@ -747,7 +746,7 @@ export const TokenActionCard: FC<Omit<TokenActionModalProps, "isOpen" | "onClose
             {protocolName && <div className="text-base-content/70 text-sm">{protocolName}</div>}
           </div>
           <div className="text-base-content/70 flex items-center justify-between text-xs">
-            <span>{apyLabel} {formatRate(apy)}</span>
+            <span>{apyLabel} {formatPercentage(apy)}%</span>
             <span>Balance: {format(Number(formatUnits(balance, decimals)))}</span>
           </div>
           <PercentInput

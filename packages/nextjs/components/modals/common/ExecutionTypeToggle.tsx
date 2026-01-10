@@ -1,7 +1,6 @@
 "use client";
 
 import { FC, useCallback } from "react";
-import { ClockIcon } from "@heroicons/react/24/outline";
 
 export type ExecutionType = "market" | "limit";
 
@@ -16,8 +15,6 @@ export interface ExecutionTypeToggleProps {
     limitReady?: boolean;
     /** Optional tooltip for disabled limit button */
     limitDisabledReason?: string;
-    /** Size variant */
-    size?: "xs" | "sm";
     /** Additional class name */
     className?: string;
 }
@@ -28,7 +25,6 @@ export const ExecutionTypeToggle: FC<ExecutionTypeToggleProps> = ({
     limitAvailable = true,
     limitReady = true,
     limitDisabledReason,
-    size = "xs",
     className = "",
 }) => {
     const handleMarketClick = useCallback(() => {
@@ -43,24 +39,30 @@ export const ExecutionTypeToggle: FC<ExecutionTypeToggleProps> = ({
         return null;
     }
 
-    const buttonClass = `btn btn-${size} flex-1`;
     const isLimitDisabled = !limitReady;
 
     return (
-        <div className={`bg-base-200 mx-auto flex w-fit gap-1 rounded-lg p-1 ${className}`}>
+        <div className={`bg-base-200/60 mx-auto flex w-fit gap-0.5 rounded-lg p-0.5 ${className}`}>
             <button
                 onClick={handleMarketClick}
-                className={`${buttonClass} ${value === "market" ? "btn-primary" : "btn-ghost"}`}
+                className={`rounded-md px-4 py-1.5 text-xs font-medium transition-colors ${
+                    value === "market"
+                        ? "bg-base-100 text-base-content shadow-sm"
+                        : "text-base-content/60 hover:text-base-content"
+                }`}
             >
                 Market
             </button>
             <button
                 onClick={handleLimitClick}
-                className={`${buttonClass} ${value === "limit" ? "btn-primary" : "btn-ghost"}`}
+                className={`rounded-md px-4 py-1.5 text-xs font-medium transition-colors ${
+                    value === "limit"
+                        ? "bg-base-100 text-base-content shadow-sm"
+                        : "text-base-content/60 hover:text-base-content"
+                } ${isLimitDisabled ? "cursor-not-allowed opacity-50" : ""}`}
                 disabled={isLimitDisabled}
                 title={isLimitDisabled ? limitDisabledReason : "Execute via CoW Protocol limit order"}
             >
-                <ClockIcon className="mr-1 size-3" />
                 Limit
             </button>
         </div>

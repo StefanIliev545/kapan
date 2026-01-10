@@ -320,6 +320,7 @@ export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
     flashLoan: { lender: Address; token: Address; amount: bigint };
     preOrderInstructions: never[];
     isKindBuy: boolean;
+    operationType: "close-position";
 } {
     const { selectedTo, debtToken, limitOrderCollateral, repayAmountRaw, cowFlashLoanInfo, buildCowInstructions, limitOrderConfig } = params;
     const numChunks = limitOrderConfig?.numChunks ?? 1;
@@ -345,6 +346,7 @@ export function buildLimitOrderCallParams(params: LimitOrderCallParams): {
         },
         preOrderInstructions: [],                    // Empty - fundOrder handles collateral transfer
         isKindBuy: true,                             // KIND_BUY: exact buyAmount, max sellAmount
+        operationType: "close-position",
     };
 }
 

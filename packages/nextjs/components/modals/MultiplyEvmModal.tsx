@@ -732,6 +732,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       flashLoan: prepareLimitOrderFlashLoanConfig(isFlashLoanMode, chunkParams.flashLoanLender, debt.address, chunkParams.chunkSize),
       preOrderInstructions,
       isKindBuy: false,
+      operationType: "leverage-up",
     });
 
     const buildError = handleLimitOrderBuildError(limitOrderResult);

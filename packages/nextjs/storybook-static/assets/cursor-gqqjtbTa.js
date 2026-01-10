@@ -1,0 +1,3 @@
+import{w as o}from"./core-DcscZfQX.js";import"./iframe-BtPwi0O8.js";import"./index.es-C-LzrPFT.js";import"./_commonjsHelpers-CE1G-McA.js";import"./events-DQ172AOg.js";import"./createSafeContext-Dp97sAkz.js";import"./_interop_require_default-BLfEiHrE.js";import"./index-kA4PVysc.js";import"./index-Bk_d_yAU.js";import"./jsx-runtime-CcWEvojh.js";import"./en_US-YBXRRIY6-ByhZuFgc.js";import"./clsx-B-dksMZM.js";import"./index-DWCZ5U4L.js";import"./index-C0udIITE.js";const h=o` <svg fill="none" viewBox="0 0 13 4">
+  <path fill="currentColor" d="M.5 0h12L8.9 3.13a3.76 3.76 0 0 1-4.8 0L.5 0Z" />
+</svg>`;export{h as cursorSvg};
