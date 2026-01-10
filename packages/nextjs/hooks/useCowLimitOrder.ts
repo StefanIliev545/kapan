@@ -220,31 +220,38 @@ const ERC20_APPROVE_ABI = [
 /**
  * Flatten per-iteration instructions to a single array for authorization.
  * Deduplicates by combining all unique instructions across iterations.
- * 
- * For KIND_BUY orders, prepends dummy ToOutput instructions to simulate the UTXOs
- * that OrderManager will prepend at execution time. This ensures authorization
- * correctly resolves inputIndex references for instructions like WithdrawCollateral.
+ *
+ * Prepends dummy ToOutput instructions to simulate the UTXOs that OrderManager
+ * will prepend at execution time. This ensures authorization correctly resolves
+ * inputIndex references for instructions like WithdrawCollateral.
+ *
+ * For KIND_BUY: prepends ToOutput(sellToken) x2 (actual sell + leftover)
+ * For KIND_SELL: prepends ToOutput(buyToken) x1 (swap output)
  */
 function flattenInstructions(
   chunks: ChunkInstructions[],
   preOrderInstructions?: ProtocolInstruction[],
   isKindBuy?: boolean,
   sellToken?: Address,
-  totalAmount?: bigint
+  buyToken?: Address,
+  totalAmount?: bigint,
+  totalBuyAmount?: bigint
 ): ProtocolInstruction[] {
   const flattened: ProtocolInstruction[] = [];
   const seen = new Set<string>();
 
-  // For KIND_BUY orders: prepend dummy ToOutput instructions matching what OrderManager
-  // prepends at execution time (UTXO[0] = actual sell, UTXO[1] = leftover, both sellToken).
-  // Assume maximum collateral sold (totalAmount) with no surplus (0n leftover).
-  // This ensures WithdrawCollateral(inputIndex=0) resolves to the correct collateral token
-  // during authorization, not the debt token from earlier instructions.
+  // Prepend dummy ToOutput instructions matching what OrderManager prepends at execution time.
+  // This ensures inputIndex references resolve correctly during authorization.
   if (isKindBuy && sellToken && totalAmount !== undefined) {
+    // KIND_BUY: OrderManager prepends two ToOutput instructions (sellToken)
     // UTXO[0] = actual sell amount (assume full totalAmount = max collateral)
     flattened.push(createRouterInstruction(encodeToOutput(totalAmount, sellToken)));
-    // UTXO[1] = leftover (assume 0 - no surplus)  
+    // UTXO[1] = leftover (assume 0 - no surplus)
     flattened.push(createRouterInstruction(encodeToOutput(0n, sellToken)));
+  } else if (!isKindBuy && buyToken && totalBuyAmount !== undefined) {
+    // KIND_SELL: OrderManager prepends one ToOutput instruction (buyToken = swap output)
+    // UTXO[0] = swap output (new collateral for collateral swap)
+    flattened.push(createRouterInstruction(encodeToOutput(totalBuyAmount, buyToken)));
   }
 
   // Include pre-order instructions first
@@ -467,13 +474,16 @@ export function useCowLimitOrder() {
       }
 
       // 4b. Get authorization calls for all instructions (including pre-order)
-      // For KIND_BUY orders, pass sellToken and totalAmount to prepend dummy UTXOs
+      // Prepend dummy ToOutput UTXOs to match OrderManager behavior at execution time
+      const totalBuyAmount = input.minBuyPerChunk * BigInt(input.targetValue);
       const allInstructions = flattenInstructions(
-        input.chunks, 
+        input.chunks,
         input.preOrderInstructions,
         input.isKindBuy,
         input.sellToken,
-        input.totalAmount
+        input.buyToken,
+        input.totalAmount,
+        totalBuyAmount
       );
       if (allInstructions.length > 0) {
         const rawAuthCalls = await getAuthorizations(allInstructions);
