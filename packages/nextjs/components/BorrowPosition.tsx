@@ -174,15 +174,18 @@ interface ClickHandlers {
 /**
  * Returns appropriate click handlers based on network type
  */
-function getClickHandlers(config: ClickHandlers) {
-  const { networkType, onBorrow, onClosePosition, onSwap, borrowModalOpen, closeWithCollateralModalOpen, debtSwapModalOpen } = config;
+function getClickHandlers(config: ClickHandlers & { protocolName: string }) {
+  const { networkType, onBorrow, onClosePosition, onSwap, borrowModalOpen, closeWithCollateralModalOpen, debtSwapModalOpen, protocolName } = config;
   const noop = () => { return; };
+
+  // Morpho requires custom handler (external modal has Morpho-specific props)
+  const isMorpho = protocolName.toLowerCase().includes("morpho");
 
   return {
     handleBorrowClick: onBorrow ?? borrowModalOpen,
     handleCloseClick: networkType === "evm" ? closeWithCollateralModalOpen : (onClosePosition ?? noop),
-    // Prefer custom onSwap handler if provided (e.g., Morpho), otherwise use internal modal for EVM
-    handleSwapClick: onSwap ?? (networkType === "evm" ? debtSwapModalOpen : noop),
+    // Morpho uses custom handler; other EVM protocols use internal modal; non-EVM uses custom handler
+    handleSwapClick: isMorpho && onSwap ? onSwap : (networkType === "evm" ? debtSwapModalOpen : (onSwap ?? noop)),
   };
 }
 
@@ -497,6 +500,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     borrowModalOpen: borrowModal.open,
     closeWithCollateralModalOpen: closeWithCollateralModal.open,
     debtSwapModalOpen: debtSwapModal.open,
+    protocolName,
   });
 
   // Extract protocol name for RefinanceModal
