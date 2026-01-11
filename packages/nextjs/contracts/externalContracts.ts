@@ -245,11 +245,14 @@ export const tokenNameToLogo = (tokenName: string) => {
 
   // Handle Pendle PT tokens (e.g., "PT-USDe-15JAN2026" -> "ptusde")
   // Strip dates like "-15JAN2026" or Unix timestamps like "-1750896023"
+  // Also handle bridged versions like "PT-USDai-19FEB2026-(ARB)"
   if (lower.startsWith("pt-")) {
     // Extract base token: "pt-usde-15jan2026" -> "usde"
     const withoutPrefix = lower.slice(3); // Remove "pt-"
-    // Remove date suffix (pattern: -DDMMMYYYY like -15jan2026) or Unix timestamp (-1xxxxxxxxx)
+    // Remove chain suffix like "-(arb)", "-(eth)", etc. first
+    // Then remove date suffix (pattern: -DDMMMYYYY like -15jan2026) or Unix timestamp (-1xxxxxxxxx)
     const baseToken = withoutPrefix
+      .replace(/-\([a-z]+\)$/i, "") // -(ARB), -(ETH), etc.
       .replace(/-\d{1,2}[a-z]{3}\d{4}$/i, "") // -15JAN2026
       .replace(/-1\d{9}$/, ""); // -1750896023 (Unix timestamp)
     return `/logos/pt${baseToken}.svg`;
