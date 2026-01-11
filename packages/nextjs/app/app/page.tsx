@@ -10,7 +10,7 @@ import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
 import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
 import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
-import { arbitrum, base, optimism, linea, plasma, mainnet } from "wagmi/chains";
+import { arbitrum, base, optimism, linea, plasma, mainnet, unichain } from "wagmi/chains";
 import { hardhat } from "viem/chains";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useAccount as useStarknetAccount } from "~~/hooks/useAccount";
@@ -61,6 +61,7 @@ const SparkProtocolView = dynamic(
 const networkOptions: NetworkOption[] = [
   { id: "ethereum", name: "Ethereum", logo: "/logos/ethereum.svg" },
   { id: "base", name: "Base", logo: "/logos/base.svg" },
+  { id: "unichain", name: "Unichain", logo: "/logos/unichain.svg" },
   { id: "plasma", name: "Plasma", logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" },
   { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
   { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
@@ -74,6 +75,7 @@ const networkOptions: NetworkOption[] = [
 const protocolCountByNetwork: Record<string, number> = {
   ethereum: 4, // Aave, Morpho, Spark, Compound (ZeroLend frozen)
   base: 5, // Aave, ZeroLend, Compound, Venus, Morpho
+  unichain: 3, // Morpho, Compound, Venus
   arbitrum: 4, // Aave, Compound, Venus, Morpho
   optimism: 3, // Aave, Morpho, Compound
   linea: 3,
@@ -132,6 +134,7 @@ const App: NextPage = () => {
     base: "Base support is experimental and pre-audit.",
     optimism: "Optimism support is experimental and pre-audit.",
     linea: "Linea support is experimental and pre-audit.",
+    unichain: "Unichain support is experimental and pre-audit.",
   }), []);
 
 
@@ -322,6 +325,21 @@ const App: NextPage = () => {
             <div className="space-y-3">
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={plasma.id} enabledFeatures={ENABLED_FEATURES_SWAP_ONLY} />
+              </StableArea>
+            </div>
+          )}
+
+          {/* UNICHAIN */}
+          {selectedNetwork === "unichain" && (
+            <div className="space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <MorphoProtocolView chainId={unichain.id} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <CompoundProtocolView chainId={unichain.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <VenusProtocolView chainId={unichain.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
             </div>
           )}

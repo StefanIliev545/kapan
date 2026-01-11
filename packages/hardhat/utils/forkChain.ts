@@ -10,6 +10,8 @@
  * - base -> 8453
  * - optimism -> 10
  * - linea -> 59144
+ * - plasma -> 9745
+ * - unichain -> 130
  *
  * Usage in deploy scripts:
  *   const effectiveChainId = getEffectiveChainId(chainId);
@@ -27,6 +29,8 @@ const FORK_CHAIN_MAP: Record<string, number> = {
   op: 10,
   linea: 59144,
   plasma: 9745,
+  unichain: 130,
+  uni: 130,
 };
 
 /**

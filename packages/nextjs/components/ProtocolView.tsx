@@ -560,12 +560,16 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const [selectedDebtSwapPosition, setSelectedDebtSwapPosition] = useState<ProtocolPosition | null>(null);
   // Start collapsed if autoExpandOnPositions is enabled
   const [isCollapsed, setIsCollapsed] = useState(autoExpandOnPositions);
+  // Track which borrow positions are expanded (for collateral views)
+  const [expandedBorrowPositions, setExpandedBorrowPositions] = useState<Record<string, boolean>>({});
 
   // Reset collapsed state when chainId changes (network switch)
   useEffect(() => {
     if (autoExpandOnPositions) {
       setIsCollapsed(true); // Reset to collapsed, will expand when positions load
     }
+    // Reset expanded borrow positions when chain changes
+    setExpandedBorrowPositions({});
   }, [chainId, autoExpandOnPositions]);
 
   const handleSwap = useCallback((position: ProtocolPosition) => {
@@ -861,6 +865,20 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       return acc;
     }, {});
   }, [filteredBorrowedPositions, handleDebtSwap]);
+
+  // Toggle handlers for borrow position expansion (for collateral views)
+  const borrowExpandToggleHandlers = useMemo(() => {
+    return filteredBorrowedPositions.reduce<Record<string, () => void>>((acc, position, index) => {
+      const key = `borrowed-${position.name}-${index}`;
+      acc[key] = () => {
+        setExpandedBorrowPositions(prev => ({
+          ...prev,
+          [key]: !prev[key],
+        }));
+      };
+      return acc;
+    }, {});
+  }, [filteredBorrowedPositions]);
 
   // Memoized tokens for Starknet TokenSelectModalStark - Supply
   const starknetSupplyTokens = useMemo(
@@ -1224,6 +1242,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     <div className="space-y-3">
                       {filteredBorrowedPositions.map((position, index) => {
                         const key = `borrowed-${position.name}-${index}`;
+                        const isExpanded = expandedBorrowPositions[key] ?? (expandFirstPositions && index === 0);
                         return (
                           <div key={key} className="min-h-[60px]">
                             <BorrowPosition
@@ -1237,7 +1256,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                               onClosePosition={borrowCloseHandlers[key]}
                               onSwap={borrowDebtSwapHandlers[key]}
                               suppressDisabledMessage
-                              defaultExpanded={expandFirstPositions && index === 0}
+                              controlledExpanded={isExpanded}
+                              onToggleExpanded={borrowExpandToggleHandlers[key]}
                             />
                           </div>
                         );

@@ -34,6 +34,7 @@ const PENDLE_AVAILABLE = new Set([
   42161, // Arbitrum
   8453,  // Base
   9745,  // Plasma
+  130,   // Unichain
   31337, // Hardhat (for local dev)
 ]);
 
@@ -56,6 +57,7 @@ const BALANCER_V2_AVAILABLE = new Set([
   42161, // Arbitrum
   8453,  // Base
   10,    // Optimism
+  130,   // Unichain
   31337, // Hardhat
 ]);
 
@@ -74,6 +76,7 @@ const MORPHO_AVAILABLE = new Set([
   42161, // Arbitrum
   8453,  // Base
   10,    // Optimism
+  130,   // Unichain (different address: 0x8f5ae9CddB9f68de460C77730b018Ae7E04a140A)
 ]);
 
 // ZeroLend (from 04_deploy_zero_lend_gateway_write.ts MAP)
@@ -226,6 +229,7 @@ export const CHAIN_IDS = {
   OPTIMISM: 10,
   LINEA: 59144,
   PLASMA: 9745,
+  UNICHAIN: 130,
   HARDHAT: 31337,
 } as const;
 

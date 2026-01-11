@@ -43,6 +43,11 @@ const DEFAULT_COMETS: Record<number, string[]> = {
   59144: [
     "0x8D38A3d6B3c3B7d96D6536DA7Eef94A9d7dbC991", // cUSDCv3 (Comet proxy)
   ],
+  // Unichain (130)
+  130: [
+    "0x2c7118c4C88B9841FCF839074c26Ae8f035f2921", // cUSDCv3
+    "0x6C987dDE50dB1dcDd32Cd4175778C2a291978E2a", // cWETHv3
+  ],
 };
 
 const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {

@@ -66,7 +66,23 @@ export const NETWORK_ID_TO_CHAIN_ID: Record<string, number> = {
   optimism: CHAIN_IDS.OPTIMISM,
   linea: CHAIN_IDS.LINEA,
   plasma: CHAIN_IDS.PLASMA,
+  unichain: CHAIN_IDS.UNICHAIN,
   hardhat: CHAIN_IDS.HARDHAT,
+};
+
+/**
+ * Reverse mapping: Chain ID to network filter ID.
+ * Used to sync wallet network changes back to the network filter.
+ */
+export const CHAIN_ID_TO_NETWORK_ID: Record<number, string> = {
+  [CHAIN_IDS.MAINNET]: "ethereum",
+  [CHAIN_IDS.ARBITRUM]: "arbitrum",
+  [CHAIN_IDS.BASE]: "base",
+  [CHAIN_IDS.OPTIMISM]: "optimism",
+  [CHAIN_IDS.LINEA]: "linea",
+  [CHAIN_IDS.PLASMA]: "plasma",
+  [CHAIN_IDS.UNICHAIN]: "unichain",
+  [CHAIN_IDS.HARDHAT]: "hardhat",
 };
 
 /** Default logo when no network-specific logo is found */

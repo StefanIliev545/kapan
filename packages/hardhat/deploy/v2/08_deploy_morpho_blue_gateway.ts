@@ -112,6 +112,11 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
       MORPHO: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
       MARKETS: [],
     },
+    // Unichain (different Morpho address)
+    130: {
+      MORPHO: "0x8f5ae9CddB9f68de460C77730b018Ae7E04a140A",
+      MARKETS: [], // Markets auto-discovered via Morpho API, no hardcoded list needed
+    },
   };
 
   const config = CONFIG[effectiveChainId];

@@ -50,6 +50,10 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     9745: {
       VAULT_V3: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",
     },
+    // Unichain (V2 only - V3 not deployed)
+    130: {
+      VAULT_V2: "0xBA12222222228d8Ba445958a75a0704d566BF2C8",
+    },
   };
 
   // Aave V3 PoolAddressesProvider map (same as in AaveGatewayWrite deployment)
@@ -93,6 +97,10 @@ const deployKapanRouter: DeployFunction = async function (hre: HardhatRuntimeEnv
     // Optimism
     10: {
       MORPHO: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+    },
+    // Unichain (different address than mainnet)
+    130: {
+      MORPHO: "0x8f5ae9CddB9f68de460C77730b018Ae7E04a140A",
     },
   };
 
