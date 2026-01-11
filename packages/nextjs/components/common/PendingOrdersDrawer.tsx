@@ -68,6 +68,8 @@ export function PendingOrdersDrawer() {
   const [orders, setOrders] = useState<OrderWithHash[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [cancellingHash, setCancellingHash] = useState<string | null>(null);
+  // Track if we have a pending order that hasn't been fetched yet
+  const [hasPendingNew, setHasPendingNew] = useState(false);
 
   // Track previous order states to detect progress/completion
   const prevOrderStates = useRef<Map<string, { status: number; iterations: bigint }>>(new Map());
@@ -151,21 +153,36 @@ export function PendingOrdersDrawer() {
   }, [currentKey, fetchedFor]);
 
   // Fetch on mount or when user/chain changes
+  // This ensures we have order hashes for event watching even if drawer is never opened
   useEffect(() => {
     if (userAddress && isAvailable && !hasFetched) {
       fetchOrders();
     }
   }, [userAddress, isAvailable, hasFetched, fetchOrders]);
 
-  // Auto-refresh when drawer is open
+  // Also fetch when hasPendingNew is set (order just created) - don't wait for timeout
+  useEffect(() => {
+    if (hasPendingNew && userAddress && isAvailable) {
+      // Immediate fetch attempt, then the delayed one will also run
+      fetchOrders();
+    }
+  }, [hasPendingNew, userAddress, isAvailable, fetchOrders]);
+
+  // Auto-refresh when drawer is open (fast - 15s)
   useIntervalWhen(fetchOrders, 15000, isOpen);
+
+  // Background refresh even when drawer is closed (slow - 60s) to detect completions
+  // Only runs when we have orders (we'll filter active ones in the callback)
+  useIntervalWhen(fetchOrders, 60000, !isOpen && orders.length > 0);
 
   // Listen for new order created events and refetch
   useEffect(() => {
     const handleOrderCreated = () => {
-      // Small delay to allow the order to be indexed
+      // Immediately show the button (even before fetch completes)
+      setHasPendingNew(true);
+      // Small delay to allow the order to be indexed, then fetch
       setTimeout(() => {
-        fetchOrders();
+        fetchOrders().then(() => setHasPendingNew(false));
       }, 2000);
     };
 
@@ -310,9 +327,9 @@ export function PendingOrdersDrawer() {
   // Don't render anything if CoW not available or not connected
   if (!isAvailable || !userAddress) return null;
 
-  // If no orders, still mount but don't show anything visible
-  // This allows us to receive ORDER_CREATED_EVENT and fetch when orders are placed
-  const showButton = orders.length > 0;
+  // Show button if we have orders OR if a new order was just created (pending fetch)
+  // This allows the button to appear immediately when ORDER_CREATED_EVENT fires
+  const showButton = orders.length > 0 || hasPendingNew;
 
   return (
     <>

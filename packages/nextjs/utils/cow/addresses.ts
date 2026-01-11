@@ -211,7 +211,7 @@ export const COW_FLASH_LOAN_PROVIDERS: Record<number, CowFlashLoanProvider[]> = 
   100: [
     { address: BALANCER.v2Vault, provider: "balancerV2", feeBps: 0, name: BALANCER_V2_NAME },
   ],
-  // Linea - Aave only (0.05%)
+  // Linea - Aave only (0.05%) - Balancer not deployed on Linea
   59144: [
     { address: requireAddress(AAVE_V3_POOLS[59144], "AAVE_V3_POOLS[59144]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
   ],

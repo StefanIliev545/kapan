@@ -759,10 +759,18 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   }, []);
 
   // Toggle markets open state (with stopPropagation)
+  // Also expand protocol if collapsed when opening markets
   const handleToggleMarkets = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsMarketsOpen(prev => !prev);
-  }, []);
+    setIsMarketsOpen(prev => {
+      const newState = !prev;
+      // If opening markets and protocol is collapsed, expand it
+      if (newState && isCollapsed) {
+        setIsCollapsed(false);
+      }
+      return newState;
+    });
+  }, [isCollapsed]);
 
   // Stop propagation handler
   const handleStopPropagation = useCallback((e: React.MouseEvent) => {

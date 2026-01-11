@@ -293,10 +293,18 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   }, []);
 
   // Toggle markets open handler (with event propagation stop)
+  // Also expand protocol if collapsed when opening markets
   const toggleMarketsOpen = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsMarketsOpen(prev => !prev);
-  }, []);
+    setIsMarketsOpen(prev => {
+      const newState = !prev;
+      // If opening markets and protocol is collapsed, expand it
+      if (newState && isCollapsed) {
+        setIsCollapsed(false);
+      }
+      return newState;
+    });
+  }, [isCollapsed]);
 
   return (
     <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 p-3'}`}>

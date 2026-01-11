@@ -171,7 +171,8 @@ const ERC20_ABI = [
 
 // ABI for KapanCowAdapter
 const KAPAN_ADAPTER_ABI = [
-  "function fundOrder(address token, address recipient, uint256 amount) external",
+  "function fundOrder(bytes32 orderHash, address token, address recipient, uint256 amount) external",
+  "function fundOrderBySalt(address user, bytes32 salt, address token, address recipient, uint256 amount) external",
 ];
 
 const borrowerIface = new Interface(BORROWER_ABI);
@@ -253,13 +254,43 @@ export function encodeTokenTransferFrom(
 /**
  * Encode a call to KapanCowAdapter.fundOrder()
  * This is used in pre-hook to transfer flash-loaned tokens to OrderManager
+ *
+ * @param orderHash - The order hash (required for security validation)
+ * @param token - Token to transfer
+ * @param recipient - Recipient address (usually OrderManager)
+ * @param amount - Amount to transfer
+ * @deprecated Use encodeAdapterFundOrderBySalt instead - orderHash is not known before order creation
  */
 export function encodeAdapterFundOrder(
+  orderHash: string,
   token: string,
   recipient: string,
   amount: bigint
 ): string {
-  return kapanAdapterIface.encodeFunctionData("fundOrder", [token, recipient, amount]);
+  return kapanAdapterIface.encodeFunctionData("fundOrder", [orderHash, token, recipient, amount]);
+}
+
+/**
+ * Encode a call to KapanCowAdapter.fundOrderBySalt()
+ * This is used in pre-hook to transfer flash-loaned tokens to OrderManager
+ *
+ * Uses (user, salt) lookup pattern to get the orderHash from on-chain,
+ * allowing pre-computation of appData before order creation.
+ *
+ * @param user - The order owner address
+ * @param salt - The order salt (known before order creation)
+ * @param token - Token to transfer
+ * @param recipient - Recipient address (usually OrderManager)
+ * @param amount - Amount to transfer
+ */
+export function encodeAdapterFundOrderBySalt(
+  user: string,
+  salt: string,
+  token: string,
+  recipient: string,
+  amount: bigint
+): string {
+  return kapanAdapterIface.encodeFunctionData("fundOrderBySalt", [user, salt, token, recipient, amount]);
 }
 
 /**
@@ -370,21 +401,26 @@ export function buildKapanAppData(
   
   if (options?.flashLoan) {
     const kapanAdapter = getKapanCowAdapter(chainId);
-    
+
     if (kapanAdapter) {
       // Use KapanCowAdapter - our custom borrower that works with HooksTrampoline
-      const fundOrderCalldata = encodeAdapterFundOrder(
+      // NOTE: Using fundOrderBySalt which looks up orderHash from (user, salt)
+      // This allows pre-computing hook calldata before order creation
+      const fundOrderCalldata = encodeAdapterFundOrderBySalt(
+        user,
+        salt,
         options.flashLoan.token,
         orderManagerAddress,
         options.flashLoan.amount
       );
-      
+
       preHooks = [
         // First: Transfer flash-loaned tokens from Adapter to OrderManager
+        // fundOrderBySalt looks up orderHash from OrderManager.userSaltToOrderHash
         {
           target: kapanAdapter,
           callData: fundOrderCalldata,
-          gasLimit: "100000",
+          gasLimit: "150000", // Increased for storage read + transfer
           dappId: "kapan://flashloans/adapter/fund",
         },
         // Second: Execute any pre-hook logic on OrderManager
@@ -395,7 +431,7 @@ export function buildKapanAppData(
           dappId: "kapan://flashloans/pre-hook",
         },
       ];
-      
+
       // Post-hook targets OrderManager (handles deposit collateral, borrow for repay)
       postHooks = [{
         target: orderManagerAddress,

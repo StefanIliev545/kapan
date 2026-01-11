@@ -21,7 +21,6 @@ import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
  */
 const deployKapanCowAdapter: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
-  const { deploy } = hre.deployments;
   const chainId = Number(await hre.getChainId());
   const effectiveChainId = getEffectiveChainId(chainId);
   logForkConfig(chainId);
@@ -48,11 +47,14 @@ const deployKapanCowAdapter: DeployFunction = async function (hre: HardhatRuntim
   const BALANCER_V2 = "0xBA12222222228d8Ba445958a75a0704d566BF2C8";
   
   // Balancer V3 Vault addresses by chain (0% flash loan fee)
+  // Same CREATE2 address on chains where deployed
   const BALANCER_V3: Record<number, string> = {
     1: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",     // Ethereum Mainnet
     42161: "0xbA1333333333a1BA1108E8412f11850A5C319bA9", // Arbitrum
     8453: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",  // Base
     10: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",    // Optimism
+    100: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",   // Gnosis
+    // Note: NOT on Linea - Balancer V3 not deployed there
   };
 
   const morphoBlue = MORPHO_BLUE[effectiveChainId];
@@ -103,6 +105,21 @@ const deployKapanCowAdapter: DeployFunction = async function (hre: HardhatRuntim
     console.log(`   Setting Balancer V3 ${balancerV3} as allowed lender (0% fee)...`);
     await safeExecute(hre, deployer, "KapanCowAdapter", "setBalancerV3Lender", [balancerV3, true], { log: true, gasLimit: 150000, waitConfirmations: WAIT });
     console.log(`   ✅ Balancer V3 configured`);
+  }
+
+  // Set OrderManager on CowAdapter (required for fundOrderBySalt)
+  const orderManagerDeployment = await hre.deployments.getOrNull("KapanOrderManager");
+  if (orderManagerDeployment) {
+    console.log(`   Setting OrderManager ${orderManagerDeployment.address} on CowAdapter...`);
+    await safeExecute(hre, deployer, "KapanCowAdapter", "setOrderManager", [orderManagerDeployment.address], { log: true, gasLimit: 150000, waitConfirmations: WAIT });
+    console.log(`   ✅ OrderManager configured on CowAdapter`);
+
+    // Also set CowAdapter on OrderManager
+    console.log(`   Setting CowAdapter on OrderManager...`);
+    await safeExecute(hre, deployer, "KapanOrderManager", "setCowAdapter", [result.address], { log: true, gasLimit: 150000, waitConfirmations: WAIT });
+    console.log(`   ✅ CowAdapter configured on OrderManager`);
+  } else {
+    console.log(`   ⚠️ KapanOrderManager not deployed yet, skipping bidirectional link setup`);
   }
 
   await waitForPendingTxs(hre, deployer);

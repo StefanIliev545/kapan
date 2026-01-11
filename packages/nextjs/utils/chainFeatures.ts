@@ -64,6 +64,7 @@ const BALANCER_V3_AVAILABLE = new Set([
   42161, // Arbitrum
   8453,  // Base
   10,    // Optimism
+  9745,  // Plasma (deployed via BIP-874)
   31337, // Hardhat
 ]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { FC, useState, useCallback, useMemo } from "react";
+import { formatUnits } from "viem";
 import Image from "next/image";
 import type { MorphoPositionRow, MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { SupplyPosition } from "~~/components/SupplyPosition";
@@ -62,6 +63,7 @@ interface SwapModalState {
   collateralDecimals: number;
   collateralBalance: bigint;
   collateralBalanceUsd: number;
+  collateralPrice: bigint; // Price in 1e8 format for SwapAsset compatibility
 }
 
 // Debt Swap modal state for a position
@@ -231,6 +233,8 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
   // Handle swap button click - opens collateral swap modal
   const handleSwapClick = useCallback(() => {
     if (!onSwapRequest || !row.hasCollateral) return;
+    // Convert price to 1e8 format for SwapAsset compatibility
+    const priceIn1e8 = BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8));
     onSwapRequest({
       isOpen: true,
       morphoContext: row.context,
@@ -240,6 +244,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
       collateralDecimals: row.collateralDecimals,
       collateralBalance: row.collateralBalance,
       collateralBalanceUsd: row.collateralBalanceUsd,
+      collateralPrice: priceIn1e8,
     });
   }, [onSwapRequest, row]);
 
@@ -466,13 +471,16 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   // Build available assets for swap modal from current position
   const swapAvailableAssets = useMemo(() => {
     if (!swapModalState) return [];
+    // Convert raw balance to human-readable number
+    const humanBalance = Number(formatUnits(swapModalState.collateralBalance, swapModalState.collateralDecimals));
     return [{
       symbol: swapModalState.collateralSymbol,
       address: swapModalState.collateralAddress,
       decimals: swapModalState.collateralDecimals,
       rawBalance: swapModalState.collateralBalance,
-      balance: swapModalState.collateralBalanceUsd,
+      balance: humanBalance, // Human-readable token amount, not USD
       icon: tokenNameToLogo(swapModalState.collateralSymbol.toLowerCase()),
+      price: swapModalState.collateralPrice, // Price in 1e8 format for USD calculation
     }];
   }, [swapModalState]);
 
@@ -487,6 +495,22 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
       type: "supply" as const,
     };
   }, [swapModalState]);
+
+  // Build available assets for debt swap modal from current position
+  const debtSwapAvailableAssets = useMemo(() => {
+    if (!debtSwapModalState) return [];
+    // Convert raw balance to human-readable number
+    const humanBalance = Number(formatUnits(debtSwapModalState.debtBalance, debtSwapModalState.debtTokenDecimals));
+    return [{
+      symbol: debtSwapModalState.debtTokenSymbol,
+      address: debtSwapModalState.debtTokenAddress,
+      decimals: debtSwapModalState.debtTokenDecimals,
+      rawBalance: debtSwapModalState.debtBalance,
+      balance: humanBalance, // Human-readable token amount, not USD
+      icon: tokenNameToLogo(debtSwapModalState.debtTokenSymbol.toLowerCase()),
+      price: debtSwapModalState.debtTokenPrice, // Price in 1e8 format for USD calculation
+    }];
+  }, [debtSwapModalState]);
 
   return (
     <>
@@ -537,7 +561,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
           debtFromDecimals={debtSwapModalState.debtTokenDecimals}
           debtFromPrice={debtSwapModalState.debtTokenPrice}
           currentDebtBalance={debtSwapModalState.debtBalance}
-          availableAssets={[]}
+          availableAssets={debtSwapAvailableAssets}
           morphoContext={debtSwapModalState.morphoContext ?? undefined}
           collateralTokenAddress={debtSwapModalState.collateralTokenAddress as Address}
           collateralTokenSymbol={debtSwapModalState.collateralTokenSymbol}

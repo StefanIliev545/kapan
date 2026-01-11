@@ -13,12 +13,16 @@ import { GPv2Order } from "../interfaces/cow/GPv2Order.sol";
 import { IGPv2Settlement } from "../interfaces/cow/IGPv2Settlement.sol";
 import { ProtocolTypes } from "../interfaces/ProtocolTypes.sol";
 
-import "hardhat/console.sol";
-
 // Forward declaration for KapanRouter interface
 interface IKapanRouter {
     function processProtocolInstructions(ProtocolTypes.ProtocolInstruction[] calldata instructions) external;
     function isAuthorizedFor(address user) external view returns (bool);
+}
+
+// Forward declaration for KapanCowAdapter interface
+interface IKapanCowAdapter {
+    function onPreHook(bytes32 orderHash) external;
+    function onPostHook(bytes32 orderHash) external;
 }
 
 /// @title KapanOrderManager
@@ -143,7 +147,10 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     
     /// @notice The KapanOrderHandler for generating orders
     address public orderHandler;
-    
+
+    /// @notice The KapanCowAdapter for flash loan order security
+    IKapanCowAdapter public cowAdapter;
+
     /// @notice Order contexts by order hash
     mapping(bytes32 => OrderContext) public orders;
     
@@ -159,9 +166,14 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     /// @notice Track pre-hook execution per order to prevent re-execution
     /// @dev Stores (iterationCount + 1) when pre-hook executed, 0 means no pre-hook pending
     mapping(bytes32 => uint256) public preHookExecutedForIteration;
-    
+
     /// @notice Track seed tokens deposited per order for accurate refunds on cancel
     mapping(bytes32 => uint256) public orderSeedBalance;
+
+    /// @notice Track token balances at end of pre-hook for delta calculation in post-hook
+    /// @dev Prevents leftover token accumulation from affecting subsequent orders
+    mapping(bytes32 => uint256) public preHookSellBalance;
+    mapping(bytes32 => uint256) public preHookBuyBalance;
 
     // ============ Events ============
     
@@ -185,6 +197,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     event ComposableCoWUpdated(address indexed oldComposableCoW, address indexed newComposableCoW);
     event HooksTrampolineUpdated(address indexed oldTrampoline, address indexed newTrampoline);
     event OrderHandlerUpdated(address indexed oldHandler, address indexed newHandler);
+    event CowAdapterUpdated(address indexed oldAdapter, address indexed newAdapter);
 
     // ============ Constructor ============
     
@@ -235,7 +248,13 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         orderHandler = _handler;
         emit OrderHandlerUpdated(oldHandler, _handler);
     }
-    
+
+    function setCowAdapter(address _cowAdapter) external onlyOwner {
+        address oldAdapter = address(cowAdapter);
+        cowAdapter = IKapanCowAdapter(_cowAdapter);
+        emit CowAdapterUpdated(oldAdapter, _cowAdapter);
+    }
+
     /// @notice Approve vault relayer to spend a token
     function approveVaultRelayer(address token) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
@@ -259,12 +278,11 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         // Validate caller is the order user
         if (params.user != msg.sender) revert Unauthorized();
         if (orderHandler == address(0)) revert InvalidHandler();
-        
-        // TODO: Re-enable instruction validation after fixing encoding mismatch
-        // The frontend encodes LendingInstruction.inputIndex as { index: uint256 } struct
-        // but the contract expects a flat LendingInstruction struct. Need to align encoding.
-        // _validateInstructionUsers(params.preInstructionsPerIteration, msg.sender);
-        // _validateInstructionUsers(params.postInstructionsPerIteration, msg.sender);
+
+        // Validate all instructions target the calling user (prevents attacking other users' positions)
+        // Pass address(this) as second arg to allow PullToken from OrderManager (for KIND_BUY post-hooks)
+        _validateInstructionUsers(params.preInstructionsPerIteration, msg.sender, address(this));
+        _validateInstructionUsers(params.postInstructionsPerIteration, msg.sender, address(this));
         
         // Compute order hash
         orderHash = keccak256(abi.encode(params, salt, block.timestamp));
@@ -406,14 +424,21 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     function _executePreHook(bytes32 orderHash) internal {
         // Only HooksTrampoline can call this
         if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
-        
+
         OrderContext storage ctx = orders[orderHash];
         if (ctx.status != OrderStatus.Active) revert InvalidOrderState();
-        
+
+        // SECURITY: For flash loan orders, validate with CowAdapter
+        // This prevents hook hijacking - attacker can't trigger victim's hooks
+        // because fundOrder must have been called with this orderHash first
+        if (ctx.params.isFlashLoanOrder && address(cowAdapter) != address(0)) {
+            cowAdapter.onPreHook(orderHash);
+        }
+
         // Guard: Pre-hook can only run once per iteration
         // Value of 0 means no pre-hook pending, non-zero means pre-hook already executed
         if (preHookExecutedForIteration[orderHash] != 0) revert PreHookAlreadyExecuted();
-        
+
         // Mark pre-hook as executed for current iteration
         // Store (iterationCount + 1) so that 0 remains the "not executed" sentinel
         preHookExecutedForIteration[orderHash] = ctx.iterationCount + 1;
@@ -446,11 +471,16 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         
         // Execute via router (router will check delegation)
         router.processProtocolInstructions(instructions);
-        
+
+        // Record balances at end of pre-hook for delta calculation in post-hook
+        // This prevents leftover tokens from previous orders affecting this order
+        preHookSellBalance[orderHash] = IERC20(ctx.params.sellToken).balanceOf(address(this));
+        preHookBuyBalance[orderHash] = IERC20(ctx.params.buyToken).balanceOf(address(this));
+
         // Emit with current iteration count (chunk index is self-determined from state)
         emit PreHookExecuted(orderHash, ctx.iterationCount);
     }
-    
+
     /// @notice Internal post-hook execution
     /// @dev For KIND_SELL: Prepends 1 UTXO (received buyToken amount)
     ///      For KIND_BUY: Prepends 2 UTXOs (actual sell amount, leftover sell amount)
@@ -478,29 +508,41 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         ProtocolTypes.ProtocolInstruction[] memory storedInstructions = 
             abi.decode(postInstructionsData, (ProtocolTypes.ProtocolInstruction[]));
         
-        uint256 actualSellAmount;
-        uint256 actualBuyAmount;
+        // Calculate deltas using pre-hook recorded balances
+        // This prevents leftover tokens from previous orders affecting this order
+        uint256 sellBefore = preHookSellBalance[orderHash];
+        uint256 buyBefore = preHookBuyBalance[orderHash];
+        uint256 sellAfter = IERC20(ctx.params.sellToken).balanceOf(address(this));
+        uint256 buyAfter = IERC20(ctx.params.buyToken).balanceOf(address(this));
+
+        // Clear stored balances (no longer needed, saves gas on subsequent reads)
+        delete preHookSellBalance[orderHash];
+        delete preHookBuyBalance[orderHash];
+
+        // Calculate actual amounts using deltas
+        uint256 actualSellAmount = sellBefore > sellAfter ? sellBefore - sellAfter : 0;
+        uint256 actualBuyAmount = buyAfter > buyBefore ? buyAfter - buyBefore : 0;
+
         ProtocolTypes.ProtocolInstruction[] memory instructions;
-        
+
         if (ctx.params.isKindBuy) {
-            // KIND_BUY: calculate actual sell amount and leftover
-            // We sent chunkSize to OrderManager (via fundOrder), CoW took some, rest remains
-            uint256 remainingSellToken = IERC20(ctx.params.sellToken).balanceOf(address(this));
-            actualSellAmount = ctx.params.chunkSize - remainingSellToken;
-            actualBuyAmount = ctx.params.minBuyPerChunk; // Exact for KIND_BUY
-            
-            // Transfer leftover sellToken to router (for flash loan repayment calculations)
-            if (remainingSellToken > 0) {
+            // KIND_BUY: actualSellAmount is the delta, actualBuyAmount should match minBuyPerChunk
+            // Calculate remaining from intended chunkSize, not from balance (avoids leftover issues)
+            uint256 remainingSellToken = actualSellAmount < ctx.params.chunkSize
+                ? ctx.params.chunkSize - actualSellAmount
+                : 0;
+
+            // Transfer only the calculated remaining to router (not any pre-existing leftovers)
+            if (remainingSellToken > 0 && sellAfter >= remainingSellToken) {
                 IERC20(ctx.params.sellToken).safeTransfer(address(router), remainingSellToken);
             }
-            
+
             // Approve router to pull buyToken (for PullToken instruction in post-hook)
-            // This is needed because KIND_BUY orders use PullToken to move debt from OM to Router
-            uint256 buyTokenBalance = IERC20(ctx.params.buyToken).balanceOf(address(this));
-            if (buyTokenBalance > 0) {
-                IERC20(ctx.params.buyToken).forceApprove(address(router), buyTokenBalance);
+            // Only approve the delta amount, not any pre-existing balance
+            if (actualBuyAmount > 0) {
+                IERC20(ctx.params.buyToken).forceApprove(address(router), actualBuyAmount);
             }
-            
+
             // Prepend TWO UTXOs for KIND_BUY:
             // UTXO[0] = actual sell amount (what we paid)
             // UTXO[1] = leftover amount (what wasn't used, now at router)
@@ -513,27 +555,26 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
                 protocolName: "router",
                 data: _encodeToOutput(remainingSellToken, ctx.params.sellToken)
             });
-            
+
             // Copy stored instructions (indices shift by 2)
             for (uint256 i = 0; i < storedInstructions.length; i++) {
                 instructions[i + 2] = storedInstructions[i];
             }
         } else {
-            // KIND_SELL: get actual received amount
-            actualBuyAmount = IERC20(ctx.params.buyToken).balanceOf(address(this));
-            actualSellAmount = ctx.params.chunkSize; // Exact for KIND_SELL
-            
-            // Transfer tokens to router for processing
-            IERC20(ctx.params.buyToken).safeTransfer(address(router), actualBuyAmount);
-            
+            // KIND_SELL: actualBuyAmount is the delta (what we received from swap)
+            // Transfer only the delta to router (not any pre-existing leftovers)
+            if (actualBuyAmount > 0) {
+                IERC20(ctx.params.buyToken).safeTransfer(address(router), actualBuyAmount);
+            }
+
             // Prepend ONE UTXO for KIND_SELL:
-            // UTXO[0] = received amount (what we got from swap)
+            // UTXO[0] = received amount (delta - what we got from swap)
             instructions = new ProtocolTypes.ProtocolInstruction[](storedInstructions.length + 1);
             instructions[0] = ProtocolTypes.ProtocolInstruction({
                 protocolName: "router",
                 data: _encodeToOutput(actualBuyAmount, ctx.params.buyToken)
             });
-            
+
             // Copy stored instructions (indices shift by 1)
             for (uint256 i = 0; i < storedInstructions.length; i++) {
                 instructions[i + 1] = storedInstructions[i];
@@ -561,8 +602,14 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
             ctx.status = OrderStatus.Completed;
             emit OrderCompleted(orderHash, ctx.params.user, ctx.executedAmount);
         }
-        
+
         emit PostHookExecuted(orderHash, ctx.iterationCount, actualBuyAmount);
+
+        // SECURITY: For flash loan orders, finalize with CowAdapter
+        // This clears the adapter state, ensuring proper cleanup
+        if (ctx.params.isFlashLoanOrder && address(cowAdapter) != address(0)) {
+            cowAdapter.onPostHook(orderHash);
+        }
     }
 
     // ============ ERC-1271 Signature Verification ============
@@ -577,9 +624,15 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     ) external view override returns (bytes4) {
         // For ERC-1271 forwarder pattern (non-Safe), signature = abi.encode(order, payload)
         // We need to decode both parts
-        (GPv2Order.Data memory order, IComposableCoW.PayloadStruct memory payload) = 
+        (GPv2Order.Data memory order, IComposableCoW.PayloadStruct memory payload) =
             abi.decode(_signature, (GPv2Order.Data, IComposableCoW.PayloadStruct));
-        
+
+        // Verify the hash matches the computed order hash
+        bytes32 computedHash = GPv2Order.hash(order, settlement.domainSeparator());
+        if (_hash != computedHash) {
+            return bytes4(0xffffffff);
+        }
+
         // Verify via ComposableCoW - this checks authorization and generates the expected order
         // ComposableCoW will call the handler's verify() function
         try composableCoW.getTradeableOrderWithSignature(
@@ -666,14 +719,15 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     /// @param expectedUser The user who must be the target of security-sensitive instructions
     function _validateInstructionUsers(
         bytes[] calldata instructionsPerIteration,
-        address expectedUser
+        address expectedUser,
+        address selfAddress
     ) internal pure {
         for (uint256 i = 0; i < instructionsPerIteration.length; i++) {
-            ProtocolTypes.ProtocolInstruction[] memory instructions = 
+            ProtocolTypes.ProtocolInstruction[] memory instructions =
                 abi.decode(instructionsPerIteration[i], (ProtocolTypes.ProtocolInstruction[]));
-            
+
             for (uint256 j = 0; j < instructions.length; j++) {
-                address instrUser = _extractUserFromInstruction(instructions[j], expectedUser);
+                address instrUser = _extractUserFromInstruction(instructions[j], expectedUser, selfAddress);
                 if (instrUser != expectedUser) {
                     revert InstructionUserMismatch(expectedUser, instrUser);
                 }
@@ -686,17 +740,19 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     ///      Only PullToken and lending instructions need strict user validation
     /// @param instruction The protocol instruction to extract user from
     /// @param expectedUser The expected user (returned for instructions that don't need validation)
+    /// @param selfAddress The OrderManager's address (allowed as source for PullToken in KIND_BUY post-hooks)
     /// @return user The user address to validate (or expectedUser if no validation needed)
     function _extractUserFromInstruction(
         ProtocolTypes.ProtocolInstruction memory instruction,
-        address expectedUser
+        address expectedUser,
+        address selfAddress
     ) internal pure returns (address user) {
         bytes32 protocolHash = keccak256(abi.encodePacked(instruction.protocolName));
-        
+
         if (protocolHash == ROUTER_PROTOCOL_HASH) {
             // Decode RouterInstruction (same method as KapanRouter)
             RouterInstruction memory routerInstruction = abi.decode(instruction.data, (RouterInstruction));
-            
+
             // Only PullToken needs strict user validation (prevents stealing from other users)
             // Other instruction types have different semantics for the user field:
             // - PushToken: user = recipient (can be OrderManager, adapters, etc.)
@@ -705,7 +761,13 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
             // - FlashLoan: user = unused (always address(0))
             // - Add/Subtract/Split: user = unused (always address(0))
             if (routerInstruction.instructionType == RouterInstructionType.PullToken) {
-                user = routerInstruction.user;
+                // Allow PullToken from self (OrderManager) for KIND_BUY post-hooks
+                // where tokens land in OrderManager from CoW settlement
+                if (routerInstruction.user == selfAddress) {
+                    user = expectedUser; // Skip validation for self
+                } else {
+                    user = routerInstruction.user;
+                }
             } else {
                 // Skip validation for other router instructions
                 user = expectedUser;
@@ -713,7 +775,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         } else {
             // Lending instruction (gateway): struct LendingInstruction { op, token, user, amount, context, input }
             // All lending operations need strict user validation
-            ProtocolTypes.LendingInstruction memory lending = 
+            ProtocolTypes.LendingInstruction memory lending =
                 abi.decode(instruction.data, (ProtocolTypes.LendingInstruction));
             user = lending.user;
         }
