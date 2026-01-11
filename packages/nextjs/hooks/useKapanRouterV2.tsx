@@ -273,6 +273,7 @@ export const useKapanRouterV2 = () => {
     59144: 1,  // Linea
     59141: 1,  // Linea Sepolia
     31337: 1,  // Hardhat
+    130: 1,    // Unichain
   };
 
   const effectiveConfirmations = CONFIRMATIONS_BY_CHAIN[chainId] ?? 1;
@@ -357,20 +358,33 @@ export const useKapanRouterV2 = () => {
     const complete = isConfirmed || isBatchConfirmed;
     if (!complete) return;
 
-    Promise.all([
-      queryClient.refetchQueries({ queryKey: ['readContract'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
-      // Morpho-specific queries
-      queryClient.refetchQueries({ queryKey: ['morpho-positions'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['morpho-markets-support'], type: 'active' }),
-    ]).catch(e => logger.warn("Post-tx refetch err:", e));
+    const doRefetch = () => {
+      Promise.all([
+        queryClient.refetchQueries({ queryKey: ['readContract'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
+        // Morpho-specific queries
+        queryClient.refetchQueries({ queryKey: ['morpho-positions'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['morpho-markets-support'], type: 'active' }),
+      ]).catch(e => logger.warn("Post-tx refetch err:", e));
 
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("txCompleted"));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("txCompleted"));
+      }
+    };
+
+    // OP Stack chains with fast block times need a delay for RPC to index new state
+    const opStackFastChains = new Set([10, 8453, 130]); // Optimism, Base, Unichain
+    const delay = opStackFastChains.has(chainId) ? 2000 : 0;
+
+    if (delay > 0) {
+      const timer = setTimeout(doRefetch, delay);
+      return () => clearTimeout(timer);
+    } else {
+      doRefetch();
     }
-  }, [isConfirmed, isBatchConfirmed, queryClient]);
+  }, [isConfirmed, isBatchConfirmed, queryClient, chainId]);
 
   const encodeCompoundMarket = useCallback((marketAddress: Address): `0x${string}` => {
     return encodeAbiParameters([{ type: "address" }], [marketAddress]) as `0x${string}`;

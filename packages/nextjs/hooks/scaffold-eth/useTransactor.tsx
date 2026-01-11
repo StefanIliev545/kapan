@@ -87,7 +87,7 @@ export const useTransactor = (_walletClient?: WalletClient): TransactionFunc => 
         />
       );
 
-      const opStackChainIds = new Set([10, 420, 8453, 84531, 84532, 11155420]);
+      const opStackChainIds = new Set([10, 420, 8453, 84531, 84532, 11155420, 130]); // 130 = Unichain
       const effectiveConfirmations =
         options?.blockConfirmations ?? (opStackChainIds.has(network) ? 2 : 1);
 

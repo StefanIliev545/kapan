@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import { MutateOptions } from "@tanstack/react-query";
 import { Abi, ExtractAbiFunctionNames } from "abitype";
+import { getPublicClient } from "@wagmi/core";
 import { Config, UseWriteContractParameters, useAccount, useWriteContract } from "wagmi";
 import { WriteContractErrorType, WriteContractReturnType } from "wagmi/actions";
 import { WriteContractVariables } from "wagmi/query";
 import { useSelectedNetwork } from "~~/hooks/scaffold-eth";
 import { useDeployedContractInfo, useTransactor } from "~~/hooks/scaffold-eth";
+import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { AllowedChainIds, notification } from "~~/utils/scaffold-eth";
+
+// Chains where MetaMask gas estimation is unreliable and we should estimate ourselves
+const CHAINS_WITH_GAS_ESTIMATION_ISSUES = new Set([130]); // Unichain
 import {
   ContractAbi,
   ContractName,
@@ -68,7 +73,7 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
     }
   }, [configOrName]);
 
-  const { chain: accountChain } = useAccount();
+  const { chain: accountChain, address: accountAddress } = useAccount();
   const writeTx = useTransactor();
   const [isMining, setIsMining] = useState(false);
 
@@ -105,12 +110,37 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
     try {
       setIsMining(true);
       const { blockConfirmations, onBlockConfirmation, ...mutateOptions } = options || {};
+
+      // For chains with unreliable MetaMask gas estimation, estimate gas ourselves
+      let gasOverride: { gas?: bigint } = {};
+      if (CHAINS_WITH_GAS_ESTIMATION_ISSUES.has(accountChain.id) && accountAddress) {
+        try {
+          const publicClient = getPublicClient(wagmiConfig, { chainId: accountChain.id as 130 });
+          if (publicClient) {
+            const gasEstimate = await publicClient.estimateContractGas({
+              address: deployedContractData.address,
+              abi: deployedContractData.abi as Abi,
+              functionName: variables.functionName as string,
+              args: variables.args as unknown[],
+              account: accountAddress,
+              value: variables.value as bigint | undefined,
+            });
+            // Add 20% buffer to the estimate
+            gasOverride = { gas: (gasEstimate * 120n) / 100n };
+          }
+        } catch (e) {
+          // If estimation fails, let MetaMask try anyway
+          console.warn("Gas estimation failed, falling back to MetaMask:", e);
+        }
+      }
+
       const makeWriteWithParams = () =>
         wagmiContractWrite.writeContractAsync(
           {
             abi: deployedContractData.abi as Abi,
             address: deployedContractData.address,
             ...variables,
+            ...gasOverride,
           } as WriteContractVariables<Abi, string, any[], Config, number>,
           mutateOptions as
             | MutateOptions<
@@ -124,8 +154,6 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
       const writeTxResult = await writeTx(makeWriteWithParams, { blockConfirmations, onBlockConfirmation });
 
       return writeTxResult;
-    } catch (e: any) {
-      throw e;
     } finally {
       setIsMining(false);
     }
