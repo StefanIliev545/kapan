@@ -107,6 +107,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // CoW limit order specific state
   const [limitSlippage, setLimitSlippage] = useState<number>(0.1);
   const [hasAutoSetLimitSlippage, setHasAutoSetLimitSlippage] = useState(false);
+  // customMinPrice: user-specified exchange rate (collateral per 1 unit of debt) for limit orders
   const [customMinPrice, setCustomMinPrice] = useState<string>("");
   const cowAvailable = isCowProtocolSupported(chainId);
 
@@ -369,6 +370,16 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const bestQuote = useMemo(() => getBestQuote(quoteData), [quoteData]);
 
+  // Calculate market exchange rate (collateral per 1 unit of debt) from quote
+  // This rate stays constant regardless of swap amount/leverage
+  const marketRate = useMemo(() => {
+    if (!bestQuote || !collateral || !debt || swapQuoteAmount === 0n) return null;
+    // rate = collateralOut / debtIn (normalized to collateral decimals for 1 unit of debt)
+    const rateRaw = (bestQuote.amount * BigInt(10 ** debt.decimals)) / swapQuoteAmount;
+    const rateFormatted = formatUnits(rateRaw, collateral.decimals);
+    return { raw: rateRaw, formatted: rateFormatted };
+  }, [bestQuote, collateral, debt, swapQuoteAmount]);
+
   const quotesPriceImpact = useMemo(() =>
     calculateQuotesPriceImpact(swapRouter, quoteData.pendleQuote, quoteData.oneInchQuote),
     [swapRouter, quoteData.pendleQuote, quoteData.oneInchQuote]
@@ -392,8 +403,37 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // ==================== Min Collateral Calculation ====================
 
-  const minCollateralOut = useMemo(() =>
-    calculateMinCollateralOut(
+  const minCollateralOut = useMemo(() => {
+    // For limit orders, calculate from rate * amount
+    if (executionType === "limit" && collateral && debt) {
+      // Use custom rate if set, otherwise use market rate
+      let rateToUse: bigint;
+      if (customMinPrice && customMinPrice !== "") {
+        try {
+          rateToUse = parseUnits(customMinPrice, collateral.decimals);
+        } catch {
+          rateToUse = marketRate?.raw ?? 0n;
+        }
+      } else {
+        rateToUse = marketRate?.raw ?? 0n;
+      }
+
+      if (rateToUse === 0n || swapQuoteAmount === 0n) {
+        return { raw: 0n, formatted: "0" };
+      }
+
+      // Apply slippage to the rate
+      const slippageBps = BigInt(Math.round(limitSlippage * 100));
+      const rateWithSlippage = (rateToUse * (10000n - slippageBps)) / 10000n;
+
+      // Calculate total: rate * swapAmount / 10^debtDecimals
+      const totalRaw = (rateWithSlippage * swapQuoteAmount) / BigInt(10 ** debt.decimals);
+      const totalFormatted = formatUnits(totalRaw, collateral.decimals);
+      return { raw: totalRaw, formatted: totalFormatted };
+    }
+
+    // For market orders, use the original calculation
+    return calculateMinCollateralOut(
       collateral,
       executionType,
       customMinPrice,
@@ -403,9 +443,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       quoteData.pendleQuote,
       limitSlippage,
       slippage
-    ),
-    [collateral, executionType, customMinPrice, bestQuote, swapRouter, quoteData.oneInchQuote, quoteData.pendleQuote, limitSlippage, slippage]
-  );
+    );
+  }, [collateral, debt, executionType, customMinPrice, marketRate, swapQuoteAmount, limitSlippage, bestQuote, swapRouter, quoteData.oneInchQuote, quoteData.pendleQuote, slippage]);
 
   // ==================== Position Metrics ====================
 
@@ -495,13 +534,19 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
     // Flash loan mode calculation
     if (useFlashLoan) {
-      console.log("[ChunkParams] Flash loan mode, flashLoanChunks:", flashLoanChunks, "chunksInput:", chunksInput);
-      return calculateFlashLoanChunkParams(flashLoanAmountRaw, debt, {
+      const result = calculateFlashLoanChunkParams(flashLoanAmountRaw, debt, {
         useFlashLoan,
         flashLoanChunks,
         limitOrderConfig,
         chainId,
       });
+      console.log("[ChunkParams] Flash loan mode:", {
+        flashLoanChunks,
+        chunksInput,
+        resultNumChunks: result.numChunks,
+        flashLoanLender: result.flashLoanLender,
+      });
+      return result;
     }
 
     // Multi-chunk mode calculation
@@ -665,6 +710,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     const preOrderInstructions = buildPreOrderInstructionsForLimitOrder(isFlashLoanMode, seedBorrowInstruction);
 
     addMultiChunkRouterCalls(allCalls, isFlashLoanMode, seedBorrowInstruction);
+
+    console.log("[Limit Order] SUBMIT - chunks debug:", {
+      chunksInput,
+      flashLoanChunks,
+      chunkParamsNumChunks: chunkParams.numChunks,
+      cowChunksLength: cowChunks.length,
+      targetValue: chunkParams.numChunks,
+    });
 
     const limitOrderResult = await buildLimitOrderCalls({
       sellToken: debt.address as Address,
@@ -985,8 +1038,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             isDevEnvironment={isDevEnvironment}
             debt={debt}
             collateral={collateral}
-            bestQuote={bestQuote}
-            minCollateralOut={minCollateralOut}
+            marketRate={marketRate}
             customMinPrice={customMinPrice}
             setCustomMinPrice={setCustomMinPrice}
             chunkParams={chunkParams}
@@ -1231,8 +1283,7 @@ interface LeverageSectionProps {
   isDevEnvironment: boolean;
   debt: SwapAsset | undefined;
   collateral: SwapAsset | undefined;
-  bestQuote: { source: string; amount: bigint } | null;
-  minCollateralOut: { raw: bigint; formatted: string };
+  marketRate: { raw: bigint; formatted: string } | null;
   customMinPrice: string;
   setCustomMinPrice: (v: string) => void;
   chunkParams: ChunkParamsResult;
@@ -1257,7 +1308,7 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
     leverage, leverageInput, maxLeverage, ticks, handleLeverageInputChange, handleLeverageInputBlur,
     handleLeverageSliderChange, cowAvailable, executionType, handleSetExecutionMarket, handleSetExecutionLimit,
     cowContractAvailable, isDevEnvironment,
-    debt, collateral, bestQuote, minCollateralOut,
+    debt, collateral, marketRate,
     customMinPrice, setCustomMinPrice, chunkParams, chunksInput, setChunksInput,
     zapMode, handleZapModeChange, swapRouter,
     handleSwapRouterChange, oneInchAvailable, pendleAvailable, slippage, handleSlippageChange,
@@ -1321,8 +1372,7 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
         <LimitOrderPricingSection
           debt={debt}
           collateral={collateral}
-          bestQuote={bestQuote}
-          minCollateralOut={minCollateralOut}
+          marketRate={marketRate}
           customMinPrice={customMinPrice}
           setCustomMinPrice={setCustomMinPrice}
           chunkParams={chunkParams}
@@ -1375,8 +1425,7 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
 interface LimitOrderPricingSectionProps {
   debt: SwapAsset | undefined;
   collateral: SwapAsset | undefined;
-  bestQuote: { source: string; amount: bigint } | null;
-  minCollateralOut: { raw: bigint; formatted: string };
+  marketRate: { raw: bigint; formatted: string } | null;
   customMinPrice: string;
   setCustomMinPrice: (v: string) => void;
   chunkParams: ChunkParamsResult;
@@ -1386,8 +1435,8 @@ interface LimitOrderPricingSectionProps {
 
 const LimitOrderPricingSection: FC<LimitOrderPricingSectionProps> = (props) => {
   const {
-    debt, collateral, bestQuote,
-    minCollateralOut, customMinPrice, setCustomMinPrice, chunkParams, chunksInput, setChunksInput,
+    debt, collateral, marketRate,
+    customMinPrice, setCustomMinPrice, chunkParams, chunksInput, setChunksInput,
   } = props;
 
   // Format price with appropriate precision (preserve significant digits)
@@ -1401,19 +1450,18 @@ const LimitOrderPricingSection: FC<LimitOrderPricingSectionProps> = (props) => {
     return value.toFixed(Math.max(0, displayDecimals));
   };
 
-  // Adjust price by percentage
+  // Adjust rate by percentage
   const adjustByPercent = (delta: number) => {
-    if (!bestQuote || !collateral) return;
-    const marketAmount = Number(formatUnits(bestQuote.amount, collateral.decimals));
-    const newAmount = marketAmount * (1 + delta / 100);
-    setCustomMinPrice(formatPrice(newAmount));
+    if (!marketRate || !collateral) return;
+    const currentRate = Number(marketRate.formatted);
+    const newRate = currentRate * (1 + delta / 100);
+    setCustomMinPrice(formatPrice(newRate));
   };
 
-  // Reset to market price
+  // Reset to market rate
   const resetToMarket = () => {
-    if (!bestQuote || !collateral) return;
-    const marketAmount = Number(formatUnits(bestQuote.amount, collateral.decimals));
-    setCustomMinPrice(formatPrice(marketAmount));
+    if (!marketRate) return;
+    setCustomMinPrice(marketRate.formatted);
   };
 
   return (
@@ -1450,9 +1498,9 @@ const LimitOrderPricingSection: FC<LimitOrderPricingSectionProps> = (props) => {
               type="text"
               inputMode="decimal"
               className="border-base-300 bg-base-100 text-base-content min-w-0 flex-1 rounded border px-1 py-0 text-[10px] font-medium"
-              value={customMinPrice || minCollateralOut.formatted}
+              value={customMinPrice || marketRate?.formatted || "0"}
               onChange={(e) => setCustomMinPrice(e.target.value)}
-              placeholder={minCollateralOut.formatted}
+              placeholder={marketRate?.formatted || "0"}
             />
             <span className="text-base-content/50 shrink-0 text-[10px]">{collateral.symbol}</span>
           </div>
