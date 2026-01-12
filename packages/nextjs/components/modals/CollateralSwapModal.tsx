@@ -1550,15 +1550,19 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
         const adjustByPercent = (delta: number) => {
             if (!bestQuote || !selectedTo) return;
-            const marketAmount = Number(formatUnits(bestQuote.amount, selectedTo.decimals));
-            const newAmount = marketAmount * (1 + delta / 100);
+            // Use current effective amount for additive adjustments
+            const currentAmount = useCustomBuyAmount && customBuyAmount
+                ? parseFloat(customBuyAmount)
+                : Number(formatUnits(bestQuote.amount, selectedTo.decimals));
+            if (isNaN(currentAmount)) return;
+            const newAmount = currentAmount * (1 + delta / 100);
             setCustomBuyAmount(newAmount.toFixed(6));
             setUseCustomBuyAmount(true);
         };
 
         const resetToMarket = () => {
             if (!bestQuote || !selectedTo) return;
-            // Set to exact market quote (no slippage adjustment)
+            // Reset to exact market quote
             const marketAmount = formatUnits(bestQuote.amount, selectedTo.decimals);
             setCustomBuyAmount(marketAmount);
             setUseCustomBuyAmount(true);
@@ -1566,7 +1570,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
         return (
             <div className="flex flex-wrap items-center justify-center gap-1 py-1">
-                {[-1, -0.5, -0.1].map(delta => (
+                {[-1, -0.5, -0.1, -0.01].map(delta => (
                     <button
                         key={delta}
                         onClick={() => adjustByPercent(delta)}
@@ -1577,11 +1581,11 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 ))}
                 <button
                     onClick={resetToMarket}
-                    className="bg-primary/20 text-primary hover:bg-primary/30 rounded px-2 py-0.5 text-[10px] font-medium"
+                    className="bg-base-300/50 hover:bg-base-300 rounded px-2 py-0.5 text-[10px]"
                 >
                     Market
                 </button>
-                {[0.1, 0.5, 1].map(delta => (
+                {[0.01, 0.1, 0.5, 1].map(delta => (
                     <button
                         key={delta}
                         onClick={() => adjustByPercent(delta)}
@@ -1592,7 +1596,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 ))}
             </div>
         );
-    }, [executionType, bestQuote, selectedTo]);
+    }, [executionType, bestQuote, selectedTo, useCustomBuyAmount, customBuyAmount]);
 
     // Prefer Morpho for limit orders
     useEffect(() => {

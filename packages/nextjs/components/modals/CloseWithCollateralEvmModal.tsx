@@ -853,16 +853,19 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const limitPriceButtons = useMemo(() => {
         if (executionType !== "limit" || !selectedTo || limitOrderCollateral === 0n) return null;
 
-        const marketAmount = Number(formatUnits(limitOrderCollateral, selectedTo.decimals));
-
         const adjustByPercent = (delta: number) => {
-            const newAmount = marketAmount * (1 + delta / 100);
+            // Use current effective amount for additive adjustments
+            const currentAmount = useCustomBuyAmount && customBuyAmount
+                ? parseFloat(customBuyAmount)
+                : Number(formatUnits(limitOrderCollateral, selectedTo.decimals));
+            if (isNaN(currentAmount)) return;
+            const newAmount = currentAmount * (1 + delta / 100);
             setCustomBuyAmount(newAmount.toFixed(6));
             setUseCustomBuyAmount(true);
         };
 
         const resetToMarket = () => {
-            // Set to exact market quote (no slippage adjustment)
+            // Reset to exact CoW quote price
             const exactMarket = formatUnits(limitOrderCollateral, selectedTo.decimals);
             setCustomBuyAmount(exactMarket);
             setUseCustomBuyAmount(true);
@@ -870,7 +873,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
         return (
             <div className="flex flex-wrap items-center justify-center gap-1 py-1">
-                {[-1, -0.5, -0.1].map(delta => (
+                {[-1, -0.5, -0.1, -0.01].map(delta => (
                     <button
                         key={delta}
                         onClick={() => adjustByPercent(delta)}
@@ -881,11 +884,11 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 ))}
                 <button
                     onClick={resetToMarket}
-                    className="bg-primary/20 text-primary hover:bg-primary/30 rounded px-2 py-0.5 text-[10px] font-medium"
+                    className="bg-base-300/50 hover:bg-base-300 rounded px-2 py-0.5 text-[10px]"
                 >
                     Market
                 </button>
-                {[0.1, 0.5, 1].map(delta => (
+                {[0.01, 0.1, 0.5, 1].map(delta => (
                     <button
                         key={delta}
                         onClick={() => adjustByPercent(delta)}
@@ -896,7 +899,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 ))}
             </div>
         );
-    }, [executionType, selectedTo, limitOrderCollateral]);
+    }, [executionType, selectedTo, limitOrderCollateral, useCustomBuyAmount, customBuyAmount]);
 
     // Prefer Morpho for limit orders
     useEffect(() => {

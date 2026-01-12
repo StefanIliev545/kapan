@@ -134,29 +134,52 @@ export function findPendingNoteForOrder(
 ): OrderNote | undefined {
   const notes = getOrderNotes();
   const ORDER_TIME_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutes tolerance
-  
-  for (const note of Object.values(notes)) {
+
+  console.log("[findPendingNoteForOrder] Looking for:", { sellToken, buyToken, chainId, createdAtTimestamp });
+  console.log("[findPendingNoteForOrder] Available notes:", Object.keys(notes).length);
+
+  for (const [key, note] of Object.entries(notes)) {
     // Skip notes that already have an orderHash set
-    if (note.orderHash) continue;
-    
+    if (note.orderHash) {
+      console.log(`[findPendingNoteForOrder] Skipping ${key}: already has orderHash`);
+      continue;
+    }
+
     // Must have a salt (pending note)
-    if (!note.salt) continue;
-    
+    if (!note.salt) {
+      console.log(`[findPendingNoteForOrder] Skipping ${key}: no salt`);
+      continue;
+    }
+
     // Match by chain
-    if (note.chainId !== chainId) continue;
-    
+    if (note.chainId !== chainId) {
+      console.log(`[findPendingNoteForOrder] Skipping ${key}: chain mismatch (${note.chainId} vs ${chainId})`);
+      continue;
+    }
+
     // Match by tokens (symbols, case-insensitive)
     const noteHasSellToken = note.sellToken?.toLowerCase() === sellToken.toLowerCase();
     const noteHasBuyToken = note.buyToken?.toLowerCase() === buyToken.toLowerCase();
-    if (!noteHasSellToken || !noteHasBuyToken) continue;
-    
+    if (!noteHasSellToken || !noteHasBuyToken) {
+      console.log(`[findPendingNoteForOrder] Skipping ${key}: token mismatch`, {
+        noteSell: note.sellToken, orderSell: sellToken,
+        noteBuy: note.buyToken, orderBuy: buyToken,
+      });
+      continue;
+    }
+
     // Match by time (within tolerance)
     const timeDiff = Math.abs(note.createdAt - createdAtTimestamp * 1000);
-    if (timeDiff > ORDER_TIME_TOLERANCE_MS) continue;
-    
+    if (timeDiff > ORDER_TIME_TOLERANCE_MS) {
+      console.log(`[findPendingNoteForOrder] Skipping ${key}: time mismatch (diff: ${timeDiff}ms)`);
+      continue;
+    }
+
+    console.log(`[findPendingNoteForOrder] Found match: ${key}`);
     return note;
   }
-  
+
+  console.log("[findPendingNoteForOrder] No match found");
   return undefined;
 }
 

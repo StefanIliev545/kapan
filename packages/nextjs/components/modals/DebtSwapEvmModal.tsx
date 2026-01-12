@@ -482,13 +482,25 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // ============ Limit Order: New Debt Amount from CoW Quote ============
     const limitOrderNewDebt = useMemo(() => {
-        return calculateLimitOrderNewDebt(cowQuote, selectedTo, slippage);
-    }, [cowQuote, selectedTo, slippage]);
+        return calculateLimitOrderNewDebt(cowQuote, selectedTo);
+    }, [cowQuote, selectedTo]);
+
+    // ============ Limit Order: Effective New Debt (custom or quote) ============
+    // When user modifies the price, use their custom amount instead of the quote
+    const effectiveLimitOrderNewDebt = useMemo(() => {
+        if (useCustomBuyAmount && customBuyAmount && selectedTo) {
+            const parsed = parseAmount(customBuyAmount, selectedTo.decimals);
+            if (parsed.value && parsed.value > 0n) {
+                return parsed.value;
+            }
+        }
+        return limitOrderNewDebt;
+    }, [useCustomBuyAmount, customBuyAmount, selectedTo, limitOrderNewDebt]);
 
     // ============ Limit Order: Flash Loan Info ============
     const cowFlashLoanInfo = useMemo(() => {
-        return buildCowFlashLoanInfo(chainId, limitOrderConfig, executionType, selectedTo, limitOrderNewDebt);
-    }, [chainId, limitOrderConfig, executionType, limitOrderNewDebt, selectedTo]);
+        return buildCowFlashLoanInfo(chainId, limitOrderConfig, executionType, selectedTo, effectiveLimitOrderNewDebt);
+    }, [chainId, limitOrderConfig, executionType, effectiveLimitOrderNewDebt, selectedTo]);
 
     // ============ Limit Order: Build Chunk Instructions ============
     const buildCowInstructions = useMemo(() => {
@@ -796,7 +808,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             selectedTo,
             repayAmountRaw,
             debtFromDecimals,
-            limitOrderNewDebt,
+            limitOrderNewDebt: effectiveLimitOrderNewDebt,
             flashLoanProviderName: limitOrderConfig.selectedProvider.name,
         });
 
@@ -809,7 +821,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             logLimitOrderBuildStart({
                 selectedTo,
                 debtFromName,
-                limitOrderNewDebt,
+                limitOrderNewDebt: effectiveLimitOrderNewDebt,
                 repayAmountRaw,
                 debtFromDecimals,
                 cowFlashLoanInfo,
@@ -821,7 +833,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             const callParams = buildLimitOrderCallParams({
                 selectedTo,
                 debtFromToken,
-                limitOrderNewDebt,
+                limitOrderNewDebt: effectiveLimitOrderNewDebt,
                 repayAmountRaw: limitOrderBuyAmount,
                 cowFlashLoanInfo,
                 buildCowInstructions,
@@ -873,11 +885,11 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         } finally {
             setIsLimitSubmitting(false);
         }
-    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, limitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose, limitOrderBuyAmount]);
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, effectiveLimitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose, limitOrderBuyAmount]);
 
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && requiredNewDebt > 0n && hasAdapter;
     const canSubmitLimit = executionType === "limit" && limitOrderReady && !!cowFlashLoanInfo &&
-        parseFloat(amountIn) > 0 && !!orderManagerAddress && limitOrderNewDebt > 0n;
+        parseFloat(amountIn) > 0 && !!orderManagerAddress && effectiveLimitOrderNewDebt > 0n;
     const canSubmit = executionType === "market" ? canSubmitMarket : canSubmitLimit;
 
     // Calculate USD values from token prices for price impact fallback
@@ -1036,25 +1048,30 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                         </div>
                     )}
 
-                    {/* Limit Price vs Market comparison */}
-                    {selectedTo && limitOrderNewDebt > 0n && repayAmountRaw > 0n && (
+                    {/* Loading indicator */}
+                    {isCowQuoteLoading && (
+                        <div className="text-base-content/50 flex items-center gap-2 text-xs">
+                            <span className="loading loading-spinner loading-xs" />
+                            <span>Fetching quote...</span>
+                        </div>
+                    )}
+
+                    {/* Limit Price vs CoW Quote comparison */}
+                    {selectedTo && effectiveLimitOrderNewDebt > 0n && repayAmountRaw > 0n && !isCowQuoteLoading && (
                         <div className="bg-base-200/50 space-y-1 rounded p-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-base-content/50">Limit Price</span>
                                 <span className="text-base-content/80 font-medium">
-                                    {isCowQuoteLoading ? (
-                                        <span className="loading loading-dots loading-xs" />
-                                    ) : (
-                                        `1 ${debtFromName} = ${(Number(formatUnits(limitOrderNewDebt, selectedTo.decimals)) / Number(formatUnits(repayAmountRaw, debtFromDecimals))).toFixed(4)} ${selectedTo.symbol}`
-                                    )}
+                                    {`1 ${debtFromName} = ${(Number(formatUnits(effectiveLimitOrderNewDebt, selectedTo.decimals)) / Number(formatUnits(repayAmountRaw, debtFromDecimals))).toFixed(4)} ${selectedTo.symbol}`}
                                 </span>
                             </div>
-                            {exchangeRate && (
+                            {limitOrderNewDebt > 0n && (
                                 <div className="text-center text-[10px]">
                                     {(() => {
-                                        const limitRate = Number(formatUnits(limitOrderNewDebt, selectedTo.decimals)) / Number(formatUnits(repayAmountRaw, debtFromDecimals));
-                                        const marketRate = parseFloat(exchangeRate);
-                                        const pctDiff = ((limitRate - marketRate) / marketRate) * 100;
+                                        // Compare user's price vs CoW quote (not 1inch)
+                                        const userRate = Number(formatUnits(effectiveLimitOrderNewDebt, selectedTo.decimals));
+                                        const quoteRate = Number(formatUnits(limitOrderNewDebt, selectedTo.decimals));
+                                        const pctDiff = ((userRate - quoteRate) / quoteRate) * 100;
                                         const isAbove = pctDiff > 0;
                                         const absDiff = Math.abs(pctDiff);
                                         if (absDiff < 0.01) return <span className="text-base-content/40">at market price</span>;
@@ -1086,9 +1103,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                                     }}
                                 />
                             </div>
-                            {numChunks > 1 && limitOrderNewDebt > 0n && (
+                            {numChunks > 1 && effectiveLimitOrderNewDebt > 0n && (
                                 <div className="text-base-content/50 text-[10px]">
-                                    Max {formatUnits(limitOrderNewDebt / BigInt(numChunks), selectedTo.decimals).slice(0, 8)} {selectedTo.symbol} per chunk
+                                    Max {formatUnits(effectiveLimitOrderNewDebt / BigInt(numChunks), selectedTo.decimals).slice(0, 8)} {selectedTo.symbol} per chunk
                                 </div>
                             )}
                         </div>
@@ -1097,7 +1114,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 </div>
             )}
         </div>
-    ), [executionType, setExecutionType, cowAvailable, limitOrderReady, slippage, setSlippage, priceImpact, formattedPriceImpact, exchangeRate, selectedTo, debtFromName, swapQuote, expectedOutput, outputCoversRepay, flashLoanProviders, selectedProvider, setSelectedProvider, oneInchAvailable, pendleAvailable, swapRouter, setSwapRouter, limitOrderConfig, numChunks, setNumChunks, limitOrderNewDebt, isCowQuoteLoading, repayAmountRaw, debtFromDecimals]);
+    ), [executionType, setExecutionType, cowAvailable, limitOrderReady, slippage, setSlippage, priceImpact, formattedPriceImpact, exchangeRate, selectedTo, debtFromName, swapQuote, expectedOutput, outputCoversRepay, flashLoanProviders, selectedProvider, setSelectedProvider, oneInchAvailable, pendleAvailable, swapRouter, setSwapRouter, limitOrderConfig, numChunks, setNumChunks, effectiveLimitOrderNewDebt, limitOrderNewDebt, isCowQuoteLoading, repayAmountRaw, debtFromDecimals]);
 
     // Info content
     const infoContent = executionType === "market" ? (
@@ -1119,10 +1136,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 oneInchAdapter={oneInchAdapter}
                 hasAdapter={hasAdapter}
                 isOpen={isOpen}
-                isCowQuoteLoading={isCowQuoteLoading}
             />
         ),
-        [executionType, swapQuote, outputCoversRepay, expectedOutput, debtFromName, swapRouter, oneInchAdapter, hasAdapter, isOpen, isCowQuoteLoading],
+        [executionType, swapQuote, outputCoversRepay, expectedOutput, debtFromName, swapRouter, oneInchAdapter, hasAdapter, isOpen],
     );
 
     // Pre-compute execution type dependent props to reduce cognitive complexity in JSX
@@ -1145,16 +1161,18 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const limitPriceButtons = useMemo(() => {
         if (executionType !== "limit" || !selectedTo || limitOrderNewDebt === 0n) return null;
 
-        const marketAmount = Number(formatUnits(limitOrderNewDebt, selectedTo.decimals));
+        // Use current effective amount for additive adjustments
+        const currentAmount = Number(formatUnits(effectiveLimitOrderNewDebt, selectedTo.decimals));
 
         const adjustByPercent = (delta: number) => {
-            const newAmount = marketAmount * (1 + delta / 100);
+            // Additive: adjust from current value, not market
+            const newAmount = currentAmount * (1 + delta / 100);
             setCustomBuyAmount(newAmount.toFixed(6));
             setUseCustomBuyAmount(true);
         };
 
         const resetToMarket = () => {
-            // Set to exact market quote (no slippage adjustment)
+            // Reset to exact CoW quote price
             const exactMarket = formatUnits(limitOrderNewDebt, selectedTo.decimals);
             setCustomBuyAmount(exactMarket);
             setUseCustomBuyAmount(true);
@@ -1162,7 +1180,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
         return (
             <div className="flex flex-wrap items-center justify-center gap-1 py-1">
-                {[-1, -0.5, -0.1].map(delta => (
+                {[-1, -0.5, -0.1, -0.01].map(delta => (
                     <button
                         key={delta}
                         onClick={() => adjustByPercent(delta)}
@@ -1173,11 +1191,11 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 ))}
                 <button
                     onClick={resetToMarket}
-                    className="bg-primary/20 text-primary hover:bg-primary/30 rounded px-2 py-0.5 text-[10px] font-medium"
+                    className="bg-base-300/50 hover:bg-base-300 rounded px-2 py-0.5 text-[10px]"
                 >
                     Market
                 </button>
-                {[0.1, 0.5, 1].map(delta => (
+                {[0.01, 0.1, 0.5, 1].map(delta => (
                     <button
                         key={delta}
                         onClick={() => adjustByPercent(delta)}
@@ -1188,7 +1206,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 ))}
             </div>
         );
-    }, [executionType, selectedTo, limitOrderNewDebt]);
+    }, [executionType, selectedTo, limitOrderNewDebt, effectiveLimitOrderNewDebt]);
 
     // Prefer Morpho for limit orders
     useEffect(() => {
@@ -1347,7 +1365,6 @@ interface DebtSwapWarningsProps {
     oneInchAdapter: { address: string } | null | undefined;
     hasAdapter: boolean;
     isOpen: boolean;
-    isCowQuoteLoading: boolean;
 }
 
 const DebtSwapWarnings: FC<DebtSwapWarningsProps> = ({
@@ -1360,12 +1377,10 @@ const DebtSwapWarnings: FC<DebtSwapWarningsProps> = ({
     oneInchAdapter,
     hasAdapter,
     isOpen,
-    isCowQuoteLoading,
 }) => {
     const showOutputWarning = executionType === "market" && swapQuote && !outputCoversRepay;
     const showFromMismatchWarning = executionType === "market" && swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from?.toLowerCase() !== oneInchAdapter.address.toLowerCase();
     const showNoAdapterWarning = executionType === "market" && !hasAdapter && isOpen;
-    const showCowQuoteLoading = executionType === "limit" && isCowQuoteLoading;
 
     return (
         <>
@@ -1387,12 +1402,6 @@ const DebtSwapWarnings: FC<DebtSwapWarningsProps> = ({
                     message={`${swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.`}
                     size="sm"
                 />
-            )}
-            {showCowQuoteLoading && (
-                <div className="alert alert-info py-2 text-xs">
-                    <span className="loading loading-spinner loading-xs"></span>
-                    <span>Fetching CoW quote...</span>
-                </div>
             )}
         </>
     );
