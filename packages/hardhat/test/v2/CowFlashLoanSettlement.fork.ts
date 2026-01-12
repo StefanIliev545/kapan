@@ -238,15 +238,15 @@ describe("CoW Flash Loan with Real FlashLoanRouter (Fork)", function () {
        * 1. Create a Kapan order that:
        *    - Has empty pre-instructions (flash loan provides the sell tokens)
        *    - Has post-instructions to deposit received USDC as collateral
-       *    - Has receiver = Settlement (required for flash loan orders)
+       *    - Has receiver = OrderManager (ALWAYS - post-hook needs tokens there)
        * 
        * 2. Build settlement with:
        *    - Pre-hook: Transfer flash loaned WETH from Borrower → OrderManager
-       *    - Order: Sell WETH for USDC
+       *    - Order: Sell WETH for USDC (received at OrderManager)
        *    - Post-hook: Execute Kapan post-instructions (deposit USDC)
        * 
        * 3. Call FlashLoanRouter.flashLoanAndSettle() which orchestrates:
-       *    - Flash loan from Balancer
+       *    - Flash loan from Aave
        *    - Settlement execution with hooks
        *    - Flash loan repayment
        */
@@ -255,8 +255,9 @@ describe("CoW Flash Loan with Real FlashLoanRouter (Fork)", function () {
       console.log(`Flash loan: ${ethers.formatEther(FLASH_AMOUNT)} WETH`);
       console.log(`Sell: ${ethers.formatEther(SELL_AMOUNT)} WETH → Buy: ${ethers.formatUnits(BUY_AMOUNT, 6)} USDC`);
 
-      // Create order with flash loan mode (receiver = Settlement)
+      // Create order with flash loan mode
       // Post-instructions: deposit received USDC as collateral
+      // Note: receiver is ALWAYS OrderManager (set by OrderHandler)
       const postInstructions = [
         createRouterInstruction(encodeApprove(0, "aave")),
         createProtocolInstruction("aave", encodeLendingInstruction(
@@ -276,7 +277,7 @@ describe("CoW Flash Loan with Real FlashLoanRouter (Fork)", function () {
         postInstructions,
         targetValue: 1,
         appDataHash,
-        isFlashLoanOrder: true, // receiver = Settlement
+        isFlashLoanOrder: true, // Marks this as flash loan order (receiver is still OrderManager)
       });
 
       salt = ethers.keccak256(ethers.toUtf8Bytes("flash-test-" + Date.now()));
@@ -286,11 +287,12 @@ describe("CoW Flash Loan with Real FlashLoanRouter (Fork)", function () {
       console.log(`Order created: ${kapanOrderHash}`);
 
       // Build the GPv2 order
+      // IMPORTANT: receiver MUST be OrderManager - post-hook checks balanceOf(this)
       const validTo = Math.floor(Date.now() / 1000) + 3600;
       const gpv2Order: GPv2OrderData = {
         sellToken: WETH,
         buyToken: USDC,
-        receiver: COW_PROTOCOL.settlement, // Flash loan orders must have receiver = Settlement
+        receiver: orderManagerAddr, // ALWAYS OrderManager - post-hook needs tokens here
         sellAmount: SELL_AMOUNT,
         buyAmount: BUY_AMOUNT,
         validTo,
@@ -306,7 +308,7 @@ describe("CoW Flash Loan with Real FlashLoanRouter (Fork)", function () {
       const trade = {
         sellTokenIndex: 0,
         buyTokenIndex: 1,
-        receiver: COW_PROTOCOL.settlement, // Must match order receiver for flash loans
+        receiver: orderManagerAddr, // Must match GPv2Order receiver
         sellAmount: SELL_AMOUNT,
         buyAmount: BUY_AMOUNT,
         validTo,
@@ -368,26 +370,16 @@ describe("CoW Flash Loan with Real FlashLoanRouter (Fork)", function () {
         "function approve(address token, address target, uint256 amount) external"
       ]).encodeFunctionData("approve", [WETH, AAVE_V3_POOL, flashRepayment]);
 
-      // For flash loan orders, receiver = Settlement, so we need to transfer
-      // the received USDC from Settlement to OrderManager before post-hook
-      const transferUsdcToOrderManager = new ethers.Interface([
-        "function transfer(address to, uint256 amount) external returns (bool)"
-      ]).encodeFunctionData("transfer", [orderManagerAddr, BUY_AMOUNT]);
-
+      // With receiver = OrderManager, bought tokens go directly to OrderManager
+      // No need to transfer from Settlement - just execute post-hook
       const postInteractions = [
-        // 1. Transfer received USDC from Settlement to OrderManager
-        {
-          target: USDC,
-          value: 0n,
-          callData: transferUsdcToOrderManager,
-        },
-        // 2. Execute Kapan post-hook (deposits USDC to Aave)
+        // 1. Execute Kapan post-hook (deposits USDC to Aave)
         {
           target: COW_PROTOCOL.hooksTrampoline,
           value: 0n,
           callData: postHookCalldata,
         },
-        // 3. Transfer repayment amount (principal + fee) back to Borrower
+        // 2. Transfer repayment amount (principal + fee) back to Borrower
         // Need to cover the flash loan fee from Settlement's WETH balance
         {
           target: WETH,
@@ -396,7 +388,7 @@ describe("CoW Flash Loan with Real FlashLoanRouter (Fork)", function () {
             "function transfer(address to, uint256 amount) external returns (bool)"
           ]).encodeFunctionData("transfer", [borrowerAddr, flashRepayment]),
         },
-        // 4. Approve Aave Pool to pull the repayment from Borrower
+        // 3. Approve Aave Pool to pull the repayment from Borrower
         {
           target: borrowerAddr,
           value: 0n,
@@ -476,11 +468,10 @@ describe("CoW Flash Loan with Real FlashLoanRouter (Fork)", function () {
       console.log("  1. FlashLoanRouter.flashLoanAndSettle() called");
       console.log("  2. AaveBorrower requested flash loan from Aave V3");
       console.log("  3. Flash loaned WETH transferred to OrderManager");
-      console.log("  4. Settlement executed with VaultRelayer pulling WETH");
-      console.log("  5. WETH swapped for USDC (solver liquidity)");
-      console.log("  6. USDC transferred to OrderManager");
-      console.log("  7. Post-hook deposited USDC to Aave via KapanRouter");
-      console.log("  8. Flash loan repaid to Aave (principal + 0.05% fee)");
+      console.log("  4. VaultRelayer pulled WETH from OrderManager");
+      console.log("  5. WETH swapped for USDC → USDC sent to OrderManager (receiver)");
+      console.log("  6. Post-hook deposited USDC to Aave via KapanRouter");
+      console.log("  7. Flash loan repaid to Aave (principal + 0.05% fee)");
     });
   });
 });

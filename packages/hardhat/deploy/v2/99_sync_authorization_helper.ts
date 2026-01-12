@@ -1,11 +1,19 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
+import { waitForPendingTxs } from "../../utils/safeExecute";
 
 /**
- * Syncs all deployed gateways with KapanAuthorizationHelper.
+ * Final sync script - ensures all contract links are properly configured.
  * 
- * This runs AFTER all gateway deployments to avoid nonce race conditions.
- * Each gateway is synced sequentially with confirmation waits.
+ * This runs AFTER all deployments to fix any missing links caused by:
+ * - Redeployments that don't trigger dependent scripts
+ * - Failed transactions during initial deployment
+ * - Manual deployments
+ * 
+ * Links configured:
+ * - Router.authorizationHelper → KapanAuthorizationHelper
+ * - OrderManager.orderHandler → KapanOrderHandler  
+ * - AuthorizationHelper.gateways[name] → Gateway addresses
  */
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, ethers } = hre;
@@ -22,8 +30,49 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     return;
   }
 
-  // Get contract instance directly
+  // Get contract instances directly
   const helper = await ethers.getContractAt("KapanAuthorizationHelper", helperDeployment.address);
+  
+  // First: Ensure Router has AuthorizationHelper set
+  const routerDeployment = await get("KapanRouter");
+  const router = await ethers.getContractAt("KapanRouter", routerDeployment.address);
+  const currentHelper = await router.authorizationHelper();
+  
+  if (currentHelper.toLowerCase() !== helperDeployment.address.toLowerCase()) {
+    console.log(`\n=== Setting AuthorizationHelper on Router ===`);
+    console.log(`Current: ${currentHelper}`);
+    console.log(`Expected: ${helperDeployment.address}`);
+    const setTx = await router.setAuthorizationHelper(helperDeployment.address);
+    console.log(`tx: ${setTx.hash}`);
+    await setTx.wait(2);
+    console.log(`Router.authorizationHelper set successfully`);
+  } else {
+    console.log(`Router.authorizationHelper already set correctly: ${currentHelper.slice(0, 10)}...`);
+  }
+  
+  // Also ensure OrderManager has OrderHandler set (if both are deployed)
+  try {
+    const orderManagerDeployment = await get("KapanOrderManager");
+    const orderHandlerDeployment = await get("KapanOrderHandler");
+    const orderManager = await ethers.getContractAt("KapanOrderManager", orderManagerDeployment.address);
+    const currentHandler = await orderManager.orderHandler();
+    
+    if (currentHandler.toLowerCase() !== orderHandlerDeployment.address.toLowerCase()) {
+      console.log(`\n=== Setting OrderHandler on OrderManager ===`);
+      console.log(`Current: ${currentHandler}`);
+      console.log(`Expected: ${orderHandlerDeployment.address}`);
+      const setHandlerTx = await orderManager.setOrderHandler(orderHandlerDeployment.address);
+      console.log(`tx: ${setHandlerTx.hash}`);
+      await setHandlerTx.wait(2);
+      console.log(`OrderManager.orderHandler set successfully`);
+    } else {
+      console.log(`OrderManager.orderHandler already set correctly: ${currentHandler.slice(0, 10)}...`);
+    }
+  } catch (e: any) {
+    if (!e.message?.includes("No deployment found")) {
+      console.log(`Warning: Could not sync OrderManager/Handler: ${e.message?.slice(0, 100)}`);
+    }
+  }
   
   // Check ownership
   const owner = await helper.owner();
@@ -102,14 +151,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 
   console.log("\n=== Gateway Sync Complete ===\n");
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default func;
 func.tags = ["SyncAuthHelper", "v2"];
 
-// Explicit dependencies on all gateway deployments
-// This ensures this script runs LAST after all gateways are deployed
+// Explicit dependencies on all deployments that need linking
+// This ensures this script runs LAST after everything is deployed
 func.dependencies = [
+  "KapanRouter",  // Must link AuthorizationHelper to Router
   "KapanAuthorizationHelper",
   "AaveGatewayWrite",
   "CompoundGatewayWrite",
@@ -120,6 +172,6 @@ func.dependencies = [
   "SparkGatewayWrite",
   "MorphoBlueGateway",
   "UiHelper",
-  "CowOrderManager",
-  "CowOrderHandler",
+  "KapanOrderManager",  // Fixed: was CowOrderManager
+  "KapanOrderHandler",  // Fixed: was CowOrderHandler
 ];

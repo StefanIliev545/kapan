@@ -5,7 +5,10 @@
  * Pendle: Mainnet, Arbitrum, Base, Optimism, Plasma (per deploy script)
  */
 
-import deployedContracts from "~~/contracts/hardhat/deployedContracts";
+import {
+  getContractAddress,
+  getContractInfo,
+} from "~~/utils/constants/contracts";
 import { Address } from "viem";
 
 // Chains where 1inch is NOT available
@@ -31,6 +34,7 @@ const PENDLE_AVAILABLE = new Set([
   42161, // Arbitrum
   8453,  // Base
   9745,  // Plasma
+  130,   // Unichain
   31337, // Hardhat (for local dev)
 ]);
 
@@ -53,6 +57,7 @@ const BALANCER_V2_AVAILABLE = new Set([
   42161, // Arbitrum
   8453,  // Base
   10,    // Optimism
+  130,   // Unichain
   31337, // Hardhat
 ]);
 
@@ -61,6 +66,7 @@ const BALANCER_V3_AVAILABLE = new Set([
   42161, // Arbitrum
   8453,  // Base
   10,    // Optimism
+  9745,  // Plasma (deployed via BIP-874)
   31337, // Hardhat
 ]);
 
@@ -70,6 +76,7 @@ const MORPHO_AVAILABLE = new Set([
   42161, // Arbitrum
   8453,  // Base
   10,    // Optimism
+  130,   // Unichain (different address: 0x8f5ae9CddB9f68de460C77730b018Ae7E04a140A)
 ]);
 
 // ZeroLend (from 04_deploy_zero_lend_gateway_write.ts MAP)
@@ -222,30 +229,40 @@ export const CHAIN_IDS = {
   OPTIMISM: 10,
   LINEA: 59144,
   PLASMA: 9745,
+  UNICHAIN: 130,
   HARDHAT: 31337,
 } as const;
 
 // ==================== ADAPTER ADDRESSES ====================
 // Get adapter addresses directly from deployed contracts - no RPC calls needed
-
-const contracts = deployedContracts as unknown as Record<number, Record<string, { address: Address; abi: unknown[] }>>;
+// Uses shared utilities from utils/constants/contracts.ts
 
 export function getPendleAdapterAddress(chainId: number | undefined): Address | undefined {
   if (!chainId || !isPendleSupported(chainId)) return undefined;
-  return contracts[chainId]?.PendleAdapter?.address;
+  return getContractAddress(chainId, "PendleAdapter");
 }
 
 export function getOneInchAdapterAddress(chainId: number | undefined): Address | undefined {
   if (!chainId || !is1inchSupported(chainId)) return undefined;
-  return contracts[chainId]?.OneInchAdapter?.address;
+  return getContractAddress(chainId, "OneInchAdapter");
 }
 
 export function getPendleAdapterInfo(chainId: number | undefined) {
   if (!chainId || !isPendleSupported(chainId)) return undefined;
-  return contracts[chainId]?.PendleAdapter;
+  return getContractInfo(chainId, "PendleAdapter");
 }
 
 export function getOneInchAdapterInfo(chainId: number | undefined) {
   if (!chainId || !is1inchSupported(chainId)) return undefined;
-  return contracts[chainId]?.OneInchAdapter;
+  return getContractInfo(chainId, "OneInchAdapter");
+}
+
+export function getCowAdapterAddress(chainId: number | undefined): Address | undefined {
+  if (!chainId || !isCowProtocolSupported(chainId)) return undefined;
+  return getContractAddress(chainId, "KapanCowAdapter");
+}
+
+export function getCowAdapterInfo(chainId: number | undefined) {
+  if (!chainId || !isCowProtocolSupported(chainId)) return undefined;
+  return getContractInfo(chainId, "KapanCowAdapter");
 }

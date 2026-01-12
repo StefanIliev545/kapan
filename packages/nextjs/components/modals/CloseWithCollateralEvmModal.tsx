@@ -1,6 +1,9 @@
-import { FC, useMemo, useRef, useState, useEffect } from "react";
+import { FC, useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address } from "viem";
+import { useAccount, useWalletClient, usePublicClient } from "wagmi";
+import { parseAmount } from "~~/utils/validation";
+import { Tooltip } from "@radix-ui/themes";
 
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { use1inchQuoteOnly } from "~~/hooks/use1inchQuoteOnly";
@@ -9,15 +12,47 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
-import { useAutoSlippage, SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
+import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
+import { useCowLimitOrder } from "~~/hooks/useCowLimitOrder";
+import { useCowQuote } from "~~/hooks/useCowQuote";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
-import { is1inchSupported, isPendleSupported, getBestSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken } from "~~/utils/chainFeatures";
-import { ExclamationTriangleIcon, InformationCircleIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
+import { is1inchSupported, isPendleSupported, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
+import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
+import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
+import {
+    ExecutionTypeToggle,
+    type ExecutionType,
+    hasEnoughCollateral as checkCollateralSufficiency,
+} from "./common";
+import { notification } from "~~/utils/scaffold-stark/notification";
+import { TransactionToast } from "~~/components/TransactionToast";
+import {
+    trackModalOpen,
+    createLimitOrderAnalyticsProps,
+    buildCowFlashLoanInfo,
+    buildCowChunkInstructions,
+    logLimitOrderBuildStart,
+    buildLimitOrderCallParams,
+    handleLimitOrderBuildFailure,
+    saveLimitOrderNote,
+    executeSequentialLimitOrder,
+    handleLimitOrderError,
+    shouldSwitchSwapRouter,
+    calculateRequiredCollateral,
+    calculateLimitOrderCollateral,
+} from "./closeWithCollateralEvmHelpers";
 
 // Aave flash loan fee: 5 bps (0.05%)
 // We add a small buffer (10 bps total) to ensure swap covers repayment
 const AAVE_FLASH_LOAN_FEE_BPS = 10n;
+
+// Buffer for max limit orders to account for interest accrual.
+// 1 basis point (0.01%) is roughly equivalent to 1 hour of interest at ~87% APY,
+// which is more than enough buffer for typical DeFi rates (3-20% APY).
+// For a 10% APY position, this covers about 8 hours of interest accrual.
+const MAX_LIMIT_ORDER_BUFFER_BPS = 1n;
 
 interface CloseWithCollateralEvmModalProps {
     isOpen: boolean;
@@ -51,7 +86,9 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     availableCollaterals,
     context,
 }) => {
-    const { buildCloseWithCollateralFlow } = useKapanRouterV2();
+    const {
+        buildCloseWithCollateralFlow,
+    } = useKapanRouterV2();
 
     // Check swap router availability and get adapter info directly from deployed contracts
     const oneInchAvailable = is1inchSupported(chainId);
@@ -64,32 +101,36 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     // Update swap router based on chain and token availability
     useEffect(() => {
-        if (swapRouter === "1inch" && !oneInchAvailable) {
-            setSwapRouter(pendleAvailable ? "pendle" : "1inch");
-        } else if (swapRouter === "pendle" && !pendleAvailable) {
-            setSwapRouter(oneInchAvailable ? "1inch" : "pendle");
+        const newRouter = shouldSwitchSwapRouter(swapRouter, oneInchAvailable, pendleAvailable);
+        if (newRouter) {
+            setSwapRouter(newRouter as SwapRouter);
         }
     }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
 
     const wasOpenRef = useRef(false);
 
     useEffect(() => {
-        if (isOpen && !wasOpenRef.current) {
-            const modalOpenProps = {
-                network: "evm",
-                protocol: protocolName,
-                debtToken: debtToken,
-                debtName,
+        const modalJustOpened = isOpen && !wasOpenRef.current;
+        if (modalJustOpened) {
+            trackModalOpen(
+                protocolName,
                 chainId,
-                market: context ?? null,
-                availableCollaterals: availableCollaterals?.length ?? null,
-            } satisfies Record<string, string | number | boolean | null>;
-
-            track("close_with_collateral_modal_open", modalOpenProps);
+                context,
+                debtToken,
+                debtName,
+                availableCollaterals?.length ?? null
+            );
         }
-
         wasOpenRef.current = isOpen;
     }, [availableCollaterals?.length, chainId, debtName, debtToken, isOpen, context, protocolName]);
+
+    // Memoize position object for useMovePositionData to avoid recreation
+    const positionForFlashLoan = useMemo(() => ({
+        name: debtName,
+        tokenAddress: debtToken,
+        decimals: debtDecimals,
+        type: "borrow" as const,
+    }), [debtName, debtToken, debtDecimals]);
 
     // Flash Loan Providers
     const { flashLoanProviders, defaultFlashLoanProvider } = useMovePositionData({
@@ -97,7 +138,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         networkType: "evm",
         fromProtocol: protocolName,
         chainId,
-        position: { name: debtName, tokenAddress: debtToken, decimals: debtDecimals, type: "borrow" },
+        position: positionForFlashLoan,
     });
 
     // "From" is fixed (debt to repay) - user inputs how much debt to repay
@@ -118,9 +159,70 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const [isMax, setIsMax] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // ============ Limit Order State ============
+    const [executionType, setExecutionType] = useState<ExecutionType>("market");
+    const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
+    const [numChunks, setNumChunks] = useState(1);
+    const [isLimitSubmitting, setIsLimitSubmitting] = useState(false);
+    const cowAvailable = isCowProtocolSupported(chainId);
+    // Custom buy amount for limit orders (user-editable)
+    const [customBuyAmount, setCustomBuyAmount] = useState<string>("");
+    const [useCustomBuyAmount, setUseCustomBuyAmount] = useState(false);
+
+    // Wallet hooks for limit order
+    const { address: userAddress } = useAccount();
+    const { data: walletClient } = useWalletClient();
+    const publicClient = usePublicClient();
+
+    // CoW limit order hook
+    const {
+        buildOrderCalls: buildLimitOrderCalls,
+        isReady: limitOrderReady,
+        orderManagerAddress
+    } = useCowLimitOrder();
+
+    // Initialize limitOrderConfig with default provider when switching to limit mode
+    useEffect(() => {
+        if (executionType !== "limit" || limitOrderConfig?.selectedProvider) return;
+
+        const providers = getCowFlashLoanProviders(chainId);
+        if (providers.length === 0) return;
+
+        // Default to Morpho if available, otherwise first provider
+        const morphoProvider = providers.find(p => p.provider === "morpho");
+        const defaultProvider = morphoProvider || providers[0];
+        const lenderInfo = getPreferredFlashLoanLender(chainId, defaultProvider.provider);
+
+        setLimitOrderConfig({
+            selectedProvider: defaultProvider,
+            useFlashLoan: true,
+            numChunks: 1,
+            chunkSize: 0n,
+            chunkSizes: [0n],
+            flashLoanLender: lenderInfo?.address || null,
+            flashLoanFee: calculateFlashLoanFee(0n, defaultProvider.provider),
+            explanation: "Single tx execution",
+        });
+    }, [executionType, chainId, limitOrderConfig?.selectedProvider]);
+
+    // Sync numChunks state to limitOrderConfig
+    useEffect(() => {
+        if (limitOrderConfig && limitOrderConfig.numChunks !== numChunks) {
+            setLimitOrderConfig({ ...limitOrderConfig, numChunks });
+        }
+    }, [numChunks, limitOrderConfig]);
+
+    // Callback for ExecutionTypeToggle onChange
+    const handleExecutionTypeChange = useCallback((type: ExecutionType) => {
+        setExecutionType(type);
+        // Set higher default slippage for limit orders (1% minimum for better fill rates)
+        if (type === "limit" && slippage < 1) setSlippage(1);
+    }, [slippage]);
+
     // Ensure "From" is always the debt token
-    useMemo(() => {
-        if (!selectedFrom || selectedFrom.address !== debtToken) {
+    useEffect(() => {
+        const fromMismatch = !selectedFrom || selectedFrom.address !== debtToken;
+        if (fromMismatch) {
             setSelectedFrom(fromAsset);
         }
     }, [selectedFrom, debtToken, fromAsset]);
@@ -133,32 +235,37 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     // Auto-switch to Pendle when a PT token is selected as collateral
     useEffect(() => {
-        if (selectedTo && isPendleToken(selectedTo.symbol) && pendleAvailable) {
+        const shouldSwitchToPendle = selectedTo && isPendleToken(selectedTo.symbol) && pendleAvailable;
+        if (shouldSwitchToPendle) {
             setSwapRouter("pendle");
         }
     }, [selectedTo, pendleAvailable]);
 
     // Amount of debt to repay in raw
     const repayAmountRaw = useMemo(() => {
-        try {
-            return amountIn ? parseUnits(amountIn, debtDecimals) : 0n;
-        } catch {
-            return 0n;
-        }
+        const result = parseAmount(amountIn || "0", debtDecimals);
+        return result.value ?? 0n;
     }, [amountIn, debtDecimals]);
 
-    // Flash Loan selection - we flash loan the DEBT token to repay, then withdraw collateral
-    // and swap it to repay the flash loan
-    const { selectedProvider, setSelectedProvider, liquidityData } = useFlashLoanSelection({
+    // For max limit orders, add a small buffer to account for interest accrual
+    // between quote time and order fill time. The buffer ensures we buy enough
+    // debt tokens to fully repay even if interest accrues. Any excess is refunded.
+    const limitOrderBuyAmount = useMemo(() => {
+        if (!isMax || executionType !== "limit") return repayAmountRaw;
+        // Add buffer: repayAmount * (1 + buffer/10000)
+        return repayAmountRaw + (repayAmountRaw * MAX_LIMIT_ORDER_BUFFER_BPS) / 10000n;
+    }, [repayAmountRaw, isMax, executionType]);
+
+    // Flash Loan selection - we flash loan the DEBT token to repay
+    const { selectedProvider, setSelectedProvider } = useFlashLoanSelection({
         flashLoanProviders,
         defaultProvider: defaultFlashLoanProvider,
-        tokenAddress: debtToken,      // We flash loan the DEBT token
-        amount: repayAmountRaw,       // Amount of debt to flash loan and repay
+        tokenAddress: debtToken,
+        amount: repayAmountRaw,
         chainId,
     });
 
     // Step 1: Get unit quote (1 collateral -> X debt) to estimate exchange rate
-    // Use 1inch on supported chains, Pendle otherwise
     const unitQuoteAmount = useMemo(() => {
         if (!selectedTo) return "0";
         return parseUnits("1", selectedTo.decimals).toString();
@@ -187,49 +294,21 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const isUnitQuoteLoading = swapRouter === "1inch" ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
 
     // Calculate required collateral based on debt to repay
-    // We want to sell just enough collateral to get repayAmountRaw of debt token
-    // The slippage % from UI is used as buffer for price movement between quote and execution
     const { requiredCollateral, requiredCollateralFormatted, exchangeRate } = useMemo(() => {
-        if (!selectedTo || repayAmountRaw === 0n) {
-            return { requiredCollateral: 0n, requiredCollateralFormatted: "0", exchangeRate: "0" };
-        }
-
-        // Get unit output from whichever quote is available
-        let unitOut = 0n;
-        if (oneInchUnitQuote) {
-            unitOut = BigInt(oneInchUnitQuote.dstAmount);
-        } else if (pendleUnitQuote) {
-            const outAmount = pendleUnitQuote.data.amountPtOut || pendleUnitQuote.data.amountTokenOut || "0";
-            unitOut = BigInt(outAmount);
-        }
-
-        if (unitOut === 0n) {
-            return { requiredCollateral: 0n, requiredCollateralFormatted: "0", exchangeRate: "0" };
-        }
-        
-        // Exchange rate: how much debt per 1 collateral
-        const rate = formatUnits(unitOut, debtDecimals);
-        
-        // requiredCollateral = repayAmountRaw * 1_collateral / unitOut
-        const unitIn = parseUnits("1", selectedTo.decimals);
-        const base = (repayAmountRaw * unitIn) / unitOut;
-        
-        // Apply slippage buffer from UI (e.g., 3% slippage -> multiply by 1.03)
-        // This accounts for price movement between quote fetch and tx execution
-        const slippageBps = BigInt(Math.round(slippage * 100)); // 3% -> 300 bps
-        const required = (base * (10000n + slippageBps)) / 10000n;
-        
-        return {
-            requiredCollateral: required,
-            requiredCollateralFormatted: formatUnits(required, selectedTo.decimals),
-            exchangeRate: rate,
-        };
+        return calculateRequiredCollateral({
+            selectedTo,
+            repayAmountRaw,
+            oneInchUnitQuote,
+            pendleUnitQuote,
+            debtDecimals,
+            slippage,
+        });
     }, [oneInchUnitQuote, pendleUnitQuote, selectedTo, repayAmountRaw, debtDecimals, slippage]);
 
-    // Check if user has enough collateral
-    const hasEnoughCollateral = selectedTo ? requiredCollateral <= selectedTo.rawBalance : false;
+    // Check if user has enough collateral (using shared utility)
+    const hasEnoughCollateral = selectedTo ? checkCollateralSufficiency(requiredCollateral, selectedTo.rawBalance) : false;
 
-    // Step 2: Get actual swap quote with the required collateral amount (needs `from` for tx.data)
+    // Step 2: Get actual swap quote with the required collateral amount
     const minSwapAmount = selectedTo ? parseUnits("0.0001", selectedTo.decimals) : 0n;
     const oneInchSwapEnabled = oneInchAvailable && swapRouter === "1inch" && requiredCollateral > minSwapAmount && !!selectedTo && !!oneInchAdapter && isOpen;
     const pendleSwapEnabled = pendleAvailable && swapRouter === "pendle" && requiredCollateral > minSwapAmount && !!selectedTo && !!pendleAdapter && isOpen;
@@ -274,12 +353,69 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const isSwapQuoteLoading = swapRouter === "1inch" ? is1inchSwapQuoteLoading : isPendleQuoteLoading;
     const quoteError = swapRouter === "1inch" ? oneInchQuoteError : pendleQuoteError;
     const isQuoteLoading = isUnitQuoteLoading || isSwapQuoteLoading;
-    
+
     // Check adapter availability
     const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
 
+    // ============ Limit Order: CoW Quote ============
+    // Use limitOrderBuyAmount which includes buffer for isMax orders
+    const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
+        sellToken: selectedTo?.address || "",       // Collateral to sell
+        buyToken: debtToken,                         // Debt to receive
+        buyAmount: limitOrderBuyAmount.toString(),  // Debt amount (buffered for isMax)
+        kind: "buy",                                 // KIND_BUY: exact buy, max sell
+        from: userAddress || "",
+        enabled: cowAvailable && executionType === "limit" && limitOrderBuyAmount > 0n && !!selectedTo && !!userAddress && isOpen,
+    });
+
+    // ============ Limit Order: Collateral from CoW Quote ============
+    const limitOrderCollateral = useMemo(() => {
+        return calculateLimitOrderCollateral(cowQuote, selectedTo, slippage);
+    }, [cowQuote, selectedTo, slippage]);
+
     // amountOut = required collateral (what user will sell)
-    const amountOut = requiredCollateralFormatted;
+    const amountOut = useMemo(() => {
+        // For limit orders, use custom amount if user has set one
+        if (executionType === "limit" && useCustomBuyAmount && customBuyAmount) {
+            return customBuyAmount;
+        }
+        // For limit orders, use CoW quote-based collateral; for market, use 1inch/Pendle
+        if (executionType === "limit" && limitOrderCollateral > 0n && selectedTo) {
+            return formatUnits(limitOrderCollateral, selectedTo.decimals);
+        }
+        return requiredCollateralFormatted;
+    }, [executionType, useCustomBuyAmount, customBuyAmount, limitOrderCollateral, selectedTo, requiredCollateralFormatted]);
+
+    // Check if user has enough collateral for limit order
+    const hasEnoughCollateralForLimit = selectedTo && limitOrderCollateral > 0n
+        ? checkCollateralSufficiency(limitOrderCollateral, selectedTo.rawBalance)
+        : hasEnoughCollateral;
+
+    // ============ Limit Order: Flash Loan Info ============
+    const cowFlashLoanInfo = useMemo(() => {
+        return buildCowFlashLoanInfo(chainId, limitOrderConfig, executionType, selectedTo, limitOrderCollateral);
+    }, [chainId, limitOrderConfig, executionType, limitOrderCollateral, selectedTo]);
+
+    // ============ Limit Order: Build Chunk Instructions ============
+    const buildCowInstructions = useMemo(() => {
+        if (!selectedTo || !userAddress || !orderManagerAddress || !cowFlashLoanInfo) {
+            return [{ preInstructions: [], postInstructions: [] }];
+        }
+        return buildCowChunkInstructions({
+            selectedTo,
+            userAddress,
+            repayAmountRaw: limitOrderBuyAmount, // Use buffered amount for isMax orders
+            orderManagerAddress,
+            protocolName,
+            context,
+            debtToken,
+            debtName,
+            debtDecimals,
+            cowFlashLoanInfo,
+            limitOrderConfig,
+            isMax, // When true, adds PushToken to return any repay refund to user
+        });
+    }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtToken, debtName, debtDecimals, cowFlashLoanInfo, limitOrderConfig, isMax]);
 
     const buildFlow = () => {
         if (!swapQuote || !selectedTo || !hasAdapter || requiredCollateral === 0n) return [];
@@ -287,19 +423,11 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
 
         // For Aave flash loans, the swap needs to output enough to cover the flash loan repayment
-        // (principal + 0.05% fee). We add a buffer to be safe.
-        // For Balancer/others (no fee), we just use the exact debt amount.
         const isAave = providerEnum === FlashLoanProvider.Aave || providerEnum === FlashLoanProvider.ZeroLend;
         const swapMinAmountOut = isAave
             ? repayAmountRaw + (repayAmountRaw * AAVE_FLASH_LOAN_FEE_BPS / 10000n)
             : repayAmountRaw;
 
-        // For close with collateral (with flash loan):
-        // 1. Flash loan debt token (use GetBorrowBalance if isMax for exact amount)
-        // 2. Repay debt (unlocks collateral) - uses Output[0], the actual debt
-        // 3. Withdraw collateral
-        // 4. Swap collateral to debt token - must output >= flash loan repayment
-        // 5. Flash loan repays itself from swap output
         return buildCloseWithCollateralFlow(
             protocolName,
             selectedTo.address,      // collateral to sell
@@ -310,7 +438,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             providerEnum,            // flash loan provider
             context,
             isMax,                   // if true, uses GetBorrowBalance for exact debt amount on-chain
-            swapRouter === "1inch" ? "oneinch" : "pendle",  // map "1inch" -> "oneinch"
+            swapRouter === "1inch" ? "oneinch" : "pendle",
         );
     };
 
@@ -324,7 +452,9 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         simulateWhenBatching: true,
     });
 
-    const handleSwapWrapper = async () => {
+    const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
+
+    const handleSwapWrapper = useCallback(async () => {
         const txBeginProps = {
             network: "evm",
             protocol: protocolName,
@@ -357,174 +487,426 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         } finally {
             setIsSubmitting(false);
         }
-    };
+    }, [protocolName, chainId, debtToken, debtName, selectedTo?.address, selectedTo?.symbol, amountIn, isMax, slippage, preferBatching, selectedProvider?.name, swapRouter, context, handleSwap]);
 
-    const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
+    // ============ Limit Order: Submit Handler ============
+    const handleLimitOrderSubmit = useCallback(async () => {
+        // Validate required data
+        if (!selectedTo || !userAddress || !orderManagerAddress || !walletClient || !publicClient) {
+            throw new Error("Missing required data for limit order");
+        }
+        if (!limitOrderConfig?.selectedProvider || !cowFlashLoanInfo) {
+            throw new Error("No flash loan provider selected");
+        }
 
-    // Can submit if we have a quote and user has enough collateral
-    const canSubmit = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter;
+        const analyticsProps = createLimitOrderAnalyticsProps({
+            protocolName,
+            chainId,
+            debtToken,
+            debtName,
+            selectedTo,
+            repayAmountRaw,
+            debtDecimals,
+            limitOrderCollateral,
+            requiredCollateral,
+            flashLoanProviderName: limitOrderConfig.selectedProvider.name,
+        });
+
+        setIsLimitSubmitting(true);
+        let notificationId: string | number | undefined;
+
+        try {
+            track("close_with_collateral_limit_order_begin", analyticsProps);
+
+            logLimitOrderBuildStart({
+                selectedTo,
+                debtName,
+                limitOrderCollateral,
+                repayAmountRaw,
+                debtDecimals,
+                cowFlashLoanInfo,
+                cowQuote,
+            });
+
+            // Build limit order calls
+            // Use limitOrderBuyAmount which includes buffer for isMax orders
+            const callParams = buildLimitOrderCallParams({
+                selectedTo,
+                debtToken,
+                limitOrderCollateral,
+                repayAmountRaw: limitOrderBuyAmount,
+                cowFlashLoanInfo,
+                buildCowInstructions,
+                limitOrderConfig,
+                protocolName,
+            });
+
+            const limitOrderResult = await buildLimitOrderCalls(callParams);
+
+            if (!limitOrderResult) {
+                throw new Error("Failed to build limit order calls");
+            }
+
+            if (!limitOrderResult.success) {
+                handleLimitOrderBuildFailure(limitOrderResult, analyticsProps);
+            }
+
+            console.log("[Limit Order] Order calls built:", limitOrderResult.calls.length);
+
+            // Save order note for display on orders page
+            saveLimitOrderNote(
+                limitOrderResult.salt,
+                protocolName,
+                selectedTo.symbol,
+                debtName,
+                chainId
+            );
+
+            const allCalls = limitOrderResult.calls;
+            notificationId = notification.loading(
+                <TransactionToast step="pending" message={`Creating limit order (${allCalls.length} operations)...`} />
+            );
+
+            // Always use sequential execution for limit orders
+            // MetaMask has issues with approvals in batched calls that may go unused
+            await executeSequentialLimitOrder({
+                allCalls,
+                walletClient,
+                publicClient,
+                chainId,
+                orderManagerAddress,
+                userAddress,
+                salt: limitOrderResult.salt,
+                appDataHash: limitOrderResult.appDataHash,
+                analyticsProps,
+                onClose,
+                notificationId,
+            });
+        } catch (e) {
+            handleLimitOrderError(e, notificationId, analyticsProps);
+            throw e;
+        } finally {
+            setIsLimitSubmitting(false);
+        }
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, limitOrderBuyAmount, debtDecimals, limitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose]);
+
+    // Can submit based on execution type
+    const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter;
+    const canSubmitLimit = executionType === "limit" && limitOrderReady && !!cowFlashLoanInfo &&
+        parseFloat(amountIn) > 0 && hasEnoughCollateralForLimit && !!orderManagerAddress && limitOrderCollateral > 0n;
+    const canSubmit = executionType === "market" ? canSubmitMarket : canSubmitLimit;
 
     // What the swap will actually produce
-    const expectedOutput = swapQuote 
+    const expectedOutput = swapQuote
         ? formatUnits(BigInt(swapQuote.dstAmount), debtDecimals)
         : "0";
-    
+
     // Is the expected output enough to cover the repay?
-    const outputCoversRepay = swapQuote 
+    const outputCoversRepay = swapQuote
         ? BigInt(swapQuote.dstAmount) >= repayAmountRaw
         : false;
 
-    // USD values from 1inch (if available)
-    const srcUSD = swapQuote?.srcUSD ? parseFloat(swapQuote.srcUSD) : null;
-    const dstUSD = swapQuote?.dstUSD ? parseFloat(swapQuote.dstUSD) : null;
-    
+    // Calculate USD values from token prices for price impact fallback
+    // (1inch v6.0 API doesn't return srcUSD/dstUSD, so we compute from token prices)
+    // Swap is: collateral (selectedTo) → debt token (debtToken)
+    const srcUsdFallback = useMemo(() => {
+        if (!selectedTo?.price || requiredCollateral === 0n) return undefined;
+        const amount = parseFloat(formatUnits(requiredCollateral, selectedTo.decimals));
+        if (amount <= 0) return undefined;
+        return amount * Number(formatUnits(selectedTo.price, 8));
+    }, [selectedTo?.price, selectedTo?.decimals, requiredCollateral]);
+
+    const dstUsdFallback = useMemo(() => {
+        if (!debtPrice || !expectedOutput) return undefined;
+        const parsed = parseFloat(expectedOutput);
+        if (isNaN(parsed) || parsed <= 0) return undefined;
+        return parsed * Number(formatUnits(debtPrice, 8));
+    }, [debtPrice, expectedOutput]);
+
     // Auto-slippage and price impact calculation
-    const { priceImpact, priceImpactColorClass, formattedPriceImpact } = useAutoSlippage({
+    const { priceImpact, formattedPriceImpact } = useAutoSlippage({
         slippage,
         setSlippage,
         oneInchQuote: oneInchSwapQuote,
         pendleQuote: pendleQuoteData,
         swapRouter,
         resetDep: selectedTo?.address,
+        srcUsdFallback,
+        dstUsdFallback,
     });
 
-    // Custom stats for close with collateral
-    const customStats = (
-        <div className="space-y-2">
-            <div className="grid grid-cols-4 gap-3 text-center bg-base-200/50 p-3 rounded text-xs">
-                <div>
-                    <div className="text-base-content/70 flex items-center justify-center gap-1">
-                        Slippage
-                        <div className="dropdown dropdown-top dropdown-hover">
-                            <label tabIndex={0} className="cursor-pointer hover:text-primary">
-                                <Cog6ToothIcon className="w-3 h-3" />
-                            </label>
-                            <ul tabIndex={0} className="dropdown-content z-[50] menu p-2 shadow bg-base-100 rounded-box w-32 text-xs mb-1">
-                                {SLIPPAGE_OPTIONS.map((s) => (
-                                    <li key={s}>
-                                        <a
-                                            className={slippage === s ? "active" : ""}
-                                            onClick={() => setSlippage(s)}
-                                        >
-                                            {s}%
-                                        </a>
-                                    </li>
+    // Right panel for close with collateral - Market/Limit settings
+    const rightPanel = useMemo(() => (
+        <div className="space-y-3">
+            {/* Execution Type Toggle */}
+            <ExecutionTypeToggle
+                value={executionType}
+                onChange={handleExecutionTypeChange}
+                limitAvailable={cowAvailable}
+                limitReady={limitOrderReady}
+            />
+
+            {/* Market Order Settings */}
+            {executionType === "market" && (
+                <div className="space-y-2 text-xs">
+                    {/* Dropdowns */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-base-content/50">Slippage</span>
+                            <select
+                                className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+                                value={slippage}
+                                onChange={(e) => setSlippage(parseFloat(e.target.value))}
+                            >
+                                {[0.1, 0.3, 0.5, 1, 3].map(s => (
+                                    <option key={s} value={s}>{s}%</option>
                                 ))}
-                            </ul>
+                            </select>
                         </div>
+                        {flashLoanProviders && flashLoanProviders.length > 1 && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Flash Loan</span>
+                                <select
+                                    className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+                                    value={selectedProvider?.name || ""}
+                                    onChange={(e) => {
+                                        const p = flashLoanProviders.find(provider => provider.name === e.target.value);
+                                        if (p) setSelectedProvider(p);
+                                    }}
+                                >
+                                    {flashLoanProviders.map(p => (
+                                        <option key={p.name} value={p.name}>{p.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
-                    <div className="font-medium">{slippage}%</div>
-                </div>
-                <div>
-                    <div className="text-base-content/70">Price Impact</div>
-                    <div className={`font-medium ${priceImpactColorClass}`}>
-                        {formattedPriceImpact}
+
+                    {/* Stats */}
+                    <div className="border-base-300/30 space-y-1 border-t pt-2">
+                        {priceImpact !== undefined && priceImpact !== null && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Price Impact</span>
+                                <span className={priceImpact > 1 ? "text-warning" : priceImpact > 3 ? "text-error" : "text-base-content/80"}>
+                                    {formattedPriceImpact || `${priceImpact.toFixed(2)}%`}
+                                </span>
+                            </div>
+                        )}
+                        {exchangeRate && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Rate</span>
+                                <span className="text-base-content/80">
+                                    1:{parseFloat(exchangeRate).toFixed(2)}
+                                </span>
+                            </div>
+                        )}
+                        {swapQuote && expectedOutput && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Output</span>
+                                <span className={outputCoversRepay === false ? "text-warning" : outputCoversRepay === true ? "text-success" : "text-base-content/80"}>
+                                    {parseFloat(expectedOutput).toFixed(4)} {debtName}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
-                <div>
-                    <div className="text-base-content/70">Swap Rate</div>
-                    <div className="font-medium">
-                        1 {selectedTo?.symbol || "?"} ≈ {parseFloat(exchangeRate).toFixed(2)} {debtName}
+            )}
+
+            {/* Limit Order Settings */}
+            {executionType === "limit" && selectedTo && (
+                <div className="space-y-2 text-xs">
+                    {/* Order Type Indicator */}
+                    <div className="flex items-center justify-between">
+                        <span className="text-base-content/50">Order Type</span>
+                        <Tooltip
+                            content="You are buying debt tokens to repay your position. The collateral amount you specify is the maximum you're willing to sell. If the market moves in your favor, you may sell less and keep the surplus."
+                            delayDuration={100}
+                        >
+                            <span className="text-info flex cursor-help items-center gap-1 font-medium">
+                                Buy Order
+                                <InformationCircleIcon className="size-3" />
+                            </span>
+                        </Tooltip>
                     </div>
-                </div>
-                <div>
-                    <div className="text-base-content/70">Swap Output</div>
-                    <div className={`font-medium ${outputCoversRepay ? "text-success" : "text-warning"}`}>
-                        {swapQuote ? `${parseFloat(expectedOutput).toFixed(4)} ${debtName}` : "-"}
-                    </div>
-                </div>
-            </div>
-            {/* Show USD values if available */}
-            {srcUSD !== null && dstUSD !== null && (
-                <div className="flex justify-between text-xs text-base-content/60 px-1">
-                    <span>Selling: ~${srcUSD.toFixed(2)}</span>
-                    <span>Receiving: ~${dstUSD.toFixed(2)}</span>
+
+                    {/* Flash Loan Provider */}
+                    {limitOrderConfig?.selectedProvider && (
+                        <div className="flex items-center justify-between">
+                            <span className="text-base-content/50">Flash Loan</span>
+                            <span className="text-base-content/80 font-medium">
+                                {limitOrderConfig.selectedProvider.provider}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Limit Price vs Market comparison */}
+                    {selectedTo && limitOrderCollateral > 0n && repayAmountRaw > 0n && (
+                        <div className="bg-base-200/50 space-y-1 rounded p-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Limit Price</span>
+                                <span className="text-base-content/80 font-medium">
+                                    {isCowQuoteLoading ? (
+                                        <span className="loading loading-dots loading-xs" />
+                                    ) : (
+                                        `1 ${debtName} = ${(Number(formatUnits(limitOrderCollateral, selectedTo.decimals)) / Number(formatUnits(repayAmountRaw, debtDecimals))).toFixed(4)} ${selectedTo.symbol}`
+                                    )}
+                                </span>
+                            </div>
+                            {exchangeRate && (
+                                <div className="text-center text-[10px]">
+                                    {(() => {
+                                        const limitRate = Number(formatUnits(limitOrderCollateral, selectedTo.decimals)) / Number(formatUnits(repayAmountRaw, debtDecimals));
+                                        const marketRate = parseFloat(exchangeRate);
+                                        const pctDiff = ((limitRate - marketRate) / marketRate) * 100;
+                                        const isAbove = pctDiff > 0;
+                                        const absDiff = Math.abs(pctDiff);
+                                        if (absDiff < 0.01) return <span className="text-base-content/40">at market price</span>;
+                                        return (
+                                            <span className={isAbove ? "text-warning" : "text-success"}>
+                                                {absDiff.toFixed(2)}% {isAbove ? "above" : "below"} market
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Chunks */}
+                    {selectedTo && (
+                        <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                                <span className="text-base-content/50">Chunks</span>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    className="border-base-300 bg-base-200 text-base-content/80 w-14 rounded border px-2 py-0.5 text-right text-xs font-medium"
+                                    value={numChunks}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value) || 1;
+                                        setNumChunks(Math.max(1, Math.min(100, val)));
+                                    }}
+                                />
+                            </div>
+                            {numChunks > 1 && limitOrderCollateral > 0n && (
+                                <div className="text-base-content/50 text-[10px]">
+                                    Max {formatUnits(limitOrderCollateral / BigInt(numChunks), selectedTo.decimals).slice(0, 8)} {selectedTo.symbol} per chunk
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                 </div>
             )}
         </div>
-    );
+    ), [executionType, handleExecutionTypeChange, cowAvailable, limitOrderReady, slippage, setSlippage, priceImpact, formattedPriceImpact, exchangeRate, debtName, swapQuote, expectedOutput, outputCoversRepay, flashLoanProviders, selectedProvider, setSelectedProvider, selectedTo, limitOrderConfig, numChunks, setNumChunks, limitOrderCollateral, isCowQuoteLoading, repayAmountRaw, debtDecimals]);
 
     // Info content
-    const infoContent = (
-        <div className="space-y-4 py-2">
-            <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-                <InformationCircleIcon className="w-5 h-5 flex-shrink-0" />
-                <span>
-                    <strong>How Close with Collateral Works</strong>
-                    <br />
-                    This feature allows you to repay your debt by selling collateral, closing your position in one transaction.
-                </span>
-            </div>
-
-            <div className="space-y-4 px-2">
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">1</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
-                    </div>
-                    <div className="pb-4">
-                        <h4 className="font-medium text-sm">Withdraw Collateral</h4>
-                        <p className="text-xs text-base-content/70">Your collateral is withdrawn from the protocol.</p>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">2</div>
-                        <div className="w-0.5 h-full bg-base-300 my-1"></div>
-                    </div>
-                    <div className="pb-4">
-                        <h4 className="font-medium text-sm">Swap</h4>
-                        <p className="text-xs text-base-content/70">Collateral is swapped for the debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.</p>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">3</div>
-                    </div>
-                    <div>
-                        <h4 className="font-medium text-sm">Repay Debt</h4>
-                        <p className="text-xs text-base-content/70">Your debt is repaid with the swapped tokens.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="text-xs text-base-content/60 mt-4">
-                Total debt: {formatUnits(debtBalance, debtDecimals)} {debtName}
-            </div>
-        </div>
-    );
+    const infoContent = useMemo(() => (
+        <CloseWithCollateralInfoContent
+            swapRouter={swapRouter}
+            debtBalance={debtBalance}
+            debtDecimals={debtDecimals}
+            debtName={debtName}
+        />
+    ), [swapRouter, debtBalance, debtDecimals, debtName]);
 
     // Warnings
-    const warnings = (
-        <>
-            {!hasEnoughCollateral && requiredCollateral > 0n && selectedTo && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>
-                        Insufficient collateral. Need ~{requiredCollateralFormatted} {selectedTo.symbol}, 
-                        but you only have {formatUnits(selectedTo.rawBalance, selectedTo.decimals)} {selectedTo.symbol}.
-                    </span>
-                </div>
-            )}
-            {swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span className="break-all">Warning: Quote &apos;from&apos; address mismatch!</span>
-                </div>
-            )}
-            {!hasAdapter && isOpen && (
-                <div className="alert alert-warning text-xs py-2">
-                    <ExclamationTriangleIcon className="w-4 h-4" />
-                    <span>{swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.</span>
-                </div>
-            )}
-        </>
-    );
+    const warnings = useMemo(() => (
+        <CloseWithCollateralWarnings
+            hasEnoughCollateral={hasEnoughCollateral}
+            requiredCollateral={requiredCollateral}
+            selectedTo={selectedTo}
+            requiredCollateralFormatted={requiredCollateralFormatted}
+            swapRouter={swapRouter}
+            swapQuote={swapQuote}
+            oneInchAdapter={oneInchAdapter}
+            hasAdapter={hasAdapter}
+            isOpen={isOpen}
+        />
+    ), [hasEnoughCollateral, requiredCollateral, selectedTo, requiredCollateralFormatted, swapRouter, swapQuote, oneInchAdapter, hasAdapter, isOpen]);
 
     // Hide dropdown when there's only one collateral option (e.g., Morpho isolated pairs)
     const singleCollateral = toAssets.length === 1;
+
+    // Memoize fromAssets array to avoid recreation on every render
+    const fromAssetsArray = useMemo(() => [fromAsset], [fromAsset]);
+
+    // Pre-compute execution type dependent props to reduce cognitive complexity in JSX
+    const isMarketExecution = executionType === "market";
+    const quoteLoadingProp = isMarketExecution ? isQuoteLoading : isCowQuoteLoading;
+    const quoteErrorProp = isMarketExecution ? quoteError : null;
+    const preferBatchingProp = isMarketExecution ? preferBatching : undefined;
+    const setPreferBatchingProp = isMarketExecution ? setPreferBatching : undefined;
+    const onSubmitHandler = isMarketExecution ? handleSwapWrapper : handleLimitOrderSubmit;
+    const isSubmittingProp = isMarketExecution ? isSubmitting : isLimitSubmitting;
+    const submitLabelProp = isMarketExecution ? "Close Position" : "Create Limit Order";
+
+    // Handler for when user edits the output amount (limit orders)
+    const handleAmountOutChange = useCallback((value: string) => {
+        setCustomBuyAmount(value);
+        setUseCustomBuyAmount(true);
+    }, []);
+
+    // Limit price adjustment buttons (shown below "Collateral to Sell" for limit orders)
+    const limitPriceButtons = useMemo(() => {
+        if (executionType !== "limit" || !selectedTo || limitOrderCollateral === 0n) return null;
+
+        const marketAmount = Number(formatUnits(limitOrderCollateral, selectedTo.decimals));
+
+        const adjustByPercent = (delta: number) => {
+            const newAmount = marketAmount * (1 + delta / 100);
+            setCustomBuyAmount(newAmount.toFixed(6));
+            setUseCustomBuyAmount(true);
+        };
+
+        const resetToMarket = () => {
+            // Set to exact market quote (no slippage adjustment)
+            const exactMarket = formatUnits(limitOrderCollateral, selectedTo.decimals);
+            setCustomBuyAmount(exactMarket);
+            setUseCustomBuyAmount(true);
+        };
+
+        return (
+            <div className="flex flex-wrap items-center justify-center gap-1 py-1">
+                {[-1, -0.5, -0.1].map(delta => (
+                    <button
+                        key={delta}
+                        onClick={() => adjustByPercent(delta)}
+                        className="bg-base-300/50 hover:bg-base-300 rounded px-2 py-0.5 text-[10px]"
+                    >
+                        {delta}%
+                    </button>
+                ))}
+                <button
+                    onClick={resetToMarket}
+                    className="bg-primary/20 text-primary hover:bg-primary/30 rounded px-2 py-0.5 text-[10px] font-medium"
+                >
+                    Market
+                </button>
+                {[0.1, 0.5, 1].map(delta => (
+                    <button
+                        key={delta}
+                        onClick={() => adjustByPercent(delta)}
+                        className="bg-base-300/50 hover:bg-base-300 rounded px-2 py-0.5 text-[10px]"
+                    >
+                        +{delta}%
+                    </button>
+                ))}
+            </div>
+        );
+    }, [executionType, selectedTo, limitOrderCollateral]);
+
+    // Prefer Morpho for limit orders
+    useEffect(() => {
+        if (executionType === "limit" && flashLoanProviders && flashLoanProviders.length > 0) {
+            const morphoProvider = flashLoanProviders.find(p => p.name.toLowerCase().includes("morpho"));
+            if (morphoProvider && selectedProvider?.name !== morphoProvider.name) {
+                setSelectedProvider(morphoProvider);
+            }
+        }
+    }, [executionType, flashLoanProviders, selectedProvider, setSelectedProvider]);
 
     return (
         <SwapModalShell
@@ -532,7 +914,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             onClose={onClose}
             title="Close with Collateral"
             protocolName={protocolName}
-            fromAssets={[fromAsset]}
+            fromAssets={fromAssetsArray}
             toAssets={toAssets}
             selectedFrom={selectedFrom}
             setSelectedFrom={setSelectedFrom}
@@ -543,29 +925,143 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             isMax={isMax}
             setIsMax={setIsMax}
             amountOut={amountOut}
-            isQuoteLoading={isQuoteLoading}
-            quoteError={quoteError}
+            isQuoteLoading={quoteLoadingProp}
+            quoteError={quoteErrorProp}
             slippage={slippage}
             setSlippage={setSlippage}
-            flashLoanProviders={flashLoanProviders}
-            selectedProvider={selectedProvider}
-            setSelectedProvider={setSelectedProvider}
-            flashLoanLiquidityData={liquidityData}
-            swapRouter={swapRouter}
-            setSwapRouter={oneInchAvailable && pendleAvailable ? setSwapRouter : undefined}
-            preferBatching={preferBatching}
-            setPreferBatching={setPreferBatching}
-            onSubmit={handleSwapWrapper}
-            isSubmitting={isSubmitting}
+            preferBatching={preferBatchingProp}
+            setPreferBatching={setPreferBatchingProp}
+            onSubmit={onSubmitHandler}
+            isSubmitting={isSubmittingProp}
             canSubmit={canSubmit}
-            submitLabel="Close Position"
+            submitLabel={submitLabelProp}
             infoContent={infoContent}
             warnings={warnings}
             fromLabel="Debt to Repay"
             toLabel="Collateral to Sell"
             fromReadOnly={true}
             toReadOnly={singleCollateral}
-            customStats={customStats}
+            hideDefaultStats={true}
+            rightPanel={rightPanel}
+            onAmountOutChange={executionType === "limit" ? handleAmountOutChange : undefined}
+            limitPriceButtons={limitPriceButtons}
         />
+    );
+};
+
+// ============ Sub-components to reduce main component complexity ============
+
+interface CloseWithCollateralInfoContentProps {
+    swapRouter: SwapRouter;
+    debtBalance: bigint;
+    debtDecimals: number;
+    debtName: string;
+}
+
+const CloseWithCollateralInfoContent: FC<CloseWithCollateralInfoContentProps> = ({
+    swapRouter,
+    debtBalance,
+    debtDecimals,
+    debtName,
+}) => (
+    <div className="space-y-4 py-2">
+        <div className="alert alert-info bg-info/10 border-info/20 text-sm">
+            <InformationCircleIcon className="size-5 flex-shrink-0" />
+            <span>
+                <strong>How Close with Collateral Works</strong>
+                <br />
+                This feature allows you to repay your debt by selling collateral, closing your position in one transaction.
+            </span>
+        </div>
+
+        <div className="space-y-4 px-2">
+            <InfoStep step={1} title="Withdraw Collateral" isLast={false}>
+                <p className="text-base-content/70 text-xs">Your collateral is withdrawn from the protocol.</p>
+            </InfoStep>
+
+            <InfoStep step={2} title="Swap" isLast={false}>
+                <p className="text-base-content/70 text-xs">
+                    Collateral is swapped for the debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.
+                </p>
+            </InfoStep>
+
+            <InfoStep step={3} title="Repay Debt" isLast={true}>
+                <p className="text-base-content/70 text-xs">Your debt is repaid with the swapped tokens.</p>
+            </InfoStep>
+        </div>
+
+        <div className="text-base-content/60 mt-4 text-xs">
+            Total debt: {formatUnits(debtBalance, debtDecimals)} {debtName}
+        </div>
+    </div>
+);
+
+interface InfoStepProps {
+    step: number;
+    title: string;
+    isLast: boolean;
+    children: React.ReactNode;
+}
+
+const InfoStep: FC<InfoStepProps> = ({ step, title, isLast, children }) => (
+    <div className="flex gap-3">
+        <div className="flex flex-col items-center">
+            <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">
+                {step}
+            </div>
+            {!isLast && <div className="bg-base-300 my-1 h-full w-0.5"></div>}
+        </div>
+        <div className={isLast ? "" : "pb-4"}>
+            <h4 className="text-sm font-medium">{title}</h4>
+            {children}
+        </div>
+    </div>
+);
+
+interface CloseWithCollateralWarningsProps {
+    hasEnoughCollateral: boolean;
+    requiredCollateral: bigint;
+    selectedTo: SwapAsset | null;
+    requiredCollateralFormatted: string;
+    swapRouter: SwapRouter;
+    swapQuote: { dstAmount: string; tx: { data: string; from?: string }; srcUSD?: string | null; dstUSD?: string | null } | null | undefined;
+    oneInchAdapter: { address: string } | null | undefined;
+    hasAdapter: boolean;
+    isOpen: boolean;
+}
+
+const CloseWithCollateralWarnings: FC<CloseWithCollateralWarningsProps> = ({
+    hasEnoughCollateral,
+    requiredCollateral,
+    selectedTo,
+    requiredCollateralFormatted,
+    swapRouter,
+    swapQuote,
+    oneInchAdapter,
+    hasAdapter,
+    isOpen,
+}) => {
+    const showInsufficientCollateralWarning = !hasEnoughCollateral && requiredCollateral > 0n && selectedTo;
+    const showFromMismatchWarning = swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from?.toLowerCase() !== oneInchAdapter.address.toLowerCase();
+    const showNoAdapterWarning = !hasAdapter && isOpen;
+
+    const hasAnyWarning = showInsufficientCollateralWarning || showFromMismatchWarning || showNoAdapterWarning;
+
+    // Reserved space container to prevent modal hopping
+    return (
+        <div className="min-h-[24px]">
+            {hasAnyWarning && (
+                <div className="text-warning/90 flex items-start gap-1.5 text-xs">
+                    <ExclamationTriangleIcon className="mt-0.5 size-3.5 flex-shrink-0" />
+                    <span>
+                        {showInsufficientCollateralWarning && (
+                            <>Need ~{requiredCollateralFormatted} {selectedTo.symbol}, have {Number(formatUnits(selectedTo.rawBalance, selectedTo.decimals)).toFixed(4)}</>
+                        )}
+                        {showFromMismatchWarning && "Quote address mismatch"}
+                        {showNoAdapterWarning && `${swapRouter === "1inch" ? "1inch" : "Pendle"} adapter unavailable`}
+                    </span>
+                </div>
+            )}
+        </div>
     );
 };

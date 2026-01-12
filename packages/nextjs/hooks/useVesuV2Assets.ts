@@ -1,8 +1,9 @@
-import { useMemo, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
+import { useLogError } from "~~/hooks/common";
 
 const normalizeDecimals = (value: unknown): number | null => {
   if (value === undefined || value === null) return 18;
@@ -24,6 +25,89 @@ const toBoolean = (value: unknown, fallback = false): boolean => {
   if (typeof value === "bigint") return value !== 0n;
   return fallback;
 };
+
+const toValueString = (value: unknown): string | undefined => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value.toString();
+  if (typeof value === "bigint") return value.toString();
+  return undefined;
+};
+
+const toDecimalsNumber = (decimals: unknown): number => {
+  if (typeof decimals === "number") return decimals;
+  if (typeof decimals === "string") return Number(decimals);
+  if (typeof decimals === "bigint") return Number(decimals);
+  return 18;
+};
+
+type RateField = { value?: unknown; decimals?: unknown } | null | undefined;
+
+const extractRateValue = (field: RateField): number => {
+  if (!field || typeof field !== "object") return 0;
+  const { value, decimals } = field as { value?: unknown; decimals?: unknown };
+
+  const valueStr = toValueString(value);
+  if (!valueStr) return 0;
+
+  const decimalsNum = toDecimalsNumber(decimals);
+  if (!Number.isFinite(decimalsNum)) return 0;
+
+  const decimalsInt = Math.max(0, Math.floor(decimalsNum));
+
+  const base = Number(valueStr);
+  if (!Number.isFinite(base)) return 0;
+
+  const scale = 10 ** decimalsInt;
+  return scale === 0 ? 0 : base / scale;
+};
+
+const computeSupplyAPY = (stats: {
+  supplyApy?: RateField;
+  defiSpringSupplyApr?: RateField;
+  btcFiSupplyApr?: RateField;
+} | null | undefined): number => {
+  const directSupply = extractRateValue(stats?.supplyApy);
+  if (directSupply > 0) return directSupply;
+
+  const defiSpringSupply = extractRateValue(stats?.defiSpringSupplyApr);
+  if (defiSpringSupply > 0) return defiSpringSupply;
+
+  return extractRateValue(stats?.btcFiSupplyApr);
+};
+
+type ApiAsset = {
+  address?: unknown;
+  stats?: {
+    borrowApr?: RateField;
+    supplyApy?: RateField;
+    defiSpringSupplyApr?: RateField;
+    btcFiSupplyApr?: RateField;
+  } | null;
+};
+
+const processApiAssets = (
+  assets: ApiAsset[],
+): Record<string, { borrowAPR: number; supplyAPY: number }> => {
+  const nextRates: Record<string, { borrowAPR: number; supplyAPY: number }> = {};
+
+  for (const asset of assets) {
+    const address = typeof asset.address === "string" ? asset.address.toLowerCase() : undefined;
+    if (!address) continue;
+
+    const stats = asset.stats ?? undefined;
+    nextRates[address] = {
+      borrowAPR: extractRateValue(stats?.borrowApr),
+      supplyAPY: computeSupplyAPY(stats),
+    };
+  }
+
+  return nextRates;
+};
+
+const isAbortError = (error: unknown): boolean =>
+  typeof DOMException !== "undefined" &&
+  error instanceof DOMException &&
+  error.name === "AbortError";
 
 const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
   if (!Array.isArray(assets)) return [];
@@ -100,60 +184,11 @@ export const useVesuV2Assets = (poolAddress: string) => {
     refetchInterval: 0,
   });
 
-  useEffect(() => {
-    if (assetsError) {
-      console.error("Error fetching V2 supported assets:", assetsError);
-    }
-  }, [assetsError]);
-
-  type RateField = { value?: unknown; decimals?: unknown } | null | undefined;
-  type ApiAsset = {
-    address?: unknown;
-    stats?: {
-      borrowApr?: RateField;
-      supplyApy?: RateField;
-      defiSpringSupplyApr?: RateField;
-      btcFiSupplyApr?: RateField;
-    } | null;
-  };
+  useLogError(assetsError, "Error fetching V2 supported assets:");
 
   const [poolRates, setPoolRates] = useState<Record<string, { borrowAPR: number; supplyAPY: number }>>({});
   const [ratesError, setRatesError] = useState<Error | null>(null);
   const [isRatesLoading, setIsRatesLoading] = useState(false);
-
-  const extractRateValue = (field: RateField): number => {
-    if (!field || typeof field !== "object") return 0;
-    const { value, decimals } = field as { value?: unknown; decimals?: unknown };
-
-    const valueStr =
-      typeof value === "string"
-        ? value
-        : typeof value === "number"
-          ? value.toString()
-          : typeof value === "bigint"
-            ? value.toString()
-            : undefined;
-    if (!valueStr) return 0;
-
-    const decimalsNum =
-      typeof decimals === "number"
-        ? decimals
-        : typeof decimals === "string"
-          ? Number(decimals)
-          : typeof decimals === "bigint"
-            ? Number(decimals)
-            : 18;
-
-    if (!Number.isFinite(decimalsNum)) return 0;
-
-    const decimalsInt = Math.max(0, Math.floor(decimalsNum));
-
-    const base = Number(valueStr);
-    if (!Number.isFinite(base)) return 0;
-
-    const scale = 10 ** decimalsInt;
-    return scale === 0 ? 0 : base / scale;
-  };
 
   useEffect(() => {
     if (!poolAddress) {
@@ -181,34 +216,14 @@ export const useVesuV2Assets = (poolAddress: string) => {
 
         const json = (await response.json()) as { data?: { assets?: ApiAsset[] } };
         const assets = Array.isArray(json?.data?.assets) ? (json?.data?.assets as ApiAsset[]) : [];
-
-        const nextRates: Record<string, { borrowAPR: number; supplyAPY: number }> = {};
-
-        for (const asset of assets) {
-          const address = typeof asset.address === "string" ? asset.address.toLowerCase() : undefined;
-          if (!address) continue;
-
-          const stats = asset.stats ?? undefined;
-          const borrowAPR = extractRateValue(stats?.borrowApr);
-          const directSupply = extractRateValue(stats?.supplyApy);
-          const defiSpringSupply = extractRateValue(stats?.defiSpringSupplyApr);
-          const btcFiSupply = extractRateValue(stats?.btcFiSupplyApr);
-          const supplyAPY = directSupply > 0 ? directSupply : defiSpringSupply > 0 ? defiSpringSupply : btcFiSupply;
-
-          nextRates[address] = {
-            borrowAPR,
-            supplyAPY,
-          };
-        }
+        const nextRates = processApiAssets(assets);
 
         if (isMounted) {
           setPoolRates(nextRates);
         }
       } catch (error) {
         if (!isMounted) return;
-        if (typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
+        if (isAbortError(error)) return;
         console.error("Error fetching Vesu V2 rates:", error);
         setRatesError(error instanceof Error ? error : new Error("Unknown error fetching Vesu V2 rates"));
         setPoolRates({});

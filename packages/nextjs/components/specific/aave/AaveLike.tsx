@@ -6,7 +6,9 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import type { ContractName } from "~~/utils/scaffold-eth/contract";
-import { useGlobalState } from "~~/services/store/store";
+import { useProtocolTotalsFromPositions } from "~~/hooks/common";
+import { aaveRateToAPY } from "~~/utils/protocolRates";
+import { filterPositionsByWalletStatus } from "~~/utils/tokenSymbols";
 
 interface AaveLikeProps {
   chainId?: number;
@@ -43,8 +45,6 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
   // Determine the address to use for queries - use contract's own address as fallback
   const queryAddress = connectedAddress || contractInfo?.address;
 
-  // Helper: Convert Aave RAY (1e27) rates to APY percentage.
-  const convertRateToAPY = (rate: bigint): number => Number(rate) / 1e25;
 
   // Track whether we've loaded data at least once
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -80,14 +80,12 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
     allTokensInfo.forEach((token: any) => {
       // Prefer on-chain decimals provided by the gateway; fallback for legacy deployments
       let decimals = typeof token.decimals !== "undefined" ? Number(token.decimals) : 18;
-      if (typeof token.decimals === "undefined") {
-        if (token.symbol === "USDC" || token.symbol === "USD₮0" || token.symbol === "USDC.e") {
-          decimals = 6;
-        }
+      if (typeof token.decimals === "undefined" && (token.symbol === "USDC" || token.symbol === "USD₮0" || token.symbol === "USDC.e")) {
+        decimals = 6;
       }
 
-      const supplyAPY = convertRateToAPY(token.supplyRate);
-      const borrowAPY = convertRateToAPY(token.borrowRate);
+      const supplyAPY = aaveRateToAPY(token.supplyRate);
+      const borrowAPY = aaveRateToAPY(token.borrowRate);
       const tokenPrice = Number(formatUnits(token.price, 8));
 
       // Add supply position
@@ -126,30 +124,19 @@ export const AaveLike: FC<AaveLikeProps> = ({ chainId, contractName, children })
     return { suppliedPositions: supplied, borrowedPositions: borrowed };
   }, [allTokensInfo]);
 
-  const tokenFilter = ["BTC", "ETH", "USDC", "USDT"];
-  const sanitize = (name: string) => name.replace("₮", "T").replace(/[^a-zA-Z]/g, "").toUpperCase();
+  const filteredSuppliedPositions = filterPositionsByWalletStatus(suppliedPositions, isWalletConnected);
+  const filteredBorrowedPositions = filterPositionsByWalletStatus(borrowedPositions, isWalletConnected);
 
-  const filteredSuppliedPositions = isWalletConnected
-    ? suppliedPositions
-    : suppliedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
-  const filteredBorrowedPositions = isWalletConnected
-    ? borrowedPositions
-    : borrowedPositions.filter(p => tokenFilter.includes(sanitize(p.name)));
+  // Derive protocol name from contract name
+  const protocolName = contractName === "ZeroLendGatewayView" ? "ZeroLend" : contractName === "SparkGatewayView" ? "Spark" : "Aave";
 
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
-
-  useEffect(() => {
-    if (!allTokensInfo) return;
-
-    const totalSupplied = filteredSuppliedPositions.reduce((sum, position) => sum + position.balance, 0);
-    const totalBorrowed = filteredBorrowedPositions.reduce(
-      (sum, position) => sum + (position.balance < 0 ? -position.balance : 0),
-      0,
-    );
-
-    const protoName = contractName === "ZeroLendGatewayView" ? "ZeroLend" : contractName === "SparkGatewayView" ? "Spark" : "Aave";
-    setProtocolTotals(protoName, totalSupplied, totalBorrowed);
-  }, [allTokensInfo, contractName, filteredBorrowedPositions, filteredSuppliedPositions, setProtocolTotals, chainId]);
+  // Use the shared hook to update protocol totals in global state
+  useProtocolTotalsFromPositions(
+    protocolName,
+    filteredSuppliedPositions,
+    filteredBorrowedPositions,
+    !!allTokensInfo
+  );
 
   return <>{children({ suppliedPositions: filteredSuppliedPositions, borrowedPositions: filteredBorrowedPositions, forceShowAll, hasLoadedOnce })}</>;
 };

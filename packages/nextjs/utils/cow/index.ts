@@ -50,7 +50,10 @@ export {
   getCowFlashLoanLender,
   getKapanCowAdapter,
   getPreferredFlashLoanLender,
+  getCowFlashLoanProviders,
+  mapFlashLoanProviderToCow,
   isMorphoLender,
+  type CowFlashLoanProvider,
 } from "./addresses";
 
 // AppData utilities
@@ -58,7 +61,15 @@ export {
   type CowHook,
   type AppDataDocument,
   type FlashLoanMetadata,
+  type KapanOperationType,
+  type KapanProtocol,
   buildKapanAppData,
+  buildAppCode,
+  parseOperationTypeFromAppCode,
+  parseProtocolFromAppCode,
+  normalizeProtocolForAppCode,
+  fetchAppData,
+  fetchOperationTypeFromAppData,
   computeAppDataHash,
   registerAppData,
   buildAndRegisterAppData,
@@ -109,3 +120,14 @@ export {
   getOrderQuoteRate,
   calculatePriceImpact,
 } from "./orderExecution";
+
+// Order recovery utilities
+export {
+  type RecoveryResult,
+  type CowOrder,
+  recoverOrderFromTx,
+  retryAppDataRegistration,
+  fetchOrdersForOwner,
+  fetchOrderByUid,
+  checkOrderInOrderbook,
+} from "./recoverOrder";

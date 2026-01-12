@@ -9,9 +9,14 @@ import { useCowOrder } from "~~/hooks/useCowOrder";
 import { useMultipleChunkExecutedEvents } from "~~/hooks/useChunkExecutedEvents";
 import { useTokenInfo } from "~~/hooks/useTokenInfo";
 import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
-import { OrderStatus, calculateExecutionSummary } from "~~/utils/cow";
+import { OrderStatus, calculateExecutionSummary, fetchAppData, parseOperationTypeFromAppCode, type KapanOperationType } from "~~/utils/cow";
 import type { OrderContext } from "~~/utils/cow";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { getOrderNote, getOperationLabel, getOperationColorClass, findPendingNoteForOrder, linkNoteToOrderHash, type OperationType } from "~~/utils/orderNotes";
+import { getProtocolLogo } from "~~/utils/protocol";
+import { LoadingOverlay } from "~~/components/common/Loading";
+import { timeAgo } from "~~/utils/deadline";
+import { truncateAddress } from "~~/utils/address";
 
 function formatAmount(amount: bigint, decimals: number): string {
   const formatted = formatUnits(amount, decimals);
@@ -27,24 +32,71 @@ function formatUsd(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
-function formatDate(timestamp: bigint): string {
-  const date = new Date(Number(timestamp) * 1000);
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function timeAgo(timestamp: bigint): string {
-  const now = Math.floor(Date.now() / 1000);
-  const diff = now - Number(timestamp);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return formatDate(timestamp);
-}
-
 interface OrderWithHash {
   orderHash: string;
   context: OrderContext;
+}
+
+/**
+ * Map KapanOperationType to OperationType for display
+ */
+function mapKapanOperationType(kapanType: KapanOperationType): OperationType {
+  switch (kapanType) {
+    case "leverage-up": return "leverage_up";
+    case "close-position": return "close_position";
+    case "debt-swap": return "debt_swap";
+    case "collateral-swap": return "collateral_swap";
+  }
+}
+
+/**
+ * Hook to fetch operation types from appData for multiple orders
+ * Returns a map of orderHash -> OperationType
+ */
+function useAppDataOperationTypes(orders: OrderWithHash[], chainId: number): Map<string, OperationType> {
+  const [operationTypes, setOperationTypes] = useState<Map<string, OperationType>>(new Map());
+
+  useEffect(() => {
+    if (orders.length === 0) return;
+
+    const fetchTypes = async () => {
+      const newTypes = new Map<string, OperationType>();
+
+      // Fetch appData for each order that has an appDataHash
+      await Promise.all(
+        orders.map(async ({ orderHash, context }) => {
+          const appDataHash = context.params.appDataHash;
+          if (!appDataHash || appDataHash === "0x0000000000000000000000000000000000000000000000000000000000000000") {
+            return;
+          }
+
+          try {
+            const appData = await fetchAppData(chainId, appDataHash);
+            if (appData) {
+              const kapanType = parseOperationTypeFromAppCode(appData.appCode);
+              if (kapanType) {
+                newTypes.set(orderHash, mapKapanOperationType(kapanType));
+              }
+            }
+          } catch {
+            // Silently ignore fetch errors - will fall back to localStorage
+          }
+        })
+      );
+
+      if (newTypes.size > 0) {
+        setOperationTypes(prev => {
+          const merged = new Map(prev);
+          newTypes.forEach((value, key) => merged.set(key, value));
+          return merged;
+        });
+      }
+    };
+
+    fetchTypes();
+  }, [orders, chainId]);
+
+  return operationTypes;
 }
 
 function UsdValue({ symbol, amount }: { symbol: string; amount: number }) {
@@ -105,9 +157,16 @@ export default function OrdersPage() {
 
   const tokenInfoMap = useTokenInfo(tokenAddresses, chainId);
 
+  // Fetch operation types from appData (falls back to localStorage notes in OrderRow)
+  const appDataOperationTypes = useAppDataOperationTypes(orders, chainId);
+
+  const handleBack = useCallback(() => {
+    window.history.back();
+  }, []);
+
   const getTokenSymbol = (address: string): string => {
     const info = tokenInfoMap.get(address.toLowerCase());
-    return info?.symbol ?? `${address.slice(0, 6)}...${address.slice(-4)}`;
+    return info?.symbol ?? truncateAddress(address);
   };
 
   const getTokenDecimals = (address: string): number => {
@@ -123,8 +182,8 @@ export default function OrdersPage() {
   if (!userAddress) {
     return (
       <div className="min-h-screen px-4 py-12 md:px-8 lg:px-16">
-        <div className="max-w-5xl mx-auto text-center py-20">
-          <h1 className="text-3xl font-bold mb-4">Orders</h1>
+        <div className="mx-auto max-w-5xl py-20 text-center">
+          <h1 className="mb-4 text-3xl font-bold">Orders</h1>
           <p className="text-base-content/50">Connect your wallet to view your orders</p>
         </div>
       </div>
@@ -134,8 +193,8 @@ export default function OrdersPage() {
   if (!isAvailable) {
     return (
       <div className="min-h-screen px-4 py-12 md:px-8 lg:px-16">
-        <div className="max-w-5xl mx-auto text-center py-20">
-          <h1 className="text-3xl font-bold mb-4">Orders</h1>
+        <div className="mx-auto max-w-5xl py-20 text-center">
+          <h1 className="mb-4 text-3xl font-bold">Orders</h1>
           <p className="text-base-content/50">Limit orders are not available on this chain</p>
         </div>
       </div>
@@ -144,14 +203,14 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen px-4 py-8 md:px-8 lg:px-16">
-      <div className="max-w-5xl mx-auto">
+      <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-8">
-          <button 
-            onClick={() => window.history.back()}
-            className="inline-flex items-center gap-2 text-base-content/50 hover:text-base-content transition-colors text-sm mb-6"
+          <button
+            onClick={handleBack}
+            className="text-base-content/50 hover:text-base-content mb-6 inline-flex items-center gap-2 text-sm transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Back
@@ -167,9 +226,9 @@ export default function OrdersPage() {
             <button 
               onClick={fetchOrders}
               disabled={isLoading}
-              className="p-2 hover:bg-base-200 rounded-lg transition-colors"
+              className="hover:bg-base-200 rounded-lg p-2 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-base-content/50 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className={`text-base-content/50 size-5${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
@@ -177,30 +236,30 @@ export default function OrdersPage() {
         </div>
 
         {isLoading && orders.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <span className="loading loading-spinner loading-lg"></span>
-          </div>
+          <LoadingOverlay size="lg" label="Loading orders..." />
         ) : orders.length === 0 ? (
-          <div className="text-center py-20">
+          <div className="py-20 text-center">
             <p className="text-base-content/50 text-lg">No orders found</p>
-            <p className="text-base-content/40 text-sm mt-2">Create a limit order from the Multiply modal</p>
+            <p className="text-base-content/40 mt-2 text-sm">Create a limit order from the Multiply modal</p>
           </div>
         ) : (
           <div className="space-y-8">
             {/* Active Orders */}
             {activeOrders.length > 0 && (
               <section>
-                <h2 className="text-sm font-medium text-base-content/50 uppercase tracking-wide mb-4">
+                <h2 className="text-base-content/50 mb-4 text-sm font-medium uppercase tracking-wide">
                   Active ({activeOrders.length})
                 </h2>
                 <div className="space-y-3">
                   {activeOrders.map((order) => (
-                    <OrderRow 
+                    <OrderRow
                       key={order.orderHash}
                       order={order}
                       executionDataMap={executionDataMap}
                       getTokenSymbol={getTokenSymbol}
                       getTokenDecimals={getTokenDecimals}
+                      chainId={chainId}
+                      appDataOperationType={appDataOperationTypes.get(order.orderHash)}
                     />
                   ))}
                 </div>
@@ -210,17 +269,19 @@ export default function OrdersPage() {
             {/* Completed Orders */}
             {completedOrders.length > 0 && (
               <section>
-                <h2 className="text-sm font-medium text-base-content/50 uppercase tracking-wide mb-4">
+                <h2 className="text-base-content/50 mb-4 text-sm font-medium uppercase tracking-wide">
                   Completed ({completedOrders.length})
                 </h2>
                 <div className="space-y-3">
                   {completedOrders.map((order) => (
-                    <OrderRow 
+                    <OrderRow
                       key={order.orderHash}
                       order={order}
                       executionDataMap={executionDataMap}
                       getTokenSymbol={getTokenSymbol}
                       getTokenDecimals={getTokenDecimals}
+                      chainId={chainId}
+                      appDataOperationType={appDataOperationTypes.get(order.orderHash)}
                     />
                   ))}
                 </div>
@@ -230,17 +291,19 @@ export default function OrdersPage() {
             {/* Cancelled Orders */}
             {cancelledOrders.length > 0 && (
               <section>
-                <h2 className="text-sm font-medium text-base-content/50 uppercase tracking-wide mb-4">
+                <h2 className="text-base-content/50 mb-4 text-sm font-medium uppercase tracking-wide">
                   Cancelled ({cancelledOrders.length})
                 </h2>
                 <div className="space-y-3">
                   {cancelledOrders.map((order) => (
-                    <OrderRow 
+                    <OrderRow
                       key={order.orderHash}
                       order={order}
                       executionDataMap={executionDataMap}
                       getTokenSymbol={getTokenSymbol}
                       getTokenDecimals={getTokenDecimals}
+                      chainId={chainId}
+                      appDataOperationType={appDataOperationTypes.get(order.orderHash)}
                       dimmed
                     />
                   ))}
@@ -254,21 +317,25 @@ export default function OrdersPage() {
   );
 }
 
-function OrderRow({ 
-  order, 
-  executionDataMap, 
-  getTokenSymbol, 
+function OrderRow({
+  order,
+  executionDataMap,
+  getTokenSymbol,
   getTokenDecimals,
-  dimmed = false 
-}: { 
+  chainId,
+  appDataOperationType,
+  dimmed = false
+}: {
   order: OrderWithHash;
   executionDataMap: Map<string, any>;
   getTokenSymbol: (address: string) => string;
   getTokenDecimals: (address: string) => number;
+  chainId: number;
+  appDataOperationType?: OperationType;
   dimmed?: boolean;
 }) {
   const { orderHash, context } = order;
-  const { params, status, executedAmount, iterationCount, createdAt } = context;
+  const { params, status, iterationCount, createdAt } = context;
   
   const isActive = status === OrderStatus.Active;
   const isCompleted = status === OrderStatus.Completed;
@@ -282,6 +349,9 @@ function OrderRow({
   const completedChunks = Number(iterationCount);
   const progressPercent = totalChunks > 0 ? (completedChunks / totalChunks) * 100 : 0;
 
+  // Memoize style object to avoid creating new object on each render
+  const progressBarStyle = useMemo(() => ({ width: `${progressPercent}%` }), [progressPercent]);
+
   const executionData = executionDataMap.get(orderHash);
   const hasExecutionData = executionData && executionData.chunks.length > 0;
   const executionSummary = hasExecutionData
@@ -291,26 +361,76 @@ function OrderRow({
   const totalReceived = executionData?.totalReceived ?? 0n;
   const hasSurplus = executionSummary && executionSummary.surplusAmount > 0n;
   
-  const sellAmountNum = parseFloat(formatUnits(params.preTotalAmount, sellDecimals));
   const receivedAmountNum = parseFloat(formatUnits(totalReceived, buyDecimals));
+
+  // Determine operation type:
+  // 1. First try appData (derived from on-chain appDataHash)
+  // 2. Fall back to localStorage notes
+  let orderNote = getOrderNote(orderHash);
+
+  // If no note found, try to find and link a pending note
+  if (!orderNote) {
+    const pendingNote = findPendingNoteForOrder(
+      sellSymbol,
+      buySymbol,
+      chainId,
+      Number(createdAt)
+    );
+
+    if (pendingNote && pendingNote.salt) {
+      // Link the pending note to this orderHash for future lookups
+      linkNoteToOrderHash(pendingNote.salt, orderHash);
+      orderNote = pendingNote;
+    }
+  }
+
+  // Prefer appData-derived type, fall back to localStorage note, then "unknown"
+  const operationType: OperationType = appDataOperationType ?? orderNote?.operationType ?? "unknown";
+  const operationLabel = getOperationLabel(operationType);
+  const operationColorClass = getOperationColorClass(operationType);
+  const protocolName = orderNote?.protocol;
+  const protocolLogo = protocolName ? getProtocolLogo(protocolName) : null;
 
   return (
     <Link 
       href={`/orders/${orderHash}`}
-      className={`block p-4 rounded-lg border border-base-200 hover:border-base-300 hover:bg-base-100/50 transition-all ${dimmed ? 'opacity-50' : ''}`}
+      className={`border-base-200 hover:border-base-300 hover:bg-base-100/50 block rounded-lg border p-4 transition-all ${dimmed ? 'opacity-50' : ''}`}
     >
       <div className="flex items-center justify-between gap-4">
         {/* Left: Token pair and progress */}
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="flex items-center -space-x-2 flex-shrink-0">
-            <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={32} height={32} className="rounded-full ring-2 ring-base-100" />
-            <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={32} height={32} className="rounded-full ring-2 ring-base-100" />
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="flex flex-shrink-0 items-center -space-x-2">
+            <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={32} height={32} className="ring-base-100 rounded-full ring-2" />
+            <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={32} height={32} className="ring-base-100 rounded-full ring-2" />
           </div>
           
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Operation type badge */}
+              {operationType !== "unknown" && (
+                <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${operationColorClass}`}>
+                  {operationLabel}
+                </span>
+              )}
+              {/* Protocol with icon */}
+              {protocolName && (
+                <div className="flex items-center gap-1">
+                  {protocolLogo && (
+                    <Image 
+                      src={protocolLogo} 
+                      alt={protocolName} 
+                      width={14} 
+                      height={14} 
+                      className="rounded-sm"
+                    />
+                  )}
+                  <span className="text-base-content/40 text-xs">{protocolName}</span>
+                </div>
+              )}
+              {/* Token pair */}
               <span className="font-semibold">{sellSymbol} → {buySymbol}</span>
-              <span className={`text-xs px-1.5 py-0.5 rounded ${
+              {/* Status badge */}
+              <span className={`rounded px-1.5 py-0.5 text-xs ${
                 isActive ? 'bg-warning/20 text-warning' :
                 isCompleted ? 'bg-success/20 text-success' :
                 'bg-error/20 text-error'
@@ -318,7 +438,7 @@ function OrderRow({
                 {isActive ? 'Active' : isCompleted ? 'Completed' : 'Cancelled'}
               </span>
             </div>
-            <div className="flex items-center gap-3 mt-1 text-sm text-base-content/50">
+            <div className="text-base-content/50 mt-1 flex items-center gap-3 text-sm">
               <span>{formatAmount(params.preTotalAmount, sellDecimals)} {sellSymbol}</span>
               <span>·</span>
               <span>{completedChunks}/{totalChunks} chunks</span>
@@ -329,10 +449,10 @@ function OrderRow({
         </div>
 
         {/* Right: Amounts */}
-        <div className="text-right flex-shrink-0">
+        <div className="flex-shrink-0 text-right">
           {hasExecutionData ? (
             <>
-              <div className="font-semibold text-success">
+              <div className="text-success font-semibold">
                 {formatAmount(totalReceived, buyDecimals)} {buySymbol}
               </div>
               <div className="text-sm">
@@ -351,10 +471,10 @@ function OrderRow({
       {/* Progress bar */}
       {isActive && (
         <div className="mt-3">
-          <div className="h-1 bg-base-200 w-full">
-            <div 
-              className="h-full bg-primary transition-all"
-              style={{ width: `${progressPercent}%` }}
+          <div className="bg-base-200 h-1 w-full">
+            <div
+              className="bg-primary h-full transition-all"
+              style={progressBarStyle}
             />
           </div>
         </div>

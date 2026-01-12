@@ -5,7 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 
 /**
  * Morpho Blue deployment script.
@@ -112,6 +112,11 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
       MORPHO: "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
       MARKETS: [],
     },
+    // Unichain (different Morpho address)
+    130: {
+      MORPHO: "0x8f5ae9CddB9f68de460C77730b018Ae7E04a140A",
+      MARKETS: [], // Markets auto-discovered via Morpho API, no hardcoded list needed
+    },
   };
 
   const config = CONFIG[effectiveChainId];
@@ -127,7 +132,7 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
   const WAIT = getWaitConfirmations(chainId);
 
   // ============ Deploy Write Gateway ============
-  const morphoGatewayWrite = await deploy("MorphoBlueGatewayWrite", {
+  const morphoGatewayWrite = await safeDeploy(hre, deployer, "MorphoBlueGatewayWrite", {
     from: deployer,
     args: [kapanRouter.address, deployer, MORPHO_ADDRESS],
     log: true,
@@ -139,7 +144,7 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
   console.log(`MorphoBlueGatewayWrite deployed to: ${morphoGatewayWrite.address}`);
 
   // ============ Deploy View Gateway ============
-  const morphoGatewayView = await deploy("MorphoBlueGatewayView", {
+  const morphoGatewayView = await safeDeploy(hre, deployer, "MorphoBlueGatewayView", {
     from: deployer,
     args: [MORPHO_ADDRESS, deployer],
     log: true,
@@ -206,6 +211,8 @@ const deployMorphoBlueGateway: DeployFunction = async function (hre: HardhatRunt
     MORPHO_ADDRESS,
     deployer,
   ]);
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployMorphoBlueGateway;

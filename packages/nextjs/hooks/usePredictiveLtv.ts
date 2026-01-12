@@ -35,7 +35,7 @@ export interface PredictedPosition {
 export function calculatePredictedPosition(
   collaterals: { token: Address; amount: bigint; config: ReserveConfig }[],
   debts: { token: Address; amount: bigint; config: ReserveConfig }[],
-  safetyBuffer: number = 0.90
+  safetyBuffer = 0.90
 ): PredictedPosition {
   let totalCollateralUsd = 0;
   let totalDebtUsd = 0;
@@ -98,7 +98,7 @@ export function calculatePredictedPosition(
 export function useAaveReserveConfigs(
   tokens: Address[],
   chainId?: number,
-  enabled: boolean = true
+  enabled = true
 ) {
   const { data: gatewayInfo } = useDeployedContractInfo({
     contractName: "AaveGatewayView",
@@ -135,7 +135,7 @@ export function useAaveReserveConfigs(
 export function useCompoundReserveConfigs(
   market: Address | undefined,
   chainId?: number,
-  enabled: boolean = true
+  enabled = true
 ) {
   const { data: gatewayInfo } = useDeployedContractInfo({
     contractName: "CompoundGatewayView",
@@ -171,7 +171,7 @@ export function useCompoundReserveConfigs(
  */
 export function useVenusReserveConfigs(
   chainId?: number,
-  enabled: boolean = true
+  enabled = true
 ) {
   const { data: gatewayInfo } = useDeployedContractInfo({
     contractName: "VenusGatewayView",
@@ -210,7 +210,7 @@ export function useReserveConfigs(
   tokens: Address[],
   market?: Address,
   chainId?: number,
-  enabled: boolean = true
+  enabled = true
 ) {
   const protocolLower = protocol.toLowerCase();
 
@@ -260,7 +260,7 @@ export function usePredictiveMaxLeverage(
   debtToken: Address | undefined,
   market?: Address,
   chainId?: number,
-  safetyBuffer: number = 0.90,
+  safetyBuffer = 0.90,
   eMode?: EModeCategory | null
 ) {
   const tokens = useMemo(() => {

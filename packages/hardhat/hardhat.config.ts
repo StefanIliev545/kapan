@@ -31,6 +31,8 @@ const FORK_RPC_URLS: Record<string, string> = {
   op: `https://opt-mainnet.g.alchemy.com/v2/${providerApiKey}`,
   linea: `https://linea-mainnet.g.alchemy.com/v2/${providerApiKey}`,
   plasma: `https://plasma-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  unichain: `https://unichain-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+  uni: `https://unichain-mainnet.g.alchemy.com/v2/${providerApiKey}`,
 };
 
 // Fuzzy match for typos like "etheum" -> "ethereum"
@@ -53,11 +55,13 @@ const FORK_BLOCK_NUMBERS: Record<string, number | undefined> = {
   mainnet: undefined,
   arbitrum: 414729450, // ~Dec 2025
   arb: 414729450,
-  base: 40261400,      // ~Jan 2026 - after real CoW order created at 40261309
+  base: undefined,     // Use latest - testing recent orders
   optimism: 129000000, // ~Dec 2024
   op: 129000000,
   linea: 13000000,     // ~Dec 2024
   plasma: 5000000,     // ~Dec 2025
+  unichain: undefined, // Use latest
+  uni: undefined,
 };
 const forkBlockNumber = FORK_BLOCK_NUMBERS[FORK_CHAIN];
 
@@ -145,6 +149,11 @@ const config: HardhatUserConfig = {
             cancun: 0,
           },
         },
+        130: { // Unichain
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
       },
     },
     localhost: {
@@ -187,6 +196,11 @@ const config: HardhatUserConfig = {
     plasma: {
       url: `https://plasma-mainnet.g.alchemy.com/v2/${providerApiKey}`,
       chainId: 9745,
+      accounts: [deployerPrivateKey],
+    },
+    unichain: {
+      url: `https://unichain-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+      chainId: 130,
       accounts: [deployerPrivateKey],
     },
     polygon: {
@@ -363,6 +377,14 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://plasmascan.to/api",
           browserURL: "https://plasmascan.to",
+        },
+      },
+      {
+        network: "unichain",
+        chainId: 130,
+        urls: {
+          apiURL: "https://api.uniscan.xyz/api",
+          browserURL: "https://uniscan.xyz",
         },
       },
     ],

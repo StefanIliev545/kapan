@@ -1,14 +1,118 @@
 "use client";
 
-import React, { useRef, useMemo, useState, useEffect } from "react";
+import React, { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { motion, AnimatePresence, useScroll, useSpring, useTransform, useMotionValue } from "framer-motion";
-import { ChevronDownIcon, ChevronUpIcon, ArrowRightIcon, ArrowPathIcon, ShieldCheckIcon, BoltIcon, CurrencyDollarIcon, SparklesIcon, CubeTransparentIcon, PuzzlePieceIcon, RocketLaunchIcon, PlusIcon, MinusIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { motion, AnimatePresence, useScroll, useSpring, useTransform, useMotionValue, MotionValue } from "framer-motion";
+import { ChevronDownIcon, ChevronUpIcon, ArrowRightIcon, ShieldCheckIcon, BoltIcon, CurrencyDollarIcon, SparklesIcon, PlusIcon, MinusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@radix-ui/themes";
 import { track } from "@vercel/analytics";
 import { StickySection, SectionData } from "./StickySection";
 import { useKapanTheme } from "~~/hooks/useKapanTheme";
 import { useLandingSection } from "~~/contexts/LandingSectionContext";
+
+// ================================
+// Static Animation Constants
+// ================================
+
+// ProtocolMarquee animations
+const MARQUEE_ANIMATE = { x: ["0%", "-50%"] as [string, string] };
+const MARQUEE_TRANSITION = {
+  x: {
+    duration: 20,
+    repeat: Infinity,
+    ease: "linear" as const,
+  },
+};
+
+// MarqueeRow animations
+const MARQUEE_ROW_TRANSITION = {
+  x: {
+    duration: 25,
+    repeat: Infinity,
+    ease: "linear" as const,
+  },
+};
+
+// NeonLetter animations
+const NEON_LETTER_INITIAL = { opacity: 0 };
+const NEON_LETTER_ANIMATE = {
+  opacity: [0, 0, 0.8, 0, 0.6, 0.1, 0.9, 0.2, 1, 0.7, 1],
+};
+const NEON_LETTER_ANIMATE_INACTIVE = { opacity: 0 };
+const NEON_LETTER_TIMES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+
+// FinalCTA animations
+const LOGO_INITIAL = { opacity: 0 };
+const LOGO_ANIMATE = {
+  opacity: [0, 0, 0.7, 0, 0, 0.5, 0.1, 0.8, 0, 0.9, 0.3, 1, 0.8, 1],
+};
+const LOGO_ANIMATE_INACTIVE = { opacity: 0 };
+const LOGO_TRANSITION_TIMES = [0, 0.05, 0.1, 0.18, 0.28, 0.35, 0.4, 0.5, 0.58, 0.68, 0.78, 0.88, 0.94, 1];
+
+const BUTTON_FLICKER_INITIAL = { opacity: 0 };
+const BUTTON_FLICKER_ANIMATE = {
+  opacity: [0, 0, 1, 0, 0.8, 0, 1, 0.3, 1, 0.6, 1, 1],
+};
+const BUTTON_FLICKER_ANIMATE_INACTIVE = { opacity: 0 };
+const BUTTON_FLICKER_TIMES = [0, 0.1, 0.15, 0.22, 0.3, 0.38, 0.5, 0.6, 0.72, 0.82, 0.92, 1];
+
+const LINKS_INITIAL = { opacity: 0, y: 20 };
+const LINKS_ANIMATE_ACTIVE = { opacity: 1, y: 0 };
+const LINKS_ANIMATE_INACTIVE = { opacity: 0, y: 20 };
+const LINKS_TRANSITION = { delay: 4.2, duration: 0.6, ease: "easeOut" as const };
+
+// HowItWorks animations
+const SPRING_SCALE_INITIAL = { scale: 0 };
+const SPRING_SCALE_ANIMATE = { scale: 1 };
+const SPRING_SCALE_TRANSITION = { type: "spring" as const, bounce: 0.4, duration: 0.8 };
+
+const LINE_INITIAL = { pathLength: 0 };
+const LINE_ANIMATE = { pathLength: 1 };
+
+const FADE_UP_INITIAL = { opacity: 0, scale: 0 };
+const FADE_UP_ANIMATE = { opacity: 1, scale: 1 };
+
+const STEP_01_INITIAL = { opacity: 0, y: 10 };
+const STEP_01_ANIMATE = { opacity: 1, y: 0 };
+const STEP_01_TRANSITION = { delay: 0.8 };
+
+const STEP_02_TRANSITION = { delay: 0.95 };
+const STEP_03_TRANSITION = { delay: 1.1 };
+
+// FlowStep animations
+const FLOW_STEP_INITIAL = { opacity: 0, y: 10 };
+const FLOW_STEP_ANIMATE_ACTIVE = { opacity: 1, y: 0 };
+const FLOW_STEP_ANIMATE_INACTIVE = { opacity: 0.3, y: 0 };
+
+// HFlowStep animations
+const HFLOW_STEP_INITIAL = { opacity: 0, x: -10 };
+const HFLOW_STEP_ANIMATE = { opacity: 1, x: 0 };
+
+// FlowArrow animations
+const FLOW_ARROW_INITIAL = { opacity: 0 };
+const FLOW_ARROW_ANIMATE = { opacity: 1 };
+const FLOW_ARROW_HORIZONTAL = { x: [0, 3, 0] };
+const FLOW_ARROW_VERTICAL = { y: [0, 3, 0] };
+const FLOW_ARROW_TRANSITION = { duration: 1.2, repeat: Infinity };
+
+// ActionContent animations
+const ACTION_CONTENT_INITIAL = { opacity: 0 };
+const ACTION_CONTENT_ANIMATE = { opacity: 1 };
+
+// ActionTabs animations
+const ACTION_TAB_UNDERLINE_TRANSITION = { type: "spring" as const, bounce: 0.15, duration: 0.5 };
+const ACTION_TAB_CONTENT_INITIAL = { opacity: 0, y: 8 };
+const ACTION_TAB_CONTENT_ANIMATE = { opacity: 1, y: 0 };
+const ACTION_TAB_CONTENT_EXIT = { opacity: 0, y: -8 };
+const ACTION_TAB_CONTENT_TRANSITION = { duration: 0.25, ease: "easeOut" as const };
+
+// Swap card arrow animation
+const SWAP_ARROW_ANIMATE = { x: [0, 4, 0] };
+const SWAP_ARROW_TRANSITION = { duration: 1.2, repeat: Infinity };
+
+// ================================
+// Protocol and Network Data
+// ================================
 
 const protocols = [
   { name: "Aave", logo: "/logos/aave.svg" },
@@ -24,24 +128,18 @@ const duplicatedProtocols = [...protocols, ...protocols];
 
 const ProtocolMarquee = () => {
   return (
-    <div className="relative overflow-hidden w-full max-w-md">
+    <div className="relative w-full max-w-md overflow-hidden">
       <motion.div
         className="flex gap-6"
-        animate={{ x: ["0%", "-50%"] }}
-        transition={{
-          x: {
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          },
-        }}
+        animate={MARQUEE_ANIMATE}
+        transition={MARQUEE_TRANSITION}
       >
         {duplicatedProtocols.map((protocol, index) => (
           <div
             key={`${protocol.name}-${index}`}
-            className="flex items-center gap-2 flex-shrink-0"
+            className="flex flex-shrink-0 items-center gap-2"
           >
-            <div className="w-5 h-5 relative">
+            <div className="relative size-5">
               <Image
                 src={protocol.logo}
                 alt={protocol.name}
@@ -49,15 +147,15 @@ const ProtocolMarquee = () => {
                 className="object-contain"
               />
             </div>
-            <span className="text-sm font-medium text-base-content/50">
+            <span className="text-base-content/50 text-sm font-medium">
               {protocol.name}
             </span>
           </div>
         ))}
       </motion.div>
       {/* Fade edges */}
-      <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-base-100 to-transparent pointer-events-none" />
-      <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-base-100 to-transparent pointer-events-none" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
     </div>
   );
 };
@@ -73,21 +171,23 @@ const LaunchAppButton = () => {
     return `${protocol}//app.${baseHost}`;
   }, []);
 
+  const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    track("To App conversion", { button: "Landing Hero" });
+    window.location.assign(appUrl);
+  }, [appUrl]);
+
   return (
     <a
       href="/app"
-      onClick={e => {
-        e.preventDefault();
-        track("To App conversion", { button: "Landing Hero" });
-        window.location.assign(appUrl);
-      }}
-      className="group relative h-16 md:h-20 px-10 md:px-14 bg-primary text-primary-content font-black uppercase tracking-[0.3em] text-[11px] md:text-xs hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] transition-all duration-500 overflow-hidden flex items-center justify-center"
+      onClick={handleClick}
+      className="bg-primary text-primary-content group relative flex h-16 items-center justify-center overflow-hidden px-10 text-[11px] font-black uppercase tracking-[0.3em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] md:h-20 md:px-14 md:text-xs"
     >
       <div className="relative z-10 flex items-center gap-4">
-        <span className="translate-x-2 group-hover:translate-x-0 transition-transform duration-500">
+        <span className="translate-x-2 transition-transform duration-500 group-hover:translate-x-0">
           Launch App
         </span>
-        <ArrowRightIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-500" />
+        <ArrowRightIcon className="size-4 opacity-0 transition-all duration-500 group-hover:translate-x-1 group-hover:opacity-100" />
       </div>
     </a>
   );
@@ -134,64 +234,65 @@ const duplicatedSupportedProtocols = [...supportedProtocols, ...supportedProtoco
 const duplicatedIntegrations = [...integrations, ...integrations];
 
 // Marquee row component
-const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; logo: string }[]; label: string; reverse?: boolean }) => (
-  <div className="flex items-center gap-4 w-full">
-    <span className="text-[10px] uppercase tracking-wider text-base-content/30 w-20 flex-shrink-0 text-right">{label}</span>
-    <div className="relative overflow-hidden flex-1">
-      <motion.div
-        className="flex gap-6"
-        animate={{ x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] }}
-        transition={{
-          x: {
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear",
-          },
-        }}
-      >
-        {items.map((item, index) => (
-          <div key={`${item.name}-${index}`} className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-5 h-5 relative">
-              <Image src={item.logo} alt={item.name} fill className="object-contain" />
+const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; logo: string }[]; label: string; reverse?: boolean }) => {
+  const animate = useMemo(() =>
+    ({ x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] as [string, string] }),
+    [reverse]
+  );
+
+  return (
+    <div className="flex w-full items-center gap-4">
+      <span className="text-base-content/30 w-20 flex-shrink-0 text-right text-[10px] uppercase tracking-wider">{label}</span>
+      <div className="relative flex-1 overflow-hidden">
+        <motion.div
+          className="flex gap-6"
+          animate={animate}
+          transition={MARQUEE_ROW_TRANSITION}
+        >
+          {items.map((item, index) => (
+            <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
+              <div className="relative size-5">
+                <Image src={item.logo} alt={item.name} fill className="object-contain" />
+              </div>
+              <span className="text-base-content/40 text-xs">{item.name}</span>
             </div>
-            <span className="text-xs text-base-content/40">{item.name}</span>
-          </div>
-        ))}
-      </motion.div>
-      {/* Fade edges */}
-      <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-base-100 to-transparent pointer-events-none" />
-      <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-base-100 to-transparent pointer-events-none" />
+          ))}
+        </motion.div>
+        {/* Fade edges */}
+        <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
+        <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const FeatureList = () => {
-  const features = [
+  const features = useMemo(() => [
     { icon: ShieldCheckIcon, title: "Non-Custodial", desc: "Your assets stay yours. Verify on any protocol's frontend." },
     { icon: BoltIcon, title: "Atomic Transactions", desc: "All operations execute in a single transaction using flash loans." },
     { icon: CurrencyDollarIcon, title: "Zero Protocol Fees", desc: "You only pay network gas and swap fees. No Kapan fees." },
     { icon: SparklesIcon, title: "Any Gas Token", desc: "Pay gas in any token with AVNU Paymaster integration." },
-  ];
+  ], []);
 
   return (
-    <div className="flex flex-col items-center gap-10 w-full max-w-4xl mx-auto px-4">
+    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-10 px-4">
       {/* Features grid - centered with consistent spacing */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 w-full max-w-2xl">
+      <div className="grid w-full max-w-2xl grid-cols-1 gap-x-12 gap-y-8 md:grid-cols-2">
         {features.map((f, i) => (
           <div key={i} className="flex gap-4 text-left">
-            <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-base-content/5 border border-base-content/5 flex items-center justify-center">
-              <f.icon className="w-5 h-5 text-base-content/60" />
+            <div className="bg-base-content/5 border-base-content/5 flex size-11 flex-shrink-0 items-center justify-center rounded-xl border">
+              <f.icon className="text-base-content/60 size-5" />
             </div>
             <div className="pt-0.5">
-              <div className="text-sm font-semibold text-base-content mb-1">{f.title}</div>
-              <div className="text-sm text-base-content/40 leading-relaxed">{f.desc}</div>
+              <div className="text-base-content mb-1 text-sm font-semibold">{f.title}</div>
+              <div className="text-base-content/40 text-sm leading-relaxed">{f.desc}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Supported networks/protocols/integrations marquees */}
-      <div className="w-full space-y-3 pt-6 border-t border-base-content/5">
+      <div className="border-base-content/5 w-full space-y-3 border-t pt-6">
         <MarqueeRow items={duplicatedNetworks} label="Networks" />
         <MarqueeRow items={duplicatedSupportedProtocols} label="Protocols" reverse />
         <MarqueeRow items={duplicatedIntegrations} label="Routers" />
@@ -201,51 +302,80 @@ const FeatureList = () => {
 };
 
 // Neon letter flicker - each letter flickers on individually
-const NeonLetter = ({ letter, delay, animate }: { letter: string; delay: number; animate: boolean }) => (
-  <motion.span
-    className="inline-block"
-    initial={{ opacity: 0 }}
-    animate={animate ? { 
-      opacity: [0, 0, 0.8, 0, 0.6, 0.1, 0.9, 0.2, 1, 0.7, 1],
-    } : { opacity: 0 }}
-    transition={{ 
-      delay,
-      duration: 0.8,
-      times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
-      ease: "linear" as const,
-    }}
-  >
-    {letter}
-  </motion.span>
-);
+const NeonLetter = ({ letter, delay, animate }: { letter: string; delay: number; animate: boolean }) => {
+  const animateValue = useMemo(() =>
+    animate ? NEON_LETTER_ANIMATE : NEON_LETTER_ANIMATE_INACTIVE,
+    [animate]
+  );
+
+  const transition = useMemo(() => ({
+    delay,
+    duration: 0.8,
+    times: NEON_LETTER_TIMES,
+    ease: "linear" as const,
+  }), [delay]);
+
+  return (
+    <motion.span
+      className="inline-block"
+      initial={NEON_LETTER_INITIAL}
+      animate={animateValue}
+      transition={transition}
+    >
+      {letter}
+    </motion.span>
+  );
+};
 
 // Final CTA section with Fallout neon sign effect
 const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
-  const letters = "KAPAN".split("");
-  
+  const letters = useMemo(() => "KAPAN".split(""), []);
+
+  const logoAnimate = useMemo(() =>
+    isActive ? LOGO_ANIMATE : LOGO_ANIMATE_INACTIVE,
+    [isActive]
+  );
+
+  const logoTransition = useMemo(() => ({
+    delay: 0.3,
+    duration: 1.2,
+    times: LOGO_TRANSITION_TIMES,
+    ease: "linear" as const,
+  }), []);
+
+  const buttonAnimate = useMemo(() =>
+    isActive ? BUTTON_FLICKER_ANIMATE : BUTTON_FLICKER_ANIMATE_INACTIVE,
+    [isActive]
+  );
+
+  const buttonTransition = useMemo(() => ({
+    delay: 3.0,
+    duration: 1.0,
+    times: BUTTON_FLICKER_TIMES,
+    ease: "linear" as const,
+  }), []);
+
+  const linksAnimate = useMemo(() =>
+    isActive ? LINKS_ANIMATE_ACTIVE : LINKS_ANIMATE_INACTIVE,
+    [isActive]
+  );
+
   return (
-    <div className="flex flex-col items-center gap-10 text-center px-4">
+    <div className="flex flex-col items-center gap-10 px-4 text-center">
       {/* Logo + KAPAN text - Fallout sign style */}
       <div className="flex flex-col items-center gap-4">
         {/* Logo flickers first */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={isActive ? { 
-            opacity: [0, 0, 0.7, 0, 0, 0.5, 0.1, 0.8, 0, 0.9, 0.3, 1, 0.8, 1],
-          } : { opacity: 0 }}
-          transition={{ 
-            delay: 0.3,
-            duration: 1.2,
-            times: [0, 0.05, 0.1, 0.18, 0.28, 0.35, 0.4, 0.5, 0.58, 0.68, 0.78, 0.88, 0.94, 1],
-            ease: "linear" as const,
-          }}
-          className="w-16 h-16 md:w-20 md:h-20 relative"
+          initial={LOGO_INITIAL}
+          animate={logoAnimate}
+          transition={logoTransition}
+          className="relative size-16 md:size-20"
         >
           <Image src="/seal-logo.png" alt="Kapan" fill className="object-contain" />
         </motion.div>
-        
+
         {/* Letters flicker on one by one */}
-        <div className="text-4xl md:text-5xl font-black tracking-[0.3em] uppercase">
+        <div className="text-4xl font-black uppercase tracking-[0.3em] md:text-5xl">
           {letters.map((letter, i) => (
             <NeonLetter key={i} letter={letter} delay={1.5 + i * 0.25} animate={isActive} />
           ))}
@@ -254,38 +384,31 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
 
       {/* Button flickers on after letters - big dramatic flicker */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={isActive ? { 
-          opacity: [0, 0, 1, 0, 0.8, 0, 1, 0.3, 1, 0.6, 1, 1],
-        } : { opacity: 0 }}
-        transition={{ 
-          delay: 3.0,
-          duration: 1.0,
-          times: [0, 0.1, 0.15, 0.22, 0.3, 0.38, 0.5, 0.6, 0.72, 0.82, 0.92, 1],
-          ease: "linear" as const,
-        }}
+        initial={BUTTON_FLICKER_INITIAL}
+        animate={buttonAnimate}
+        transition={buttonTransition}
       >
         <LaunchAppButton />
       </motion.div>
-      
+
       {/* Links slide up and fade in after button */}
-      <motion.div 
+      <motion.div
         className="flex flex-col items-center gap-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={isActive ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-        transition={{ delay: 4.2, duration: 0.6, ease: "easeOut" }}
+        initial={LINKS_INITIAL}
+        animate={linksAnimate}
+        transition={LINKS_TRANSITION}
       >
-        <div className="flex items-center gap-6 text-xs text-base-content/30">
+        <div className="text-base-content/30 flex items-center gap-6 text-xs">
           <a href="https://discord.gg/Vjk6NhkxGv" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Discord</a>
           <a href="https://t.me/+vYCKr2TrOXRiODg0" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Telegram</a>
           <a href="https://x.com/KapanFinance" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Twitter</a>
           <a href="https://github.com/StefanIliev545/kapan" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">GitHub</a>
         </div>
-        <a 
-          href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf" 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          className="text-[10px] uppercase tracking-wider text-base-content/20 hover:text-base-content/40 transition-colors"
+        <a
+          href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-base-content/20 hover:text-base-content/40 text-[10px] uppercase tracking-wider transition-colors"
         >
           Starknet Audit by Codespect
         </a>
@@ -296,67 +419,116 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
 
 // How it Works section - Kapan as orchestrator visualization
 const HowItWorks = () => {
-  // Protocols positioned around Kapan - using consistent percentage-based positioning
-  // Angles: 0=top, 45=top-right, 90=right, 135=bottom-right, 180=bottom, 225=bottom-left, 270=left, 315=top-left
-  const connectedProtocols = [
-    { name: "Aave", logo: "/logos/aave.svg", angle: 0 },
-    { name: "Morpho", logo: "/logos/morpho.svg", angle: 45 },
-    { name: "Compound", logo: "/logos/compound.svg", angle: 90 },
-    { name: "1inch", logo: "/logos/1inch.png", angle: 135 },
-    { name: "Pendle", logo: "/logos/pendle.png", angle: 180 },
-    { name: "Venus", logo: "/logos/venus.svg", angle: 225 },
-    { name: "ZeroLend", logo: "/logos/zerolend.svg", angle: 270 },
-    { name: "Nostra", logo: "/logos/nostra.svg", angle: 315 },
-  ];
-
-  // Instructions that travel to specific protocols
-  // deposit->Aave(0), borrow->Morpho(45), swap->1inch(135), swap PT->Pendle(180), repay->Venus(225), move->Nostra(315)
-  const travelingInstructions = [
-    { instruction: "deposit", angle: 0, delay: 0, color: "bg-success/20 text-success border-success/30" },
-    { instruction: "borrow", angle: 45, delay: 1.5, color: "bg-error/20 text-error border-error/30" },
-    { instruction: "swap", angle: 135, delay: 3, color: "bg-primary/20 text-primary border-primary/30" },
-    { instruction: "swap PT", angle: 180, delay: 4.5, color: "bg-warning/20 text-warning border-warning/30" },
-    { instruction: "repay", angle: 225, delay: 6, color: "bg-info/20 text-info border-info/30" },
-    { instruction: "move", angle: 315, delay: 7.5, color: "bg-secondary/20 text-secondary border-secondary/30" },
-  ];
-
   // Shared radius values - X is larger since container is wider than tall
   const radiusX = 42; // percentage from center horizontally
   const radiusY = 38; // percentage from center vertically
-  
+
   // Helper to calculate position from angle
-  const getPosition = (angle: number, radius: number = 1) => {
+  const getPosition = useCallback((angle: number, radius = 1) => {
     const radians = ((angle - 90) * Math.PI) / 180;
     return {
       x: 50 + Math.cos(radians) * radiusX * radius,
       y: 50 + Math.sin(radians) * radiusY * radius,
     };
-  };
+  }, []);
+
+  // Pre-compute all protocol data with positions, styles, and transitions
+  const protocolData = useMemo(() => {
+    const protocols = [
+      { name: "Aave", logo: "/logos/aave.svg", angle: 0 },
+      { name: "Morpho", logo: "/logos/morpho.svg", angle: 45 },
+      { name: "Compound", logo: "/logos/compound.svg", angle: 90 },
+      { name: "1inch", logo: "/logos/1inch.png", angle: 135 },
+      { name: "Pendle", logo: "/logos/pendle.png", angle: 180 },
+      { name: "Venus", logo: "/logos/venus.svg", angle: 225 },
+      { name: "ZeroLend", logo: "/logos/zerolend.svg", angle: 270 },
+      { name: "Nostra", logo: "/logos/nostra.svg", angle: 315 },
+    ];
+
+    return protocols.map((protocol, i) => {
+      const pos = getPosition(protocol.angle);
+      return {
+        ...protocol,
+        pos,
+        style: { left: `${pos.x}%`, top: `${pos.y}%` },
+        mobileTransition: { delay: 0.2 + i * 0.05 },
+        lineTransition: { delay: i * 0.1, duration: 0.5 },
+        desktopTransition: { delay: 0.3 + i * 0.08, duration: 0.4 },
+      };
+    });
+  }, [getPosition]);
+
+  // Pre-compute all traveling instruction animation data
+  const instructionAnimations = useMemo(() => {
+    const instructions = [
+      { instruction: "deposit", angle: 0, delay: 0, color: "bg-success/20 text-success border-success/30" },
+      { instruction: "borrow", angle: 45, delay: 1.5, color: "bg-error/20 text-error border-error/30" },
+      { instruction: "swap", angle: 135, delay: 3, color: "bg-primary/20 text-primary border-primary/30" },
+      { instruction: "swap PT", angle: 180, delay: 4.5, color: "bg-warning/20 text-warning border-warning/30" },
+      { instruction: "repay", angle: 225, delay: 6, color: "bg-info/20 text-info border-info/30" },
+      { instruction: "move", angle: 315, delay: 7.5, color: "bg-secondary/20 text-secondary border-secondary/30" },
+    ];
+
+    return instructions.map((item) => {
+      const endPos = getPosition(item.angle, 0.65);
+      return {
+        ...item,
+        outboundInitial: { left: "50%", top: "50%", opacity: 0 },
+        outboundAnimate: {
+          left: ["50%", "50%", `${endPos.x}%`, `${endPos.x}%`],
+          top: ["50%", "50%", `${endPos.y}%`, `${endPos.y}%`],
+          opacity: [0, 1, 1, 0],
+        },
+        outboundTransition: {
+          delay: item.delay,
+          duration: 2.5,
+          repeat: Infinity,
+          repeatDelay: 3.5,
+          times: [0, 0.1, 0.7, 1],
+          ease: "easeInOut" as const,
+        },
+        returnInitial: { left: `${endPos.x}%`, top: `${endPos.y}%`, opacity: 0 },
+        returnAnimate: {
+          left: [`${endPos.x}%`, `${endPos.x}%`, "50%", "50%"],
+          top: [`${endPos.y}%`, `${endPos.y}%`, "50%", "50%"],
+          opacity: [0, 1, 1, 0],
+        },
+        returnTransition: {
+          delay: item.delay + 2.8,
+          duration: 2.5,
+          repeat: Infinity,
+          repeatDelay: 3.5,
+          times: [0, 0.1, 0.7, 1],
+          ease: "easeInOut" as const,
+        },
+      };
+    });
+  }, [getPosition]);
 
   return (
-    <div className="flex flex-col items-center gap-10 max-w-5xl mx-auto px-4">
+    <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 px-4">
       {/* Mobile: Just Kapan logo centered */}
-      <div className="md:hidden flex flex-col items-center gap-6">
+      <div className="flex flex-col items-center gap-6 md:hidden">
         <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", bounce: 0.4, duration: 0.8 }}
+          initial={SPRING_SCALE_INITIAL}
+          animate={SPRING_SCALE_ANIMATE}
+          transition={SPRING_SCALE_TRANSITION}
         >
-          <div className="w-20 h-20 rounded-2xl bg-base-200/80 border border-base-content/20 flex items-center justify-center shadow-lg">
+          <div className="bg-base-200/80 border-base-content/20 flex size-20 items-center justify-center rounded-2xl border shadow-lg">
             <Image src="/seal-logo.png" alt="Kapan" width={48} height={48} />
           </div>
         </motion.div>
-        
+
         {/* Protocol logos in a row */}
-        <div className="flex flex-wrap items-center justify-center gap-3 max-w-xs">
-          {connectedProtocols.map((protocol, i) => (
+        <div className="flex max-w-xs flex-wrap items-center justify-center gap-3">
+          {protocolData.map((protocol) => (
             <motion.div
               key={protocol.name}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 + i * 0.05 }}
+              initial={FADE_UP_INITIAL}
+              animate={FADE_UP_ANIMATE}
+              transition={protocol.mobileTransition}
             >
-              <div className="w-8 h-8 rounded-lg bg-base-200/60 border border-base-content/10 flex items-center justify-center">
+              <div className="bg-base-200/60 border-base-content/10 flex size-8 items-center justify-center rounded-lg border">
                 <Image src={protocol.logo} alt={protocol.name} width={18} height={18} />
               </div>
             </motion.div>
@@ -365,171 +537,126 @@ const HowItWorks = () => {
       </div>
 
       {/* Desktop: Full orchestrator visualization */}
-      <div className="hidden md:flex items-center justify-center w-full">
-        <div className="relative w-full max-w-2xl h-[350px]">
+      <div className="hidden w-full items-center justify-center md:flex">
+        <div className="relative h-[350px] w-full max-w-2xl">
           {/* Connection lines using same percentage system */}
-          <svg className="absolute inset-0 w-full h-full overflow-visible">
-            {connectedProtocols.map((protocol, i) => {
-              const pos = getPosition(protocol.angle);
-              return (
-                <motion.line
-                  key={i}
-                  x1="50%"
-                  y1="50%"
-                  x2={`${pos.x}%`}
-                  y2={`${pos.y}%`}
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  className="text-base-content/10"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ delay: i * 0.1, duration: 0.5 }}
-                />
-              );
-            })}
+          <svg className="absolute inset-0 size-full overflow-visible">
+            {protocolData.map((protocol, i) => (
+              <motion.line
+                key={i}
+                x1="50%"
+                y1="50%"
+                x2={`${protocol.pos.x}%`}
+                y2={`${protocol.pos.y}%`}
+                stroke="currentColor"
+                strokeWidth="1"
+                className="text-base-content/10"
+                initial={LINE_INITIAL}
+                animate={LINE_ANIMATE}
+                transition={protocol.lineTransition}
+              />
+            ))}
           </svg>
 
           {/* Traveling instructions */}
-          {travelingInstructions.map((item, i) => {
-            const endPos = getPosition(item.angle, 0.65); // Stop at 65% of the way
-            return (
-              <React.Fragment key={i}>
-                {/* Outbound: instruction travels TO protocol */}
-                <motion.div
-                  className="absolute -translate-x-1/2 -translate-y-1/2 z-5 pointer-events-none"
-                  initial={{ left: "50%", top: "50%", opacity: 0 }}
-                  animate={{ 
-                    left: ["50%", "50%", `${endPos.x}%`, `${endPos.x}%`],
-                    top: ["50%", "50%", `${endPos.y}%`, `${endPos.y}%`],
-                    opacity: [0, 1, 1, 0],
-                  }}
-                  transition={{ 
-                    delay: item.delay,
-                    duration: 2.5,
-                    repeat: Infinity,
-                    repeatDelay: 3.5,
-                    times: [0, 0.1, 0.7, 1],
-                    ease: "easeInOut",
-                  }}
-                >
-                  <span className={`px-2 py-0.5 text-[10px] font-mono font-medium rounded border ${item.color} whitespace-nowrap`}>
-                    {item.instruction}
-                  </span>
-                </motion.div>
-                
-                {/* Return: UTXO travels back FROM protocol */}
-                <motion.div
-                  className="absolute -translate-x-1/2 -translate-y-1/2 z-5 pointer-events-none"
-                  initial={{ left: `${endPos.x}%`, top: `${endPos.y}%`, opacity: 0 }}
-                  animate={{ 
-                    left: [`${endPos.x}%`, `${endPos.x}%`, "50%", "50%"],
-                    top: [`${endPos.y}%`, `${endPos.y}%`, "50%", "50%"],
-                    opacity: [0, 1, 1, 0],
-                  }}
-                  transition={{ 
-                    delay: item.delay + 2.8,
-                    duration: 2.5,
-                    repeat: Infinity,
-                    repeatDelay: 3.5,
-                    times: [0, 0.1, 0.7, 1],
-                    ease: "easeInOut",
-                  }}
-                >
-                  <span className="px-2 py-0.5 text-[10px] font-mono font-medium rounded border bg-base-content/10 text-base-content/60 border-base-content/20 whitespace-nowrap">
-                    UTXO
-                  </span>
-                </motion.div>
-              </React.Fragment>
-            );
-          })}
+          {instructionAnimations.map((item, i) => (
+            <React.Fragment key={i}>
+              {/* Outbound: instruction travels TO protocol */}
+              <motion.div
+                className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                initial={item.outboundInitial}
+                animate={item.outboundAnimate}
+                transition={item.outboundTransition}
+              >
+                <span className={`rounded border px-2 py-0.5 font-mono text-[10px] font-medium ${item.color} whitespace-nowrap`}>
+                  {item.instruction}
+                </span>
+              </motion.div>
+
+              {/* Return: UTXO travels back FROM protocol */}
+              <motion.div
+                className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                initial={item.returnInitial}
+                animate={item.returnAnimate}
+                transition={item.returnTransition}
+              >
+                <span className="bg-base-content/10 text-base-content/60 border-base-content/20 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] font-medium">
+                  UTXO
+                </span>
+              </motion.div>
+            </React.Fragment>
+          ))}
 
           {/* Center - Kapan Router */}
-          <motion.div 
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", bounce: 0.4, duration: 0.8 }}
+          <motion.div
+            className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
+            initial={SPRING_SCALE_INITIAL}
+            animate={SPRING_SCALE_ANIMATE}
+            transition={SPRING_SCALE_TRANSITION}
           >
-            <div className="flex items-center gap-2 px-4 py-2 bg-base-100 border border-base-content/20 rounded-lg shadow-lg">
+            <div className="bg-base-100 border-base-content/20 flex items-center gap-2 rounded-lg border px-4 py-2 shadow-lg">
               <Image src="/seal-logo.png" alt="Kapan" width={24} height={24} />
-              <span className="font-bold text-sm tracking-wide">KAPAN</span>
+              <span className="text-sm font-bold tracking-wide">KAPAN</span>
             </div>
           </motion.div>
 
           {/* Surrounding protocols */}
-          {connectedProtocols.map((protocol, i) => {
-            const pos = getPosition(protocol.angle);
-            return (
-              <motion.div
-                key={protocol.name}
-                className="absolute -translate-x-1/2 -translate-y-1/2 z-20"
-                style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 + i * 0.08, duration: 0.4 }}
-              >
-                <div className="flex flex-col items-center gap-1">
-                  <div className="w-12 h-12 rounded-xl bg-base-100 border border-base-content/10 flex items-center justify-center shadow-md">
-                    <Image src={protocol.logo} alt={protocol.name} width={28} height={28} />
-                  </div>
-                  <span className="text-[10px] text-base-content/40 font-medium">{protocol.name}</span>
+          {protocolData.map((protocol) => (
+            <motion.div
+              key={protocol.name}
+              className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
+              style={protocol.style}
+              initial={FADE_UP_INITIAL}
+              animate={FADE_UP_ANIMATE}
+              transition={protocol.desktopTransition}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <div className="bg-base-100 border-base-content/10 flex size-12 items-center justify-center rounded-xl border shadow-md">
+                  <Image src={protocol.logo} alt={protocol.name} width={28} height={28} />
                 </div>
-              </motion.div>
-            );
-          })}
+                <span className="text-base-content/40 text-[10px] font-medium">{protocol.name}</span>
+              </div>
+            </motion.div>
+          ))}
         </div>
       </div>
 
       {/* Explanation text */}
-      <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 text-center">
-        <motion.div 
+      <div className="flex flex-col items-center justify-center gap-8 text-center md:flex-row md:gap-16">
+        <motion.div
           className="max-w-[200px]"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
+          initial={STEP_01_INITIAL}
+          animate={STEP_01_ANIMATE}
+          transition={STEP_01_TRANSITION}
         >
-          <div className="text-[10px] uppercase tracking-widest text-primary mb-1">01</div>
-          <div className="text-sm font-medium mb-1">Bundle Instructions</div>
-          <div className="text-xs text-base-content/40">Combine deposit, borrow, swap, and repay into one bundle.</div>
+          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">01</div>
+          <div className="mb-1 text-sm font-medium">Bundle Instructions</div>
+          <div className="text-base-content/40 text-xs">Combine deposit, borrow, swap, and repay into one bundle.</div>
         </motion.div>
-        <motion.div 
+        <motion.div
           className="max-w-[200px]"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.95 }}
+          initial={STEP_01_INITIAL}
+          animate={STEP_01_ANIMATE}
+          transition={STEP_02_TRANSITION}
         >
-          <div className="text-[10px] uppercase tracking-widest text-primary mb-1">02</div>
-          <div className="text-sm font-medium mb-1">Flash Loan Powered</div>
-          <div className="text-xs text-base-content/40">No upfront capital needed. Borrow, execute, repay atomically.</div>
+          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">02</div>
+          <div className="mb-1 text-sm font-medium">Flash Loan Powered</div>
+          <div className="text-base-content/40 text-xs">No upfront capital needed. Borrow, execute, repay atomically.</div>
         </motion.div>
-        <motion.div 
+        <motion.div
           className="max-w-[200px]"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1 }}
+          initial={STEP_01_INITIAL}
+          animate={STEP_01_ANIMATE}
+          transition={STEP_03_TRANSITION}
         >
-          <div className="text-[10px] uppercase tracking-widest text-primary mb-1">03</div>
-          <div className="text-sm font-medium mb-1">All or Nothing</div>
-          <div className="text-xs text-base-content/40">Transaction succeeds completely or reverts. No partial states.</div>
+          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">03</div>
+          <div className="mb-1 text-sm font-medium">All or Nothing</div>
+          <div className="text-base-content/40 text-xs">Transaction succeeds completely or reverts. No partial states.</div>
         </motion.div>
       </div>
     </div>
   );
 };
-
-// Wrapper to add fade effect to real components
-const FadedPreview = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <div className={`relative w-full max-w-6xl mx-auto px-4 ${className}`}>
-    <div className="pointer-events-none">
-      {children}
-    </div>
-    {/* Fade overlay on bottom */}
-    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-base-100 to-transparent pointer-events-none" />
-    {/* Fade overlay on sides */}
-    <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-base-100 to-transparent pointer-events-none" />
-    <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-base-100 to-transparent pointer-events-none" />
-  </div>
-);
 
 // Tooltip wrapper using Radix UI for professional look
 const MockTooltip = ({ children, tip }: { children: React.ReactNode; tip: string }) => (
@@ -538,13 +665,31 @@ const MockTooltip = ({ children, tip }: { children: React.ReactNode; tip: string
   </Tooltip>
 );
 
+// Icon components for MockActionButton
+type MockActionIconType = "plus" | "minus" | "arrow-right" | "x-mark";
+
+const MockActionIcon = ({ type }: { type: MockActionIconType }) => {
+  switch (type) {
+    case "plus":
+      return <PlusIcon className="size-3.5" />;
+    case "minus":
+      return <MinusIcon className="size-3.5" />;
+    case "arrow-right":
+      return <ArrowRightIcon className="size-3.5" />;
+    case "x-mark":
+      return <XMarkIcon className="size-3.5" />;
+    default:
+      return null;
+  }
+};
+
 // Mock action button matching real SegmentedActionBar style
-const MockActionButton = ({ icon, label, tip }: { icon: React.ReactNode; label: string; tip: string }) => (
+const MockActionButton = ({ iconType, label, tip }: { iconType: MockActionIconType; label: string; tip: string }) => (
   <Tooltip content={tip} delayDuration={100}>
-    <button 
-      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-base-content/50 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-help"
+    <button
+      className="text-base-content/50 hover:text-base-content/70 hover:bg-base-content/5 flex flex-1 cursor-help items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors"
     >
-      {icon}
+      <MockActionIcon type={iconType} />
       <span>{label}</span>
     </button>
   </Tooltip>
@@ -552,14 +697,14 @@ const MockActionButton = ({ icon, label, tip }: { icon: React.ReactNode; label: 
 
 // Mock Morpho Blue protocol view - matches real dashboard layout with mobile responsiveness
 const MockMorphoView = () => (
-  <div className="w-full flex flex-col p-2 sm:p-3 space-y-2">
+  <div className="flex w-full flex-col space-y-2 p-2 sm:p-3">
     {/* Protocol Header Card */}
-    <div className="card bg-base-200/40 shadow-lg rounded-xl border border-base-300/50">
-      <div className="card-body px-3 sm:px-5 py-2 sm:py-3">
+    <div className="card-surface shadow-lg">
+      <div className="card-body px-3 py-2 sm:px-5 sm:py-3">
         {/* Mobile Protocol Header */}
-        <div className="flex md:hidden items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 md:hidden">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 flex items-center justify-center ring-1 ring-base-300/30">
+            <div className="token-icon-wrapper-md">
               <Image src="/logos/morpho.svg" alt="Morpho Blue" width={18} height={18} className="object-contain" />
             </div>
             <span className="text-sm font-bold">Morpho Blue</span>
@@ -575,54 +720,54 @@ const MockMorphoView = () => (
         </div>
 
         {/* Desktop Protocol Header */}
-        <div className="hidden md:flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="hidden flex-wrap items-center gap-x-6 gap-y-4 md:flex">
           <MockTooltip tip="The lending protocol where this position lives">
-            <div className="flex items-center gap-3 cursor-help">
-              <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+            <div className="flex cursor-help items-center gap-3">
+              <div className="token-icon-wrapper-lg">
                 <Image src="/logos/morpho.svg" alt="Morpho Blue" width={24} height={24} className="object-contain drop-shadow-sm" />
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+                <span className="label-text-xs-semibold">Protocol</span>
                 <span className="text-base font-bold tracking-tight">Morpho Blue</span>
               </div>
             </div>
           </MockTooltip>
-          <div className="w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
-          <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
+          <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
+          <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
             <MockTooltip tip="Total value of your positions (collateral minus debt)">
-              <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
-                <span className="text-sm font-mono font-bold tabular-nums text-success">$6.55K</span>
+              <div className="flex cursor-help flex-col items-center gap-1 px-3 py-1">
+                <span className="label-text-xs-semibold">Balance</span>
+                <span className="text-success font-mono text-sm font-bold tabular-nums">$6.55K</span>
               </div>
             </MockTooltip>
             <MockTooltip tip="Estimated earnings over the last 30 days">
-              <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
-                <span className="text-sm font-mono font-bold tabular-nums text-success">$241.28</span>
+              <div className="flex cursor-help flex-col items-center gap-1 px-3 py-1">
+                <span className="label-text-xs-semibold">30D Yield</span>
+                <span className="text-success font-mono text-sm font-bold tabular-nums">$241.28</span>
               </div>
             </MockTooltip>
             <MockTooltip tip="Net APY: supply yield minus borrow cost">
-              <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
-                <span className="text-sm font-mono font-bold tabular-nums text-success">+44.79%</span>
+              <div className="flex cursor-help flex-col items-center gap-1 px-3 py-1">
+                <span className="label-text-xs-semibold">Net APY</span>
+                <span className="text-success font-mono text-sm font-bold tabular-nums">+44.79%</span>
               </div>
             </MockTooltip>
             <MockTooltip tip="How much of your borrowing capacity you're using">
-              <div className="flex flex-col gap-1 items-center px-3 py-1 cursor-help">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
+              <div className="flex cursor-help flex-col items-center gap-1 px-3 py-1">
+                <span className="label-text-xs-semibold">Utilization</span>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
-                    <div className="h-full bg-error rounded-full w-[90%]" />
+                  <div className="bg-base-300/60 h-1.5 w-24 overflow-hidden rounded-full">
+                    <div className="bg-error h-full w-[90%] rounded-full" />
                   </div>
-                  <span className="text-xs font-mono font-semibold tabular-nums text-error">90%</span>
+                  <span className="text-error font-mono text-xs font-semibold tabular-nums">90%</span>
                 </div>
               </div>
             </MockTooltip>
           </div>
           <MockTooltip tip="View available markets on this protocol">
-            <div className="flex items-center gap-1 text-xs text-base-content/50 cursor-help border border-base-content/20 rounded px-2 py-1">
+            <div className="text-base-content/50 border-base-content/20 flex cursor-help items-center gap-1 rounded border px-2 py-1 text-xs">
               <span>Markets</span>
-              <ChevronDownIcon className="w-4 h-4" />
+              <ChevronDownIcon className="size-4" />
             </div>
           </MockTooltip>
         </div>
@@ -630,32 +775,32 @@ const MockMorphoView = () => (
     </div>
 
     {/* YOUR POSITIONS section */}
-    <div className="card bg-base-200/40 shadow-md rounded-xl border border-base-300/50">
-      <div className="card-body p-3 sm:p-4 space-y-2 sm:space-y-3">
+    <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-md">
+      <div className="card-body space-y-2 p-3 sm:space-y-3 sm:p-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-4 sm:h-5 rounded-full bg-primary" />
-            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-widest text-base-content/60">Your Positions</span>
+            <div className="bg-primary h-4 w-1 rounded-full sm:h-5" />
+            <span className="text-base-content/60 text-[10px] font-semibold uppercase tracking-widest sm:text-[11px]">Your Positions</span>
           </div>
           <MockTooltip tip="Number of active markets you have positions in">
-            <div className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-primary/10 text-primary cursor-help">
-              <span className="text-[10px] sm:text-xs font-mono font-bold">1</span>
-              <span className="text-[8px] sm:text-[10px] uppercase tracking-wider opacity-70">market</span>
+            <div className="bg-primary/10 text-primary flex cursor-help items-center gap-1 rounded-full px-1.5 py-0.5 sm:px-2">
+              <span className="font-mono text-[10px] font-bold sm:text-xs">1</span>
+              <span className="text-[8px] uppercase tracking-wider opacity-70 sm:text-[10px]">market</span>
             </div>
           </MockTooltip>
         </div>
 
         {/* Market pair - expanded view */}
-        <div className="rounded-lg border border-primary/30 overflow-hidden ring-1 ring-primary/10">
+        <div className="border-primary/30 ring-primary/10 overflow-hidden rounded-lg border ring-1">
           {/* Market pair header - Mobile */}
-          <div className="flex md:hidden items-center justify-between bg-base-200/50 px-3 py-2 border-b border-base-300">
+          <div className="bg-base-200/50 border-base-300 flex items-center justify-between border-b px-3 py-2 md:hidden">
             <div className="flex items-center gap-2">
               <div className="flex -space-x-1">
-                <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={18} height={18} className="rounded-full border border-base-200 bg-base-200" />
-                <Image src="/logos/usdc.svg" alt="USDC" width={18} height={18} className="rounded-full border border-base-200 bg-base-200" />
+                <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={18} height={18} className="border-base-200 bg-base-200 rounded-full border" />
+                <Image src="/logos/usdc.svg" alt="USDC" width={18} height={18} className="border-base-200 bg-base-200 rounded-full border" />
               </div>
-              <span className="text-xs font-semibold truncate max-w-[120px]">PT-USDai/USDC</span>
+              <span className="max-w-[120px] truncate text-xs font-semibold">PT-USDai/USDC</span>
             </div>
             <div className="flex items-center gap-2 text-[10px]">
               <span className="text-success font-mono">$6.55K</span>
@@ -664,13 +809,13 @@ const MockMorphoView = () => (
           </div>
 
           {/* Market pair header - Desktop */}
-          <div className="hidden md:flex items-center justify-between bg-base-200/50 px-4 py-2.5 border-b border-base-300">
+          <div className="bg-base-200/50 border-base-300 hidden items-center justify-between border-b px-4 py-2.5 md:flex">
             <div className="flex items-center gap-3">
               <MockTooltip tip="Isolated lending market: PT-USDai collateral, USDC debt">
-                <div className="flex items-center gap-3 cursor-help">
+                <div className="flex cursor-help items-center gap-3">
                   <div className="flex -space-x-1.5">
-                    <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={22} height={22} className="rounded-full border-2 border-base-200 bg-base-200" />
-                    <Image src="/logos/usdc.svg" alt="USDC" width={22} height={22} className="rounded-full border-2 border-base-200 bg-base-200" />
+                    <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={22} height={22} className="border-base-200 bg-base-200 rounded-full border-2" />
+                    <Image src="/logos/usdc.svg" alt="USDC" width={22} height={22} className="border-base-200 bg-base-200 rounded-full border-2" />
                   </div>
                   <span className="text-sm font-semibold">PT-USDai-19FEB2026/USDC</span>
                 </div>
@@ -679,7 +824,7 @@ const MockMorphoView = () => (
                 <Image src="/logos/morpho.svg" alt="Morpho" width={14} height={14} />
                 <MockTooltip tip="View on Morpho">
                   <a href="#" className="text-base-content/40 hover:text-base-content/60">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                    <svg className="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                   </a>
                 </MockTooltip>
               </div>
@@ -701,153 +846,153 @@ const MockMorphoView = () => (
           </div>
 
           {/* Mobile: Stacked layout */}
-          <div className="md:hidden bg-base-200/20">
+          <div className="bg-base-200/20 md:hidden">
             {/* Collateral */}
-            <div className="px-3 py-2 border-b border-base-300/50">
+            <div className="border-base-300/50 border-b px-3 py-2">
               <div className="flex items-center gap-2">
                 <div className="relative flex-shrink-0">
                   <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={28} height={28} className="rounded-full" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[9px] text-base-content/40 uppercase tracking-wider">Collateral</div>
-                  <div className="font-medium text-xs truncate">PT-USDai-1...</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-base-content/40 text-[9px] uppercase tracking-wider">Collateral</div>
+                  <div className="truncate text-xs font-medium">PT-USDai-1...</div>
                 </div>
                 <div className="flex items-center gap-3 text-right">
                   <div>
-                    <div className="text-[8px] text-base-content/40 uppercase">Bal</div>
-                    <div className="text-xs font-mono font-semibold text-success">$63.8K</div>
+                    <div className="text-base-content/40 text-[8px] uppercase">Bal</div>
+                    <div className="text-success font-mono text-xs font-semibold">$63.8K</div>
                   </div>
                   <div>
-                    <div className="text-[8px] text-base-content/40 uppercase">APY</div>
-                    <div className="text-xs font-mono font-semibold">7.46%</div>
+                    <div className="text-base-content/40 text-[8px] uppercase">APY</div>
+                    <div className="font-mono text-xs font-semibold">7.46%</div>
                   </div>
                 </div>
               </div>
               {/* Mobile action buttons */}
-              <div className="flex items-center gap-1 mt-2">
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">+ Deposit</button>
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">- Withdraw</button>
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">Move</button>
+              <div className="mt-2 flex items-center gap-1">
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">+ Deposit</button>
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">- Withdraw</button>
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">Move</button>
               </div>
             </div>
             {/* Debt */}
             <div className="px-3 py-2">
               <div className="flex items-center gap-2">
-                <Image src="/logos/usdc.svg" alt="USDC" width={28} height={28} className="rounded-full flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[9px] text-base-content/40 uppercase tracking-wider">Debt</div>
-                  <div className="font-medium text-xs">USDC</div>
+                <Image src="/logos/usdc.svg" alt="USDC" width={28} height={28} className="flex-shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-base-content/40 text-[9px] uppercase tracking-wider">Debt</div>
+                  <div className="text-xs font-medium">USDC</div>
                 </div>
                 <div className="flex items-center gap-3 text-right">
                   <div>
-                    <div className="text-[8px] text-base-content/40 uppercase">Bal</div>
-                    <div className="text-xs font-mono font-semibold text-error">-$57.3K</div>
+                    <div className="text-base-content/40 text-[8px] uppercase">Bal</div>
+                    <div className="text-error font-mono text-xs font-semibold">-$57.3K</div>
                   </div>
                   <div>
-                    <div className="text-[8px] text-base-content/40 uppercase">APR</div>
-                    <div className="text-xs font-mono font-semibold">3.19%</div>
+                    <div className="text-base-content/40 text-[8px] uppercase">APR</div>
+                    <div className="font-mono text-xs font-semibold">3.19%</div>
                   </div>
                 </div>
               </div>
               {/* Mobile action buttons */}
-              <div className="flex items-center gap-1 mt-2">
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">- Repay</button>
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">+ Borrow</button>
-                <button className="flex-1 text-[10px] text-base-content/50 py-1 hover:bg-base-content/5 rounded">Move</button>
+              <div className="mt-2 flex items-center gap-1">
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">- Repay</button>
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">+ Borrow</button>
+                <button className="text-base-content/50 hover:bg-base-content/5 flex-1 rounded py-1 text-[10px]">Move</button>
               </div>
             </div>
           </div>
 
           {/* Desktop: Two-column layout */}
-          <div className="hidden md:grid grid-cols-2 divide-x divide-base-300">
+          <div className="divide-base-300 hidden grid-cols-2 divide-x md:grid">
             {/* Collateral side */}
             <div className="bg-base-200/20">
               {/* Using 12-col grid like real app: token=3, stats=8, chevron=1 */}
-              <div className="grid grid-cols-12 items-center px-4 py-3 border-b border-base-300/50">
+              <div className="border-base-300/50 grid grid-cols-12 items-center border-b px-4 py-3">
                 {/* Token - col-span-3 */}
-                <div className="col-span-3 flex items-center gap-2 min-w-0">
+                <div className="col-span-3 flex min-w-0 items-center gap-2">
                   <MockTooltip tip="Pendle Principal Token - fixed yield until maturity">
-                    <div className="relative cursor-help flex-shrink-0">
+                    <div className="relative flex-shrink-0 cursor-help">
                       <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={36} height={36} className="rounded-full" />
-                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-base-200 border border-base-300 flex items-center justify-center">
+                      <div className="bg-base-200 border-base-300 absolute -bottom-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full border">
                         <Image src="/logos/pendle.png" alt="Pendle" width={10} height={10} />
                       </div>
                     </div>
                   </MockTooltip>
                   <div className="min-w-0">
-                    <div className="font-medium text-sm truncate">PT-USDai-1...</div>
+                    <div className="truncate text-sm font-medium">PT-USDai-1...</div>
                   </div>
                 </div>
                 {/* Stats - col-span-9, evenly distributed */}
                 <div className="col-span-9 grid grid-cols-4 gap-0">
                   <MockTooltip tip="Total collateral value">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">Balance</div>
-                      <div className="text-sm font-mono font-semibold text-success">$63.83K</div>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Balance</div>
+                      <div className="text-success font-mono text-sm font-semibold">$63.83K</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Current yield rate">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">APY</div>
-                      <div className="text-sm font-mono font-semibold">7.46%</div>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">APY</div>
+                      <div className="font-mono text-sm font-semibold">7.46%</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Best available rate across protocols">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">Best APY</div>
-                      <div className="flex items-center gap-1 justify-center">
-                        <span className="text-sm font-mono font-semibold text-success">7.46%</span>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Best APY</div>
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-success font-mono text-sm font-semibold">7.46%</span>
                         <Image src="/logos/morpho.svg" alt="Morpho" width={12} height={12} />
                       </div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Loan-to-Value ratio">
-                    <div className="text-center cursor-help px-2">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">LTV</div>
-                      <div className="text-sm font-mono font-semibold text-warning">89.7%</div>
+                    <div className="cursor-help px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">LTV</div>
+                      <div className="text-warning font-mono text-sm font-semibold">89.7%</div>
                     </div>
                   </MockTooltip>
                 </div>
               </div>
-              <div className="flex items-stretch divide-x divide-base-300/30">
-                <MockActionButton icon={<PlusIcon className="w-3.5 h-3.5" />} label="Deposit" tip="Add more collateral to reduce liquidation risk" />
-                <MockActionButton icon={<MinusIcon className="w-3.5 h-3.5" />} label="Withdraw" tip="Remove collateral from your position" />
-                <MockActionButton icon={<ArrowRightIcon className="w-3.5 h-3.5" />} label="Move" tip="Move collateral to another protocol" />
+              <div className="divide-base-300/30 flex items-stretch divide-x">
+                <MockActionButton iconType="plus" label="Deposit" tip="Add more collateral to reduce liquidation risk" />
+                <MockActionButton iconType="minus" label="Withdraw" tip="Remove collateral from your position" />
+                <MockActionButton iconType="arrow-right" label="Move" tip="Move collateral to another protocol" />
               </div>
             </div>
 
             {/* Debt side */}
             <div className="bg-base-200/20">
               {/* Using 12-col grid: token=3, stats=8, chevron=1 */}
-              <div className="grid grid-cols-12 items-center px-4 py-3 border-b border-base-300/50">
+              <div className="border-base-300/50 grid grid-cols-12 items-center border-b px-4 py-3">
                 {/* Token - col-span-3 */}
-                <div className="col-span-3 flex items-center gap-2 min-w-0">
+                <div className="col-span-3 flex min-w-0 items-center gap-2">
                   <MockTooltip tip="USDC stablecoin borrowed against collateral">
-                    <Image src="/logos/usdc.svg" alt="USDC" width={36} height={36} className="rounded-full cursor-help flex-shrink-0" />
+                    <Image src="/logos/usdc.svg" alt="USDC" width={36} height={36} className="flex-shrink-0 cursor-help rounded-full" />
                   </MockTooltip>
                   <div className="min-w-0">
-                    <div className="font-medium text-sm">USDC</div>
+                    <div className="text-sm font-medium">USDC</div>
                   </div>
                 </div>
                 {/* Stats - col-span-8, evenly distributed */}
                 <div className="col-span-8 grid grid-cols-3 gap-0">
                   <MockTooltip tip="Total debt owed">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">Balance</div>
-                      <div className="text-sm font-mono font-semibold text-error">-$57.28K</div>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Balance</div>
+                      <div className="text-error font-mono text-sm font-semibold">-$57.28K</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Current borrow rate">
-                    <div className="text-center cursor-help px-2 border-r border-base-300/30">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">APR</div>
-                      <div className="text-sm font-mono font-semibold">3.19%</div>
+                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">APR</div>
+                      <div className="font-mono text-sm font-semibold">3.19%</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Best available borrow rate">
-                    <div className="text-center cursor-help px-2">
-                      <div className="text-[10px] text-base-content/40 uppercase tracking-wider">Best APR</div>
-                      <div className="flex items-center gap-1 justify-center">
-                        <span className="text-sm font-mono font-semibold text-success">3.72%</span>
+                    <div className="cursor-help px-2 text-center">
+                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Best APR</div>
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-success font-mono text-sm font-semibold">3.72%</span>
                         <Image src="/logos/aave.svg" alt="Aave" width={12} height={12} />
                       </div>
                     </div>
@@ -856,17 +1001,17 @@ const MockMorphoView = () => (
                 {/* Chevron - col-span-1 */}
                 <div className="col-span-1 flex justify-end">
                   <MockTooltip tip="Collapse position details">
-                    <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-base-300/30 cursor-help">
-                      <ChevronUpIcon className="w-4 h-4 text-base-content/50" />
+                    <div className="bg-base-300/30 flex size-8 cursor-help items-center justify-center rounded-lg">
+                      <ChevronUpIcon className="text-base-content/50 size-4" />
                     </div>
                   </MockTooltip>
                 </div>
               </div>
-              <div className="flex items-stretch divide-x divide-base-300/30">
-                <MockActionButton icon={<MinusIcon className="w-3.5 h-3.5" />} label="Repay" tip="Pay back debt to reduce interest costs" />
-                <MockActionButton icon={<PlusIcon className="w-3.5 h-3.5" />} label="Borrow" tip="Borrow more against your collateral" />
-                <MockActionButton icon={<ArrowRightIcon className="w-3.5 h-3.5" />} label="Move" tip="Move debt to another protocol" />
-                <MockActionButton icon={<XMarkIcon className="w-3.5 h-3.5" />} label="Close" tip="Close entire position" />
+              <div className="divide-base-300/30 flex items-stretch divide-x">
+                <MockActionButton iconType="minus" label="Repay" tip="Pay back debt to reduce interest costs" />
+                <MockActionButton iconType="plus" label="Borrow" tip="Borrow more against your collateral" />
+                <MockActionButton iconType="arrow-right" label="Move" tip="Move debt to another protocol" />
+                <MockActionButton iconType="x-mark" label="Close" tip="Close entire position" />
               </div>
             </div>
           </div>
@@ -878,13 +1023,13 @@ const MockMorphoView = () => (
 
 // Mock Aave header only (fades into darkness)
 const MockAaveHeader = () => (
-  <div className="w-full flex flex-col p-2 sm:p-3">
-    <div className="card bg-base-200/40 shadow-lg rounded-xl border border-base-300/50">
-      <div className="card-body px-3 sm:px-5 py-2 sm:py-3">
+  <div className="flex w-full flex-col p-2 sm:p-3">
+    <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-lg">
+      <div className="card-body px-3 py-2 sm:px-5 sm:py-3">
         {/* Mobile */}
-        <div className="flex md:hidden items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 md:hidden">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 relative rounded-lg bg-gradient-to-br from-base-200 to-base-300/50 p-1.5 flex items-center justify-center ring-1 ring-base-300/30">
+            <div className="from-base-200 to-base-300/50 ring-base-300/30 relative flex size-8 items-center justify-center rounded-lg bg-gradient-to-br p-1.5 ring-1">
               <Image src="/logos/aave.svg" alt="Aave V3" width={18} height={18} className="object-contain" />
             </div>
             <span className="text-sm font-bold">Aave V3</span>
@@ -896,43 +1041,43 @@ const MockAaveHeader = () => (
         </div>
 
         {/* Desktop */}
-        <div className="hidden md:flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="hidden flex-wrap items-center gap-x-6 gap-y-4 md:flex">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+            <div className="from-base-200 to-base-300/50 ring-base-300/30 relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br p-2 shadow-sm ring-1">
               <Image src="/logos/aave.svg" alt="Aave V3" width={24} height={24} className="object-contain drop-shadow-sm" />
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Protocol</span>
               <span className="text-base font-bold tracking-tight">Aave V3</span>
             </div>
           </div>
-          <div className="w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
-          <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
-            <div className="flex flex-col gap-1 items-center px-3 py-1">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
-              <span className="text-sm font-mono font-bold tabular-nums text-success">$2,356.66</span>
+          <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
+          <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
+            <div className="flex flex-col items-center gap-1 px-3 py-1">
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Balance</span>
+              <span className="text-success font-mono text-sm font-bold tabular-nums">$2,356.66</span>
             </div>
-            <div className="flex flex-col gap-1 items-center px-3 py-1">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
-              <span className="text-sm font-mono font-bold tabular-nums text-error">-$7.45</span>
+            <div className="flex flex-col items-center gap-1 px-3 py-1">
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">30D Yield</span>
+              <span className="text-error font-mono text-sm font-bold tabular-nums">-$7.45</span>
             </div>
-            <div className="flex flex-col gap-1 items-center px-3 py-1">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
-              <span className="text-sm font-mono font-bold tabular-nums text-error">-3.85%</span>
+            <div className="flex flex-col items-center gap-1 px-3 py-1">
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Net APY</span>
+              <span className="text-error font-mono text-sm font-bold tabular-nums">-3.85%</span>
             </div>
-            <div className="flex flex-col gap-1 items-center px-3 py-1">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Utilization</span>
+            <div className="flex flex-col items-center gap-1 px-3 py-1">
+              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Utilization</span>
               <div className="flex items-center gap-2.5">
-                <div className="w-24 h-1.5 bg-base-300/60 rounded-full overflow-hidden">
-                  <div className="h-full bg-warning rounded-full w-[81%]" />
+                <div className="bg-base-300/60 h-1.5 w-24 overflow-hidden rounded-full">
+                  <div className="bg-warning h-full w-[81%] rounded-full" />
                 </div>
-                <span className="text-xs font-mono font-semibold tabular-nums text-warning">81%</span>
+                <span className="text-warning font-mono text-xs font-semibold tabular-nums">81%</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1 text-xs text-base-content/50">
+          <div className="text-base-content/50 flex items-center gap-1 text-xs">
             <span>Markets</span>
-            <ChevronDownIcon className="w-4 h-4" />
+            <ChevronDownIcon className="size-4" />
           </div>
         </div>
       </div>
@@ -942,85 +1087,104 @@ const MockAaveHeader = () => (
 
 // Dashboard preview - Morpho with positions, Aave header fading out
 const DashboardPreview = () => (
-  <div className="relative w-full max-w-5xl mx-auto">
+  <div className="relative mx-auto w-full max-w-5xl">
     <MockMorphoView />
     <div className="pointer-events-none">
       <MockAaveHeader />
     </div>
     {/* Fade overlay on bottom */}
-    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-base-100 via-base-100/90 to-transparent pointer-events-none" />
+    <div className="from-base-100 via-base-100/90 pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t to-transparent" />
   </div>
 );
 
 // Animated flow component - shows the transaction being built
-const FlowStep = ({ 
-  children, 
+const FlowStep = ({
+  children,
   delay = 0,
-  isActive = true 
-}: { 
-  children: React.ReactNode; 
+  isActive = true
+}: {
+  children: React.ReactNode;
   delay?: number;
   isActive?: boolean;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={isActive ? { opacity: 1, y: 0 } : { opacity: 0.3, y: 0 }}
-    transition={{ delay, duration: 0.4, ease: "easeOut" }}
-    className="flex-shrink-0"
-  >
-    {children}
-  </motion.div>
-);
+}) => {
+  const animate = useMemo(() =>
+    isActive ? FLOW_STEP_ANIMATE_ACTIVE : FLOW_STEP_ANIMATE_INACTIVE,
+    [isActive]
+  );
+
+  const transition = useMemo(() =>
+    ({ delay, duration: 0.4, ease: "easeOut" as const }),
+    [delay]
+  );
+
+  return (
+    <motion.div
+      initial={FLOW_STEP_INITIAL}
+      animate={animate}
+      transition={transition}
+      className="flex-shrink-0"
+    >
+      {children}
+    </motion.div>
+  );
+};
 
 // Horizontal flow step for desktop
-const HFlowStep = ({ 
-  children, 
+const HFlowStep = ({
+  children,
   delay = 0,
-}: { 
-  children: React.ReactNode; 
+}: {
+  children: React.ReactNode;
   delay?: number;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, x: -10 }}
-    animate={{ opacity: 1, x: 0 }}
-    transition={{ delay, duration: 0.4, ease: "easeOut" }}
-    className="flex-shrink-0"
-  >
-    {children}
-  </motion.div>
-);
+}) => {
+  const transition = useMemo(() =>
+    ({ delay, duration: 0.4, ease: "easeOut" as const }),
+    [delay]
+  );
+
+  return (
+    <motion.div
+      initial={HFLOW_STEP_INITIAL}
+      animate={HFLOW_STEP_ANIMATE}
+      transition={transition}
+      className="flex-shrink-0"
+    >
+      {children}
+    </motion.div>
+  );
+};
 
 // Token display - minimal, elegant
-const TokenDisplay = ({ 
-  logo, 
-  symbol, 
-  amount, 
+const TokenDisplay = ({
+  logo,
+  symbol,
+  amount,
   label,
   variant = "default",
   size = "md"
-}: { 
-  logo: string; 
-  symbol: string; 
+}: {
+  logo: string;
+  symbol: string;
   amount?: string;
   label?: string;
   variant?: "default" | "success" | "error";
   size?: "sm" | "md" | "lg";
 }) => {
-  const sizes = {
+  const sizes = useMemo(() => ({
     sm: { img: 24, amount: "text-base", symbol: "text-xs" },
     md: { img: 32, amount: "text-lg", symbol: "text-sm" },
     lg: { img: 40, amount: "text-xl", symbol: "text-base" },
-  };
+  }), []);
   const s = sizes[size];
   return (
     <div className="flex items-center gap-3">
       <Image src={logo} alt={symbol} width={s.img} height={s.img} className="rounded-full" />
       <div>
-        {label && <div className="text-[10px] uppercase tracking-wider text-base-content/30">{label}</div>}
+        {label && <div className="text-base-content/30 text-[10px] uppercase tracking-wider">{label}</div>}
         <div className="flex items-baseline gap-2">
           <span className={`font-mono ${s.amount} ${
-            variant === "success" ? "text-success" : 
-            variant === "error" ? "text-error" : 
+            variant === "success" ? "text-success" :
+            variant === "error" ? "text-error" :
             "text-base-content"
           }`}>
             {amount}
@@ -1034,11 +1198,11 @@ const TokenDisplay = ({
 
 // Protocol badge - clean, minimal
 const ProtocolBadge = ({ logo, name, size = "md" }: { logo: string; name: string; size?: "sm" | "md" | "lg" }) => {
-  const sizes = {
+  const sizes = useMemo(() => ({
     sm: { img: 20, text: "text-xs" },
     md: { img: 28, text: "text-sm" },
     lg: { img: 36, text: "text-base" },
-  };
+  }), []);
   const s = sizes[size];
   return (
     <div className="flex items-center gap-2">
@@ -1049,50 +1213,58 @@ const ProtocolBadge = ({ logo, name, size = "md" }: { logo: string; name: string
 };
 
 // Rate comparison - dramatic
-const RateDisplay = ({ 
-  oldRate, 
-  newRate, 
+const RateDisplay = ({
+  oldRate,
+  newRate,
   label = "APR",
   size = "lg"
-}: { 
-  oldRate?: string; 
-  newRate: string; 
+}: {
+  oldRate?: string;
+  newRate: string;
   label?: string;
   size?: "md" | "lg";
 }) => (
   <div className={`flex items-baseline gap-3 ${size === "md" ? "" : ""}`}>
-    <span className="text-xs uppercase tracking-wider text-base-content/30">{label}</span>
+    <span className="text-base-content/30 text-xs uppercase tracking-wider">{label}</span>
     {oldRate && (
-      <span className="text-base-content/30 line-through font-mono">{oldRate}</span>
+      <span className="text-base-content/30 font-mono line-through">{oldRate}</span>
     )}
-    <span className={`font-bold text-success font-mono ${size === "lg" ? "text-2xl sm:text-3xl" : "text-xl"}`}>{newRate}</span>
+    <span className={`text-success font-mono font-bold ${size === "lg" ? "text-2xl sm:text-3xl" : "text-xl"}`}>{newRate}</span>
   </div>
 );
 
 // Animated arrow for horizontal flow
-const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?: boolean }) => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ delay, duration: 0.3 }}
-    className={`flex items-center justify-center ${vertical ? "py-2" : "px-4"}`}
-  >
+const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?: boolean }) => {
+  const transition = useMemo(() => ({ delay, duration: 0.3 }), [delay]);
+  const arrowAnimate = useMemo(() =>
+    vertical ? FLOW_ARROW_VERTICAL : FLOW_ARROW_HORIZONTAL,
+    [vertical]
+  );
+
+  return (
     <motion.div
-      animate={vertical ? { y: [0, 3, 0] } : { x: [0, 3, 0] }}
-      transition={{ duration: 1.2, repeat: Infinity }}
+      initial={FLOW_ARROW_INITIAL}
+      animate={FLOW_ARROW_ANIMATE}
+      transition={transition}
+      className={`flex items-center justify-center ${vertical ? "py-2" : "px-4"}`}
     >
-      <ArrowRightIcon className={`w-5 h-5 text-base-content/20 ${vertical ? "rotate-90" : ""}`} />
+      <motion.div
+        animate={arrowAnimate}
+        transition={FLOW_ARROW_TRANSITION}
+      >
+        <ArrowRightIcon className={`text-base-content/20 size-5${vertical ? "rotate-90" : ""}`} />
+      </motion.div>
     </motion.div>
-  </motion.div>
-);
+  );
+};
 
 // Action content wrapper - horizontal on desktop, vertical on mobile
 const ActionContent = ({ children, description }: { children: React.ReactNode; description: string }) => (
-  <div className="w-full max-w-4xl mx-auto">
-    <motion.p 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="text-sm sm:text-base text-base-content/40 text-center mb-8 sm:mb-10"
+  <div className="mx-auto w-full max-w-4xl">
+    <motion.p
+      initial={ACTION_CONTENT_INITIAL}
+      animate={ACTION_CONTENT_ANIMATE}
+      className="text-base-content/40 mb-8 text-center text-sm sm:mb-10 sm:text-base"
     >
       {description}
     </motion.p>
@@ -1112,13 +1284,13 @@ const LendCard = () => (
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-3">
             <ProtocolBadge logo="/logos/aave.svg" name="Aave V3" size="lg" />
-            <span className="text-[10px] uppercase tracking-wider text-success px-2 py-0.5 border border-success/20 rounded">Best</span>
+            <span className="text-success border-success/20 rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider">Best</span>
           </div>
           <RateDisplay newRate="3.40%" label="APY" />
         </div>
       </FlowStep>
       <FlowStep delay={0.5}>
-        <div className="flex items-center gap-4 text-base-content/25 text-xs">
+        <div className="text-base-content/25 flex items-center gap-4 text-xs">
           <span className="flex items-center gap-1"><Image src="/logos/morpho.svg" alt="" width={12} height={12} className="opacity-50" />3.21%</span>
           <span className="flex items-center gap-1"><Image src="/logos/compound.svg" alt="" width={12} height={12} className="opacity-50" />2.89%</span>
         </div>
@@ -1126,7 +1298,7 @@ const LendCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <TokenDisplay logo="/logos/usdc.svg" symbol="USDC" amount="5,000" label="Deposit" size="lg" />
       </HFlowStep>
@@ -1135,13 +1307,13 @@ const LendCard = () => (
         <div className="flex flex-col items-center gap-2 px-6">
           <div className="flex items-center gap-3">
             <ProtocolBadge logo="/logos/aave.svg" name="Aave V3" size="lg" />
-            <span className="text-[10px] uppercase tracking-wider text-success px-2 py-0.5 border border-success/20 rounded">Best rate</span>
+            <span className="text-success border-success/20 rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider">Best rate</span>
           </div>
           <RateDisplay newRate="3.40%" label="Supply APY" />
         </div>
       </HFlowStep>
       <HFlowStep delay={0.4}>
-        <div className="flex flex-col gap-2 text-base-content/25 text-xs pl-8 border-l border-base-content/10">
+        <div className="text-base-content/25 border-base-content/10 flex flex-col gap-2 border-l pl-8 text-xs">
           <span className="flex items-center gap-1.5"><Image src="/logos/morpho.svg" alt="" width={14} height={14} className="opacity-50" />Morpho 3.21%</span>
           <span className="flex items-center gap-1.5"><Image src="/logos/compound.svg" alt="" width={14} height={14} className="opacity-50" />Compound 2.89%</span>
         </div>
@@ -1165,7 +1337,7 @@ const BorrowCard = () => (
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-3">
             <ProtocolBadge logo="/logos/morpho.svg" name="Morpho" size="md" />
-            <span className="text-[10px] uppercase tracking-wider text-success px-2 py-0.5 border border-success/20 rounded">Best</span>
+            <span className="text-success border-success/20 rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider">Best</span>
           </div>
           <RateDisplay newRate="3.20%" label="APR" />
         </div>
@@ -1173,7 +1345,7 @@ const BorrowCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <TokenDisplay logo="/logos/wsteth.svg" symbol="wstETH" amount="5.25" label="Collateral" size="lg" />
       </HFlowStep>
@@ -1186,13 +1358,13 @@ const BorrowCard = () => (
         <div className="flex flex-col items-center gap-2 px-6">
           <div className="flex items-center gap-3">
             <ProtocolBadge logo="/logos/morpho.svg" name="Morpho" size="lg" />
-            <span className="text-[10px] uppercase tracking-wider text-success px-2 py-0.5 border border-success/20 rounded">Best rate</span>
+            <span className="text-success border-success/20 rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider">Best rate</span>
           </div>
           <RateDisplay newRate="3.20%" label="Borrow APR" />
         </div>
       </HFlowStep>
       <HFlowStep delay={0.55}>
-        <div className="flex flex-col gap-2 text-base-content/25 text-xs pl-8 border-l border-base-content/10">
+        <div className="text-base-content/25 border-base-content/10 flex flex-col gap-2 border-l pl-8 text-xs">
           <span className="flex items-center gap-1.5"><Image src="/logos/aave.svg" alt="" width={14} height={14} className="opacity-50" />Aave 4.80%</span>
           <span className="flex items-center gap-1.5"><Image src="/logos/compound.svg" alt="" width={14} height={14} className="opacity-50" />Compound 5.12%</span>
         </div>
@@ -1215,31 +1387,31 @@ const SwapCard = () => (
       <FlowStep delay={0.4}>
         <div className="flex items-center gap-3 text-sm">
           <span className="text-base-content/30">APY improvement</span>
-          <span className="text-xl font-bold text-success font-mono">+0.8%</span>
+          <span className="text-success font-mono text-xl font-bold">+0.8%</span>
         </div>
       </FlowStep>
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <TokenDisplay logo="/logos/weth.svg" symbol="WETH" amount="2.5" label="Current collateral" size="lg" />
       </HFlowStep>
       <HFlowStep delay={0.15}>
         <div className="flex flex-col items-center px-8">
-          <motion.div animate={{ x: [0, 4, 0] }} transition={{ duration: 1.2, repeat: Infinity }}>
-            <ArrowRightIcon className="w-6 h-6 text-primary" />
+          <motion.div animate={SWAP_ARROW_ANIMATE} transition={SWAP_ARROW_TRANSITION}>
+            <ArrowRightIcon className="text-primary size-6" />
           </motion.div>
-          <span className="text-[9px] uppercase tracking-widest text-base-content/20 mt-1">swap</span>
+          <span className="text-base-content/20 mt-1 text-[9px] uppercase tracking-widest">swap</span>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.3}>
         <TokenDisplay logo="/logos/wsteth.svg" symbol="wstETH" amount="2.15" label="New collateral" size="lg" variant="success" />
       </HFlowStep>
       <HFlowStep delay={0.45}>
-        <div className="flex flex-col items-center pl-10 border-l border-base-content/10 ml-6">
-          <span className="text-[10px] uppercase tracking-wider text-base-content/30">APY improvement</span>
-          <span className="text-2xl font-bold text-success font-mono">+0.8%</span>
+        <div className="border-base-content/10 ml-6 flex flex-col items-center border-l pl-10">
+          <span className="text-base-content/30 text-[10px] uppercase tracking-wider">APY improvement</span>
+          <span className="text-success font-mono text-2xl font-bold">+0.8%</span>
         </div>
       </HFlowStep>
     </div>
@@ -1254,14 +1426,14 @@ const LoopCard = () => (
         <div className="flex items-center gap-3">
           <Image src="/logos/wsteth.svg" alt="wstETH" width={36} height={36} className="rounded-full" />
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-base-content/30">Deposit</div>
+            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Deposit</div>
             <span className="font-mono text-lg">5.0 wstETH</span>
           </div>
         </div>
       </FlowStep>
       <FlowStep delay={0.2}>
         <div className="flex items-center gap-3">
-          <span className="text-sm px-3 py-1 bg-primary/10 text-primary rounded font-bold">3x Loop</span>
+          <span className="bg-primary/10 text-primary rounded px-3 py-1 text-sm font-bold">3x Loop</span>
         </div>
       </FlowStep>
       <FlowStep delay={0.35}>
@@ -1269,12 +1441,12 @@ const LoopCard = () => (
           <div className="flex items-center gap-2">
             <Image src="/logos/wsteth.svg" alt="" width={20} height={20} />
             <span className="text-base-content/40">Position:</span>
-            <span className="font-mono text-success">15.0 wstETH</span>
+            <span className="text-success font-mono">15.0 wstETH</span>
           </div>
           <div className="flex items-center gap-2">
             <Image src="/logos/weth.svg" alt="" width={20} height={20} />
             <span className="text-base-content/40">Debt:</span>
-            <span className="font-mono text-error">-10.0 WETH</span>
+            <span className="text-error font-mono">-10.0 WETH</span>
           </div>
         </div>
       </FlowStep>
@@ -1284,12 +1456,12 @@ const LoopCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <div className="flex items-center gap-3">
           <Image src="/logos/wsteth.svg" alt="wstETH" width={40} height={40} className="rounded-full" />
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-base-content/30">You deposit</div>
+            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">You deposit</div>
             <span className="font-mono text-xl">5.0 wstETH</span>
           </div>
         </div>
@@ -1297,8 +1469,8 @@ const LoopCard = () => (
       <FlowArrow delay={0.15} />
       <HFlowStep delay={0.25}>
         <div className="flex flex-col items-center px-6">
-          <span className="text-sm px-4 py-1.5 bg-primary/10 text-primary rounded font-bold">3x Leverage</span>
-          <span className="text-[9px] uppercase tracking-widest text-base-content/20 mt-1">wstETH / WETH</span>
+          <span className="bg-primary/10 text-primary rounded px-4 py-1.5 text-sm font-bold">3x Leverage</span>
+          <span className="text-base-content/20 mt-1 text-[9px] uppercase tracking-widest">wstETH / WETH</span>
         </div>
       </HFlowStep>
       <FlowArrow delay={0.35} />
@@ -1307,17 +1479,17 @@ const LoopCard = () => (
           <div className="flex items-center gap-2 text-sm">
             <Image src="/logos/wsteth.svg" alt="" width={20} height={20} />
             <span className="text-base-content/40">Position:</span>
-            <span className="font-mono text-success">15.0 wstETH</span>
+            <span className="text-success font-mono">15.0 wstETH</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Image src="/logos/weth.svg" alt="" width={20} height={20} />
             <span className="text-base-content/40">Debt:</span>
-            <span className="font-mono text-error">-10.0 WETH</span>
+            <span className="text-error font-mono">-10.0 WETH</span>
           </div>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.55}>
-        <div className="flex flex-col items-center pl-8 border-l border-base-content/10 ml-4">
+        <div className="border-base-content/10 ml-4 flex flex-col items-center border-l pl-8">
           <RateDisplay newRate="+4.2%" label="Net APY" />
         </div>
       </HFlowStep>
@@ -1333,12 +1505,12 @@ const PendleCard = () => (
         <div className="flex items-center gap-3">
           <div className="relative">
             <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={40} height={40} className="rounded-full" />
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-base-100 flex items-center justify-center">
+            <div className="bg-base-100 absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full">
               <Image src="/logos/pendle.png" alt="Pendle" width={14} height={14} />
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-base-content/30">Pendle PT</div>
+            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Pendle PT</div>
             <div className="font-semibold">PT-USDai-19FEB2026</div>
           </div>
         </div>
@@ -1347,7 +1519,7 @@ const PendleCard = () => (
         <RateDisplay newRate="8.42%" label="Fixed APY" />
       </FlowStep>
       <FlowStep delay={0.4}>
-        <div className="flex items-center gap-4 text-xs text-base-content/30">
+        <div className="text-base-content/30 flex items-center gap-4 text-xs">
           <span className="uppercase tracking-wider">Leverage</span>
           <span className="text-base-content/10">|</span>
           <span className="uppercase tracking-wider">Swap</span>
@@ -1358,18 +1530,18 @@ const PendleCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <div className="flex items-center gap-3">
           <div className="relative">
             <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={44} height={44} className="rounded-full" />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-base-100 flex items-center justify-center border border-base-content/10">
+            <div className="bg-base-100 border-base-content/10 absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-full border">
               <Image src="/logos/pendle.png" alt="Pendle" width={16} height={16} />
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-base-content/30">Pendle PT Token</div>
-            <div className="font-semibold text-lg">PT-USDai-19FEB2026</div>
+            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Pendle PT Token</div>
+            <div className="text-lg font-semibold">PT-USDai-19FEB2026</div>
           </div>
         </div>
       </HFlowStep>
@@ -1380,10 +1552,10 @@ const PendleCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.4}>
-        <div className="flex flex-col gap-2 pl-8 border-l border-base-content/10 text-xs text-base-content/30">
-          <span className="uppercase tracking-wider hover:text-base-content/60 transition-colors cursor-default">Leverage</span>
-          <span className="uppercase tracking-wider hover:text-base-content/60 transition-colors cursor-default">Swap</span>
-          <span className="uppercase tracking-wider hover:text-base-content/60 transition-colors cursor-default">Refinance</span>
+        <div className="border-base-content/10 text-base-content/30 flex flex-col gap-2 border-l pl-8 text-xs">
+          <span className="hover:text-base-content/60 cursor-default uppercase tracking-wider transition-colors">Leverage</span>
+          <span className="hover:text-base-content/60 cursor-default uppercase tracking-wider transition-colors">Swap</span>
+          <span className="hover:text-base-content/60 cursor-default uppercase tracking-wider transition-colors">Refinance</span>
         </div>
       </HFlowStep>
     </div>
@@ -1405,7 +1577,7 @@ const RefinanceCard = () => (
           </div>
           <div className="flex items-center gap-2">
             <Image src="/logos/usdc.svg" alt="USDC" width={20} height={20} />
-            <span className="font-mono text-error">-$12K</span>
+            <span className="text-error font-mono">-$12K</span>
           </div>
         </div>
       </FlowStep>
@@ -1419,46 +1591,46 @@ const RefinanceCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden md:flex items-center justify-center gap-0">
+    <div className="hidden items-center justify-center gap-0 md:flex">
       <HFlowStep delay={0}>
         <div className="flex flex-col items-center gap-2">
           <ProtocolBadge logo="/logos/aave.svg" name="Aave V3" size="lg" />
-          <span className="text-[10px] uppercase tracking-wider text-base-content/25">Current</span>
+          <span className="text-base-content/25 text-[10px] uppercase tracking-wider">Current</span>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.1}>
-        <div className="flex flex-col items-center gap-3 px-8 py-2 mx-4 border-x border-base-content/5">
-          <div className="text-[10px] uppercase tracking-wider text-base-content/30">Position</div>
+        <div className="border-base-content/5 mx-4 flex flex-col items-center gap-3 border-x px-8 py-2">
+          <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Position</div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <Image src="/logos/wsteth.svg" alt="wstETH" width={24} height={24} />
               <span className="font-mono">5.25 wstETH</span>
             </div>
-            <div className="w-px h-6 bg-base-content/10" />
+            <div className="bg-base-content/10 h-6 w-px" />
             <div className="flex items-center gap-2">
               <Image src="/logos/usdc.svg" alt="USDC" width={24} height={24} />
-              <span className="font-mono text-error">-$12,000</span>
+              <span className="text-error font-mono">-$12,000</span>
             </div>
           </div>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.2}>
-        <motion.div 
+        <motion.div
           className="px-4"
-          animate={{ x: [0, 4, 0] }} 
-          transition={{ duration: 1.2, repeat: Infinity }}
+          animate={SWAP_ARROW_ANIMATE}
+          transition={SWAP_ARROW_TRANSITION}
         >
-          <ArrowRightIcon className="w-6 h-6 text-primary" />
+          <ArrowRightIcon className="text-primary size-6" />
         </motion.div>
       </HFlowStep>
       <HFlowStep delay={0.3}>
         <div className="flex flex-col items-center gap-2">
           <ProtocolBadge logo="/logos/morpho.svg" name="Morpho Blue" size="lg" />
-          <span className="text-[10px] uppercase tracking-wider text-success">Better rate</span>
+          <span className="text-success text-[10px] uppercase tracking-wider">Better rate</span>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.45}>
-        <div className="pl-8 border-l border-base-content/10 ml-4">
+        <div className="border-base-content/10 ml-4 border-l pl-8">
           <RateDisplay oldRate="4.80%" newRate="3.20%" label="APR" />
         </div>
       </HFlowStep>
@@ -1479,8 +1651,13 @@ const actionTabs = [
 const ActionTabs = () => {
   const [activeTab, setActiveTab] = useState("lend");
 
+  // Create stable callbacks for each tab
+  const handleTabClick = useCallback((tabId: string) => {
+    setActiveTab(tabId);
+  }, []);
+
   // Render card based on active tab
-  const renderCard = () => {
+  const renderCard = useCallback(() => {
     switch (activeTab) {
       case "lend": return <LendCard />;
       case "borrow": return <BorrowCard />;
@@ -1490,46 +1667,33 @@ const ActionTabs = () => {
       case "pendle": return <PendleCard />;
       default: return <LendCard />;
     }
-  };
+  }, [activeTab]);
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-4">
+    <div className="mx-auto w-full max-w-2xl px-4">
       {/* Tight tab bar */}
-      <div className="flex items-center justify-center mb-8">
-        <div className="inline-flex items-center gap-0 border-b border-base-content/10">
+      <div className="mb-8 flex items-center justify-center">
+        <div className="border-base-content/10 inline-flex items-center gap-0 border-b">
           {actionTabs.map((tab) => (
-            <button
+            <TabButton
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                relative px-3 sm:px-5 py-3 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.15em] transition-colors
-                ${activeTab === tab.id 
-                  ? "text-base-content" 
-                  : "text-base-content/30 hover:text-base-content/60"}
-              `}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <motion.div
-                  layoutId="action-underline"
-                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-base-content"
-                  transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                />
-              )}
-            </button>
+              tab={tab}
+              isActive={activeTab === tab.id}
+              onClick={handleTabClick}
+            />
           ))}
         </div>
       </div>
 
       {/* Content area - allows breathing room for animated content */}
-      <div className="min-h-[320px] sm:min-h-[380px] flex items-start justify-center pt-4">
+      <div className="flex min-h-[320px] items-start justify-center pt-4 sm:min-h-[380px]">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
+            initial={ACTION_TAB_CONTENT_INITIAL}
+            animate={ACTION_TAB_CONTENT_ANIMATE}
+            exit={ACTION_TAB_CONTENT_EXIT}
+            transition={ACTION_TAB_CONTENT_TRANSITION}
             className="w-full"
           >
             {renderCard()}
@@ -1540,22 +1704,64 @@ const ActionTabs = () => {
   );
 };
 
+// Separate tab button component for performance
+const TabButton = ({
+  tab,
+  isActive,
+  onClick
+}: {
+  tab: { id: string; label: string };
+  isActive: boolean;
+  onClick: (id: string) => void;
+}) => {
+  const handleClick = useCallback(() => {
+    onClick(tab.id);
+  }, [onClick, tab.id]);
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`
+        relative p-3 text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors sm:px-5 sm:text-xs
+        ${isActive
+          ? "text-base-content"
+          : "text-base-content/30 hover:text-base-content/60"}
+      `}
+    >
+      {tab.label}
+      {isActive && (
+        <motion.div
+          layoutId="action-underline"
+          className="bg-base-content absolute inset-x-0 bottom-0 h-[2px]"
+          transition={ACTION_TAB_UNDERLINE_TRANSITION}
+        />
+      )}
+    </button>
+  );
+};
+
+// Scroll hint opacity hook
+const useScrollHintOpacity = (smoothProgress: MotionValue<number>) => {
+  return useTransform(smoothProgress, [0, 0.1], [1, 0]);
+};
+
 export const StickyLanding = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { setCurrentSection, setTotalSections } = useLandingSection();
-  
+
   // Force kapan dark theme on landing page
   useKapanTheme();
 
   // Parallax grid effect - mouse tracking
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  
+
   // Smooth spring animation for mouse movement (inverse parallax)
-  const gridX = useSpring(mouseX, { stiffness: 50, damping: 20 });
-  const gridY = useSpring(mouseY, { stiffness: 50, damping: 20 });
-  
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const springConfig = useMemo(() => ({ stiffness: 50, damping: 20 }), []);
+  const gridX = useSpring(mouseX, springConfig);
+  const gridY = useSpring(mouseY, springConfig);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const { clientX, clientY } = e;
     const { innerWidth, innerHeight } = window;
     // Map mouse position to -40px to 40px range (inverse: subtract from center)
@@ -1563,9 +1769,9 @@ export const StickyLanding = () => {
     const yOffset = ((clientY / innerHeight) - 0.5) * -80;
     mouseX.set(xOffset);
     mouseY.set(yOffset);
-  };
+  }, [mouseX, mouseY]);
 
-  const sections: SectionData[] = [
+  const sections: SectionData[] = useMemo(() => [
     {
       tag: "00 / KAPAN",
       title: "ONE DASHBOARD.",
@@ -1607,70 +1813,85 @@ export const StickyLanding = () => {
       description: "Start optimizing your DeFi lending today.",
       content: <FinalCTA />,
     },
-  ];
+  ], []);
 
   const { scrollYProgress } = useScroll({ container: containerRef });
-  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
-  
+  const scrollSpringConfig = useMemo(() => ({ stiffness: 100, damping: 30 }), []);
+  const smoothProgress = useSpring(scrollYProgress, scrollSpringConfig);
+
   // Scroll-based parallax: grid shifts up as you scroll down
   const scrollGridY = useTransform(scrollYProgress, [0, 1], [0, -100]);
-  const smoothScrollGridY = useSpring(scrollGridY, { stiffness: 50, damping: 20 });
+  const smoothScrollGridY = useSpring(scrollGridY, springConfig);
 
   // Track current section for header CTA visibility
   useEffect(() => {
     setTotalSections(sections.length);
-    
+
     const unsubscribe = scrollYProgress.on("change", (progress) => {
       const sectionIndex = Math.round(progress * (sections.length - 1));
       setCurrentSection(sectionIndex);
     });
-    
+
     return () => unsubscribe();
   }, [scrollYProgress, sections.length, setCurrentSection, setTotalSections]);
 
+  const gridStyle = useMemo(() => ({
+    x: gridX,
+    y: smoothScrollGridY,
+  }), [gridX, smoothScrollGridY]);
+
+  const innerGridStyle = useMemo(() => ({ y: gridY }), [gridY]);
+
+  const scrollProgressStyle = useMemo(() => ({ height: "100%", scaleY: smoothProgress }), [smoothProgress]);
+
+  const containerHeight = useMemo(() => ({ height: `${sections.length * 100}vh` }), [sections.length]);
+
+  const scrollHintOpacity = useScrollHintOpacity(smoothProgress);
+
+  const scrollHintStyle = useMemo(() => ({ opacity: scrollHintOpacity }), [scrollHintOpacity]);
+
   return (
-    <div 
-      className="fixed inset-0 bg-base-100 text-base-content overflow-hidden"
+    <div
+      className="bg-base-100 text-base-content fixed inset-0 overflow-hidden"
       onMouseMove={handleMouseMove}
     >
       {/* Background grid with parallax effect */}
-      <motion.div 
+      <motion.div
         className="absolute inset-0"
-        style={{ 
-          x: gridX, 
-          y: smoothScrollGridY,
-        }}
+        style={gridStyle}
       >
-        <motion.div 
+        {/* eslint-disable tailwindcss/no-contradicting-classname -- bg-[linear-gradient] and bg-[size] are different CSS properties */}
+        <motion.div
           className="absolute -inset-24 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem]"
-          style={{ y: gridY }}
+          style={innerGridStyle}
         />
+        {/* eslint-enable tailwindcss/no-contradicting-classname */}
       </motion.div>
-      
+
       {/* Radial glow - fixed position, no parallax */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
 
       {/* Scroll container */}
       <div
         ref={containerRef}
-        className="h-full w-full hide-scrollbar relative z-10 overflow-y-auto snap-y snap-mandatory scroll-smooth"
+        className="hide-scrollbar relative z-10 size-full snap-y snap-mandatory overflow-y-auto scroll-smooth"
       >
         {/* Total height based on sections */}
-        <div style={{ height: `${sections.length * 100}vh` }} className="relative">
+        <div style={containerHeight} className="relative">
           {/* Snap targets */}
-          <div className="absolute inset-0 flex flex-col pointer-events-none">
+          <div className="pointer-events-none absolute inset-0 flex flex-col">
             {sections.map((_, i) => (
               <div key={i} className="h-screen w-full snap-start" />
             ))}
           </div>
 
           {/* Sticky viewport */}
-          <div className="sticky top-0 h-screen w-full flex items-center justify-center overflow-hidden">
+          <div className="sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden">
             {/* Scroll progress indicator */}
-            <div className="absolute right-6 md:right-12 top-1/2 -translate-y-1/2 h-48 w-[1px] bg-base-content/5 hidden lg:block">
+            <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
               <motion.div
-                className="w-full bg-base-content/40 origin-top"
-                style={{ height: "100%", scaleY: smoothProgress }}
+                className="bg-base-content/40 w-full origin-top"
+                style={scrollProgressStyle}
               />
             </div>
 
@@ -1687,11 +1908,11 @@ export const StickyLanding = () => {
 
             {/* Scroll hint on first section */}
             <motion.div
-              style={{ opacity: useTransform(smoothProgress, [0, 0.1], [1, 0]) }}
-              className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 text-base-content/30"
+              style={scrollHintStyle}
+              className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="landing-tag">Scroll to explore</span>
-              <ChevronDownIcon className="w-5 h-5 animate-bounce" />
+              <ChevronDownIcon className="size-5 animate-bounce" />
             </motion.div>
           </div>
         </div>

@@ -18,7 +18,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/`, lastModified: now },
     { url: `${baseUrl}/app`, lastModified: now },
     { url: `${baseUrl}/markets`, lastModified: now },
-    { url: `${baseUrl}/automate`, lastModified: now },
     { url: `${baseUrl}/info`, lastModified: now },
     { url: `${baseUrl}/blog`, lastModified: now },
     { url: `${baseUrl}/privacy`, lastModified: now },

@@ -1,12 +1,13 @@
 "use client";
 
-import React, { FC, useMemo } from "react";
+import React, { FC, useMemo, useCallback, MouseEvent } from "react";
 import Image from "next/image";
 import { ExternalLink } from "lucide-react";
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { createMorphoContext, type MorphoMarketContext } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
+import { LoadingSpinner } from "./Loading";
 
 // ============ Types ============
 
@@ -88,19 +89,29 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
     return bestMarket.uniqueKey;
   }, [markets]);
 
-  const handleSelect = (market: MorphoMarket) => {
+  const handleSelect = useCallback((market: MorphoMarket) => {
     if (disabled) return;
     const context = createMorphoContext(market);
     onSelectMarket(market, context);
-  };
+  }, [disabled, onSelectMarket]);
+
+  const handleStopPropagation = useCallback((e: MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  // Factory for market click handlers
+  const createMarketClickHandler = useCallback(
+    (market: MorphoMarket) => () => handleSelect(market),
+    [handleSelect],
+  );
 
   // Loading state
   if (isLoading) {
     return (
       <div className={`space-y-2 ${className}`}>
-        <div className="text-sm text-base-content/80">Select Morpho Market</div>
-        <div className="flex items-center justify-center py-6 border border-base-300 rounded-lg">
-          <span className="loading loading-spinner loading-md" />
+        <div className="text-base-content/80 text-sm">Select Morpho Market</div>
+        <div className="border-base-300 flex items-center justify-center rounded-lg border py-6">
+          <LoadingSpinner size="md" />
         </div>
       </div>
     );
@@ -110,9 +121,9 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
   if (markets.length === 0) {
     return (
       <div className={`space-y-2 ${className}`}>
-        <div className="text-sm text-base-content/80">Select Morpho Market</div>
-        <div className="p-4 border border-base-300 rounded-lg bg-base-200/30">
-          <div className="text-sm text-base-content/60 text-center">
+        <div className="text-base-content/80 text-sm">Select Morpho Market</div>
+        <div className="border-base-300 bg-base-200/30 rounded-lg border p-4">
+          <div className="text-base-content/60 text-center text-sm">
             No compatible Morpho markets found for this collateral/debt pair.
           </div>
         </div>
@@ -122,8 +133,8 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <div className="text-sm text-base-content/80">Select Morpho Market</div>
-      <div className="space-y-2 max-h-48 overflow-y-auto">
+      <div className="text-base-content/80 text-sm">Select Morpho Market</div>
+      <div className="max-h-48 space-y-2 overflow-y-auto">
         {markets.map(market => {
           const isSelected = selectedMarket?.uniqueKey === market.uniqueKey;
           const isBestRate = market.uniqueKey === bestRateMarketId;
@@ -137,28 +148,28 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
             <div
               key={market.uniqueKey}
               className={`
-                p-3 border rounded-lg cursor-pointer transition-all
+                cursor-pointer rounded-lg border p-3 transition-all
                 ${isSelected ? "border-primary bg-primary/10" : "border-base-300 hover:border-base-content/30"}
-                ${disabled ? "opacity-50 cursor-not-allowed" : ""}
+                ${disabled ? "cursor-not-allowed opacity-50" : ""}
               `}
-              onClick={() => handleSelect(market)}
+              onClick={createMarketClickHandler(market)}
             >
               <div className="flex items-center justify-between gap-3">
                 {/* Left side: Radio + Market info */}
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex min-w-0 items-center gap-3">
                   {/* Radio indicator */}
                   <div
                     className={`
-                      w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center
+                      flex size-4 flex-shrink-0 items-center justify-center rounded-full border-2
                       ${isSelected ? "border-primary bg-primary" : "border-base-content/30"}
                     `}
                   >
-                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-content" />}
+                    {isSelected && <div className="bg-primary-content size-1.5 rounded-full" />}
                   </div>
 
                   {/* Token pair icons */}
-                  <div className="flex items-center -space-x-1.5 flex-shrink-0">
-                    <div className="w-5 h-5 relative ring-2 ring-base-100 rounded-full overflow-hidden">
+                  <div className="flex flex-shrink-0 items-center -space-x-1.5">
+                    <div className="ring-base-100 relative size-5 overflow-hidden rounded-full ring-2">
                       <Image
                         src={tokenNameToLogo(collateralSymbol.toLowerCase())}
                         alt={collateralSymbol}
@@ -166,7 +177,7 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
                         className="object-cover"
                       />
                     </div>
-                    <div className="w-5 h-5 relative ring-2 ring-base-100 rounded-full overflow-hidden">
+                    <div className="ring-base-100 relative size-5 overflow-hidden rounded-full ring-2">
                       <Image
                         src={tokenNameToLogo(loanSymbol.toLowerCase())}
                         alt={loanSymbol}
@@ -177,8 +188,8 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
                   </div>
 
                   {/* Market name + best rate badge */}
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-medium text-sm whitespace-nowrap">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="whitespace-nowrap text-sm font-medium">
                       {collateralSymbol}/{loanSymbol}
                     </span>
                     {isBestRate && markets.length > 1 && (
@@ -189,17 +200,17 @@ export const MorphoMarketSelector: FC<MorphoMarketSelectorProps> = ({
                         href={morphoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
+                        onClick={handleStopPropagation}
                         className="text-base-content/40 hover:text-primary transition-colors"
                       >
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="size-3" />
                       </a>
                     )}
                   </div>
                 </div>
 
                 {/* Right side: Stats */}
-                <div className="flex items-center gap-4 text-xs flex-shrink-0">
+                <div className="flex flex-shrink-0 items-center gap-4 text-xs">
                   <div className="text-center">
                     <div className="text-base-content/50">LTV</div>
                     <div className="font-medium">{formatLtv(market.lltv)}</div>

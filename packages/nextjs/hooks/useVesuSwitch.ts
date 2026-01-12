@@ -5,10 +5,11 @@ import type { Quote } from "@avnu/avnu-sdk";
 import { useLendingAuthorizations, type BaseProtocolInstruction, type LendingAuthorization } from "~~/hooks/useLendingAuthorizations";
 import { buildVesuContextOption, createVesuContext, type VesuProtocolKey } from "~~/utils/vesu";
 import { buildModifyDelegationRevokeCalls } from "~~/utils/authorizations";
+import { DEBOUNCE_DELAYS } from "~~/hooks/useDebouncedEffect";
 
 const SLIPPAGE = 0.05;
 const BUFFER_BPS = 500n; // 5%
-const DEBOUNCE_MS = 450;
+const DEBOUNCE_MS = DEBOUNCE_DELAYS.STANDARD;
 
 const withBuffer = (amount: bigint, bufferBps: bigint = BUFFER_BPS) => {
   if (amount === 0n) return 0n;
@@ -166,6 +167,9 @@ export const useVesuSwitch = ({
         const calldata = (swapCall.calldata as any[]).map(v => BigInt(v.toString()));
 
         // Build protocol instructions (pure; safe to run multiple times)
+        // targetToken is guaranteed to exist due to early return on !targetTokenAddr above
+        if (!targetToken) return;
+
         const instructions =
           type === "collateral"
             ? buildCollateralSwitchInstructions({
@@ -173,7 +177,7 @@ export const useVesuSwitch = ({
                 poolKey,
                 currentCollateral,
                 currentDebt,
-                targetToken: targetToken!,
+                targetToken,
                 collateralBalance,
                 debtBalance,
                 quote,
@@ -185,7 +189,7 @@ export const useVesuSwitch = ({
                 poolKey,
                 currentCollateral,
                 currentDebt,
-                targetToken: targetToken!,
+                targetToken,
                 collateralBalance,
                 debtBalance,
                 quote,
@@ -246,7 +250,7 @@ export const useVesuSwitch = ({
           const borrowOnly = new CairoCustomEnum({
             Deposit: undefined,
             Borrow: {
-              basic: { token: targetToken!.address, amount: uint256.bnToUint256(borrowAmount), user: address },
+              basic: { token: targetToken.address, amount: uint256.bnToUint256(borrowAmount), user: address },
               context: toContextOption(protocolKey, poolKey, currentCollateral.address),
             },
             Repay: undefined,

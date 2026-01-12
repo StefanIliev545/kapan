@@ -3,7 +3,6 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Metadata } from "next";
 import { headers } from "next/headers";
 import { Inter } from "next/font/google";
-import { Theme } from "@radix-ui/themes";
 import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithProviders";
 import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
@@ -33,6 +32,16 @@ const inter = Inter({
   display: "swap",
 });
 
+// Static object for dangerouslySetInnerHTML to avoid creating new object on each render
+const themeScript = {
+  __html: `
+    (function() {
+      document.documentElement.classList.add('dark');
+      document.documentElement.setAttribute('data-theme', 'kapan');
+    })();
+  `,
+};
+
 const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
   const headersList = await headers();
   const initialHost = headersList.get("host");
@@ -51,16 +60,7 @@ const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
         <link rel="dns-prefetch" href="https://api.1inch.io" />
         
         {/* Inline script to ensure kapan theme is always applied */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                document.documentElement.classList.add('dark');
-                document.documentElement.setAttribute('data-theme', 'kapan');
-              })();
-            `,
-          }}
-        />
+        <script dangerouslySetInnerHTML={themeScript} />
       </head>
       <body className={`${inter.className}`}>
         <ThemeProvider>

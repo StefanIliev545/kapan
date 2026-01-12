@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { default as NextImage } from "next/image";
 import Link from "next/link";
-import ConnectModal from "./CustomConnectButton/ConnectModal";
 import { Address as AddressType } from "@starknet-react/chains";
 import { devnet } from "@starknet-react/chains";
-import CopyToClipboard from "react-copy-to-clipboard";
-import { getChecksumAddress, validateChecksumAddress } from "starknet";
+import { getChecksumAddress } from "starknet";
 import { CheckCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import { BalanceSkeleton } from "~~/components/common";
 import { BlockieAvatar } from "~~/components/scaffold-stark/BlockieAvatar";
+import { useCopyToClipboard } from "~~/hooks/common/useCopyToClipboard";
 import { useScaffoldStarkProfile } from "~~/hooks/scaffold-stark/useScaffoldStarkProfile";
 import { useTargetNetwork } from "~~/hooks/scaffold-stark/useTargetNetwork";
 import { getStarknetPFPIfExists } from "~~/utils/profile";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-stark";
+import { truncateAddress } from "~~/utils/address";
 
 type AddressProps = {
   address?: AddressType;
@@ -36,8 +37,8 @@ const blockieSizeMap = {
  * Displays an address (or ENS) with a Blockie image and option to copy address.
  */
 export const Address = ({ address, disableAddressLink, format, size = "base" }: AddressProps) => {
-  const [ensAvatar, setEnsAvatar] = useState<string | null>();
-  const [addressCopied, setAddressCopied] = useState(false);
+  const [ensAvatar] = useState<string | null>();
+  const { copy, isCopied: addressCopied } = useCopyToClipboard();
 
   const { targetNetwork } = useTargetNetwork();
   const { data: fetchedProfile, isLoading } = useScaffoldStarkProfile(address);
@@ -54,21 +55,8 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
 
   const blockExplorerAddressLink = getBlockExplorerAddressLink(targetNetwork, checkSumAddress || address || "");
 
-  const isValidHexAddress = (value: string): boolean => {
-    if (value.toLowerCase() === "0x") {
-      value = "0x0";
-    }
-
-    if (value.toLowerCase() === "0x0x0") {
-      return false;
-    }
-
-    const hexAddressRegex = /^0x[0-9a-fA-F]+$/;
-    return hexAddressRegex.test(value);
-  };
-
   const [displayAddress, setDisplayAddress] = useState(
-    checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4),
+    truncateAddress(checkSumAddress),
   );
 
   useEffect(() => {
@@ -79,24 +67,23 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
     } else if (format === "long") {
       setDisplayAddress(addressWithFallback || "");
     } else {
-      setDisplayAddress(addressWithFallback.slice(0, 6) + "..." + addressWithFallback.slice(-4));
+      setDisplayAddress(truncateAddress(addressWithFallback));
     }
   }, [fetchedProfile, checkSumAddress, address, format]);
 
+  const handleCopy = useCallback(() => {
+    if (checkSumAddress) {
+      copy(checkSumAddress);
+    }
+  }, [copy, checkSumAddress]);
+
   // Skeleton UI
   if (isLoading) {
-    return (
-      <div className="animate-pulse flex space-x-4">
-        <div className="rounded-md bg-slate-300 h-6 w-6"></div>
-        <div className="flex items-center space-y-6">
-          <div className="h-2 w-28 bg-slate-300 rounded"></div>
-        </div>
-      </div>
-    );
+    return <BalanceSkeleton />;
   }
 
   if (!checkSumAddress) {
-    return <div className="italic text-base font-bold ">Wallet not connected</div>;
+    return <div className="text-base font-bold italic ">Wallet not connected</div>;
   }
 
   if (!checkSumAddress) {
@@ -123,14 +110,14 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
         )}
       </div>
       {disableAddressLink ? (
-        <span className={`ml-1.5 text-${size} font-normal`}>{fetchedProfile?.name || displayAddress}</span>
+        <span className={`text- ml-1.5${size} font-normal`}>{fetchedProfile?.name || displayAddress}</span>
       ) : targetNetwork.network === devnet.network ? (
-        <span className={`ml-1.5 text-${size} font-normal`}>
+        <span className={`text- ml-1.5${size} font-normal`}>
           <Link href={blockExplorerAddressLink}>{fetchedProfile?.name || displayAddress}</Link>
         </span>
       ) : (
         <a
-          className={`ml-1.5 text-${size} font-normal`}
+          className={`text- ml-1.5${size} font-normal`}
           target="_blank"
           href={blockExplorerAddressLink}
           rel="noopener noreferrer"
@@ -138,28 +125,23 @@ export const Address = ({ address, disableAddressLink, format, size = "base" }: 
           {fetchedProfile?.name || displayAddress}
         </a>
       )}
-      {addressCopied ? (
-        <CheckCircleIcon
-          className="ml-1.5 text-xl font-normal text-sky-600 h-5 w-5 cursor-pointer"
-          aria-hidden="true"
-        />
-      ) : (
-        //@ts-ignore
-        <CopyToClipboard
-          text={checkSumAddress}
-          onCopy={() => {
-            setAddressCopied(true);
-            setTimeout(() => {
-              setAddressCopied(false);
-            }, 800);
-          }}
-        >
-          <DocumentDuplicateIcon
-            className="ml-1.5 text-xl font-normal text-sky-600 h-5 w-5 cursor-pointer"
+      <button
+        onClick={handleCopy}
+        className="ml-1.5 cursor-pointer border-0 bg-transparent p-0"
+        type="button"
+      >
+        {addressCopied ? (
+          <CheckCircleIcon
+            className="size-5 text-xl font-normal text-sky-600"
             aria-hidden="true"
           />
-        </CopyToClipboard>
-      )}
+        ) : (
+          <DocumentDuplicateIcon
+            className="size-5 text-xl font-normal text-sky-600"
+            aria-hidden="true"
+          />
+        )}
+      </button>
     </div>
   );
 };

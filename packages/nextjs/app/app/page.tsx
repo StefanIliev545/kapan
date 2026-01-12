@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, startTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 
 import type { NextPage } from "next";
 import dynamic from "next/dynamic";
@@ -10,7 +10,7 @@ import StableArea from "~~/components/common/StableArea";
 import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
 import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
 import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
-import { arbitrum, base, optimism, linea, plasma, mainnet } from "wagmi/chains";
+import { arbitrum, base, optimism, linea, plasma, mainnet, unichain } from "wagmi/chains";
 import { hardhat } from "viem/chains";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useAccount as useStarknetAccount } from "~~/hooks/useAccount";
@@ -61,6 +61,7 @@ const SparkProtocolView = dynamic(
 const networkOptions: NetworkOption[] = [
   { id: "ethereum", name: "Ethereum", logo: "/logos/ethereum.svg" },
   { id: "base", name: "Base", logo: "/logos/base.svg" },
+  { id: "unichain", name: "Unichain", logo: "/logos/unichain.svg" },
   { id: "plasma", name: "Plasma", logo: "/logos/plasma.png", logoDark: "/logos/plasma-dark.png" },
   { id: "arbitrum", name: "Arbitrum", logo: "/logos/arb.svg" },
   { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
@@ -74,6 +75,7 @@ const networkOptions: NetworkOption[] = [
 const protocolCountByNetwork: Record<string, number> = {
   ethereum: 4, // Aave, Morpho, Spark, Compound (ZeroLend frozen)
   base: 5, // Aave, ZeroLend, Compound, Venus, Morpho
+  unichain: 3, // Morpho, Compound, Venus
   arbitrum: 4, // Aave, Compound, Venus, Morpho
   optimism: 3, // Aave, Morpho, Compound
   linea: 3,
@@ -81,6 +83,10 @@ const protocolCountByNetwork: Record<string, number> = {
   plasma: 1,
   hardhat: 3, // Aave, Morpho, Compound
 };
+
+// Static feature flags for protocol views (extracted for referential stability)
+const ENABLED_FEATURES_SWAP_AND_MOVE = { swap: true, move: true } as const;
+const ENABLED_FEATURES_SWAP_ONLY = { swap: true, move: false } as const;
 
 const App: NextPage = () => {
   const initialNetwork = process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base";
@@ -99,9 +105,9 @@ const App: NextPage = () => {
   const expectedProtocolCount = protocolCountByNetwork[selectedNetwork] ?? 0;
 
   // Tiny helper so the button click never feels blocked
-  const handleNetworkChange = (id: string) => {
+  const handleNetworkChange = useCallback((id: string) => {
     startTransition(() => setSelectedNetwork(id));
-  };
+  }, []);
 
   // Optional: prefetch likely-next bundles when idle (micro-UX win)
   useEffect(() => {
@@ -128,6 +134,7 @@ const App: NextPage = () => {
     base: "Base support is experimental and pre-audit.",
     optimism: "Optimism support is experimental and pre-audit.",
     linea: "Linea support is experimental and pre-audit.",
+    unichain: "Unichain support is experimental and pre-audit.",
   }), []);
 
 
@@ -156,9 +163,9 @@ const App: NextPage = () => {
         {/* Compact header: title + metrics + network filter on one line (desktop) */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Left: Title + Metrics */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-            <h1 className="text-lg font-bold text-base-content tracking-tight uppercase">Positions</h1>
-            <div className="hidden sm:block w-px h-6 bg-base-content/10" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <h1 className="text-base-content text-lg font-bold uppercase tracking-tight">Positions</h1>
+            <div className="bg-base-content/10 hidden h-6 w-px sm:block" />
             <DashboardMetrics
               netWorth={totalNet}
               totalSupply={totalSupplied}
@@ -187,7 +194,7 @@ const App: NextPage = () => {
 
         {/* Subtle warning */}
         {warnings[selectedNetwork as keyof typeof warnings] && (
-          <p className="text-[10px] uppercase tracking-wider text-base-content/30 border-l border-base-content/10 pl-3">
+          <p className="text-base-content/30 border-base-content/10 border-l pl-3 text-[10px] uppercase tracking-wider">
             {warnings[selectedNetwork as keyof typeof warnings]}
           </p>
         )}
@@ -199,17 +206,17 @@ const App: NextPage = () => {
           {selectedNetwork === "ethereum" && (
             <div className="space-y-3">
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
+                <AaveProtocolView chainId={mainnet.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <MorphoProtocolView chainId={mainnet.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <SparkProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
+                <SparkProtocolView chainId={mainnet.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               {/* ZeroLend mainnet LRT market has frozen reserves - disabled until unfrozen */}
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={mainnet.id} enabledFeatures={{ swap: true, move: true }} />
+                <CompoundProtocolView chainId={mainnet.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
             </div>
           )}
@@ -218,16 +225,16 @@ const App: NextPage = () => {
           {selectedNetwork === "arbitrum" && (
             <div className="space-y-3">
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
+                <AaveProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <MorphoProtocolView chainId={arbitrum.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
+                <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <VenusProtocolView chainId={arbitrum.id} enabledFeatures={{ swap: true, move: true }} />
+                <VenusProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
             </div>
           )}
@@ -239,16 +246,16 @@ const App: NextPage = () => {
                 <MorphoProtocolView chainId={base.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+                <AaveProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <ZeroLendProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+                <ZeroLendProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+                <CompoundProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <VenusProtocolView chainId={base.id} enabledFeatures={{ swap: true, move: true }} />
+                <VenusProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
             </div>
           )}
@@ -260,13 +267,13 @@ const App: NextPage = () => {
                 Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
               </div>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+                <AaveProtocolView chainId={hardhat.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <MorphoProtocolView chainId={hardhat.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={hardhat.id} enabledFeatures={{ swap: true, move: true }} />
+                <CompoundProtocolView chainId={hardhat.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
             </div>
           )}
@@ -287,13 +294,13 @@ const App: NextPage = () => {
           {selectedNetwork === "optimism" && (
             <div className="space-y-3">
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
+                <AaveProtocolView chainId={optimism.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <MorphoProtocolView chainId={optimism.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={optimism.id} enabledFeatures={{ swap: true, move: true }} />
+                <CompoundProtocolView chainId={optimism.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
             </div>
           )}
@@ -302,13 +309,13 @@ const App: NextPage = () => {
           {selectedNetwork === "linea" && (
             <div className="space-y-3">
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
+                <AaveProtocolView chainId={linea.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <ZeroLendProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
+                <ZeroLendProtocolView chainId={linea.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={linea.id} enabledFeatures={{ swap: true, move: true }} />
+                <CompoundProtocolView chainId={linea.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
             </div>
           )}
@@ -317,7 +324,22 @@ const App: NextPage = () => {
           {selectedNetwork === "plasma" && (
             <div className="space-y-3">
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={plasma.id} enabledFeatures={{ swap: true, move: false }} />
+                <AaveProtocolView chainId={plasma.id} enabledFeatures={ENABLED_FEATURES_SWAP_ONLY} />
+              </StableArea>
+            </div>
+          )}
+
+          {/* UNICHAIN */}
+          {selectedNetwork === "unichain" && (
+            <div className="space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <MorphoProtocolView chainId={unichain.id} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <CompoundProtocolView chainId={unichain.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <VenusProtocolView chainId={unichain.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
             </div>
           )}

@@ -45,4 +45,10 @@ export const formatCurrencyCompact = (value: number): string => {
     return `${sign}$${(absValue / 1_000).toFixed(2)}K`;
   }
   return `${sign}$${absValue.toFixed(2)}`;
-}; 
+};
+
+/**
+ * Format a number as USD with appropriate precision
+ * Alias for formatCurrency for semantic clarity
+ */
+export const formatUsd = formatCurrency; 

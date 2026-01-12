@@ -1,21 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
-import { usePublicClient, useChainId } from "wagmi";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { usePublicClient, useChainId, useWatchContractEvent } from "wagmi";
 import { type Address, type PublicClient } from "viem";
+import { getKapanOrderManagerAddress } from "~~/utils/constants";
 import { logger } from "~~/utils/logger";
-
-/**
- * Deployed KapanOrderManager addresses by chain ID
- */
-const ORDER_MANAGER_ADDRESSES: Record<number, Address | undefined> = {
-  42161: "0x8F94351Ac17B4B5fb0923D229319805bB52616CD", // Arbitrum
-  8453: "0xE4b28de3AA865540Bbc1C71892b6b6Af24929858",  // Base (v2)
-  1: undefined,
-  10: undefined,
-  100: undefined,
-  137: undefined,
-  59144: undefined,
-  31337: undefined,
-};
 
 // ChunkExecuted event ABI
 const CHUNK_EXECUTED_EVENT_ABI = [
@@ -170,8 +157,9 @@ export function useChunkExecutedEvents(
 } {
   const publicClient = usePublicClient();
   const chainId = useChainId();
-  const orderManagerAddress = ORDER_MANAGER_ADDRESSES[chainId];
-  
+  // Get order manager address from deployed contracts
+  const orderManagerAddress = getKapanOrderManagerAddress(chainId);
+
   const [data, setData] = useState<OrderExecutionData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -237,8 +225,9 @@ export function useMultipleChunkExecutedEvents(
 ): Map<string, OrderExecutionData> {
   const publicClient = usePublicClient();
   const chainId = useChainId();
-  const orderManagerAddress = ORDER_MANAGER_ADDRESSES[chainId];
-  
+  // Get order manager address from deployed contracts
+  const orderManagerAddress = getKapanOrderManagerAddress(chainId);
+
   const [dataMap, setDataMap] = useState<Map<string, OrderExecutionData>>(new Map());
 
   useEffect(() => {
@@ -283,4 +272,48 @@ export function useMultipleChunkExecutedEvents(
   }, [publicClient, orderManagerAddress, chainId, orders]);
 
   return dataMap;
+}
+
+/**
+ * Watch for live ChunkExecuted events on-chain.
+ * Calls onChunkExecuted callback when a chunk is filled for any of the watched order hashes.
+ */
+export function useWatchChunkExecuted(
+  orderHashes: string[],
+  onChunkExecuted: (orderHash: string, chunkIndex: number, sellAmount: bigint, buyAmount: bigint) => void,
+  enabled = true
+): void {
+  const chainId = useChainId();
+  const orderManagerAddress = getKapanOrderManagerAddress(chainId);
+
+  // Use ref to avoid re-creating the watcher when callback changes
+  const callbackRef = useRef(onChunkExecuted);
+  callbackRef.current = onChunkExecuted;
+
+  const orderHashSet = useRef(new Set<string>());
+  orderHashSet.current = new Set(orderHashes.map(h => h.toLowerCase()));
+
+  useWatchContractEvent({
+    address: orderManagerAddress,
+    abi: CHUNK_EXECUTED_EVENT_ABI,
+    eventName: "ChunkExecuted",
+    enabled: enabled && !!orderManagerAddress && orderHashes.length > 0,
+    onLogs: (logs) => {
+      for (const log of logs) {
+        const hash = (log.args.orderHash as string)?.toLowerCase();
+        if (hash && orderHashSet.current.has(hash)) {
+          logger.info("[useWatchChunkExecuted] Chunk filled!", {
+            orderHash: hash,
+            chunkIndex: log.args.chunkIndex,
+          });
+          callbackRef.current(
+            hash,
+            Number(log.args.chunkIndex ?? 0),
+            log.args.sellAmount ?? 0n,
+            log.args.buyAmount ?? 0n
+          );
+        }
+      }
+    },
+  });
 }

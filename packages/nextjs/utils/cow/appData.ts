@@ -1,6 +1,8 @@
 import { keccak256, toUtf8Bytes, Interface } from "ethers";
 import stringify from "json-stringify-deterministic";
-import { getCowApiUrl, COW_FLASH_LOAN_ROUTER, COW_AAVE_BORROWERS, COW_PROTOCOL, getKapanCowAdapter, getPreferredFlashLoanLender } from "./addresses";
+import { getCowApiUrl, COW_FLASH_LOAN_ROUTER, COW_AAVE_BORROWERS, getKapanCowAdapter, getPreferredFlashLoanLender } from "./addresses";
+import { BALANCER, ALL_AAVE_V3_POOLS } from "~~/utils/constants";
+import { withRetry, isNetworkError, isRateLimitError } from "~~/utils/retry";
 
 /**
  * Hook definition for CoW AppData
@@ -48,6 +50,74 @@ export interface FlashLoanMetadata {
   token: string;
   /** Amount to borrow (in wei/atoms as string) */
   amount: string;
+}
+
+/**
+ * Operation types for Kapan orders - encoded in appCode for on-chain derivation
+ */
+export type KapanOperationType =
+  | "leverage-up"
+  | "close-position"
+  | "debt-swap"
+  | "collateral-swap";
+
+/**
+ * Lending protocol identifiers for appCode
+ */
+export type KapanProtocol =
+  | "aave"
+  | "compound"
+  | "venus"
+  | "morpho";
+
+/**
+ * Build the appCode string with operation type and optional protocol
+ * Format: "kapan:operation-type/protocol" or "kapan:operation-type" or just "kapan"
+ * Examples: "kapan:collateral-swap/morpho", "kapan:debt-swap/aave", "kapan:leverage-up"
+ */
+export function buildAppCode(operationType?: KapanOperationType, protocol?: KapanProtocol): string {
+  if (!operationType) return "kapan";
+  if (!protocol) return `kapan:${operationType}`;
+  return `kapan:${operationType}/${protocol}`;
+}
+
+/**
+ * Normalize protocol name to KapanProtocol
+ */
+export function normalizeProtocolForAppCode(protocolName: string): KapanProtocol | undefined {
+  const lower = protocolName.toLowerCase();
+  if (lower.includes("morpho")) return "morpho";
+  if (lower.includes("aave")) return "aave";
+  if (lower.includes("compound")) return "compound";
+  if (lower.includes("venus")) return "venus";
+  return undefined;
+}
+
+/**
+ * Parse operation type and protocol from appCode
+ * Returns undefined if not a kapan appCode or no operation type encoded
+ */
+export function parseOperationTypeFromAppCode(appCode: string): KapanOperationType | undefined {
+  if (!appCode.startsWith("kapan:")) return undefined;
+  // Handle format "kapan:operation-type/protocol" or "kapan:operation-type"
+  const rest = appCode.slice(6);
+  const type = rest.split("/")[0] as KapanOperationType;
+  const validTypes: KapanOperationType[] = ["leverage-up", "close-position", "debt-swap", "collateral-swap"];
+  return validTypes.includes(type) ? type : undefined;
+}
+
+/**
+ * Parse protocol from appCode
+ * Returns undefined if not present
+ */
+export function parseProtocolFromAppCode(appCode: string): KapanProtocol | undefined {
+  if (!appCode.startsWith("kapan:")) return undefined;
+  const rest = appCode.slice(6);
+  const parts = rest.split("/");
+  if (parts.length < 2) return undefined;
+  const protocol = parts[1] as KapanProtocol;
+  const validProtocols: KapanProtocol[] = ["aave", "compound", "venus", "morpho"];
+  return validProtocols.includes(protocol) ? protocol : undefined;
 }
 
 /**
@@ -101,7 +171,8 @@ const ERC20_ABI = [
 
 // ABI for KapanCowAdapter
 const KAPAN_ADAPTER_ABI = [
-  "function fundOrder(address token, address recipient, uint256 amount) external",
+  "function fundOrder(bytes32 orderHash, address token, address recipient, uint256 amount) external",
+  "function fundOrderBySalt(address user, bytes32 salt, address token, address recipient, uint256 amount) external",
 ];
 
 const borrowerIface = new Interface(BORROWER_ABI);
@@ -110,43 +181,37 @@ const kapanAdapterIface = new Interface(KAPAN_ADAPTER_ABI);
 
 /**
  * Get the appropriate CoW Protocol borrower address based on lender type
- * 
+ *
  * SUPPORTED LENDERS:
  * - Aave V3: Use AaveBorrower (RECOMMENDED for CoW limit orders)
  * - ERC-3156 compliant lenders (Maker): Use ERC3156Borrower
- * 
+ *
  * NOT SUPPORTED:
  * - Balancer V2: Does NOT implement ERC-3156, will fail silently!
- * 
+ *
  * For limit orders, use getCowFlashLoanLender() which only returns Aave V3 addresses.
- * 
+ *
  * @see https://github.com/cowprotocol/flash-loan-router
  */
 export function getCowBorrower(lenderAddress: string, chainId?: number): string {
-  // Aave V3 Pool addresses (mainnet and L2s)
-  const AAVE_POOLS = [
-    "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2", // Ethereum Mainnet
-    "0x794a61358D6845594F94dc1DB02A252b5b4814aD", // Arbitrum, Optimism, Polygon, Avalanche
-    "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5", // Base
-    "0x3E5f750726cc1D0d4a9c62c507f890f984576507", // Linea
-  ].map(a => a.toLowerCase());
-  
-  if (AAVE_POOLS.includes(lenderAddress.toLowerCase())) {
+  // Check if the lender is an Aave V3 Pool
+  const aavePools = ALL_AAVE_V3_POOLS.map(a => a.toLowerCase());
+
+  if (aavePools.includes(lenderAddress.toLowerCase())) {
     // Check for chain-specific borrower (e.g., Base uses a factory-deployed adapter)
     if (chainId && COW_AAVE_BORROWERS[chainId]) {
       return COW_AAVE_BORROWERS[chainId];
     }
     return COW_FLASH_LOAN_ROUTER.aaveBorrower;
   }
-  
+
   // Warn if using Balancer - it won't work with CoW FlashLoanRouter!
-  const BALANCER_VAULT = "0xBA12222222228d8Ba445958a75a0704d566BF2C8".toLowerCase();
-  if (lenderAddress.toLowerCase() === BALANCER_VAULT) {
+  if (lenderAddress.toLowerCase() === BALANCER.v2Vault.toLowerCase()) {
     console.error("[getCowBorrower] ERROR: Balancer V2 is NOT supported by CoW FlashLoanRouter!");
     console.error("[getCowBorrower] Balancer V2 does not implement ERC-3156. Order will fail!");
     console.error("[getCowBorrower] Use getCowFlashLoanLender() to get a supported lender (Aave V3).");
   }
-  
+
   // Default to ERC3156Borrower for Maker and other ERC-3156 compliant lenders
   // NOTE: This will NOT work for Balancer V2!
   return COW_FLASH_LOAN_ROUTER.erc3156Borrower;
@@ -189,13 +254,43 @@ export function encodeTokenTransferFrom(
 /**
  * Encode a call to KapanCowAdapter.fundOrder()
  * This is used in pre-hook to transfer flash-loaned tokens to OrderManager
+ *
+ * @param orderHash - The order hash (required for security validation)
+ * @param token - Token to transfer
+ * @param recipient - Recipient address (usually OrderManager)
+ * @param amount - Amount to transfer
+ * @deprecated Use encodeAdapterFundOrderBySalt instead - orderHash is not known before order creation
  */
 export function encodeAdapterFundOrder(
+  orderHash: string,
   token: string,
   recipient: string,
   amount: bigint
 ): string {
-  return kapanAdapterIface.encodeFunctionData("fundOrder", [token, recipient, amount]);
+  return kapanAdapterIface.encodeFunctionData("fundOrder", [orderHash, token, recipient, amount]);
+}
+
+/**
+ * Encode a call to KapanCowAdapter.fundOrderBySalt()
+ * This is used in pre-hook to transfer flash-loaned tokens to OrderManager
+ *
+ * Uses (user, salt) lookup pattern to get the orderHash from on-chain,
+ * allowing pre-computation of appData before order creation.
+ *
+ * @param user - The order owner address
+ * @param salt - The order salt (known before order creation)
+ * @param token - Token to transfer
+ * @param recipient - Recipient address (usually OrderManager)
+ * @param amount - Amount to transfer
+ */
+export function encodeAdapterFundOrderBySalt(
+  user: string,
+  salt: string,
+  token: string,
+  recipient: string,
+  amount: bigint
+): string {
+  return kapanAdapterIface.encodeFunctionData("fundOrderBySalt", [user, salt, token, recipient, amount]);
 }
 
 /**
@@ -268,6 +363,10 @@ export function buildKapanAppData(
     partnerFeeRecipient?: string;
     /** Slippage tolerance in basis points */
     slippageBps?: number;
+    /** Operation type for order categorization */
+    operationType?: KapanOperationType;
+    /** Lending protocol (e.g., "aave", "morpho") for appCode tagging */
+    protocol?: KapanProtocol;
     /** Flash loan configuration for single-tx leverage */
     flashLoan?: {
       /** Flash loan liquidity provider (Aave pool) */
@@ -279,9 +378,11 @@ export function buildKapanAppData(
     };
   }
 ): AppDataDocument {
-  // Gas limits based on working Aave tx: pre=300000, post=800000
-  const preHookGasLimit = options?.preHookGasLimit ?? "300000";
-  const postHookGasLimit = options?.postHookGasLimit ?? "800000";
+  // Gas limits - generous limits for complex operations
+  // Pre-hook: 800k for patterns like close-with-collateral (PullToken + Repay + Withdraw)
+  // Post-hook: 1.75M for complex protocols like Venus
+  const preHookGasLimit = options?.preHookGasLimit ?? "800000";
+  const postHookGasLimit = options?.postHookGasLimit ?? "1750000";
 
   // Encode the hook calls to OrderManager using (user, salt) lookup
   // Note: chunkIndex is NOT passed - contract reads from iterationCount
@@ -300,21 +401,26 @@ export function buildKapanAppData(
   
   if (options?.flashLoan) {
     const kapanAdapter = getKapanCowAdapter(chainId);
-    
+
     if (kapanAdapter) {
       // Use KapanCowAdapter - our custom borrower that works with HooksTrampoline
-      const fundOrderCalldata = encodeAdapterFundOrder(
+      // NOTE: Using fundOrderBySalt which looks up orderHash from (user, salt)
+      // This allows pre-computing hook calldata before order creation
+      const fundOrderCalldata = encodeAdapterFundOrderBySalt(
+        user,
+        salt,
         options.flashLoan.token,
         orderManagerAddress,
         options.flashLoan.amount
       );
-      
+
       preHooks = [
         // First: Transfer flash-loaned tokens from Adapter to OrderManager
+        // fundOrderBySalt looks up orderHash from OrderManager.userSaltToOrderHash
         {
           target: kapanAdapter,
           callData: fundOrderCalldata,
-          gasLimit: "100000",
+          gasLimit: "150000", // Increased for storage read + transfer
           dappId: "kapan://flashloans/adapter/fund",
         },
         // Second: Execute any pre-hook logic on OrderManager
@@ -325,7 +431,7 @@ export function buildKapanAppData(
           dappId: "kapan://flashloans/pre-hook",
         },
       ];
-      
+
       // Post-hook targets OrderManager (handles deposit collateral, borrow for repay)
       postHooks = [{
         target: orderManagerAddress,
@@ -375,7 +481,7 @@ export function buildKapanAppData(
   // Use version 1.10.0 to match working Aave implementation
   const appData: AppDataDocument = {
     version: "1.10.0",
-    appCode: "KapanFinance",
+    appCode: buildAppCode(options?.operationType, options?.protocol),
     metadata: {
       hooks: {
         pre: preHooks,
@@ -404,7 +510,7 @@ export function buildKapanAppData(
     console.log("[buildKapanAppData] Flash loan metadata:", {
       liquidityProvider: options.flashLoan.lender,
       protocolAdapter: protocolAdapter,
-      receiver: protocolAdapter, // Same as protocolAdapter (matches working Aave pattern)
+      receiver: protocolAdapter, // ProtocolAdapter or OrderManager .. both seem to work
       token: flashLoanToken,
       amount: flashLoanAmount.toString(),
       usingKapanAdapter: !!kapanAdapter,
@@ -412,13 +518,12 @@ export function buildKapanAppData(
     
     // Flash loan metadata for CoW API:
     // - protocolAdapter: The borrower contract that handles flash loan mechanics (KapanCowAdapter)
-    // - receiver: Same as protocolAdapter (balance override applies to adapter)
-    // - Pre-hook transfers tokens from adapter → OrderManager during simulation
-    // At settlement time, actual tokens flow: Lender → Adapter → (pre-hook) → OrderManager
+    // - receiver: OrderManager (balance override here, fundOrder pre-hook transfers tokens)
+    // At settlement time, actual tokens flow: Lender → Adapter → (fundOrder) → OrderManager
     appData.metadata.flashloan = {
       liquidityProvider: options.flashLoan.lender,
       protocolAdapter: protocolAdapter,
-      receiver: protocolAdapter, // Same as protocolAdapter (matches working Aave pattern)
+      receiver: protocolAdapter, // ProtocolAdapter or OrderManager .. both seem to work
       token: flashLoanToken,
       amount: flashLoanAmount.toString(),
     };
@@ -474,53 +579,103 @@ export async function registerAppData(
     return { success: false, error: `Chain ${chainId} not supported by CoW Protocol` };
   }
 
+  console.log("[registerAppData] Chain ID:", chainId);
+
+  // Use deterministic stringify for consistent serialization
+  const fullAppDataJson = stringify(appDataDoc);
+  console.log("[registerAppData] Registering appData:");
+  console.log("[registerAppData] Full JSON:", fullAppDataJson);
+  if (appDataDoc.metadata.flashloan) {
+    console.log("[registerAppData] Flash loan config:", JSON.stringify(appDataDoc.metadata.flashloan, null, 2));
+  }
+  if (appDataDoc.metadata.hooks) {
+    console.log("[registerAppData] Pre-hooks:", appDataDoc.metadata.hooks.pre?.length || 0);
+    console.log("[registerAppData] Post-hooks:", appDataDoc.metadata.hooks.post?.length || 0);
+  }
+
+  // Build request body - fullAppData should be a JSON string
+  const requestBody = JSON.stringify({
+    fullAppData: fullAppDataJson,
+  });
+  console.log("[registerAppData] Request body:", requestBody);
+
+  // Use our Next.js API proxy to bypass browser-level interference
+  // (ad blockers, VPNs, corporate proxies can block direct CoW API calls)
+  const proxyUrl = `/api/cow/${chainId}/app-data`;
+  console.log("[registerAppData] Using proxy:", proxyUrl);
+
   try {
-    // Use deterministic stringify for consistent serialization
-    const fullAppDataJson = stringify(appDataDoc);
-    console.log("[registerAppData] Registering appData:");
-    console.log("[registerAppData] Full JSON:", fullAppDataJson);
-    if (appDataDoc.metadata.flashloan) {
-      console.log("[registerAppData] Flash loan config:", JSON.stringify(appDataDoc.metadata.flashloan, null, 2));
-    }
-    if (appDataDoc.metadata.hooks) {
-      console.log("[registerAppData] Pre-hooks:", appDataDoc.metadata.hooks.pre?.length || 0);
-      console.log("[registerAppData] Post-hooks:", appDataDoc.metadata.hooks.post?.length || 0);
-    }
-    
-    // Build request body - fullAppData should be a JSON string
-    const requestBody = JSON.stringify({
-      fullAppData: fullAppDataJson,
-    });
-    console.log("[registerAppData] Request body:", requestBody);
-    
-    // Use the simpler endpoint that computes the hash server-side
-    // This avoids hash mismatch issues from JSON serialization differences
-    const response = await fetch(`${apiUrl}/api/v1/app_data`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
+    return await withRetry(
+      async () => {
+        const response = await fetch(proxyUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: requestBody,
+        });
+
+        // Handle rate limiting explicitly - throw to trigger retry
+        if (response.status === 429) {
+          throw new Error("CoW API rate limit exceeded");
+        }
+
+        if (response.ok || response.status === 200 || response.status === 201) {
+          // The API returns the computed appDataHash
+          const result = await response.json();
+          const computedHash = result.appDataHash || result;
+          console.log("[registerAppData] Success! Computed hash:", computedHash);
+          return { success: true, computedHash: typeof computedHash === 'string' ? computedHash : undefined };
+        }
+
+        // 409 Conflict means it already exists - that's fine
+        if (response.status === 409) {
+          return { success: true };
+        }
+
+        const errorText = await response.text();
+        console.error("[registerAppData] API error response:", errorText);
+        console.error("[registerAppData] Request body was:", fullAppDataJson);
+        console.error("[registerAppData] Full appData document:", JSON.stringify(appDataDoc, null, 2));
+
+        // Try to parse error for more details
+        let parsedError = errorText;
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.description) {
+            parsedError = errorJson.description;
+          } else if (errorJson.errorType) {
+            parsedError = `${errorJson.errorType}: ${errorJson.description || errorText}`;
+          }
+        } catch {
+          // Keep original errorText
+        }
+
+        // Don't retry client errors (4xx except 429)
+        if (response.status >= 400 && response.status < 500) {
+          return { success: false, error: `API error ${response.status}: ${parsedError}` };
+        }
+
+        // Throw server errors to trigger retry
+        throw new Error(`API error ${response.status}: ${parsedError}`);
       },
-      body: requestBody,
-    });
-
-    if (response.ok || response.status === 200 || response.status === 201) {
-      // The API returns the computed appDataHash
-      const result = await response.json();
-      const computedHash = result.appDataHash || result;
-      console.log("[registerAppData] Success! Computed hash:", computedHash);
-      return { success: true, computedHash: typeof computedHash === 'string' ? computedHash : undefined };
-    }
-
-    // 409 Conflict means it already exists - that's fine
-    if (response.status === 409) {
-      return { success: true };
-    }
-
-    const errorText = await response.text();
-    console.error("[registerAppData] API error response:", errorText);
-    console.error("[registerAppData] Request body was:", fullAppDataJson);
-    return { success: false, error: `API error ${response.status}: ${errorText}` };
+      {
+        retries: 2,
+        baseDelay: 1000,
+        isRetryable: (error) => {
+          // Retry on network errors and rate limits
+          if (isNetworkError(error) || isRateLimitError(error)) return true;
+          // Retry on server errors (wrapped in Error objects from our throw above)
+          if (error instanceof Error && error.message.startsWith("API error 5")) return true;
+          return false;
+        },
+        onRetry: (attempt, error, delay) => {
+          console.warn(`[registerAppData] Retry ${attempt}, waiting ${delay}ms`, error);
+        },
+      }
+    );
   } catch (error) {
+    console.error("[registerAppData] All retries failed:", error);
     return { success: false, error: `Network error: ${error}` };
   }
 }
@@ -599,4 +754,63 @@ export function buildFlashLoanOptions(
     token,
     amount,
   };
+}
+
+/**
+ * Fetch appData document from CoW API by hash
+ * Uses the local API proxy to avoid CORS issues
+ *
+ * @param chainId - Chain ID
+ * @param appDataHash - The appData hash to look up
+ * @returns The appData document or null if not found
+ */
+export async function fetchAppData(
+  chainId: number,
+  appDataHash: string
+): Promise<AppDataDocument | null> {
+  try {
+    const response = await fetch(`/api/cow/${chainId}/app-data?hash=${appDataHash}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      console.warn(`[fetchAppData] API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // CoW API returns { fullAppData: { appCode, metadata, ... } } structure
+    if (data.fullAppData) {
+      return data.fullAppData as AppDataDocument;
+    }
+
+    // Or it might return the document directly
+    if (data.appCode && data.metadata) {
+      return data as AppDataDocument;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn("[fetchAppData] Fetch failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Fetch and parse operation type from appData
+ *
+ * @param chainId - Chain ID
+ * @param appDataHash - The appData hash to look up
+ * @returns The operation type or undefined if not found/parseable
+ */
+export async function fetchOperationTypeFromAppData(
+  chainId: number,
+  appDataHash: string
+): Promise<KapanOperationType | undefined> {
+  const appData = await fetchAppData(chainId, appDataHash);
+  if (!appData) return undefined;
+
+  return parseOperationTypeFromAppCode(appData.appCode);
 }

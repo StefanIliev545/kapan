@@ -5,7 +5,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { verifyContract } from "../../utils/verification";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute, getWaitConfirmations } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from "../../utils/safeExecute";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
@@ -42,6 +42,11 @@ const DEFAULT_COMETS: Record<number, string[]> = {
   ],
   59144: [
     "0x8D38A3d6B3c3B7d96D6536DA7Eef94A9d7dbC991", // cUSDCv3 (Comet proxy)
+  ],
+  // Unichain (130)
+  130: [
+    "0x2c7118c4C88B9841FCF839074c26Ae8f035f2921", // cUSDCv3
+    "0x6C987dDE50dB1dcDd32Cd4175778C2a291978E2a", // cWETHv3
   ],
 };
 
@@ -128,7 +133,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   const kapanRouter = await get("KapanRouter");
   const WAIT = getWaitConfirmations(chainId);
 
-  const compoundGatewayWrite = await deploy("CompoundGatewayWrite", {
+  const compoundGatewayWrite = await safeDeploy(hre, deployer, "CompoundGatewayWrite", {
     from: deployer,
     args: [kapanRouter.address, deployer], // router, owner
     log: true,
@@ -165,7 +170,7 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   };
 
   // View gateway
-  const compoundGatewayView = await deploy("CompoundGatewayView", {
+  const compoundGatewayView = await safeDeploy(hre, deployer, "CompoundGatewayView", {
     from: deployer,
     args: [deployer], // owner
     log: true,
@@ -206,6 +211,8 @@ const deployCompoundGatewayWrite: DeployFunction = async function (hre: HardhatR
   // Verification is handled by verifyContract utility (checks DISABLE_VERIFICATION env var)
   await verifyContract(hre, compoundGatewayWrite.address, [kapanRouter.address, deployer]);
   await verifyContract(hre, compoundGatewayView.address, [deployer]);
+
+  await waitForPendingTxs(hre, deployer);
 };
 
 export default deployCompoundGatewayWrite;

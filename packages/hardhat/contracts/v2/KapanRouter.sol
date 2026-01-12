@@ -333,8 +333,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             address tokenToApprove = outputs[inputPtr.index].token;
             uint256 amountToApprove = outputs[inputPtr.index].amount;
 
-            IERC20(tokenToApprove).approve(target, 0);
-            IERC20(tokenToApprove).approve(target, amountToApprove);
+            IERC20(tokenToApprove).forceApprove(target, amountToApprove);
 
             outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: address(0), amount: 0 }));
         } else if (routerInstruction.instructionType == RouterInstructionType.Split) {
@@ -355,6 +354,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: feeAmount }));
             outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: orig.token, amount: remainder }));
         } else if (routerInstruction.instructionType == RouterInstructionType.Add) {
+            // Non-destructive: creates new UTXO with sum, keeps originals intact
             (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
                 instruction.data,
                 (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
@@ -365,10 +365,9 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             if (outA.token == address(0) || outB.token == address(0)) revert ZeroToken();
             if (outA.token != outB.token) revert TokenMismatch();
             uint256 total = outA.amount + outB.amount;
-            outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-            outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
             outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: total }));
         } else if (routerInstruction.instructionType == RouterInstructionType.Subtract) {
+            // Non-destructive: creates new UTXO with difference, keeps originals intact
             (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
                 instruction.data,
                 (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
@@ -380,8 +379,6 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             if (outA.token != outB.token) revert TokenMismatch();
             if (outA.amount < outB.amount) revert Underflow();
             uint256 diff = outA.amount - outB.amount;
-            outputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-            outputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
             outputs = _appendOutputMemory(outputs, ProtocolTypes.Output({ token: outA.token, amount: diff }));
         }
 
@@ -441,8 +438,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             address tokenToApprove = inputs[inputPtr.index].token;
             uint256 amountToApprove = inputs[inputPtr.index].amount;
 
-            IERC20(tokenToApprove).approve(target, 0);
-            IERC20(tokenToApprove).approve(target, amountToApprove);
+            IERC20(tokenToApprove).forceApprove(target, amountToApprove);
             // Always produce an output (even if empty) to ensure consistent indexing
             ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
             out[0] = ProtocolTypes.Output({ token: address(0), amount: 0 });
@@ -472,6 +468,7 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             _appendOutputs(out);
         } else if (routerInstruction.instructionType == RouterInstructionType.Add) {
             // Decode extra params: two input pointers
+            // Non-destructive: creates new UTXO with sum, keeps originals intact
             (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
                 instruction.data,
                 (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
@@ -485,13 +482,10 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             uint256 total = outA.amount + outB.amount;
             ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
             out[0] = ProtocolTypes.Output({ token: outA.token, amount: total });
-            // Clear the original outputs
-            inputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-            inputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-            TBytes.set(OUTPUTS_SLOT, abi.encode(inputs));
             _appendOutputs(out);
         } else if (routerInstruction.instructionType == RouterInstructionType.Subtract) {
             // Decode extra params: two input pointers (minuend - subtrahend)
+            // Non-destructive: creates new UTXO with difference, keeps originals intact
             (, ProtocolTypes.InputPtr memory ptrA, ProtocolTypes.InputPtr memory ptrB) = abi.decode(
                 instruction.data,
                 (RouterInstruction, ProtocolTypes.InputPtr, ProtocolTypes.InputPtr)
@@ -506,10 +500,6 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
             uint256 diff = outA.amount - outB.amount;
             ProtocolTypes.Output[] memory out = new ProtocolTypes.Output[](1);
             out[0] = ProtocolTypes.Output({ token: outA.token, amount: diff });
-            // Clear the original outputs
-            inputs[ptrA.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-            inputs[ptrB.index] = ProtocolTypes.Output({ token: address(0), amount: 0 });
-            TBytes.set(OUTPUTS_SLOT, abi.encode(inputs));
             _appendOutputs(out);
         }
         return false;

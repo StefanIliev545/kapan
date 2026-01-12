@@ -1,20 +1,13 @@
 import { FC } from "react";
-import { TokenActionModal, TokenInfo } from "../TokenActionModal";
+import { TokenActionModal } from "../TokenActionModal";
+import {
+  useDepositModalConfig,
+  buildDepositModalProps,
+  type StarkDepositModalProps,
+} from "../common/useDepositModalConfig";
 import { useLendingAction } from "~~/hooks/useLendingAction";
-import type { VesuContext } from "~~/utils/vesu";
-import { useTokenBalance } from "~~/hooks/useTokenBalance";
-import { PositionManager } from "~~/utils/position";
 
-interface DepositModalStarkProps {
-  isOpen: boolean;
-  onClose: () => void;
-  token: TokenInfo;
-  protocolName: string;
-  vesuContext?: VesuContext;
-  position?: PositionManager;
-}
-
-export const DepositModalStark: FC<DepositModalStarkProps> = ({
+export const DepositModalStark: FC<StarkDepositModalProps> = ({
   isOpen,
   onClose,
   token,
@@ -22,35 +15,35 @@ export const DepositModalStark: FC<DepositModalStarkProps> = ({
   vesuContext,
   position,
 }) => {
-  const { balance, decimals } = useTokenBalance(token.address, "stark", undefined, token.decimals);
-  const decimalsForAction = decimals ?? token.decimals ?? 18;
+  // Use shared hook for common deposit modal configuration
+  const renderProps = useDepositModalConfig({
+    token,
+    network: "stark",
+  });
+
+  const { decimals } = renderProps;
+
+  // Starknet-specific transaction handling
   const { execute, buildCalls } = useLendingAction(
     "stark",
     "Deposit",
     token.address,
     protocolName,
-    decimalsForAction,
+    decimals,
     vesuContext,
   );
-  if (token.decimals == null) {
-    token.decimals = decimalsForAction;
-  }
-  return (
-    <TokenActionModal
-      isOpen={isOpen}
-      onClose={onClose}
-      action="Deposit"
-      token={token}
-      protocolName={protocolName}
-      apyLabel="Supply APY"
-      apy={token.currentRate}
-      metricLabel="Total supplied"
-      before={0}
-      balance={balance}
-      network="stark"
-      buildCalls={buildCalls}
-      position={position}
-      onConfirm={execute}
-    />
-  );
+
+  // Build props using shared utility
+  const modalProps = buildDepositModalProps({
+    isOpen,
+    onClose,
+    token,
+    protocolName,
+    position,
+    renderProps,
+    onConfirm: execute,
+    buildCalls,
+  });
+
+  return <TokenActionModal {...modalProps} />;
 };

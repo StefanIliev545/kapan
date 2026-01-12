@@ -1,8 +1,9 @@
-import React, { FC, useState, useEffect, useMemo } from "react";
+import React, { FC, useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { formatUnits, parseUnits } from "viem";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { LoadingSpinner } from "~~/components/common/Loading";
 
 // Define types for collateral
 export interface CollateralToken {
@@ -35,11 +36,178 @@ interface CollateralSelectorProps {
   initialSelectedCollaterals?: CollateralWithAmount[];
 }
 
+// Sub-component for rendering a single collateral button in the list
+interface CollateralButtonProps {
+  collateral: CollateralToken;
+  isSelected: boolean;
+  isDisabled: boolean;
+  hasZeroBalance: boolean;
+  selectedProtocol?: string;
+  onToggle: (collateral: CollateralToken) => void;
+  formatBalance: (balance: number) => string;
+}
+
+const CollateralButton: FC<CollateralButtonProps> = ({
+  collateral,
+  isSelected,
+  isDisabled,
+  hasZeroBalance,
+  selectedProtocol,
+  onToggle,
+  formatBalance,
+}) => {
+  const handleClick = useCallback(() => {
+    onToggle(collateral);
+  }, [onToggle, collateral]);
+
+  return (
+    // eslint-disable-next-line tailwindcss/no-contradicting-classname -- btn-block is DaisyUI, not CSS block
+    <button
+      onClick={handleClick}
+      className={`
+        btn btn-block flex h-auto items-center justify-start gap-2 px-3 py-2 normal-case
+        ${isSelected ? "btn-primary" : "btn-outline bg-base-100"}
+        ${isDisabled ? "tooltip cursor-not-allowed opacity-50" : ""}
+      `}
+      disabled={isDisabled}
+      data-tip={
+        isDisabled
+          ? hasZeroBalance
+            ? "Zero balance"
+            : !collateral.supported
+              ? `Not supported in ${selectedProtocol}`
+              : ""
+          : undefined
+      }
+    >
+      <div className="relative size-6 flex-shrink-0">
+        <Image
+          src={tokenNameToLogo(collateral.symbol)}
+          alt={collateral.symbol}
+          fill
+          className="rounded-full object-contain"
+        />
+      </div>
+      <div className="flex flex-col items-start overflow-hidden">
+        <span className="w-full truncate font-medium">{collateral.symbol}</span>
+        <span className="text-xs tabular-nums opacity-70">
+          {formatBalance(collateral.balance)}
+        </span>
+      </div>
+      {!collateral.supported && <span className="bg-base-300 ml-auto rounded-full px-1 text-xs">!</span>}
+      {hasZeroBalance && <span className="bg-base-300 ml-auto rounded-full px-1 text-xs">0</span>}
+    </button>
+  );
+};
+
+// Sub-component for rendering a selected collateral with amount input
+interface CollateralInputRowProps {
+  collateral: CollateralWithAmount;
+  selectedProtocol?: string;
+  onAmountChange: (token: string, amountStr: string, decimals: number) => void;
+  onSetMax: (token: string) => void;
+  onRemove: (token: string) => void;
+  formatMaxAmount: (value: string | number) => string;
+}
+
+const CollateralInputRow: FC<CollateralInputRowProps> = ({
+  collateral,
+  selectedProtocol,
+  onAmountChange,
+  onSetMax,
+  onRemove,
+  formatMaxAmount,
+}) => {
+  // Format human-readable amount for display
+  const displayAmount = collateral.inputValue
+    ? collateral.inputValue
+    : collateral.amount === 0n
+      ? ""
+      : formatUnits(collateral.amount, collateral.decimals);
+
+  // Format max amount for display
+  const maxAmountStr = formatUnits(collateral.maxAmount, collateral.decimals);
+  const maxAmount = formatMaxAmount(maxAmountStr);
+
+  // Check if this collateral is supported in the current protocol
+  const isSupported = collateral.supported;
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onAmountChange(collateral.token, e.target.value, collateral.decimals);
+  }, [onAmountChange, collateral.token, collateral.decimals]);
+
+  const handleMaxClick = useCallback(() => {
+    onSetMax(collateral.token);
+  }, [onSetMax, collateral.token]);
+
+  const handleRemoveClick = useCallback(() => {
+    onRemove(collateral.token);
+  }, [onRemove, collateral.token]);
+
+  return (
+    <div
+      className={`bg-base-100 border-base-300/50 flex items-center gap-3 rounded-md border px-3 py-2.5 shadow-sm ${!isSupported ? 'opacity-60' : ''}`}
+    >
+      {/* Left side: Token icon and info - fixed width */}
+      <div className="flex w-[160px] flex-shrink-0 items-center gap-2">
+        <div className="relative size-7 flex-shrink-0">
+          <Image
+            src={tokenNameToLogo(collateral.symbol)}
+            alt={collateral.symbol}
+            fill
+            className={`rounded-full object-contain ${!isSupported ? 'grayscale' : ''}`}
+          />
+        </div>
+        <div className="flex flex-col overflow-hidden">
+          <span className="truncate font-medium">{collateral.symbol}</span>
+          <span className="text-base-content/60 text-xs">
+            Available: {maxAmount}
+          </span>
+          {!isSupported && (
+            <span className="text-error/80 text-xs">Not supported in {selectedProtocol}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Input field - takes remaining space */}
+      <div className="flex-1">
+        <div className={`bg-base-200/60 border-base-300 focus-within:border-primary focus-within:ring-primary/30 flex items-center rounded-lg border transition-all focus-within:ring-1 ${!isSupported ? 'opacity-50' : ''}`}>
+          <input
+            type="text"
+            value={displayAmount}
+            onChange={handleChange}
+            className="text-base-content h-10 flex-1 border-none bg-transparent px-3 py-2 focus:outline-none"
+            placeholder="0.00"
+            disabled={!isSupported}
+          />
+          <button
+            className={`bg-base-300 hover:bg-primary text-base-content/70 mr-2 rounded px-2 py-0.5 text-xs font-medium transition-colors duration-200 hover:text-white ${!isSupported ? 'cursor-not-allowed opacity-50' : ''}`}
+            onClick={handleMaxClick}
+            disabled={!isSupported}
+          >
+            MAX
+          </button>
+        </div>
+      </div>
+
+      {/* Remove button - fixed width */}
+      <div className="flex-shrink-0">
+        <button
+          className="btn btn-ghost btn-sm text-base-content/70 hover:bg-error/10 hover:text-error flex size-8 items-center justify-center p-1"
+          onClick={handleRemoveClick}
+          title="Remove collateral"
+        >
+          <XMarkIcon className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export const CollateralSelector: FC<CollateralSelectorProps> = ({
   collaterals,
   isLoading,
   selectedProtocol,
-  marketToken,
   onCollateralSelectionChange,
   onMaxClick,
   hideAmounts = false,
@@ -58,7 +226,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSelectedCollaterals]);
-  
+
   // Create a memoized version of the collateral support mapping
   const collateralSupportMap = useMemo(() => {
     return collaterals.reduce((acc, collateral) => {
@@ -66,30 +234,30 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
       return acc;
     }, {} as Record<string, boolean>);
   }, [collaterals]);
-  
+
   // Sort collaterals to show selectable ones first, then by balance, then alphabetically
   const sortedCollaterals = useMemo(() => {
     return [...collaterals].sort((a, b) => {
       const aSelectable = a.supported && a.rawBalance > 0n;
       const bSelectable = b.supported && b.rawBalance > 0n;
-      
+
       // Primary sort: selectable items first
       if (aSelectable && !bSelectable) return -1;
       if (!aSelectable && bSelectable) return 1;
-      
+
       // Secondary sort: if both are selectable, sort by balance (descending)
       if (aSelectable && bSelectable) {
         if (a.balance > b.balance) return -1;
         if (a.balance < b.balance) return 1;
       }
-      
+
       // Tertiary sort: alphabetically by symbol
       return a.symbol.localeCompare(b.symbol);
     });
   }, [collaterals]);
-  
+
   // Format max amount with fewer decimals
-  const formatMaxAmount = (value: string | number) => {
+  const formatMaxAmount = useCallback((value: string | number) => {
     const num = typeof value === "string" ? parseFloat(value) : value;
     if (isNaN(num)) return "0.00";
     // For very small numbers, show limited precision
@@ -98,29 +266,29 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2, // Limit to 2 decimal places
     }).format(num);
-  };
+  }, []);
 
   // Format balance with limited decimal places
-  const formatBalance = (balance: number) => {
+  const formatBalance = useCallback((balance: number) => {
     // For very small numbers, show more precision
     if (balance > 0 && balance < 0.01) return "<0.01";
-    
+
     // For larger numbers, limit to 2 decimal places
     return balance.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-  };
+  }, []);
 
   // Handle selecting a collateral
-  const handleCollateralToggle = (collateral: CollateralToken) => {
+  const handleCollateralToggle = useCallback((collateral: CollateralToken) => {
     // Don't allow selection if the collateral is not supported or has zero balance
     if (!collateral.supported || collateral.rawBalance <= 0n) return;
-    
+
     setSelectedCollaterals(prev => {
       // Check if collateral is already selected
       const existingIndex = prev.findIndex(c => c.token === collateral.address);
-      
+
       if (existingIndex >= 0) {
         // Remove it if already selected
         return prev.filter(c => c.token !== collateral.address);
@@ -140,31 +308,31 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
         ];
       }
     });
-  };
+  }, []);
 
   // Update selected collaterals when protocol changes
   useEffect(() => {
     if (!selectedProtocol) return;
-  
+
     // Update selected collaterals when collateral support changes
     setSelectedCollaterals(prev => {
       const updated = prev.map(c => ({
         ...c,
         supported: collateralSupportMap[c.token] ?? false,
       }));
-  
+
       // Check if any 'supported' value has changed
       const hasChanged = updated.some((collateral, index) => {
         return collateral.supported !== prev[index].supported;
       });
-  
+
       // Only update state if there's a difference
       return hasChanged ? updated : prev;
     });
   }, [collateralSupportMap, selectedProtocol]);
-  
+
   // Handle amount change for a selected collateral
-  const handleAmountChange = (token: string, amountStr: string, decimals: number) => {
+  const handleAmountChange = useCallback((token: string, amountStr: string, decimals: number) => {
     setSelectedCollaterals(prev => {
       return prev.map(c => {
         if (c.token === token) {
@@ -175,12 +343,12 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
               if (amountStr === "." || amountStr === "0." || /^\d+\.$/.test(amountStr)) {
                 return { ...c, amount: 0n, inputValue: amountStr };
               }
-              
+
               // For valid numbers, convert to bigint
               try {
                 // Check if the amount exceeds max before applying
                 let amount = parseUnits(amountStr, decimals);
-                
+
                 // If entered amount is greater than max, cap it at maximum
                 if (amount > c.maxAmount) {
                   amount = c.maxAmount;
@@ -189,7 +357,7 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
                   // Update inputValue to show max value
                   return { ...c, amount, inputValue: maxAmountStr };
                 }
-                
+
                 // Otherwise use the entered amount
                 return { ...c, amount, inputValue: undefined };
               } catch {
@@ -208,33 +376,37 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
         return c;
       });
     });
-  };
+  }, []);
 
   // Modify the handleSetMax function to call onMaxClick when provided
-  const handleSetMax = (token: string) => {
-    const selected = selectedCollaterals.find(c => c.token === token);
-    if (selected) {
+  const handleSetMax = useCallback((token: string) => {
+    setSelectedCollaterals(prev => {
+      const selected = prev.find(c => c.token === token);
+      if (!selected) return prev;
+
       const maxAmount = selected.maxAmount;
       const formattedMaxAmount = formatUnits(maxAmount, selected.decimals);
-      
-      // Update local state
-      const updated = selectedCollaterals.map(c =>
+
+      const updated = prev.map(c =>
         c.token === token ? { ...c, amount: maxAmount, inputValue: formattedMaxAmount } : c
       );
-      setSelectedCollaterals(updated);
-      onCollateralSelectionChange(updated);
-      
+
       // Call the onMaxClick handler if provided
       if (onMaxClick) {
         onMaxClick(token, maxAmount, formattedMaxAmount);
       }
-    }
-  };
+
+      // Notify parent of change
+      onCollateralSelectionChange(updated);
+
+      return updated;
+    });
+  }, [onMaxClick, onCollateralSelectionChange]);
 
   // Handle removing a collateral from the selected list
-  const handleRemoveCollateral = (token: string) => {
+  const handleRemoveCollateral = useCallback((token: string) => {
     setSelectedCollaterals(prev => prev.filter(c => c.token !== token));
-  };
+  }, []);
 
   // Update the parent component when selection changes
   useEffect(() => {
@@ -242,71 +414,44 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
   }, [selectedCollaterals, onCollateralSelectionChange]);
 
   // Check if a collateral is selected
-  const isCollateralSelected = (address: string) => {
+  const isCollateralSelected = useCallback((address: string) => {
     return selectedCollaterals.some(c => c.token === address);
-  };
+  }, [selectedCollaterals]);
 
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <label className="text-sm font-medium text-base-content/80">Select Collateral to Move</label>
+        <label className="text-base-content/80 text-sm font-medium">Select Collateral to Move</label>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-6 bg-base-200/50 rounded-lg">
-          <span className="loading loading-spinner loading-md"></span>
-          <span className="ml-2 text-base-content/70">Checking collateral support...</span>
+        <div className="bg-base-200/50 flex items-center justify-center rounded-lg py-6">
+          <LoadingSpinner size="md" label="Checking collateral support..." />
         </div>
       ) : sortedCollaterals.length > 0 ? (
-        <div className="bg-base-200/30 p-4 rounded-lg">
+        <div className="bg-base-200/30 rounded-lg p-4">
           <div className="space-y-2">
             {sortedCollaterals.map(collateral => {
               const hasZeroBalance = collateral.rawBalance <= 0n;
               const isDisabled = !collateral.supported || hasZeroBalance;
 
               return (
-                <button
+                <CollateralButton
                   key={collateral.address}
-                  onClick={() => handleCollateralToggle(collateral)}
-                  className={`
-                    btn btn-block h-auto py-2 px-3 normal-case flex items-center gap-2 justify-start
-                    ${isCollateralSelected(collateral.address) ? "btn-primary" : "btn-outline bg-base-100"}
-                    ${isDisabled ? "opacity-50 cursor-not-allowed tooltip" : ""}
-                  `}
-                  disabled={isDisabled}
-                  data-tip={
-                    isDisabled
-                      ? hasZeroBalance
-                        ? "Zero balance"
-                        : !collateral.supported
-                          ? `Not supported in ${selectedProtocol}`
-                          : ""
-                      : undefined
-                  }
-                >
-                  <div className="w-6 h-6 relative flex-shrink-0">
-                    <Image
-                      src={tokenNameToLogo(collateral.symbol)}
-                      alt={collateral.symbol}
-                      fill
-                      className="rounded-full object-contain"
-                    />
-                  </div>
-                  <div className="flex flex-col items-start overflow-hidden">
-                    <span className="truncate font-medium w-full">{collateral.symbol}</span>
-                    <span className="text-xs opacity-70 tabular-nums">
-                      {formatBalance(collateral.balance)}
-                    </span>
-                  </div>
-                  {!collateral.supported && <span className="text-xs px-1 bg-base-300 rounded-full ml-auto">!</span>}
-                  {hasZeroBalance && <span className="text-xs px-1 bg-base-300 rounded-full ml-auto">0</span>}
-                </button>
+                  collateral={collateral}
+                  isSelected={isCollateralSelected(collateral.address)}
+                  isDisabled={isDisabled}
+                  hasZeroBalance={hasZeroBalance}
+                  selectedProtocol={selectedProtocol}
+                  onToggle={handleCollateralToggle}
+                  formatBalance={formatBalance}
+                />
               );
             })}
           </div>
         </div>
       ) : (
-        <div className="text-base-content/70 text-center p-6 bg-base-200/50 rounded-lg">
+        <div className="text-base-content/70 bg-base-200/50 rounded-lg p-6 text-center">
           No collateral available to move
         </div>
       )}
@@ -314,88 +459,22 @@ export const CollateralSelector: FC<CollateralSelectorProps> = ({
       {/* Vertical list of selected collaterals with amount inputs */}
       {!hideAmounts && selectedCollaterals.length > 0 && (
         <div className="mt-4 space-y-2">
-          <label className="block text-lg font-semibold text-center">Collateral</label>
-          <div className="bg-base-200/40 p-4 rounded-lg space-y-3">
-            {selectedCollaterals.map((collateral) => {
-              // Format human-readable amount for display
-              const displayAmount = collateral.inputValue 
-                ? collateral.inputValue
-                : collateral.amount === 0n 
-                  ? "" 
-                  : formatUnits(collateral.amount, collateral.decimals);
-              
-              // Format max amount for display
-              const maxAmountStr = formatUnits(collateral.maxAmount, collateral.decimals);
-              const maxAmount = formatMaxAmount(maxAmountStr);
-              
-              // Check if this collateral is supported in the current protocol
-              const isSupported = collateral.supported;
-              
-              return (
-                <div 
-                  key={collateral.token} 
-                  className={`flex items-center gap-3 py-2.5 px-3 rounded-md bg-base-100 border border-base-300/50 shadow-sm ${!isSupported ? 'opacity-60' : ''}`}
-                >
-                  {/* Left side: Token icon and info - fixed width */}
-                  <div className="flex items-center gap-2 w-[160px] flex-shrink-0">
-                    <div className="w-7 h-7 relative flex-shrink-0">
-                      <Image
-                        src={tokenNameToLogo(collateral.symbol)}
-                        alt={collateral.symbol}
-                        fill
-                        className={`rounded-full object-contain ${!isSupported ? 'grayscale' : ''}`}
-                      />
-                    </div>
-                    <div className="flex flex-col overflow-hidden">
-                      <span className="font-medium truncate">{collateral.symbol}</span>
-                      <span className="text-xs text-base-content/60">
-                        Available: {maxAmount}
-                      </span>
-                      {!isSupported && (
-                        <span className="text-xs text-error/80">Not supported in {selectedProtocol}</span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Input field - takes remaining space */}
-                  <div className="flex-1">
-                    <div className={`flex items-center bg-base-200/60 rounded-lg border border-base-300 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all ${!isSupported ? 'opacity-50' : ''}`}>
-                      <input
-                        type="text"
-                        value={displayAmount}
-                        onChange={(e) => handleAmountChange(collateral.token, e.target.value, collateral.decimals)}
-                        className="flex-1 bg-transparent border-none focus:outline-none px-3 py-2 h-10 text-base-content"
-                        placeholder="0.00"
-                        disabled={!isSupported}
-                      />
-                      <button
-                        className={`mr-2 px-2 py-0.5 text-xs font-medium bg-base-300 hover:bg-primary hover:text-white text-base-content/70 rounded transition-colors duration-200 ${!isSupported ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={() => {
-                          handleSetMax(collateral.token);
-                        }}
-                        disabled={!isSupported}
-                      >
-                        MAX
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Remove button - fixed width */}
-                  <div className="flex-shrink-0">
-                    <button
-                      className="btn btn-ghost btn-sm text-base-content/70 p-1 h-8 w-8 flex items-center justify-center hover:bg-error/10 hover:text-error"
-                      onClick={() => handleRemoveCollateral(collateral.token)}
-                      title="Remove collateral"
-                    >
-                      <XMarkIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+          <label className="block text-center text-lg font-semibold">Collateral</label>
+          <div className="bg-base-200/40 space-y-3 rounded-lg p-4">
+            {selectedCollaterals.map((collateral) => (
+              <CollateralInputRow
+                key={collateral.token}
+                collateral={collateral}
+                selectedProtocol={selectedProtocol}
+                onAmountChange={handleAmountChange}
+                onSetMax={handleSetMax}
+                onRemove={handleRemoveCollateral}
+                formatMaxAmount={formatMaxAmount}
+              />
+            ))}
           </div>
         </div>
       )}
     </div>
   );
-}; 
+};

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const MORPHO_GRAPHQL_API = "https://blue-api.morpho.org/graphql";
+import { MORPHO_GRAPHQL_API } from "~~/utils/constants";
 
 // Optimized query with server-side filtering support
 // Key filters: utilization_lte, supplyAssetsUsd_gte reduce junk at API level

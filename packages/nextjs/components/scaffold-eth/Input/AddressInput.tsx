@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { blo } from "blo";
 import { useDebounceValue } from "usehooks-ts";
 import { Address, isAddress } from "viem";
@@ -78,6 +78,41 @@ export const AddressInput = ({ value, name, placeholder, onChange, disabled }: C
     ensName === null ||
     ensAddress === null;
 
+  const prefix = useMemo(() => {
+    if (ensName) {
+      return (
+        <div className="bg-base-300 flex items-center rounded-l-full">
+          {isEnsAvatarLoading && <div className="skeleton bg-base-200 size-[35px] shrink-0 rounded-full"></div>}
+          {ensAvatar ? (
+            <span className="w-[35px]">
+              {
+                // eslint-disable-next-line
+                <img className="w-full rounded-full" src={ensAvatar} alt={`${ensAddress} avatar`} />
+              }
+            </span>
+          ) : null}
+          <span className="text-accent px-2">{enteredEnsName ?? ensName}</span>
+        </div>
+      );
+    }
+    if (isEnsNameLoading || isEnsAddressLoading) {
+      return (
+        <div className="bg-base-300 flex items-center gap-2 rounded-l-full pr-2">
+          <div className="skeleton bg-base-200 size-[35px] shrink-0 rounded-full"></div>
+          <div className="skeleton bg-base-200 h-3 w-20"></div>
+        </div>
+      );
+    }
+    return null;
+  }, [ensName, isEnsAvatarLoading, ensAvatar, ensAddress, enteredEnsName, isEnsNameLoading, isEnsAddressLoading]);
+
+  const suffix = useMemo(() => {
+    if (!value) return null;
+    // Don't want to use nextJS Image here (and adding remote patterns for the URL)
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img alt="" className="!rounded-full" src={blo(value as `0x${string}`)} width="35" height="35" />;
+  }, [value]);
+
   return (
     <InputBase<Address>
       name={name}
@@ -87,34 +122,8 @@ export const AddressInput = ({ value, name, placeholder, onChange, disabled }: C
       onChange={onChange}
       disabled={isEnsAddressLoading || isEnsNameLoading || disabled}
       reFocus={reFocus}
-      prefix={
-        ensName ? (
-          <div className="flex bg-base-300 rounded-l-full items-center">
-            {isEnsAvatarLoading && <div className="skeleton bg-base-200 w-[35px] h-[35px] rounded-full shrink-0"></div>}
-            {ensAvatar ? (
-              <span className="w-[35px]">
-                {
-                  // eslint-disable-next-line
-                  <img className="w-full rounded-full" src={ensAvatar} alt={`${ensAddress} avatar`} />
-                }
-              </span>
-            ) : null}
-            <span className="text-accent px-2">{enteredEnsName ?? ensName}</span>
-          </div>
-        ) : (
-          (isEnsNameLoading || isEnsAddressLoading) && (
-            <div className="flex bg-base-300 rounded-l-full items-center gap-2 pr-2">
-              <div className="skeleton bg-base-200 w-[35px] h-[35px] rounded-full shrink-0"></div>
-              <div className="skeleton bg-base-200 h-3 w-20"></div>
-            </div>
-          )
-        )
-      }
-      suffix={
-        // Don't want to use nextJS Image here (and adding remote patterns for the URL)
-        // eslint-disable-next-line @next/next/no-img-element
-        value && <img alt="" className="!rounded-full" src={blo(value as `0x${string}`)} width="35" height="35" />
-      }
+      prefix={prefix}
+      suffix={suffix}
     />
   );
 };

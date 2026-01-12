@@ -2,9 +2,14 @@ import Image from "next/image";
 import React, { type FC } from "react";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 
+// Static objects for disabled actions - extracted to avoid creating new objects on each render
+const DISABLED_SUPPLY_ACTIONS = { deposit: false, withdraw: false, move: false } as const;
+const DISABLED_BORROW_ACTIONS = { borrow: false, repay: false, move: false } as const;
+
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { SupplyPosition } from "~~/components/SupplyPosition";
+import { LoadingSpinner } from "~~/components/common/Loading";
 import formatPercentage from "~~/utils/formatPercentage";
 
 interface VesuMarketSectionProps {
@@ -56,7 +61,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   const renderMarketContent = () => {
     if (assetsError) {
       return (
-        <div className="rounded-md bg-error/10 p-4 text-sm text-error">
+        <div className="bg-error/10 text-error rounded-md p-4 text-sm">
           Error loading markets. Please try again later.
           {headerExtra && <div className="ml-auto flex items-center">{headerExtra}</div>}
         </div>
@@ -66,14 +71,14 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
     if (isLoadingAssets) {
       return (
         <div className="flex justify-center py-8">
-          <span className="loading loading-spinner loading-md" />
+          <LoadingSpinner size="md" />
         </div>
       );
     }
 
     if (suppliablePositions.length === 0 && borrowablePositions.length === 0) {
       return (
-        <div className="rounded-md bg-base-200/60 p-4 text-center text-sm text-base-content/70">
+        <div className="bg-base-200/60 text-base-content/70 rounded-md p-4 text-center text-sm">
           No markets available
         </div>
       );
@@ -84,7 +89,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
         {suppliablePositions.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+              <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">
                 Suppliable assets
               </div>
               <button
@@ -103,7 +108,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
                 protocolName={protocolName}
                 networkType="starknet"
                 hideBalanceColumn
-                availableActions={{ deposit: false, withdraw: false, move: false }}
+                availableActions={DISABLED_SUPPLY_ACTIONS}
                 showInfoDropdown={false}
               />
             ))}
@@ -112,7 +117,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
 
         {borrowablePositions.length > 0 && (
           <div className="space-y-3">
-            <div className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+            <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">
               Borrowable assets
             </div>
             {borrowablePositions.map(position => (
@@ -122,7 +127,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
                 protocolName={protocolName}
                 networkType="starknet"
                 hideBalanceColumn
-                availableActions={{ borrow: false, repay: false, move: false }}
+                availableActions={DISABLED_BORROW_ACTIONS}
                 showInfoDropdown={false}
               />
             ))}
@@ -133,46 +138,46 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   };
 
   return (
-    <div className="card bg-gradient-to-r from-base-100 to-base-100/95 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl border border-base-200/50">
+    <div className="card from-base-100 to-base-100/95 border-base-200/50 rounded-xl border bg-gradient-to-r shadow-lg transition-all duration-300 hover:shadow-xl">
       <div className="card-body px-5 py-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
           {/* Protocol name + icon */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 p-2 flex items-center justify-center shadow-sm ring-1 ring-base-300/30">
+            <div className="token-icon-wrapper-lg">
               <Image src={iconSrc} alt={`${title} icon`} width={24} height={24} className="object-contain drop-shadow-sm" />
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Protocol</span>
+              <span className="label-text-xs-semibold">Protocol</span>
               <span className="text-base font-bold tracking-tight">{title}</span>
             </div>
           </div>
 
           {/* Divider */}
-          <div className="hidden sm:block w-px h-10 bg-gradient-to-b from-transparent via-base-300 to-transparent" />
+          <div className="via-base-300 hidden h-10 w-px bg-gradient-to-b from-transparent to-transparent sm:block" />
 
           {/* Stats - spread evenly across available space */}
           {userAddress && (
-            <div className="flex-1 flex flex-wrap items-center justify-around gap-y-3">
+            <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
               {/* Net Balance */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Balance</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
+              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
+                <span className="label-text-xs-semibold">Balance</span>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${netBalanceUsd >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netBalanceUsd)}
                 </span>
               </div>
 
               {/* 30D Yield */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">30D Yield</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
+              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
+                <span className="label-text-xs-semibold">30D Yield</span>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${netYield30d >= 0 ? "text-success" : "text-error"}`}>
                   {formatCurrency(netYield30d)}
                 </span>
               </div>
 
               {/* Net APY */}
-              <div className="group flex flex-col gap-1 items-center px-3 py-1 rounded-lg transition-colors hover:bg-base-200/30">
-                <span className="text-[10px] uppercase tracking-widest text-base-content/35 font-semibold">Net APY</span>
-                <span className={`text-sm font-mono font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
+              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
+                <span className="label-text-xs-semibold">Net APY</span>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${netApyPercent == null ? "text-base-content/40" : netApyPercent >= 0 ? "text-success" : "text-error"}`}>
                   {netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)}
                 </span>
               </div>
@@ -180,23 +185,23 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
           )}
 
           {/* Right side - status message + actions */}
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="ml-auto flex items-center gap-3">
             {!userAddress ? (
-              <span className="text-[11px] text-primary/80 font-medium">Connect Starknet wallet</span>
+              <span className="text-primary/80 text-[11px] font-medium">Connect Starknet wallet</span>
             ) : hasPositions ? (
-              <span className="hidden md:inline text-[10px] text-base-content/40">Managing positions</span>
+              <span className="text-base-content/40 hidden text-[10px] md:inline">Managing positions</span>
             ) : null}
-            <div className="flex items-center gap-2 pl-2 border-l border-base-300/50">
+            <div className="border-base-300/50 flex items-center gap-2 border-l pl-2">
               <button className="btn btn-sm btn-ghost gap-1.5" type="button" onClick={onToggle}>
-                <span className="text-[10px] uppercase tracking-widest font-semibold">Markets</span>
-                {isOpen ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
+                <span className="text-[10px] font-semibold uppercase tracking-widest">Markets</span>
+                {isOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}
               </button>
               {headerExtra}
             </div>
           </div>
         </div>
 
-        {isOpen && <div className="space-y-4 border-t border-base-200/50 pt-4 mt-3">{renderMarketContent()}</div>}
+        {isOpen && <div className="border-base-200/50 mt-3 space-y-4 border-t pt-4">{renderMarketContent()}</div>}
       </div>
     </div>
   );

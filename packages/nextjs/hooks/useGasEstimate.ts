@@ -8,6 +8,7 @@ import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
 import { useGlobalState } from "~~/services/store/store";
 import { weiToEth, friToStrk } from "~~/lib/feeUnits";
 import { universalStrkAddress } from "~~/utils/Constants";
+import { DEBOUNCE_DELAYS } from "~~/hooks/useDebouncedEffect";
 
 type BuildCalls =
   | (() => Call | Call[] | null | undefined | Promise<Call | Call[] | null | undefined>)
@@ -26,7 +27,7 @@ export function useGasEstimate(opts: {
     enabled,
     buildCalls,
     currency = "ETH",
-    debounceMs = 300,
+    debounceMs = DEBOUNCE_DELAYS.FAST,
     preferPaymaster = true,
   } = opts;
 

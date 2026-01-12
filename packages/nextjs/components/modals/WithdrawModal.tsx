@@ -1,6 +1,7 @@
 import { FC, useCallback } from "react";
 import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { formatUnits } from "viem";
+import { BatchingPreference } from "./common/BatchingPreference";
+import { useWithdrawModalConfig } from "./common/useWithdrawModalConfig";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { PositionManager } from "~~/utils/position";
@@ -61,44 +62,33 @@ export const WithdrawModal: FC<WithdrawModalProps> = ({
   });
   const { enabled: preferBatching, setEnabled: setPreferBatching, isLoaded: isPreferenceLoaded } = batchingPreference;
 
-  if (token.decimals == null) {
-    token.decimals = decimals;
-  }
-  
-  const before = decimals ? Number(formatUnits(supplyBalance, decimals)) : 0;
-  const maxInput = (supplyBalance * 101n) / 100n;
+  const { commonModalProps } = useWithdrawModalConfig({ token, supplyBalance });
+
+  const renderBatchingPreference = useCallback(
+    () => (
+      <BatchingPreference
+        enabled={preferBatching}
+        setEnabled={setPreferBatching}
+        isLoaded={isPreferenceLoaded}
+      />
+    ),
+    [preferBatching, setPreferBatching, isPreferenceLoaded],
+  );
 
   return (
     <TokenActionModal
       isOpen={isOpen}
       onClose={onClose}
-      action="Withdraw"
+      {...commonModalProps}
       token={token}
       protocolName={protocolName}
-      apyLabel="Supply APY"
       apy={token.currentRate}
-      metricLabel="Total supplied"
-      before={before}
       balance={supplyBalance}
-      percentBase={supplyBalance}
-      max={maxInput}
       network="evm"
       chainId={chainId}
       position={position}
       onConfirm={handleConfirm}
-      renderExtraContent={() => isPreferenceLoaded ? (
-        <div className="pt-2 pb-1">
-          <label className="label cursor-pointer gap-2 justify-start">
-            <input
-              type="checkbox"
-              checked={preferBatching}
-              onChange={(e) => setPreferBatching(e.target.checked)}
-              className="checkbox checkbox-sm"
-            />
-            <span className="label-text text-xs">Batch Transactions with Smart Account</span>
-          </label>
-        </div>
-      ) : null}
+      renderExtraContent={renderBatchingPreference}
     />
   );
 };

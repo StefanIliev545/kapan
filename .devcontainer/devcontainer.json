@@ -31,6 +31,8 @@
 		"source=opencode-config,target=/home/node/.config/opencode,type=volume",
 		// 2. Keep OpenCode History (Past chats/sessions)
 		"source=opencode-data,target=/home/node/.local/share/opencode,type=volume",
+		// 3. Keep Claude Code Config (Settings/API keys)
+		"source=claude-config,target=/home/node/.config/claude-code,type=volume",
 		// Persist VS Code server extensions between rebuilds
 		"source=vscode-extensions,target=/home/node/.vscode-server/extensions,type=volume",
 		// Persist VS Code server user data (includes globalStorage/secret storage used by extensions)
@@ -44,12 +46,15 @@
 				"NomicFoundation.hardhat-solidity",
 				"StarkWare.cairo1",
 				"tamasfe.even-better-toml",
-				"openai.chatgpt"
+				"openai.chatgpt",
+				"anthropic.claude-code"
 			]
 		}
 	},
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo chown -R node:node /home/node/.local/share/opencode /home/node/.config/opencode /home/node/.npm && curl -fsSL https://opencode.ai/install | bash && npm install -g @beads/bd && echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc && echo 'OpenCode + Beads Installed ✅'"
+	"postCreateCommand": "sudo mkdir -p /home/node/.local/state && sudo chown -R node:node /home/node/.local/share/opencode /home/node/.local/state /home/node/.config/opencode /home/node/.config/claude-code /home/node/.npm /home/node/.vscode-server /home/node/.local/share/pnpm 2>/dev/null || true && curl -fsSL https://opencode.ai/install | bash && npm install -g @beads/bd && echo \"alias cursor-tools='yarn cursor-tools'\" >> ~/.bashrc && echo \"alias ct='npx cursor-tools'\" >> ~/.bashrc && echo 'OpenCode + Beads + Claude Code Installed ✅'",
+	// Use 'postStartCommand' to run commands after the container starts (fixes permissions on mounted volumes)
+	"postStartCommand": "sudo chown -R node:node /home/node/.local/share/opencode /home/node/.config/opencode /home/node/.config/claude-code /home/node/.vscode-server /home/node/.local/share/pnpm 2>/dev/null || true"
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	// "remoteUser": "root"
 }

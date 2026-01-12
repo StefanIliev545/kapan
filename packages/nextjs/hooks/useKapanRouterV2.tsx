@@ -35,10 +35,10 @@ import {
   encodeFlashLoan,
   encodeSplit,
   encodeAdd,
-  FlashLoanProvider,
   LendingOp,
   normalizeProtocolName,
 } from "~~/utils/v2/instructionHelpers";
+import { FlashLoanProvider, FlashLoanVersion, versionToProviderEnum } from "~~/utils/flashLoan";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth/useDeployedContractInfo";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { simulateTransaction, formatErrorForDisplay, decodeRevertReason } from "~~/utils/errorDecoder";
@@ -111,6 +111,145 @@ const isZeroAmountApproval = (data: `0x${string}` | undefined): boolean => {
   }
 };
 
+// --- Error Handling Helpers ---
+
+/**
+ * Check if an error represents a user rejection
+ */
+const isUserRejection = (error: any): boolean => {
+  const errorMessage = error?.message || "";
+  const lowerMessage = errorMessage.toLowerCase();
+
+  const rejectionPhrases = [
+    "user rejected",
+    "user denied",
+    "user cancelled",
+    "rejected",
+    "denied",
+    "cancelled",
+  ];
+
+  const rejectionCodes = [4001, "ACTION_REJECTED", "USER_REJECTED"];
+
+  return (
+    rejectionPhrases.some(phrase => lowerMessage.includes(phrase)) ||
+    rejectionCodes.includes(error?.code)
+  );
+};
+
+/**
+ * Extract hex data from various error formats
+ */
+const extractHexData = (data: unknown): string => {
+  if (!data) return "";
+  if (typeof data === "string" && data.startsWith("0x")) return data;
+
+  if (typeof data === "object" && data !== null) {
+    if ("data" in data && typeof (data as any).data === "string") {
+      return (data as any).data;
+    }
+    const str = String(data);
+    const match = str.match(/(0x[a-fA-F0-9]{8,})/);
+    return match ? match[1] : "";
+  }
+
+  return "";
+};
+
+/**
+ * Extract revert data from an error object
+ */
+const extractRevertData = (error: any): string => {
+  const errorMessage = error?.message || "";
+
+  // Try various sources for revert data
+  let revertData = extractHexData(error?.cause?.data) ||
+                   extractHexData(error?.data) ||
+                   "";
+
+  // Try to extract from error message if not found
+  if (!revertData && errorMessage) {
+    const match = errorMessage.match(/return data: (0x[a-fA-F0-9]+)/i) ||
+                  errorMessage.match(/data: (0x[a-fA-F0-9]+)/i) ||
+                  errorMessage.match(/(0x[a-fA-F0-9]{8,})/);
+    if (match) {
+      revertData = match[1];
+    }
+  }
+
+  return revertData;
+};
+
+/**
+ * Format an error into a user-friendly message
+ */
+const formatExecutionError = (error: any): string => {
+  if (isUserRejection(error)) {
+    return "User rejected the request";
+  }
+
+  const revertData = extractRevertData(error);
+
+  if (revertData && revertData.length >= 10) {
+    const decoded = decodeRevertReason(revertData);
+    const formatted = formatErrorForDisplay(decoded);
+    return formatted.suggestion
+      ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
+      : `${formatted.title}: ${formatted.description}`;
+  }
+
+  return error.shortMessage || error.message || "Failed to execute instructions";
+};
+
+/**
+ * Check if an authorization call should be skipped
+ */
+const shouldSkipAuthCall = (authCall: AuthorizationCall): boolean => {
+  if (!authCall.target || !authCall.data || authCall.data.length === 0) return true;
+  if (isZeroAmountApproval(authCall.data)) return true;
+  return false;
+};
+
+/**
+ * Check if deauthorization should be performed on this chain
+ * Disabled for Linea (59144) and Plasma (9745) due to batching issues
+ */
+const shouldRevokeOnChain = (chainId: number, revokePermissions?: boolean): boolean => {
+  if (!revokePermissions) return false;
+  const disabledChains = [59144, 9745]; // Linea, Plasma
+  return !disabledChains.includes(chainId);
+};
+
+/**
+ * Filter authorization calls to remove invalid/zero-amount approvals and deduplicate
+ */
+const filterValidAuthCalls = (authCalls: AuthorizationCall[]): AuthorizationCall[] => {
+  const seen = new Set<string>();
+  return authCalls.filter(call => {
+    if (shouldSkipAuthCall(call)) return false;
+    // Deduplicate by (target, data) pair
+    const key = `${call.target.toLowerCase()}:${call.data.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+/**
+ * Filter deauthorization calls to remove invalid ones and deduplicate
+ */
+const filterValidDeauthCalls = (deauthCalls: AuthorizationCall[]): AuthorizationCall[] => {
+  const seen = new Set<string>();
+  return deauthCalls.filter(({ target, data }) => {
+    if (!target || !data || data.length === 0) return false;
+    // Deduplicate by (target, data) pair
+    const key = `${target.toLowerCase()}:${data.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 /**
  * Hook for building and executing instructions on KapanRouter v2
  */
@@ -134,6 +273,7 @@ export const useKapanRouterV2 = () => {
     59144: 1,  // Linea
     59141: 1,  // Linea Sepolia
     31337: 1,  // Hardhat
+    130: 1,    // Unichain
   };
 
   const effectiveConfirmations = CONFIRMATIONS_BY_CHAIN[chainId] ?? 1;
@@ -218,20 +358,33 @@ export const useKapanRouterV2 = () => {
     const complete = isConfirmed || isBatchConfirmed;
     if (!complete) return;
 
-    Promise.all([
-      queryClient.refetchQueries({ queryKey: ['readContract'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
-      // Morpho-specific queries
-      queryClient.refetchQueries({ queryKey: ['morpho-positions'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['morpho-markets-support'], type: 'active' }),
-    ]).catch(e => logger.warn("Post-tx refetch err:", e));
+    const doRefetch = () => {
+      Promise.all([
+        queryClient.refetchQueries({ queryKey: ['readContract'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
+        // Morpho-specific queries
+        queryClient.refetchQueries({ queryKey: ['morpho-positions'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['morpho-markets-support'], type: 'active' }),
+      ]).catch(e => logger.warn("Post-tx refetch err:", e));
 
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("txCompleted"));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("txCompleted"));
+      }
+    };
+
+    // OP Stack chains with fast block times need a delay for RPC to index new state
+    const opStackFastChains = new Set([10, 8453, 130]); // Optimism, Base, Unichain
+    const delay = opStackFastChains.has(chainId) ? 2000 : 0;
+
+    if (delay > 0) {
+      const timer = setTimeout(doRefetch, delay);
+      return () => clearTimeout(timer);
+    } else {
+      doRefetch();
     }
-  }, [isConfirmed, isBatchConfirmed, queryClient]);
+  }, [isConfirmed, isBatchConfirmed, queryClient, chainId]);
 
   const encodeCompoundMarket = useCallback((marketAddress: Address): `0x${string}` => {
     return encodeAbiParameters([{ type: "address" }], [marketAddress]) as `0x${string}`;
@@ -568,7 +721,7 @@ export const useKapanRouterV2 = () => {
 
       // Flash loan repayment happens automatically - Router must have funds from Withdraw
     ];
-  }, [userAddress, encodeCompoundMarket]);
+  }, [userAddress]);
 
   type BuildMultiplyFlowParams = {
     protocolName: string;
@@ -849,7 +1002,7 @@ export const useKapanRouterV2 = () => {
       // NOTE: Output[7] (debt token) stays in router to repay flash loan
       // Any excess debt token from swap (beyond flash loan repayment) is dust in router
     ];
-  }, [userAddress, encodeCompoundMarket]);
+  }, [userAddress]);
 
   /**
    * Build a "swap debt A -> debt B" flow using a flash loan:
@@ -956,7 +1109,7 @@ export const useKapanRouterV2 = () => {
         encodeLendingInstruction(LendingOp.Borrow, debtToToken, userAddress, 0n, context, 1)
       ),
     ];
-  }, [userAddress, encodeCompoundMarket]);
+  }, [userAddress]);
 
   // --- Authorization Helpers ---
 
@@ -1091,6 +1244,64 @@ export const useKapanRouterV2 = () => {
     });
   }, []);
 
+  /**
+   * Check if a simulation error is definitely not related to missing approvals
+   * These are errors that would still occur even after approvals are executed
+   */
+  const isDefinitelyNotApprovalRelated = useCallback((errorText: string): boolean => {
+    const nonApprovalPatterns = /health.?factor|liquidation|borrow.?cap|supply.?cap|frozen|paused|insufficient.?collateral|siloed|isolation.?mode|debt.?ceiling/i;
+    return nonApprovalPatterns.test(errorText);
+  }, []);
+
+  /**
+   * Format a simulation error with title, description, and optional suggestion
+   */
+  const formatSimulationError = useCallback((formatted: ReturnType<typeof formatErrorForDisplay>): string => {
+    return formatted.suggestion
+      ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
+      : `${formatted.title}: ${formatted.description}`;
+  }, []);
+
+  /**
+   * Simulate authorization calls and throw on failure
+   */
+  const simulateAuthCalls = useCallback(async (
+    authCalls: AuthorizationCall[],
+    client: NonNullable<typeof publicClient>,
+    user: Address
+  ): Promise<void> => {
+    for (const { target, data } of authCalls) {
+      if (!target || !data) continue;
+
+      const authResult = await simulateTransaction(client, target as `0x${string}`, data, user as `0x${string}`);
+      if (!authResult.success && authResult.error) {
+        const formatted = formatErrorForDisplay(authResult.error);
+        throw new Error(formatSimulationError(formatted));
+      }
+    }
+  }, [formatSimulationError]);
+
+  /**
+   * Handle router simulation result, considering whether auth calls will be bundled
+   */
+  const handleRouterSimulationResult = useCallback((
+    simResult: { success: boolean; error?: any },
+    authCallsExist: boolean
+  ): void => {
+    if (simResult.success || !simResult.error) return;
+
+    const formatted = formatErrorForDisplay(simResult.error);
+    const errorText = `${formatted.description || ""} ${formatted.title || ""}`.toLowerCase();
+
+    // When auth calls exist, only fail on errors that are definitely not approval-related
+    if (authCallsExist && !isDefinitelyNotApprovalRelated(errorText)) {
+      logger.info("Skipping simulation error because authorization calls will be bundled:", formatted);
+      return;
+    }
+
+    throw new Error(formatSimulationError(formatted));
+  }, [isDefinitelyNotApprovalRelated, formatSimulationError]);
+
   const simulateInstructions = useCallback(
     async (instructions: ProtocolInstruction[], options?: { skipWhenAuthCallsExist?: boolean }) => {
       if (!routerContract || !userAddress || !publicClient) {
@@ -1102,31 +1313,19 @@ export const useKapanRouterV2 = () => {
         return;
       }
 
-      // 1) Get authorization calls first - we need to know if batching will include approvals
+      // Get authorization calls first - we need to know if batching will include approvals
       const authCalls = await getAuthorizations(instructions);
 
-      // 2) If caller requests to skip simulation when auth calls exist (for batched flows),
-      // skip entirely since simulation can't accurately predict atomic batch behavior.
-      // The approvals would be bundled atomically with the main tx, so simulating separately gives false negatives.
+      // Skip simulation when auth calls exist and caller requests it (for batched flows)
       if (options?.skipWhenAuthCallsExist && authCalls.length > 0) {
         logger.info("Skipping simulation for batched flow with authorization calls");
         return;
       }
 
-      // 3) Simulate authorization calls to surface readable errors (e.g. allowance issues)
-      for (const { target, data } of authCalls) {
-        if (!target || !data) continue;
-        const authResult = await simulateTransaction(publicClient, target as `0x${string}`, data, userAddress as `0x${string}`);
-        if (!authResult.success && authResult.error) {
-          const formatted = formatErrorForDisplay(authResult.error);
-          const errorMsg = formatted.suggestion
-            ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
-            : `${formatted.title}: ${formatted.description}`;
-          throw new Error(errorMsg);
-        }
-      }
+      // Simulate authorization calls to surface readable errors
+      await simulateAuthCalls(authCalls, publicClient, userAddress as Address);
 
-      // 4) Simulate the router call
+      // Simulate the router call
       const protocolInstructions = instructions.map(inst => ({
         protocolName: inst.protocolName,
         data: inst.data as `0x${string}`,
@@ -1145,32 +1344,9 @@ export const useKapanRouterV2 = () => {
         userAddress as `0x${string}`
       );
 
-      if (!simResult.success && simResult.error) {
-        const formatted = formatErrorForDisplay(simResult.error);
-        const errorText = `${formatted.description || ""} ${formatted.title || ""}`.toLowerCase();
-
-        // 5) When auth calls exist, only fail on errors that are DEFINITELY not approval-related.
-        // These are errors that would still occur even after approvals are executed:
-        if (authCalls.length > 0) {
-          const definitelyNotApprovalRelated =
-            /health.?factor|liquidation|borrow.?cap|supply.?cap|frozen|paused|insufficient.?collateral|siloed|isolation.?mode|debt.?ceiling/i.test(errorText);
-
-          if (!definitelyNotApprovalRelated) {
-            // Approvals will be bundled with execution, so skip failing on errors that might be
-            // caused by missing approvals. Common false negatives include ERC20 transfer failures,
-            // "unknown error" from protocols, etc.
-            logger.info("Skipping simulation error because authorization calls will be bundled:", formatted);
-            return;
-          }
-        }
-
-        const errorMsg = formatted.suggestion
-          ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
-          : `${formatted.title}: ${formatted.description}`;
-        throw new Error(errorMsg);
-      }
+      handleRouterSimulationResult(simResult, authCalls.length > 0);
     },
-    [routerContract, userAddress, publicClient, getAuthorizations, isBasicLendingFlow]
+    [routerContract, userAddress, publicClient, getAuthorizations, isBasicLendingFlow, simulateAuthCalls, handleRouterSimulationResult]
   );
 
   const executeInstructions = useCallback(async (
@@ -1248,70 +1424,9 @@ export const useKapanRouterV2 = () => {
       return transactionHash;
     } catch (error: any) {
       if (notificationId) notification.remove(notificationId);
-
       console.error("Error executing instructions:", error);
-      const errorMessage = error?.message || "";
-      const lowerMessage = errorMessage.toLowerCase();
-      const isRejection =
-        lowerMessage.includes("user rejected") ||
-        lowerMessage.includes("user denied") ||
-        lowerMessage.includes("user cancelled") ||
-        lowerMessage.includes("rejected") ||
-        lowerMessage.includes("denied") ||
-        lowerMessage.includes("cancelled") ||
-        error?.code === 4001 ||
-        error?.code === "ACTION_REJECTED" ||
-        error?.code === "USER_REJECTED";
 
-      let message = "Failed to execute instructions";
-      if (isRejection) {
-        message = "User rejected the request";
-      } else {
-        // Try to extract and decode revert data from the error
-        let revertData = "";
-
-        // Helper to extract hex string from various data formats
-        const extractHexData = (data: unknown): string => {
-          if (!data) return "";
-          if (typeof data === "string" && data.startsWith("0x")) return data;
-          if (typeof data === "object" && data !== null) {
-            // Check if it's an object with a data property
-            if ("data" in data && typeof (data as any).data === "string") {
-              return (data as any).data;
-            }
-            // Try to stringify and extract hex
-            const str = String(data);
-            const match = str.match(/(0x[a-fA-F0-9]{8,})/);
-            return match ? match[1] : "";
-          }
-          return "";
-        };
-
-        // Check various places where revert data might be
-        revertData = extractHexData(error?.cause?.data) ||
-                     extractHexData(error?.data) ||
-                     "";
-
-        // If still no revert data, try to extract from error message
-        if (!revertData && errorMessage) {
-          const match = errorMessage.match(/return data: (0x[a-fA-F0-9]+)/i) ||
-                        errorMessage.match(/data: (0x[a-fA-F0-9]+)/i) ||
-                        errorMessage.match(/(0x[a-fA-F0-9]{8,})/);
-          if (match) {
-            revertData = match[1];
-          }
-        }
-
-        if (revertData && revertData.length >= 10) {
-          const decoded = decodeRevertReason(revertData);
-          const formatted = formatErrorForDisplay(decoded);
-          message = formatted.suggestion
-            ? `${formatted.title}: ${formatted.description} ${formatted.suggestion}`
-            : `${formatted.title}: ${formatted.description}`;
-        } else {
-          message = error.shortMessage || error.message || message;
-        }
-      }
+      const message = formatExecutionError(error);
 
       notification.error(
         <TransactionToast
@@ -1325,6 +1440,172 @@ export const useKapanRouterV2 = () => {
     }
   }, [routerContract, userAddress, writeContractAsync, publicClient, effectiveConfirmations]);
 
+  /**
+   * Execute a single approval transaction with notifications
+   */
+  const executeSingleApproval = useCallback(async (
+    authCall: AuthorizationCall
+  ): Promise<void> => {
+    if (!publicClient || !walletClient || !userAddress) return;
+
+    const tokenAddress = authCall.target;
+    let tokenSymbol = tokenAddress.substring(0, 6) + "...";
+    try {
+      tokenSymbol = await publicClient.readContract({
+        address: tokenAddress,
+        abi: ERC20ABI,
+        functionName: "symbol",
+        args: [],
+      }) as string;
+    } catch { /* Use truncated address as fallback */ }
+
+    let approvalNotificationId: string | number | null = null;
+
+    try {
+      approvalNotificationId = notification.loading(
+        <TransactionToast step="pending" message={`Approving ${tokenSymbol}...`} />
+      );
+
+      const currentNonce = await publicClient.getTransactionCount({
+        address: userAddress as Address,
+      });
+
+      const approvalHash = await walletClient.sendTransaction({
+        account: userAddress as Address,
+        to: authCall.target,
+        data: authCall.data,
+        nonce: currentNonce,
+      });
+
+      notification.remove(approvalNotificationId);
+      approvalNotificationId = notification.loading(
+        <TransactionToast step="sent" txHash={approvalHash} message={`Approving ${tokenSymbol}...`} />
+      );
+
+      await publicClient.waitForTransactionReceipt({
+        hash: approvalHash as `0x${string}`,
+        confirmations: effectiveConfirmations,
+        pollingInterval: 1000,
+      });
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      notification.remove(approvalNotificationId);
+      notification.success(
+        <TransactionToast step="confirmed" txHash={approvalHash} message={`${tokenSymbol} approved`} />
+      );
+    } catch (error) {
+      if (approvalNotificationId) notification.remove(approvalNotificationId);
+      throw error;
+    }
+  }, [publicClient, walletClient, userAddress, effectiveConfirmations]);
+
+  /**
+   * Execute a single deauthorization transaction with notifications
+   */
+  const executeSingleDeauth = useCallback(async (
+    call: AuthorizationCall
+  ): Promise<void> => {
+    if (!publicClient || !walletClient || !userAddress) return;
+    if (!call.target || !call.data) return;
+
+    let deauthNotifId: string | number | null = null;
+
+    try {
+      deauthNotifId = notification.loading(
+        <TransactionToast step="pending" message="Revoking permissions..." />
+      );
+
+      const currentNonce = await publicClient.getTransactionCount({
+        address: userAddress as Address,
+      });
+
+      const hash = await walletClient.sendTransaction({
+        account: userAddress as Address,
+        to: call.target,
+        data: call.data,
+        nonce: currentNonce,
+      });
+
+      notification.remove(deauthNotifId);
+      deauthNotifId = notification.loading(
+        <TransactionToast step="sent" txHash={hash} message="Revoking permissions..." />
+      );
+
+      await publicClient.waitForTransactionReceipt({
+        hash,
+        confirmations: effectiveConfirmations,
+        pollingInterval: 1000,
+      });
+
+      notification.remove(deauthNotifId);
+      notification.success(
+        <TransactionToast step="confirmed" txHash={hash} message="Permissions revoked" />
+      );
+    } catch (e) {
+      if (deauthNotifId) notification.remove(deauthNotifId);
+      logger.warn("Deauth step failed", e);
+    }
+  }, [publicClient, walletClient, userAddress, effectiveConfirmations]);
+
+  /**
+   * Execute all approvals sequentially
+   */
+  const executeApprovalsSequentially = useCallback(async (
+    authCalls: AuthorizationCall[]
+  ): Promise<void> => {
+    const validCalls = filterValidAuthCalls(authCalls);
+
+    for (const authCall of validCalls) {
+      setIsApproving(true);
+      await executeSingleApproval(authCall);
+      setIsApproving(false);
+    }
+  }, [executeSingleApproval]);
+
+  /**
+   * Execute all deauthorizations sequentially
+   */
+  const executeDeauthsSequentially = useCallback(async (
+    deauthCalls: AuthorizationCall[]
+  ): Promise<void> => {
+    const validCalls = filterValidDeauthCalls(deauthCalls);
+
+    for (const call of validCalls) {
+      await executeSingleDeauth(call);
+    }
+  }, [executeSingleDeauth]);
+
+  /**
+   * Build atomic batch calls for router execution with optional deauthorizations
+   */
+  const buildAtomicBatchCalls = useCallback((
+    instructions: ProtocolInstruction[],
+    deauthCalls: AuthorizationCall[]
+  ): { to: Address; data: Hex; value: bigint }[] => {
+    if (!routerContract) return [];
+
+    const mainCall = {
+      to: routerContract.address as Address,
+      data: encodeFunctionData({
+        abi: routerContract.abi,
+        functionName: "processProtocolInstructions",
+        args: [instructions.map(inst => ({
+          protocolName: inst.protocolName,
+          data: inst.data as `0x${string}`,
+        }))],
+      }),
+      value: 0n,
+    };
+
+    const deauthCallsFormatted = deauthCalls.map(call => ({
+      to: call.target,
+      data: call.data,
+      value: 0n,
+    }));
+
+    return [mainCall, ...deauthCallsFormatted];
+  }, [routerContract]);
+
   const executeFlowWithApprovals = useCallback(async (
     instructions: ProtocolInstruction[],
     options?: { revokePermissions?: boolean }
@@ -1334,91 +1615,21 @@ export const useKapanRouterV2 = () => {
     }
 
     try {
-      // 1. Calculate Authorizations
+      // 1. Calculate and execute authorizations
       const authCalls = await getAuthorizations(instructions);
 
       if (authCalls.length === 0) {
         return await executeInstructions(instructions);
       }
 
-      // 2. Execute Approvals Sequentially
-      for (let i = 0; i < authCalls.length; i++) {
-        const authCall = authCalls[i];
-        if (!authCall.target || !authCall.data || authCall.data.length === 0) continue;
-        if (isZeroAmountApproval(authCall.data)) continue;
+      await executeApprovalsSequentially(authCalls);
 
-        setIsApproving(true);
-        const tokenAddress = authCall.target;
-        let tokenSymbol = tokenAddress.substring(0, 6) + "...";
-        try {
-          tokenSymbol = await publicClient.readContract({
-            address: tokenAddress,
-            abi: ERC20ABI,
-            functionName: "symbol",
-            args: [],
-          }) as string;
-        } catch { }
-
-        let approvalNotificationId: string | number | null = null;
-        let approvalHash: string | undefined = undefined;
-
-        try {
-          approvalNotificationId = notification.loading(
-            <TransactionToast step="pending" message={`Approving ${tokenSymbol}...`} />
-          );
-
-          const currentNonce = await publicClient.getTransactionCount({
-            address: userAddress as Address,
-          });
-
-          approvalHash = await walletClient.sendTransaction({
-            account: userAddress as Address,
-            to: authCall.target,
-            data: authCall.data,
-            nonce: currentNonce,
-          });
-
-          if (approvalNotificationId) notification.remove(approvalNotificationId);
-          approvalNotificationId = notification.loading(
-            <TransactionToast step="sent" txHash={approvalHash} message={`Approving ${tokenSymbol}...`} />
-          );
-
-          await publicClient.waitForTransactionReceipt({ hash: approvalHash as `0x${string}`, confirmations: effectiveConfirmations, pollingInterval: 1000 });
-          await new Promise(resolve => setTimeout(resolve, 100));
-
-          if (approvalNotificationId) notification.remove(approvalNotificationId);
-          notification.success(<TransactionToast step="confirmed" txHash={approvalHash} message={`${tokenSymbol} approved`} />);
-        } catch (error: any) {
-          if (approvalNotificationId) notification.remove(approvalNotificationId);
-          throw error;
-        }
-        setIsApproving(false);
-      }
-
-      // 3. Execute Logic (Atomic Batch if supported, else Tx)
+      // 2. Execute main logic (Atomic Batch if supported, else standard Tx)
       if (canDoAtomicBatch && sendCallsAsync) {
-        const deauthCalls = options?.revokePermissions ? await getDeauthorizations(instructions) : [];
-
-        const calls = [
-          {
-            to: routerContract.address as Address,
-            data: encodeFunctionData({
-              abi: routerContract.abi,
-              functionName: "processProtocolInstructions",
-              args: [instructions.map(inst => ({
-                protocolName: inst.protocolName,
-                data: inst.data as `0x${string}`,
-              }))],
-            }),
-            value: 0n,
-          },
-          ...deauthCalls.map(call => ({
-            to: call.target,
-            data: call.data,
-            value: 0n,
-          }))
-        ];
-
+        const deauthCalls = options?.revokePermissions
+          ? await getDeauthorizations(instructions)
+          : [];
+        const calls = buildAtomicBatchCalls(instructions, deauthCalls);
         const { id } = await sendCallsAsync({ calls, capabilities });
         setBatchId(id);
         return id;
@@ -1426,44 +1637,14 @@ export const useKapanRouterV2 = () => {
 
       const txHash = await executeInstructions(instructions);
 
-      // 4. Post-Execution Deauthorization (Sequential)
-      // Disabled for Linea and Plasma due to batching issues
-      try {
-        const shouldRevoke = options?.revokePermissions && chainId !== 59144 && chainId !== 9745; // Skip Linea and Plasma
-        const deauthCalls = shouldRevoke ? await getDeauthorizations(instructions) : [];
-        if (deauthCalls.length > 0) {
-          for (let i = 0; i < deauthCalls.length; i++) {
-            const call = deauthCalls[i];
-            if (!call.target || !call.data) continue;
-
-            // Reuse approval notification logic for simplicity
-            let deauthNotifId: string | number | null = null;
-            try {
-              deauthNotifId = notification.loading(
-                <TransactionToast step="pending" message="Revoking permissions..." />
-              );
-              const currentNonce = await publicClient.getTransactionCount({ address: userAddress as Address });
-              const hash = await walletClient.sendTransaction({
-                account: userAddress as Address,
-                to: call.target,
-                data: call.data,
-                nonce: currentNonce,
-              });
-              if (deauthNotifId) notification.remove(deauthNotifId);
-              deauthNotifId = notification.loading(
-                <TransactionToast step="sent" txHash={hash} message="Revoking permissions..." />
-              );
-              await publicClient.waitForTransactionReceipt({ hash, confirmations: effectiveConfirmations, pollingInterval: 1000 });
-              if (deauthNotifId) notification.remove(deauthNotifId);
-              notification.success(<TransactionToast step="confirmed" txHash={hash} message="Permissions revoked" />);
-            } catch (e) {
-              if (deauthNotifId) notification.remove(deauthNotifId);
-              logger.warn("Deauth step failed", e);
-            }
-          }
+      // 3. Post-execution deauthorization (sequential, non-blocking)
+      if (shouldRevokeOnChain(chainId, options?.revokePermissions)) {
+        try {
+          const deauthCalls = await getDeauthorizations(instructions);
+          await executeDeauthsSequentially(deauthCalls);
+        } catch (e) {
+          logger.warn("Deauthorization check failed", e);
         }
-      } catch (e) {
-        logger.warn("Deauthorization check failed", e);
       }
 
       return txHash;
@@ -1472,7 +1653,42 @@ export const useKapanRouterV2 = () => {
       console.error("Error in executeFlowWithApprovals:", error);
       throw error;
     }
-  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, executeInstructions, effectiveConfirmations, canDoAtomicBatch, sendCallsAsync, capabilities, getDeauthorizations, chainId]);
+  }, [
+    routerContract,
+    userAddress,
+    publicClient,
+    walletClient,
+    getAuthorizations,
+    executeInstructions,
+    executeApprovalsSequentially,
+    canDoAtomicBatch,
+    sendCallsAsync,
+    capabilities,
+    buildAtomicBatchCalls,
+    getDeauthorizations,
+    executeDeauthsSequentially,
+    chainId,
+  ]);
+
+  /**
+   * Build router calldata for processing instructions
+   */
+  const buildRouterCalldata = useCallback((
+    instructions: ProtocolInstruction[]
+  ): Hex => {
+    if (!routerContract) throw new Error("Router contract not available");
+
+    const protocolInstructions = instructions.map(inst => ({
+      protocolName: inst.protocolName,
+      data: inst.data as `0x${string}`,
+    }));
+
+    return encodeFunctionData({
+      abi: routerContract.abi,
+      functionName: "processProtocolInstructions",
+      args: [protocolInstructions],
+    });
+  }, [routerContract]);
 
   /**
    * Build all calls for a flow (for batching with other calls)
@@ -1486,38 +1702,22 @@ export const useKapanRouterV2 = () => {
       throw new Error("Missing context");
     }
 
-    // Prepare main calldata
-    const protocolInstructions = instructions.map(inst => ({
-      protocolName: inst.protocolName,
-      data: inst.data as `0x${string}`,
-    }));
-    const routerCalldata = encodeFunctionData({
-      abi: routerContract.abi,
-      functionName: "processProtocolInstructions",
-      args: [protocolInstructions],
-    });
+    const routerCalldata = buildRouterCalldata(instructions);
 
-    // Prepare approvals
     const authCalls = await getAuthorizations(instructions);
-    const filteredAuthCalls = authCalls.filter(({ target, data }) => {
-      if (!target || !data || data.length === 0) return false;
-      if (isZeroAmountApproval(data)) return false;
-      return true;
-    });
+    const filteredAuthCalls = filterValidAuthCalls(authCalls);
 
-    // Prepare deauthorizations
-    const shouldRevoke = options?.revokePermissions && chainId !== 59144 && chainId !== 9745;
-    const deauthCalls = shouldRevoke ? await getDeauthorizations(instructions) : [];
-    const filteredDeauthCalls = deauthCalls.filter(({ target, data }) => {
-      return target && data && data.length > 0;
-    });
+    const deauthCalls = shouldRevokeOnChain(chainId, options?.revokePermissions)
+      ? await getDeauthorizations(instructions)
+      : [];
+    const filteredDeauthCalls = filterValidDeauthCalls(deauthCalls);
 
     return [
       ...filteredAuthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
       { to: routerContract.address as Address, data: routerCalldata as Hex },
       ...filteredDeauthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
     ];
-  }, [routerContract, userAddress, getAuthorizations, getDeauthorizations, chainId]);
+  }, [routerContract, userAddress, buildRouterCalldata, getAuthorizations, getDeauthorizations, chainId]);
 
   const executeFlowBatchedIfPossible = useCallback(async (
     instructions: ProtocolInstruction[],
@@ -1528,31 +1728,15 @@ export const useKapanRouterV2 = () => {
       throw new Error("Missing context");
     }
 
-    // Prepare main calldata
-    const protocolInstructions = instructions.map(inst => ({
-      protocolName: inst.protocolName,
-      data: inst.data as `0x${string}`,
-    }));
-    const routerCalldata = encodeFunctionData({
-      abi: routerContract.abi,
-      functionName: "processProtocolInstructions",
-      args: [protocolInstructions],
-    });
+    const routerCalldata = buildRouterCalldata(instructions);
 
-    // Prepare approvals
     const authCalls = await getAuthorizations(instructions);
-    const filteredAuthCalls = authCalls.filter(({ target, data }) => {
-      if (!target || !data || data.length === 0) return false;
-      if (isZeroAmountApproval(data)) return false;
-      return true;
-    });
+    const filteredAuthCalls = filterValidAuthCalls(authCalls);
 
-    // Prepare deauthorizations (disabled for Linea and Plasma due to batching issues)
-    const shouldRevoke = options?.revokePermissions && chainId !== 59144 && chainId !== 9745; // Skip Linea and Plasma
-    const deauthCalls = shouldRevoke ? await getDeauthorizations(instructions) : [];
-    const filteredDeauthCalls = deauthCalls.filter(({ target, data }) => {
-      return target && data && data.length > 0;
-    });
+    const deauthCalls = shouldRevokeOnChain(chainId, options?.revokePermissions)
+      ? await getDeauthorizations(instructions)
+      : [];
+    const filteredDeauthCalls = filterValidDeauthCalls(deauthCalls);
 
     const calls = [
       ...filteredAuthCalls.map(({ target, data }) => ({ to: target as Address, data: data as Hex })),
@@ -1585,12 +1769,12 @@ export const useKapanRouterV2 = () => {
     }
 
     const hash = await executeFlowWithApprovals(instructions, options);
-      return hash ? { kind: "tx", hash } : undefined;
-  }, [routerContract, userAddress, publicClient, walletClient, getAuthorizations, sendCallsAsync, executeFlowWithApprovals, getDeauthorizations, chainId]);
+    return hash ? { kind: "tx", hash } : undefined;
+  }, [routerContract, userAddress, publicClient, walletClient, buildRouterCalldata, getAuthorizations, sendCallsAsync, executeFlowWithApprovals, getDeauthorizations, chainId]);
 
   // --- Move Flow Builder ---
 
-  type FlashConfig = { version: "v3" | "v2" | "aave" | "zerolend" | "morpho"; premiumBps?: number; bufferBps?: number; };
+  type FlashConfig = { version: FlashLoanVersion; premiumBps?: number; bufferBps?: number; };
   type BuildUnlockDebtParams = {
     fromProtocol: string; debtToken: Address; expectedDebt: string; debtDecimals?: number; fromContext?: `0x${string}`; flash: FlashConfig;
   };
@@ -1649,12 +1833,8 @@ export const useKapanRouterV2 = () => {
         addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
 
         // 2. Flash Loan (creates UTXO)
-        // Map version string to FlashLoanProvider enum
-        const provider: FlashLoanProvider = version === "aave" ? FlashLoanProvider.Aave 
-          : version === "zerolend" ? FlashLoanProvider.ZeroLend
-          : version === "morpho" ? FlashLoanProvider.Morpho
-          : version === "v3" ? FlashLoanProvider.BalancerV3 
-          : FlashLoanProvider.BalancerV2;
+        // Use centralized version-to-enum mapping
+        const provider = versionToProviderEnum(version);
         const flashData = encodeFlashLoan(provider, utxoIndexForGetBorrow);
         const flashLoanUtxoIndex = utxoCount;
         addRouter(flashData as `0x${string}`, true);

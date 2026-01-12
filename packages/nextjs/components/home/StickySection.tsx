@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, cloneElement, isValidElement, useState, useEffect } from "react";
+import { ReactNode, cloneElement, isValidElement, useState, useEffect, useMemo } from "react";
 import { motion, MotionValue, useTransform } from "framer-motion";
 import { TextScramble } from "./TextScramble";
 
@@ -19,6 +19,10 @@ export interface SectionData {
 export interface SectionContentProps {
   isActive?: boolean;
 }
+
+// Static animation props for motion.div to avoid creating new objects on each render
+const decorativeLineInitial = { width: 0 };
+const decorativeLineWhileInView = { width: "40px" };
 
 interface StickySectionProps {
   section: SectionData;
@@ -54,7 +58,7 @@ export const StickySection = ({
   const pointerEvents = useTransform(opacity, (v) => (v > 0.5 ? "auto" : "none"));
   
   // Track if this section is active (opacity > 0.8)
-  const [isActive, setIsActive] = useState(false);
+  const [, setIsActive] = useState(false);
   const [hasBeenActive, setHasBeenActive] = useState(false);
   
   useEffect(() => {
@@ -69,31 +73,34 @@ export const StickySection = ({
   }, [opacity, hasBeenActive]);
 
   const isCompact = section.compactHeader;
-  
+
   // Clone content element and inject isActive prop if it accepts it
   const contentWithProps = section.content && isValidElement(section.content)
     ? cloneElement(section.content as React.ReactElement<SectionContentProps>, { isActive: hasBeenActive })
     : section.content;
 
+  // Memoize motion style object to avoid creating new object on each render
+  const motionStyle = useMemo(() => ({
+    opacity,
+    scale,
+    y,
+    zIndex: index,
+    pointerEvents,
+  }), [opacity, scale, y, index, pointerEvents]);
+
   return (
     <motion.div
-      style={{
-        opacity,
-        scale,
-        y,
-        zIndex: index,
-        pointerEvents,
-      }}
+      style={motionStyle}
       className="absolute inset-0 flex items-center justify-center overflow-hidden"
     >
-      <div className={`w-full ${isCompact ? "max-w-7xl" : "max-w-5xl"} px-6 md:px-8 flex flex-col items-center text-center`}>
+      <div className={`w-full ${isCompact ? "max-w-7xl" : "max-w-5xl"} flex flex-col items-center px-6 text-center md:px-8`}>
         {/* Tag + Title + Description */}
-        <div className={`flex flex-col items-center ${isCompact ? "gap-2 md:gap-3 mb-4 md:mb-6" : "gap-4 md:gap-6 mb-8 md:mb-12"}`}>
+        <div className={`flex flex-col items-center ${isCompact ? "mb-4 gap-2 md:mb-6 md:gap-3" : "mb-8 gap-4 md:mb-12 md:gap-6"}`}>
           {/* Decorative line */}
           <motion.div
-            initial={{ width: 0 }}
-            whileInView={{ width: "40px" }}
-            className="h-[1px] bg-base-content/20"
+            initial={decorativeLineInitial}
+            whileInView={decorativeLineWhileInView}
+            className="bg-base-content/20 h-[1px]"
           />
           
           {/* Section tag */}
@@ -116,13 +123,13 @@ export const StickySection = ({
         </div>
 
         {/* Description */}
-        <p className={`text-base-content/60 leading-relaxed font-light max-w-2xl ${isCompact ? "text-base md:text-lg mb-4 md:mb-6" : "text-lg md:text-xl lg:text-2xl mb-8 md:mb-12"}`}>
+        <p className={`text-base-content/60 max-w-2xl font-light leading-relaxed ${isCompact ? "mb-4 text-base md:mb-6 md:text-lg" : "mb-8 text-lg md:mb-12 md:text-xl lg:text-2xl"}`}>
           {section.description}
         </p>
 
         {/* Optional content (mock components, CTA, etc.) */}
         {section.content && (
-          <div className="w-full flex justify-center">
+          <div className="flex w-full justify-center">
             {contentWithProps}
           </div>
         )}

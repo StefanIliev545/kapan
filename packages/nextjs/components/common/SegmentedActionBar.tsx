@@ -5,6 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type ActionVariant = "ghost" | "primary" | "error" | "secondary";
 
+// Static style for disabled buttons - extracted to avoid creating new object on each render
+const disabledButtonStyle = { backgroundColor: "transparent", borderColor: "transparent", boxShadow: "none" };
+
 export type SegmentedAction = {
   key: string;
   label: string;
@@ -79,14 +82,14 @@ export const SegmentedActionBar: FC<SegmentedActionBarProps> = ({ actions, class
       return (
         <button
           key={action.key}
-          className={`group btn btn-sm h-7 px-2 flex items-center justify-center gap-1 flex-1 basis-0 rounded-none ${variantClass(
+          className={`btn btn-sm group flex h-7 flex-1 basis-0 items-center justify-center gap-1 rounded-none px-2 ${variantClass(
             action.variant,
-          )} ${action.disabled ? "!bg-transparent !border-transparent !shadow-none hover:!bg-transparent text-base-content/50" : ""}`}
+          )} ${action.disabled ? "text-base-content/50 !border-transparent !bg-transparent !shadow-none hover:!bg-transparent" : ""}`}
           onClick={action.onClick}
           disabled={action.disabled}
           aria-label={action.ariaLabel || action.label}
           title={action.title}
-          style={action.disabled ? { backgroundColor: "transparent", borderColor: "transparent", boxShadow: "none" } : undefined}
+          style={action.disabled ? disabledButtonStyle : undefined}
         >
           {action.icon}
           <span className={`ml-1 ${hideLabel ? "hidden group-hover:inline" : ""}`}>{action.label}</span>

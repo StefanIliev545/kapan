@@ -106,7 +106,7 @@ export const contracts = contractsData as GenericContractsDeclaration | null;
 
 type ConfiguredChainId = (typeof scaffoldConfig)["targetEVMNetworks"][0]["id"];
 
-type IsContractDeclarationMissing<TYes, TNo> = typeof contractsData extends { [key in ConfiguredChainId]: any }
+type IsContractDeclarationMissing<TYes, TNo> = typeof contractsData extends Record<ConfiguredChainId, any>
   ? TNo
   : TYes;
 
@@ -176,6 +176,7 @@ export type FunctionNamesWithInputs<
 
 type Expand<T> = T extends object ? (T extends infer O ? { [K in keyof O]: O[K] } : never) : T;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type UnionToIntersection<U> = Expand<(U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never>;
 
 type OptionalTuple<T> = T extends readonly [infer H, ...infer R] ? readonly [H | undefined, ...OptionalTuple<R>] : T;
@@ -261,6 +262,7 @@ export type UseScaffoldEventConfig<
 } & IsContractDeclarationMissing<
   Omit<UseWatchContractEventParameters, "onLogs" | "address" | "abi" | "eventName"> & {
     onLogs: (
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       logs: Simplify<
         Omit<Log<bigint, number, any>, "args" | "eventName"> & {
           args: Record<string, unknown>;
@@ -271,6 +273,7 @@ export type UseScaffoldEventConfig<
   },
   Omit<UseWatchContractEventParameters<ContractAbi<TContractName>>, "onLogs" | "address" | "abi" | "eventName"> & {
     onLogs: (
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       logs: Simplify<
         Omit<Log<bigint, number, false, TEvent, false, [TEvent], TEventName>, "args"> & {
           args: AbiParametersToPrimitiveTypes<TEvent["inputs"]> &

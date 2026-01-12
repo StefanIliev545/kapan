@@ -1,11 +1,12 @@
-export type CommonInputProps<T = string> = {
-  value: T;
-  onChange: (newValue: T) => void;
-  name?: string;
-  placeholder?: string;
-  disabled?: boolean;
-};
+// Re-export shared types for backward compatibility
+export type { CommonInputProps } from "~~/components/common/Input";
+export { isENS } from "~~/components/common/Input";
 
+// EVM-specific regex patterns (slightly different from shared ones)
+export const SIGNED_NUMBER_REGEX = /^-?\d+\.?\d*$/;
+export const UNSIGNED_NUMBER_REGEX = /^\.?\d+\.?\d*$/;
+
+// EVM-specific integer variant enum
 export enum IntegerVariant {
   UINT8 = "uint8",
   UINT16 = "uint16",
@@ -73,9 +74,6 @@ export enum IntegerVariant {
   INT256 = "int256",
 }
 
-export const SIGNED_NUMBER_REGEX = /^-?\d+\.?\d*$/;
-export const UNSIGNED_NUMBER_REGEX = /^\.?\d+\.?\d*$/;
-
 export const isValidInteger = (dataType: IntegerVariant, value: string) => {
   const isSigned = dataType.startsWith("i");
   const bitcount = Number(dataType.substring(isSigned ? 3 : 4));
@@ -95,15 +93,8 @@ export const isValidInteger = (dataType: IntegerVariant, value: string) => {
   }
   const hexString = valueAsBigInt.toString(16);
   const significantHexDigits = hexString.match(/.*x0*(.*)$/)?.[1] ?? "";
-  if (
+  return !(
     significantHexDigits.length * 4 > bitcount ||
     (isSigned && significantHexDigits.length * 4 === bitcount && parseInt(significantHexDigits.slice(-1)?.[0], 16) < 8)
-  ) {
-    return false;
-  }
-  return true;
+  );
 };
-
-// Treat any dot-separated string as a potential ENS name
-const ensRegex = /.+\..+/;
-export const isENS = (address = "") => ensRegex.test(address);

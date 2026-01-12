@@ -1,26 +1,25 @@
-import { useState } from "react";
-import CopyToClipboard from "react-copy-to-clipboard";
+import { useCallback } from "react";
 import { CheckCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import { useCopyToClipboard } from "~~/hooks/common/useCopyToClipboard";
 
 export const AddressCopyIcon = ({ className, address }: { className?: string; address: string }) => {
-  const [addressCopied, setAddressCopied] = useState(false);
+  const { copy, isCopied } = useCopyToClipboard();
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    copy(address);
+  }, [copy, address]);
+
   return (
-    <CopyToClipboard
-      text={address}
-      onCopy={() => {
-        setAddressCopied(true);
-        setTimeout(() => {
-          setAddressCopied(false);
-        }, 800);
-      }}
+    <button
+      onClick={handleClick}
+      type="button"
     >
-      <button onClick={e => e.stopPropagation()} type="button">
-        {addressCopied ? (
-          <CheckCircleIcon className={className} aria-hidden="true" />
-        ) : (
-          <DocumentDuplicateIcon className={className} aria-hidden="true" />
-        )}
-      </button>
-    </CopyToClipboard>
+      {isCopied ? (
+        <CheckCircleIcon className={className} aria-hidden="true" />
+      ) : (
+        <DocumentDuplicateIcon className={className} aria-hidden="true" />
+      )}
+    </button>
   );
 };

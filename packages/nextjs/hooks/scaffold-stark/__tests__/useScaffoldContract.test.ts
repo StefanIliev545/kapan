@@ -36,7 +36,8 @@ describe("useScaffoldContract", () => {
   const mockUseProvider = useProvider as unknown as Mock;
   const mockedUseAccount = useAccount as unknown as Mock;
   const MockedContract = Contract as unknown as Mock;
-  const MockedRpcProvider = RpcProvider as unknown as Mock;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _MockedRpcProvider = RpcProvider as unknown as Mock;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -101,7 +102,7 @@ describe("useScaffoldContract", () => {
   });
 
   it("should create a contract instance with the correct parameters", () => {
-    const { result } = renderHook(() => useScaffoldContract({ contractName }));
+    renderHook(() => useScaffoldContract({ contractName }));
     expect(MockedContract).toHaveBeenCalledWith(
       mockAbi,
       mockAddress,
@@ -119,8 +120,8 @@ describe("useScaffoldContract", () => {
     expect(result.current.isLoading).toBe(false);
   });
 
-  it("should create a contract instance with the correct parameters", () => {
-    const { result } = renderHook(() => useScaffoldContract({ contractName }));
+  it("should create a contract instance with the correct parameters (duplicate)", () => {
+    renderHook(() => useScaffoldContract({ contractName }));
     expect(MockedContract).toHaveBeenCalledWith(
       mockAbi,
       mockAddress,

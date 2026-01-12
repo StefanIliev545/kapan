@@ -42,8 +42,8 @@ export interface KapanOrderInput {
    */
   preInstructions?: ProtocolInstruction[] | ProtocolInstruction[][];
   
-  /** Total amount to process across all chunks */
-  preTotalAmount: string;
+  /** Total amount to process across all chunks (raw bigint or human-readable string with decimals) */
+  preTotalAmount: string | bigint;
   preTotalAmountDecimals?: number;
   
   /** Token being sold (output of pre-hook) */
@@ -52,12 +52,12 @@ export interface KapanOrderInput {
   /** Token being bought (input to post-hook) */
   buyToken: string;
   
-  /** Maximum sell amount per chunk */
-  chunkSize: string;
+  /** Maximum sell amount per chunk (raw bigint or human-readable string with decimals) */
+  chunkSize: string | bigint;
   chunkSizeDecimals?: number;
   
-  /** Minimum buy amount per chunk (slippage protection) */
-  minBuyPerChunk: string;
+  /** Minimum buy amount per chunk - slippage protection (raw bigint or human-readable string with decimals) */
+  minBuyPerChunk: string | bigint;
   minBuyPerChunkDecimals?: number;
   
   /** 
@@ -87,6 +87,13 @@ export interface KapanOrderInput {
   
   /** Flash loan mode: when true, order.receiver = Settlement (required by CoW solvers) */
   isFlashLoanOrder?: boolean;
+  
+  /** 
+   * Order kind: if true, creates KIND_BUY order instead of KIND_SELL.
+   * KIND_SELL: chunkSize = exact sell, minBuyPerChunk = minimum buy (slippage protection)
+   * KIND_BUY: chunkSize = max sell (slippage protection), minBuyPerChunk = exact buy amount
+   */
+  isKindBuy?: boolean;
 }
 
 /**
@@ -106,6 +113,7 @@ export interface KapanOrderParams {
   minHealthFactor: bigint;
   appDataHash: string;
   isFlashLoanOrder: boolean;  // When true, order.receiver = Settlement (required by CoW solvers)
+  isKindBuy: boolean;  // When true, creates KIND_BUY order instead of KIND_SELL
 }
 
 /**
@@ -206,6 +214,16 @@ export function decodeInstructions(data: string): ProtocolInstruction[] {
 }
 
 /**
+ * Parse amount - handles both raw bigint and human-readable string
+ */
+function parseAmount(value: string | bigint, decimals: number): bigint {
+  if (typeof value === 'bigint') {
+    return value;
+  }
+  return parseUnits(value, decimals);
+}
+
+/**
  * Build order parameters for KapanOrderManager.createOrder()
  * 
  * @param input - User-friendly order input
@@ -219,17 +237,18 @@ export function buildOrderParams(input: KapanOrderInput): KapanOrderParams {
   return {
     user: input.user,
     preInstructionsPerIteration: encodePerIterationInstructions(input.preInstructions),
-    preTotalAmount: parseUnits(input.preTotalAmount, preTotalAmountDecimals),
+    preTotalAmount: parseAmount(input.preTotalAmount, preTotalAmountDecimals),
     sellToken: input.sellToken,
     buyToken: input.buyToken,
-    chunkSize: parseUnits(input.chunkSize, chunkSizeDecimals),
-    minBuyPerChunk: parseUnits(input.minBuyPerChunk, minBuyDecimals),
+    chunkSize: parseAmount(input.chunkSize, chunkSizeDecimals),
+    minBuyPerChunk: parseAmount(input.minBuyPerChunk, minBuyDecimals),
     postInstructionsPerIteration: encodePerIterationInstructions(input.postInstructions),
     completion: input.completion ?? CompletionType.Iterations,
     targetValue: BigInt(input.targetValue ?? 1),
     minHealthFactor: parseUnits(input.minHealthFactor ?? "1.1", 18),
     appDataHash: input.appDataHash ?? keccak256(toUtf8Bytes("kapan-order")),
     isFlashLoanOrder: input.isFlashLoanOrder ?? false,
+    isKindBuy: input.isKindBuy ?? false,
   };
 }
 
@@ -286,6 +305,7 @@ export function parseOrderContext(rawContext: any): OrderContext {
       minHealthFactor: BigInt(rawContext.params.minHealthFactor),
       appDataHash: rawContext.params.appDataHash,
       isFlashLoanOrder: Boolean(rawContext.params.isFlashLoanOrder),
+      isKindBuy: Boolean(rawContext.params.isKindBuy),
     },
     status: Number(rawContext.status) as OrderStatus,
     executedAmount: BigInt(rawContext.executedAmount),

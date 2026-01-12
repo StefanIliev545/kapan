@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-duplicate-string */
 import { renderHook } from "@testing-library/react";
 import { useAutoConnect } from "../useAutoConnect";
 import { useConnect } from "@starknet-react/core";

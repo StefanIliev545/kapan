@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
-import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
+import { ArrowTopRightOnSquareIcon, CheckCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import { arbitrum, base, linea, optimism } from "viem/chains";
 import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
+import { useCopyToClipboard } from "~~/hooks/common/useCopyToClipboard";
 import starknetContractsData, {
   type SNContract,
   type SNContractsType,
@@ -79,6 +80,8 @@ export const DeployedContractsList = () => {
   const { targetNetwork: targetStarknetNetwork } = useStarknetTargetNetwork();
   const setTargetEvmNetwork = useGlobalState(state => state.setTargetEVMNetwork);
   const evmNetworks = useMemo(() => getTargetNetworks(), []);
+  const { copy, isCopied } = useCopyToClipboard();
+  const handleCopyAddress = useCallback((address: string) => () => copy(address), [copy]);
   const [selectedNetwork, setSelectedNetwork] = useState<string>(() => {
     const activeNetworkId = chainIdToNetworkOptionId[targetEvmNetwork.id];
     return activeNetworkId ?? defaultEvmNetworkId;
@@ -163,10 +166,8 @@ export const DeployedContractsList = () => {
       return;
     }
 
-    if (selectedNetwork !== "starknet" && contractsToDisplay.length === 0) {
-      if (Object.keys(starknetContractsForTarget).length > 0) {
-        setSelectedNetwork("starknet");
-      }
+    if (selectedNetwork !== "starknet" && contractsToDisplay.length === 0 && Object.keys(starknetContractsForTarget).length > 0) {
+      setSelectedNetwork("starknet");
     }
   }, [contractsToDisplay.length, isMounted, selectedNetwork, starknetContractsForTarget]);
 
@@ -180,7 +181,7 @@ export const DeployedContractsList = () => {
 
   if (contractsToDisplay.length === 0) {
     return (
-      <div className="text-center py-5 space-y-4">
+      <div className="space-y-4 py-5 text-center">
         <NetworkFilter networks={networkOptions} defaultNetwork={selectedNetwork} onNetworkChange={setSelectedNetwork} />
         <p>No contracts deployed on the current network ({activeNetworkName}).</p>
       </div>
@@ -206,16 +207,18 @@ export const DeployedContractsList = () => {
                 <td className="font-medium">{contract.name}</td>
                 <td>
                   <div className="flex items-center gap-1">
-                    <span className="font-mono text-xs truncate max-w-[150px] md:max-w-[200px] lg:max-w-[300px]">
+                    <span className="max-w-[150px] truncate font-mono text-xs md:max-w-[200px] lg:max-w-[300px]">
                       {contract.address}
                     </span>
                     <button
                       className="btn btn-xs btn-ghost"
-                      onClick={() => {
-                        navigator.clipboard.writeText(contract.address);
-                      }}
+                      onClick={handleCopyAddress(contract.address)}
                     >
-                      📋
+                      {isCopied ? (
+                        <CheckCircleIcon className="text-success size-4" />
+                      ) : (
+                        <DocumentDuplicateIcon className="size-4" />
+                      )}
                     </button>
                   </div>
                 </td>
@@ -228,11 +231,11 @@ export const DeployedContractsList = () => {
                       rel="noopener noreferrer"
                       className="btn btn-xs btn-primary"
                     >
-                      <ArrowTopRightOnSquareIcon className="h-4 w-4 mr-1" />
+                      <ArrowTopRightOnSquareIcon className="mr-1 size-4" />
                       View
                     </Link>
                   ) : (
-                    <span className="text-xs text-base-content/60">Explorer unavailable</span>
+                    <span className="text-base-content/60 text-xs">Explorer unavailable</span>
                   )}
                 </td>
               </tr>

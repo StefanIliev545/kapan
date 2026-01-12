@@ -123,6 +123,7 @@ describe("CoW Protocol Integration", function () {
         minHealthFactor: ethers.parseEther("1.1"),
         appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data")),
         isFlashLoanOrder: false,  // Non-flash loan order (receiver = OrderManager)
+        isKindBuy: false,  // KIND_SELL order
       };
       
       const salt = ethers.keccak256(ethers.toUtf8Bytes("unique-salt"));
@@ -149,6 +150,7 @@ describe("CoW Protocol Integration", function () {
         minHealthFactor: ethers.parseEther("1.1"),
         appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data")),
         isFlashLoanOrder: false,
+        isKindBuy: false,
       };
       
       const salt = ethers.keccak256(ethers.toUtf8Bytes("unique-salt"));
@@ -177,6 +179,7 @@ describe("CoW Protocol Integration", function () {
         minHealthFactor: ethers.parseEther("1.1"),
         appDataHash: ethers.keccak256(ethers.toUtf8Bytes("test-app-data")),
         isFlashLoanOrder: false,
+        isKindBuy: false,
       };
       
       const salt = ethers.keccak256(ethers.toUtf8Bytes("unique-salt"));
@@ -218,11 +221,12 @@ describe("CoW Protocol Integration", function () {
     });
 
     it("should return chunk params", async function () {
-      const [sellAmount, minBuyAmount, isComplete] = await orderHandler.getChunkParams(orderHash);
+      const [sellAmount, buyAmount, isComplete, isKindBuy] = await orderHandler.getChunkParams(orderHash);
       
       expect(sellAmount).to.equal(ethers.parseUnits("2000", 6));
-      expect(minBuyAmount).to.equal(ethers.parseEther("0.5"));
+      expect(buyAmount).to.equal(ethers.parseEther("0.5"));
       expect(isComplete).to.equal(false);
+      expect(isKindBuy).to.equal(false);
     });
 
     it("should return progress", async function () {
@@ -233,8 +237,11 @@ describe("CoW Protocol Integration", function () {
       expect(iterations).to.equal(0);
     });
 
-    it("should set receiver to Settlement for flash loan orders", async function () {
-      // Create a flash loan order
+    it("should set receiver to OrderManager for flash loan orders (same as multi-chunk)", async function () {
+      // Create a flash loan order - receiver should STILL be OrderManager
+      // IMPORTANT: Receiver must ALWAYS be OrderManager because _executePostHook()
+      // checks balanceOf(address(this)) to determine how much was received.
+      // Setting receiver = Settlement would break post-hook (tokens would be at Settlement, not OrderManager)
       const flashLoanParams = {
         user: await user.getAddress(),
         preInstructionsPerIteration: [],
@@ -248,7 +255,8 @@ describe("CoW Protocol Integration", function () {
         targetValue: 1, // Single iteration
         minHealthFactor: ethers.parseEther("1.1"),
         appDataHash: ethers.keccak256(ethers.toUtf8Bytes("flash-loan-app-data")),
-        isFlashLoanOrder: true,  // Flash loan order - receiver should be Settlement
+        isFlashLoanOrder: true,  // Flash loan flag - but receiver is still OrderManager
+        isKindBuy: false,
       };
       
       const flashLoanSalt = ethers.keccak256(ethers.toUtf8Bytes("flash-loan-salt"));
@@ -283,8 +291,25 @@ describe("CoW Protocol Integration", function () {
         "0x"
       );
       
-      // Flash loan order should have receiver = Settlement (not OrderManager)
-      expect(order.receiver).to.equal(await mockSettlement.getAddress());
+      // Flash loan orders: receiver = OrderManager (ALWAYS - post-hook needs tokens there)
+      const orderManagerAddr = await orderManager.getAddress();
+      expect(order.receiver).to.equal(orderManagerAddr);
+    });
+
+    it("should set receiver to OrderManager for multi-chunk orders", async function () {
+      // Standard order (not flash loan) - receiver should be OrderManager
+      const staticInput = coder.encode(["bytes32"], [orderHash]);
+      
+      const order = await orderHandler.getTradeableOrder(
+        await orderManager.getAddress(),
+        await owner.getAddress(),
+        ethers.ZeroHash,
+        staticInput,
+        "0x"
+      );
+      
+      // Multi-chunk orders: receiver = OrderManager (standard flow)
+      expect(order.receiver).to.equal(await orderManager.getAddress());
     });
 
     it("should return deterministic validTo (same order hash on multiple polls)", async function () {
@@ -320,6 +345,70 @@ describe("CoW Protocol Integration", function () {
       expect(order1.buyAmount).to.equal(order2.buyAmount);
       expect(order1.sellToken).to.equal(order2.sellToken);
       expect(order1.buyToken).to.equal(order2.buyToken);
+    });
+
+    it("should generate KIND_BUY order when isKindBuy is true", async function () {
+      // Create a KIND_BUY order (for close-with-collateral)
+      const kindBuyParams = {
+        user: await user.getAddress(),
+        preInstructionsPerIteration: [],
+        preTotalAmount: ethers.parseUnits("10000", 6),
+        sellToken: await mockToken.getAddress(),
+        buyToken: await buyToken.getAddress(),
+        chunkSize: ethers.parseUnits("10000", 6), // Max sell (slippage buffer)
+        minBuyPerChunk: ethers.parseEther("5"), // Exact buy amount
+        postInstructionsPerIteration: [],
+        completion: 2,
+        targetValue: 1,
+        minHealthFactor: ethers.parseEther("1.1"),
+        appDataHash: ethers.keccak256(ethers.toUtf8Bytes("kind-buy-app-data")),
+        isFlashLoanOrder: false,
+        isKindBuy: true,  // KIND_BUY order
+      };
+      
+      const kindBuySalt = ethers.keccak256(ethers.toUtf8Bytes("kind-buy-salt"));
+      
+      const tx = await orderManager.connect(user).createOrder(kindBuyParams, kindBuySalt, 0);
+      const receipt = await tx.wait();
+      
+      // Extract orderHash
+      const event = receipt?.logs.find((log: any) => {
+        try {
+          return orderManager.interface.parseLog(log)?.name === "OrderCreated";
+        } catch {
+          return false;
+        }
+      });
+      
+      let kindBuyOrderHash: string;
+      if (event) {
+        const parsed = orderManager.interface.parseLog(event);
+        kindBuyOrderHash = parsed?.args[0];
+      } else {
+        throw new Error("OrderCreated event not found");
+      }
+      
+      const staticInput = coder.encode(["bytes32"], [kindBuyOrderHash]);
+      
+      const order = await orderHandler.getTradeableOrder(
+        await orderManager.getAddress(),
+        await owner.getAddress(),
+        ethers.ZeroHash,
+        staticInput,
+        "0x"
+      );
+      
+      // Should be KIND_BUY
+      const KIND_BUY = ethers.keccak256(ethers.toUtf8Bytes("buy"));
+      expect(order.kind).to.equal(KIND_BUY);
+      
+      // Amounts should be set correctly
+      expect(order.sellAmount).to.equal(ethers.parseUnits("10000", 6)); // Max sell
+      expect(order.buyAmount).to.equal(ethers.parseEther("5")); // Exact buy
+      
+      // Check getChunkParams returns isKindBuy = true
+      const [, , , isKindBuy] = await orderHandler.getChunkParams(kindBuyOrderHash);
+      expect(isKindBuy).to.equal(true);
     });
 
     it("should extend validTo to current window if chunk window expires", async function () {

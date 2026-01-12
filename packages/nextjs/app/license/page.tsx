@@ -15,7 +15,7 @@ const effectiveDate = "2025-10-22";
 
 const LicensePage = () => {
   return (
-    <div className="container mx-auto px-4 py-8 prose">
+    <div className="prose container mx-auto px-4 py-8">
       <h1>Kapan Finance — License &amp; Terms</h1>
 
       <p>

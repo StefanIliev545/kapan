@@ -1,4 +1,5 @@
 export * from "../common/useAnimationConfig";
+export * from "../common/useCopyToClipboard";
 export * from "./useContractLogs";
 export * from "./useDeployedContractInfo";
 export * from "./useFetchBlocks";

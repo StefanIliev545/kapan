@@ -1,5 +1,13 @@
 import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 
+// Logo constants to avoid duplication
+const LOGO_USDC = "/logos/usdc.svg";
+const LOGO_USDT = "/logos/usdt.svg";
+const LOGO_ETHEREUM = "/logos/ethereum.svg";
+
+// Common rich address for Arbitrum tokens
+const ARBITRUM_RICH_ADDRESS = "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D";
+
 const externalContracts = {
   42161: {
     USDC: {
@@ -20,8 +28,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/usdc.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_USDC,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
     USDT: {
       address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
@@ -41,8 +49,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/usdt.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_USDT,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
     USDCe: {
       address: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
@@ -62,8 +70,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/usdc.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_USDC,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
     eth: {
       address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
@@ -83,8 +91,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/ethereum.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_ETHEREUM,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
     ETH: {
       address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
@@ -104,8 +112,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/ethereum.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_ETHEREUM,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
   },
   31337: {
@@ -127,8 +135,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/usdc.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_USDC,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
     USDT: {
       address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
@@ -148,8 +156,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/usdt.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_USDT,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
     USDCe: {
       address: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
@@ -169,8 +177,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/usdc.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_USDC,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
     eth: {
       address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
@@ -190,8 +198,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/ethereum.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_ETHEREUM,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
     ETH: {
       address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
@@ -211,8 +219,8 @@ const externalContracts = {
           type: "function",
         },
       ],
-      logo: "/logos/ethereum.svg",
-      richAddress: "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+      logo: LOGO_ETHEREUM,
+      richAddress: ARBITRUM_RICH_ADDRESS,
     },
   },
 } as const;
@@ -237,11 +245,14 @@ export const tokenNameToLogo = (tokenName: string) => {
 
   // Handle Pendle PT tokens (e.g., "PT-USDe-15JAN2026" -> "ptusde")
   // Strip dates like "-15JAN2026" or Unix timestamps like "-1750896023"
+  // Also handle bridged versions like "PT-USDai-19FEB2026-(ARB)"
   if (lower.startsWith("pt-")) {
     // Extract base token: "pt-usde-15jan2026" -> "usde"
     const withoutPrefix = lower.slice(3); // Remove "pt-"
-    // Remove date suffix (pattern: -DDMMMYYYY like -15jan2026) or Unix timestamp (-1xxxxxxxxx)
+    // Remove chain suffix like "-(arb)", "-(eth)", etc. first
+    // Then remove date suffix (pattern: -DDMMMYYYY like -15jan2026) or Unix timestamp (-1xxxxxxxxx)
     const baseToken = withoutPrefix
+      .replace(/-\([a-z]+\)$/i, "") // -(ARB), -(ETH), etc.
       .replace(/-\d{1,2}[a-z]{3}\d{4}$/i, "") // -15JAN2026
       .replace(/-1\d{9}$/, ""); // -1750896023 (Unix timestamp)
     return `/logos/pt${baseToken}.svg`;

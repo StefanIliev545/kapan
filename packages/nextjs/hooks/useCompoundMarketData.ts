@@ -6,20 +6,9 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useSelectedNetwork } from "~~/hooks/scaffold-eth/useSelectedNetwork";
 import formatPercentage from "~~/utils/formatPercentage";
+import { CHAIN_ID_TO_NETWORK, compoundRateToAPR } from "~~/utils/protocolRates";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
-const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
-const RATE_SCALE = 1e18;
-
-const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
-  42161: "arbitrum",
-  8453: "base",
-  10: "optimism",
-  59144: "linea",
-};
-
-const convertRateToApr = (ratePerSecond: bigint): number =>
-  (Number(ratePerSecond) * SECONDS_PER_YEAR * 100) / RATE_SCALE;
 
 type UseCompoundMarketDataParams = {
   chainId?: number;
@@ -101,8 +90,8 @@ export const useCompoundMarketData = ({ chainId }: UseCompoundMarketDataParams =
         bigint | number,
       ];
 
-      const supplyApr = supplyRate ? convertRateToApr(BigInt(supplyRate)) : 0;
-      const borrowApr = borrowRate ? convertRateToApr(BigInt(borrowRate)) : 0;
+      const supplyApr = supplyRate ? compoundRateToAPR(BigInt(supplyRate)) : 0;
+      const borrowApr = borrowRate ? compoundRateToAPR(BigInt(borrowRate)) : 0;
       const utilization = borrowApr > 0 ? (supplyApr / borrowApr) * 100 : 0;
       const priceValue = price ? (typeof price === "bigint" ? price : BigInt(price)) : 0n;
       const priceFormatted = price ? Number(formatUnits(priceValue, 8)).toFixed(2) : "0.00";

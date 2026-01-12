@@ -1,12 +1,26 @@
+import { memo, useEffect, useMemo, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { ArrowsRightLeftIcon } from "@heroicons/react/24/solid";
-import { getNetworkColor, useSwitchNetwork } from "~~/hooks/scaffold-stark";
-import { getTargetNetworks } from "~~/utils/scaffold-stark";
+import { getNetworkColor } from "~~/hooks/scaffold-stark";
+import { getTargetNetworks, type ChainWithAttributes } from "~~/utils/scaffold-stark";
 import { useSwitchChain } from "@starknet-react/core";
 import { useAccount } from "~~/hooks/useAccount";
-import { useEffect, useMemo } from "react";
-import { constants } from "starknet";
 import { track } from "@vercel/analytics";
+
+// Memoized network name span to avoid creating inline style objects
+const NetworkName = memo(function NetworkName({
+  network,
+  isDarkMode,
+}: {
+  network: ChainWithAttributes;
+  isDarkMode: boolean;
+}) {
+  const style = useMemo(
+    () => ({ color: getNetworkColor(network, isDarkMode) }),
+    [network, isDarkMode]
+  );
+  return <span style={style}>{network.name}</span>;
+});
 
 type NetworkOptionsProps = {
   hidden?: boolean;
@@ -31,6 +45,21 @@ export const NetworkOptions = ({ hidden = false }: NetworkOptionsProps) => {
     );
   }, [allowedNetworks]);
 
+  // Factory for network switch handlers
+  const createSwitchHandler = useCallback(
+    (network: ChainWithAttributes) => () => {
+      const nextChainId = allowedNetworksMapping[network.network];
+      track("Network switched event", {
+        network: network.name,
+        chainId: nextChainId,
+      });
+      switchChain({
+        chainId: nextChainId,
+      });
+    },
+    [allowedNetworksMapping, switchChain],
+  );
+
   return (
     <>
       {allowedNetworks
@@ -38,29 +67,14 @@ export const NetworkOptions = ({ hidden = false }: NetworkOptionsProps) => {
         .map((allowedNetwork) => (
           <li key={allowedNetwork.network} className={hidden ? "hidden" : ""}>
             <button
-              className="menu-item btn-sm !rounded-xl flex gap-3 py-3 whitespace-nowrap"
+              className="menu-item btn-sm flex gap-3 whitespace-nowrap !rounded-xl py-3"
               type="button"
-              onClick={() => {
-                const nextChainId = allowedNetworksMapping[allowedNetwork.network];
-                track("Network switched event", {
-                  network: allowedNetwork.name,
-                  chainId: nextChainId,
-                });
-                switchChain({
-                  chainId: nextChainId,
-                });
-              }}
+              onClick={createSwitchHandler(allowedNetwork)}
             >
-              <ArrowsRightLeftIcon className="h-6 w-4 ml-2 sm:ml-0" />
+              <ArrowsRightLeftIcon className="ml-2 h-6 w-4 sm:ml-0" />
               <span>
                 Switch to{" "}
-                <span
-                  style={{
-                    color: getNetworkColor(allowedNetwork, isDarkMode),
-                  }}
-                >
-                  {allowedNetwork.name}
-                </span>
+                <NetworkName network={allowedNetwork} isDarkMode={isDarkMode} />
               </span>
             </button>
           </li>

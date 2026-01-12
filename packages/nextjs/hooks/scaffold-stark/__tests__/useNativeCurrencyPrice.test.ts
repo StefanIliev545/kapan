@@ -119,9 +119,8 @@ describe("useNativeCurrencyPrice", () => {
   });
 
   it("should handle errors in global state selectors gracefully", () => {
-    vi.mocked(useGlobalState).mockImplementation(() => {
-      return () => {};
-    });
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional no-op for test
+    vi.mocked(useGlobalState).mockImplementation(() => () => {});
 
     expect(() => {
       renderHook(() => useNativeCurrencyPrice());

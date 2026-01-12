@@ -25,3 +25,5 @@ package-lock.json
 
 # cli
 dist
+# Quality reports
+.quality/

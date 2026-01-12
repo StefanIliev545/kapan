@@ -1,5 +1,13 @@
 "use client";
 
+// BigInt JSON serialization polyfill - prevents "Cannot serialize BigInt" errors
+// This must be at the top level, before any other code runs
+if (typeof BigInt !== "undefined") {
+  (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
+    return this.toString();
+  };
+}
+
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import {
@@ -16,7 +24,6 @@ import { Fordefi } from "starknetkit/fordefi";
 import { Keplr } from "starknetkit/keplr";
 import { MetaMask } from "starknetkit/metamask";
 import { WagmiProvider } from "wagmi";
-import FloatingSocials from "~~/components/FloatingSocials";
 import { PendingOrdersDrawer } from "~~/components/common/PendingOrdersDrawer";
 import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
@@ -65,7 +72,7 @@ const ScaffoldEthApp = ({
 
   const isAppSubdomain = hostname?.startsWith("app.") ?? false;
   const isAppExperience = pathname.startsWith("/app") || pathname.startsWith("/markets") || pathname.startsWith("/orders") || isAppSubdomain;
-  const isLandingRoute = pathname === "/" || pathname.startsWith("/info") || pathname.startsWith("/about") || pathname.startsWith("/automate");
+  const isLandingRoute = pathname === "/" || pathname.startsWith("/info") || pathname.startsWith("/about");
 
   const renderHeader = () => {
     if (isAppExperience) {
@@ -82,12 +89,11 @@ const ScaffoldEthApp = ({
   return (
     <SelectedGasTokenProvider>
       <LandingSectionProvider>
-        <div className={`flex flex-col min-h-screen `}>
+        <div className={`flex min-h-screen flex-col `}>
           {renderHeader()}
-          <main className="relative flex flex-col flex-1">{children}</main>
+          <main className="relative flex flex-1 flex-col">{children}</main>
           <Footer />
         </div>
-        {!isLandingRoute && <FloatingSocials />}
         {isAppExperience && <PendingOrdersDrawer />}
         <Toaster position="bottom-right" />
       </LandingSectionProvider>

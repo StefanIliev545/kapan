@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { ethers } from "hardhat";
 import { deterministicSalt } from "../../utils/deploySalt";
 import { getEffectiveChainId, logForkConfig } from "../../utils/forkChain";
-import { safeExecute } from "../../utils/safeExecute";
+import { safeExecute, safeDeploy, waitForPendingTxs } from "../../utils/safeExecute";
 
 const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     const { deployments, getNamedAccounts } = hre;
@@ -19,6 +19,7 @@ const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeE
         42161: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Arbitrum
         8453: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Base
         9745: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Plasma
+        130: "0x888888888889758F76e7103c6CbF23ABbF58F946", // Unichain
     };
 
     const chainId = parseInt(await hre.getChainId());
@@ -33,7 +34,7 @@ const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeE
     }
 
     console.log("Deploying PendleGateway...");
-    const gateway = await deploy("PendleGateway", {
+    const gateway = await safeDeploy(hre, deployer, "PendleGateway", {
         from: deployer,
         args: [router.address, deployer],
         log: true,
@@ -43,7 +44,7 @@ const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeE
     });
 
     console.log("Deploying PendleAdapter...");
-    const adapter = await deploy("PendleAdapter", {
+    const adapter = await safeDeploy(hre, deployer, "PendleAdapter", {
         from: deployer,
         args: [gateway.address, pendleRouter],
         log: true,
@@ -66,6 +67,8 @@ const deployPendleGateway: DeployFunction = async function (hre: HardhatRuntimeE
     }
 
     console.log("Pendle integration deployed!");
+
+    await waitForPendingTxs(hre, deployer);
 };
 
 export default deployPendleGateway;

@@ -1,9 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import {
-  fetchProfileFromApi,
-  useScaffoldStarkProfile,
-} from "../useScaffoldStarkProfile";
+import { useScaffoldStarkProfile } from "../useScaffoldStarkProfile";
 import scaffoldConfig from "~~/scaffold.config";
 
 const createMockResponse = (data: any): Response => {

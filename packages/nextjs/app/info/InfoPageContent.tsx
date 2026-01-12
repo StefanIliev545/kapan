@@ -1,12 +1,17 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 // Note: Header is rendered by ScaffoldEthAppWithProviders (LandingHeader for /info route)
 import { ChevronDownIcon, ArrowRightIcon, ShieldCheckIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
 import { useKapanTheme } from "~~/hooks/useKapanTheme";
+
+// Static animation variants - extracted to module level to avoid recreation
+const ACCORDION_ANIMATE_OPEN = { height: "auto", opacity: 1 };
+const ACCORDION_ANIMATE_CLOSED = { height: 0, opacity: 0 };
+const ACCORDION_TRANSITION = { duration: 0.3, ease: "easeInOut" as const };
 
 // Character set for scramble effect
 const CHARS = "@#$%&*!?<>[]{}ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -29,7 +34,7 @@ const ScrambleText = ({
   const scrambleReveal = useCallback(() => {
     const length = text.length;
     const startTime = performance.now();
-    let scrambledChars = text.split("").map((char) => 
+    const scrambledChars = text.split("").map((char) => 
       char === " " || char === "." ? char : getRandomChar()
     );
     let lastScrambleTime = 0;
@@ -137,59 +142,34 @@ interface SectionData {
   ContentComponent?: React.FC<{ isActive: boolean }>;
 }
 
-// FAQ Accordion item
-const FAQAccordion = ({ item, isOpen, onToggle }: { item: FAQItem; isOpen: boolean; onToggle: () => void }) => (
-  <div className="border-b border-base-content/10">
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center justify-between py-5 text-left group"
-    >
-      <span className="text-sm md:text-base font-medium text-base-content/70 group-hover:text-base-content transition-colors pr-4">
-        {item.question}
-      </span>
-      <ChevronDownIcon 
-        className={`w-4 h-4 text-base-content/40 flex-shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} 
-      />
-    </button>
-    <motion.div
-      initial={false}
-      animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
-      transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="overflow-hidden"
-    >
-      <p className="pb-5 text-base-content/40 text-sm leading-relaxed">
-        {item.answer}
-      </p>
-    </motion.div>
-  </div>
-);
-
 // Launch App Button
 const LaunchAppButton = () => {
-  const getAppUrl = () => {
+  const getAppUrl = useCallback(() => {
     if (typeof window === "undefined") return "/app";
     const { protocol, hostname, host } = window.location;
     const baseHost = hostname.replace(/^www\./, "");
     if (host.endsWith("localhost:3000")) return `${protocol}//app.localhost:3000`;
     if (hostname.startsWith("app.")) return `${protocol}//${host}`;
     return `${protocol}//app.${baseHost}`;
-  };
+  }, []);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    track("To App conversion", { button: "Info Page CTA" });
+    window.location.assign(getAppUrl());
+  }, [getAppUrl]);
 
   return (
     <a
       href="/app"
-      onClick={e => {
-        e.preventDefault();
-        track("To App conversion", { button: "Info Page CTA" });
-        window.location.assign(getAppUrl());
-      }}
-      className="group relative h-14 md:h-16 px-8 md:px-12 bg-primary text-primary-content font-bold uppercase tracking-[0.2em] text-[11px] md:text-xs hover:shadow-[0_0_40px_rgba(255,255,255,0.1)] transition-all duration-500 overflow-hidden flex items-center justify-center"
+      onClick={handleClick}
+      className="bg-primary text-primary-content group relative flex h-14 items-center justify-center overflow-hidden px-8 text-[11px] font-bold uppercase tracking-[0.2em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.1)] md:h-16 md:px-12 md:text-xs"
     >
       <div className="relative z-10 flex items-center gap-3">
-        <span className="translate-x-2 group-hover:translate-x-0 transition-transform duration-500">
+        <span className="translate-x-2 transition-transform duration-500 group-hover:translate-x-0">
           Launch App
         </span>
-        <ArrowRightIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-500" />
+        <ArrowRightIcon className="size-4 opacity-0 transition-all duration-500 group-hover:translate-x-1 group-hover:opacity-100" />
       </div>
     </a>
   );
@@ -198,10 +178,10 @@ const LaunchAppButton = () => {
 // Integration item
 const IntegrationItem = ({ name, logo }: { name: string; logo: string }) => (
   <div className="flex items-center gap-2 px-3 py-2">
-    <div className="w-6 h-6 relative flex-shrink-0">
+    <div className="relative size-6 flex-shrink-0">
       <Image src={logo} alt={name} fill className="object-contain" />
     </div>
-    <span className="text-xs text-base-content/50">{name}</span>
+    <span className="text-base-content/50 text-xs">{name}</span>
   </div>
 );
 
@@ -244,19 +224,28 @@ const StickySection = ({
     return () => unsubscribe();
   }, [opacity, hasBeenActive]);
 
+  // Memoize style object for motion.div to avoid recreation
+  const motionStyle = useMemo(() => ({
+    opacity,
+    scale,
+    y,
+    zIndex: index,
+    pointerEvents
+  }), [opacity, scale, y, index, pointerEvents]);
+
   return (
     <motion.div
-      style={{ opacity, scale, y, zIndex: index, pointerEvents }}
+      style={motionStyle}
       className="absolute inset-0 flex items-center justify-center overflow-hidden"
     >
-      <div className="w-full max-w-4xl px-6 md:px-8 flex flex-col items-center text-center">
+      <div className="flex w-full max-w-4xl flex-col items-center px-6 text-center md:px-8">
         {/* Tag + Title */}
-        <div className="flex flex-col items-center gap-3 mb-8 md:mb-12">
-          <div className="h-px w-10 bg-base-content/20" />
-          <span className="text-[10px] uppercase tracking-[0.2em] text-base-content/40 font-medium">
+        <div className="mb-8 flex flex-col items-center gap-3 md:mb-12">
+          <div className="bg-base-content/20 h-px w-10" />
+          <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-[0.2em]">
             {section.tag}
           </span>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight">
+          <h2 className="text-4xl font-black uppercase tracking-tight md:text-5xl lg:text-6xl">
             <ScrambleText text={section.title} isActive={hasBeenActive} duration={600} />
           </h2>
         </div>
@@ -276,11 +265,11 @@ const StickySection = ({
 
 // Mission content
 const MissionContent = ({ isActive }: { isActive: boolean }) => (
-  <div className="max-w-2xl mx-auto space-y-6">
-    <p className="text-lg md:text-xl text-base-content/50 leading-relaxed">
+  <div className="mx-auto max-w-2xl space-y-6">
+    <p className="text-base-content/50 text-lg leading-relaxed md:text-xl">
       <ScrambleText text="Deposit. Borrow. Swap. Refinance. Loop. Close." isActive={isActive} duration={700} />
     </p>
-    <p className="text-lg md:text-xl text-base-content/50 leading-relaxed">
+    <p className="text-base-content/50 text-lg leading-relaxed md:text-xl">
       <ScrambleText text="Any combination. Any protocol. One transaction." isActive={isActive} duration={700} />
     </p>
   </div>
@@ -316,13 +305,13 @@ const FeaturesContent = ({ isActive }: { isActive: boolean }) => {
   const featureStates = [feature1Active, feature2Active, feature3Active];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 max-w-3xl mx-auto">
+    <div className="mx-auto grid max-w-3xl grid-cols-1 gap-8 md:grid-cols-3 md:gap-12">
       {features.map((f, i) => (
         <div key={f.title} className="text-center">
-          <h3 className="text-lg md:text-xl font-bold tracking-tight mb-2">
+          <h3 className="mb-2 text-lg font-bold tracking-tight md:text-xl">
             <ScrambleText text={f.title} isActive={featureStates[i]} duration={500} />
           </h3>
-          <p className="text-sm text-base-content/40">
+          <p className="text-base-content/40 text-sm">
             <ScrambleText text={f.desc} isActive={featureStates[i]} duration={600} />
           </p>
         </div>
@@ -333,9 +322,9 @@ const FeaturesContent = ({ isActive }: { isActive: boolean }) => {
 
 // Integrations content
 const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
-  <div className="space-y-6 max-w-2xl mx-auto">
+  <div className="mx-auto max-w-2xl space-y-6">
     <div>
-      <h3 className="text-[10px] uppercase tracking-[0.15em] text-base-content/30 mb-3">
+      <h3 className="text-base-content/30 mb-3 text-[10px] uppercase tracking-[0.15em]">
         <ScrambleText text="Networks" isActive={isActive} duration={400} />
       </h3>
       <div className="flex flex-wrap items-center justify-center gap-1">
@@ -343,7 +332,7 @@ const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
       </div>
     </div>
     <div>
-      <h3 className="text-[10px] uppercase tracking-[0.15em] text-base-content/30 mb-3">
+      <h3 className="text-base-content/30 mb-3 text-[10px] uppercase tracking-[0.15em]">
         <ScrambleText text="Protocols" isActive={isActive} duration={400} />
       </h3>
       <div className="flex flex-wrap items-center justify-center gap-1">
@@ -351,7 +340,7 @@ const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
       </div>
     </div>
     <div>
-      <h3 className="text-[10px] uppercase tracking-[0.15em] text-base-content/30 mb-3">
+      <h3 className="text-base-content/30 mb-3 text-[10px] uppercase tracking-[0.15em]">
         <ScrambleText text="Routers" isActive={isActive} duration={400} />
       </h3>
       <div className="flex flex-wrap items-center justify-center gap-1">
@@ -364,15 +353,25 @@ const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
 // FAQ content
 const FAQContent = ({ faqItems, isActive }: { faqItems: FAQItem[]; isActive: boolean }) => {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
-  
+
+  const handleToggle = useCallback((index: number) => {
+    setOpenFAQ(prev => prev === index ? null : index);
+  }, []);
+
+  // Create memoized toggle handlers for each FAQ item
+  const toggleHandlers = useMemo(() =>
+    faqItems.map((_, i) => () => handleToggle(i)),
+    [faqItems, handleToggle]
+  );
+
   return (
-    <div className="max-w-xl mx-auto text-left">
+    <div className="mx-auto max-w-xl text-left">
       {faqItems.map((item, i) => (
         <FAQAccordionScramble
           key={i}
           item={item}
           isOpen={openFAQ === i}
-          onToggle={() => setOpenFAQ(openFAQ === i ? null : i)}
+          onToggle={toggleHandlers[i]}
           isActive={isActive}
           delay={i * 150}
         />
@@ -382,21 +381,21 @@ const FAQContent = ({ faqItems, isActive }: { faqItems: FAQItem[]; isActive: boo
 };
 
 // FAQ Accordion with scramble effect
-const FAQAccordionScramble = ({ 
-  item, 
-  isOpen, 
-  onToggle, 
+const FAQAccordionScramble = ({
+  item,
+  isOpen,
+  onToggle,
   isActive,
-  delay 
-}: { 
-  item: FAQItem; 
-  isOpen: boolean; 
+  delay
+}: {
+  item: FAQItem;
+  isOpen: boolean;
   onToggle: () => void;
   isActive: boolean;
   delay: number;
 }) => {
   const [itemActive, setItemActive] = useState(false);
-  
+
   useEffect(() => {
     if (isActive) {
       const t = setTimeout(() => setItemActive(true), delay);
@@ -405,25 +404,25 @@ const FAQAccordionScramble = ({
   }, [isActive, delay]);
 
   return (
-    <div className="border-b border-base-content/10">
+    <div className="border-base-content/10 border-b">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between py-5 text-left group"
+        className="group flex w-full items-center justify-between py-5 text-left"
       >
-        <span className="text-sm md:text-base font-medium text-base-content/70 group-hover:text-base-content transition-colors pr-4">
+        <span className="text-base-content/70 group-hover:text-base-content pr-4 text-sm font-medium transition-colors md:text-base">
           <ScrambleText text={item.question} isActive={itemActive} duration={500} />
         </span>
-        <ChevronDownIcon 
-          className={`w-4 h-4 text-base-content/40 flex-shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} 
+        <ChevronDownIcon
+          className={`text-base-content/40 size-4 flex-shrink-0 transition-transform duration-300${isOpen ? "rotate-180" : ""}`}
         />
       </button>
       <motion.div
         initial={false}
-        animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
+        animate={isOpen ? ACCORDION_ANIMATE_OPEN : ACCORDION_ANIMATE_CLOSED}
+        transition={ACCORDION_TRANSITION}
         className="overflow-hidden"
       >
-        <p className="pb-5 text-base-content/40 text-sm leading-relaxed">
+        <p className="text-base-content/40 pb-5 text-sm leading-relaxed">
           {item.answer}
         </p>
       </motion.div>
@@ -434,25 +433,25 @@ const FAQAccordionScramble = ({
 // Security content
 const SecurityContent = ({ isActive }: { isActive: boolean }) => (
   <div className="flex flex-col items-center gap-6">
-    <p className="text-base-content/40 text-sm max-w-md">
+    <p className="text-base-content/40 max-w-md text-sm">
       <ScrambleText text="Audited. Verified. Open source." isActive={isActive} duration={500} />
     </p>
     <a
       href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex items-center gap-3 px-5 py-3 border border-base-content/10 hover:border-base-content/20 transition-colors"
+      className="border-base-content/10 hover:border-base-content/20 group flex items-center gap-3 border px-5 py-3 transition-colors"
     >
-      <ShieldCheckIcon className="w-6 h-6 text-success" />
+      <ShieldCheckIcon className="text-success size-6" />
       <div className="text-left">
-        <div className="text-sm font-medium text-base-content/80 group-hover:text-success transition-colors">
+        <div className="text-base-content/80 group-hover:text-success text-sm font-medium transition-colors">
           <ScrambleText text="Starknet Audit" isActive={isActive} duration={500} />
         </div>
-        <div className="text-[10px] text-base-content/40">
+        <div className="text-base-content/40 text-[10px]">
           <ScrambleText text="Codespect" isActive={isActive} duration={400} />
         </div>
       </div>
-      <DocumentTextIcon className="w-4 h-4 text-base-content/30" />
+      <DocumentTextIcon className="text-base-content/30 size-4" />
     </a>
   </div>
 );
@@ -461,7 +460,7 @@ const SecurityContent = ({ isActive }: { isActive: boolean }) => (
 const CTAContent = ({ isActive }: { isActive: boolean }) => (
   <div className="flex flex-col items-center gap-8">
     <LaunchAppButton />
-    <div className="flex items-center gap-6 text-xs text-base-content/30">
+    <div className="text-base-content/30 flex items-center gap-6 text-xs">
       <a href="https://discord.gg/Vjk6NhkxGv" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">
         <ScrambleText text="Discord" isActive={isActive} duration={300} />
       </a>
@@ -478,12 +477,27 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => (
   </div>
 );
 
+// Static spring config - extracted to module level
+const SMOOTH_PROGRESS_CONFIG = { stiffness: 100, damping: 30 };
+
+// Progress indicator style - extracted to module level
+const PROGRESS_STYLE = { height: "100%" };
+
 const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
   useKapanTheme();
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  const sections: SectionData[] = [
+
+  // Memoize FAQContent wrapper component to avoid recreation
+  const FAQContentWrapper = useMemo(() => {
+    const Component: React.FC<{ isActive: boolean }> = ({ isActive }) => (
+      <FAQContent faqItems={faqItems} isActive={isActive} />
+    );
+    Component.displayName = "FAQContentWrapper";
+    return Component;
+  }, [faqItems]);
+
+  const sections: SectionData[] = useMemo(() => [
     {
       tag: "01 / MISSION",
       title: "ONE TRANSACTION.",
@@ -506,7 +520,7 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
       tag: "04 / FAQ",
       title: "QUESTIONS.",
       content: null,
-      ContentComponent: ({ isActive }) => <FAQContent faqItems={faqItems} isActive={isActive} />,
+      ContentComponent: FAQContentWrapper,
     },
     {
       tag: "05 / SECURITY",
@@ -520,37 +534,57 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
       content: null,
       ContentComponent: CTAContent,
     },
-  ];
+  ], [FAQContentWrapper]);
 
   const { scrollYProgress } = useScroll({ container: containerRef });
-  const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
+  const smoothProgress = useSpring(scrollYProgress, SMOOTH_PROGRESS_CONFIG);
+
+  // Memoize scroll container height style
+  const scrollContainerStyle = useMemo(() => ({
+    height: `${sections.length * 100}vh`
+  }), [sections.length]);
+
+  // Memoize scroll hint opacity transform
+  const scrollHintOpacity = useTransform(smoothProgress, [0, 0.1], [1, 0]);
+
+  // Memoize scroll hint style object
+  const scrollHintStyle = useMemo(() => ({
+    opacity: scrollHintOpacity
+  }), [scrollHintOpacity]);
+
+  // Memoize progress indicator style with scaleY
+  const progressIndicatorStyle = useMemo(() => ({
+    ...PROGRESS_STYLE,
+    scaleY: smoothProgress
+  }), [smoothProgress]);
 
   return (
-    <div className="fixed inset-0 bg-base-100 text-base-content overflow-hidden">
+    <div className="bg-base-100 text-base-content fixed inset-0 overflow-hidden">
       {/* Background grid */}
+      {/* eslint-disable-next-line tailwindcss/no-contradicting-classname -- bg-[linear-gradient] and bg-[size] are different CSS properties */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
 
       {/* Scroll container */}
       <div
         ref={containerRef}
-        className="h-full w-full hide-scrollbar relative z-10 overflow-y-auto snap-y snap-mandatory scroll-smooth"
+        className="hide-scrollbar relative z-10 size-full snap-y snap-mandatory overflow-y-auto scroll-smooth"
       >
-        <div style={{ height: `${sections.length * 100}vh` }} className="relative">
+        <div style={scrollContainerStyle} className="relative">
           {/* Snap targets */}
-          <div className="absolute inset-0 flex flex-col pointer-events-none">
+          <div className="pointer-events-none absolute inset-0 flex flex-col">
             {sections.map((_, i) => (
               <div key={i} className="h-screen w-full snap-start" />
             ))}
           </div>
 
           {/* Sticky viewport */}
-          <div className="sticky top-0 h-screen w-full flex items-center justify-center overflow-hidden">
+          <div className="sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden">
             {/* Progress indicator */}
-            <div className="absolute right-6 md:right-12 top-1/2 -translate-y-1/2 h-48 w-[1px] bg-base-content/5 hidden lg:block">
+            <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
               <motion.div
-                className="w-full bg-base-content/40 origin-top"
-                style={{ height: "100%", scaleY: smoothProgress }}
+                className="bg-base-content/40 w-full origin-top"
+                style={progressIndicatorStyle}
               />
             </div>
 
@@ -567,11 +601,11 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
 
             {/* Scroll hint */}
             <motion.div
-              style={{ opacity: useTransform(smoothProgress, [0, 0.1], [1, 0]) }}
-              className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 text-base-content/30"
+              style={scrollHintStyle}
+              className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>
-              <ChevronDownIcon className="w-4 h-4 animate-bounce" />
+              <ChevronDownIcon className="size-4 animate-bounce" />
             </motion.div>
           </div>
         </div>

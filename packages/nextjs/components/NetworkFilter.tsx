@@ -1,20 +1,11 @@
 "use client";
 
 import { track } from "@vercel/analytics";
-import { Suspense, useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback, useMemo, FC } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
-
 import Image from "next/image";
-
-// Helper to get the correct logo based on theme
-const getNetworkLogo = (network: NetworkOption, isDarkMode: boolean): string => {
-  // In dark mode, use the light logo (logo). In light mode, use logoDark if available
-  if (!isDarkMode && network.logoDark) {
-    return network.logoDark;
-  }
-  return network.logo;
-};
+import { getNetworkOptionLogo, NETWORK_ID_TO_CHAIN_ID, CHAIN_ID_TO_NETWORK_ID } from "~~/utils/networkLogos";
 
 export interface NetworkOption {
   id: string;
@@ -31,18 +22,61 @@ interface NetworkFilterProps {
 
 const STORAGE_KEY = "kapan-network-filter-selection";
 
-// Map network IDs to EVM chain IDs
-const NETWORK_TO_CHAIN_ID: Record<string, number> = {
-  arbitrum: 42161,
-  base: 8453,
-  optimism: 10,
-  linea: 59144,
-  hardhat: 31337,
-};
-
 // --- tweakable behavior flags ---
-const SHALLOW_URL_SYNC = true; // ✅ don't trigger app-router navigation
+const SHALLOW_URL_SYNC = true; // don't trigger app-router navigation
 const HISTORY_MODE: "replace" | "push" = "push"; // "push" so Back works
+
+// Sub-component for network button to handle ref and click properly
+interface NetworkButtonProps {
+  network: NetworkOption;
+  isActive: boolean;
+  isDarkMode: boolean;
+  onNetworkChange: (networkId: string) => void;
+  onRef: (id: string, el: HTMLButtonElement | null) => void;
+}
+
+const NetworkButton: FC<NetworkButtonProps> = ({
+  network,
+  isActive,
+  isDarkMode,
+  onNetworkChange,
+  onRef,
+}) => {
+  const handleClick = useCallback(() => {
+    onNetworkChange(network.id);
+  }, [onNetworkChange, network.id]);
+
+  const handleRef = useCallback((el: HTMLButtonElement | null) => {
+    onRef(network.id, el);
+  }, [onRef, network.id]);
+
+  return (
+    <button
+      ref={handleRef}
+      type="button"
+      aria-pressed={isActive}
+      className={`
+        relative z-10 flex min-w-[65px] items-center justify-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors duration-200
+        ${isActive
+          ? "text-base-content"
+          : "text-base-content/35 hover:text-base-content/60"
+        }
+      `}
+      onClick={handleClick}
+    >
+      <div className="relative size-3 shrink-0">
+        <Image
+          src={getNetworkOptionLogo(network, isDarkMode)}
+          alt={network.name}
+          fill
+          sizes="12px"
+          className="object-contain"
+        />
+      </div>
+      <span className="whitespace-nowrap">{network.name}</span>
+    </button>
+  );
+};
 
 const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   networks,
@@ -61,6 +95,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   const selectedRef = useRef(selectedNetwork);
   const didInitRef = useRef(false);
   const suppressNextUrlSyncRef = useRef(false); // guards URL->state loop
+  const weInitiatedChainSwitchRef = useRef(false); // guards wallet->filter loop
 
   // keep ref in sync
   useEffect(() => {
@@ -91,16 +126,16 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     const onPopState = () => {
       const url = new URL(window.location.href);
       const urlNetwork = url.searchParams.get("network");
-      if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
-        setSelectedNetwork(urlNetwork!);
-        onNetworkChange(urlNetwork!);
+      if (isValid(urlNetwork) && urlNetwork && urlNetwork !== selectedRef.current) {
+        setSelectedNetwork(urlNetwork);
+        onNetworkChange(urlNetwork);
 
         // cache
         try {
-          localStorage.setItem(STORAGE_KEY, urlNetwork!);
+          localStorage.setItem(STORAGE_KEY, urlNetwork);
         } catch { }
         // non-blocking wallet network switch
-        const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
+        const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
         if (chainId && chainId !== chain?.id) {
           try {
             void switchChain?.({ chainId });
@@ -113,7 +148,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [SHALLOW_URL_SYNC, isValid, onNetworkChange, chain?.id, switchChain]);
+  }, [isValid, onNetworkChange, chain?.id, switchChain]);
 
   // 1) Initialize once after mount (URL > cache > default)
   useEffect(() => {
@@ -123,12 +158,12 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     const urlNetwork = searchParams.get("network");
     let initial = defaultNetwork;
 
-    if (isValid(urlNetwork)) {
-      initial = urlNetwork!;
+    if (isValid(urlNetwork) && urlNetwork) {
+      initial = urlNetwork;
     } else {
       try {
         const cached = localStorage.getItem(STORAGE_KEY);
-        if (isValid(cached)) initial = cached!;
+        if (isValid(cached) && cached) initial = cached;
       } catch { }
     }
 
@@ -137,7 +172,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       onNetworkChange(initial);
 
       // Switch wallet network if it's an EVM network (non-blocking)
-      const chainId = NETWORK_TO_CHAIN_ID[initial];
+      const chainId = NETWORK_ID_TO_CHAIN_ID[initial];
       if (chainId && chainId !== chain?.id) {
         try {
           void switchChain?.({ chainId });
@@ -158,13 +193,13 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     if (SHALLOW_URL_SYNC) return; // shallow mode: we manage URL with popstate above
 
     const urlNetwork = searchParams.get("network");
-    if (isValid(urlNetwork) && urlNetwork !== selectedRef.current) {
-      setSelectedNetwork(urlNetwork!);
-      onNetworkChange(urlNetwork!);
+    if (isValid(urlNetwork) && urlNetwork && urlNetwork !== selectedRef.current) {
+      setSelectedNetwork(urlNetwork);
+      onNetworkChange(urlNetwork);
       try {
-        localStorage.setItem(STORAGE_KEY, urlNetwork!);
+        localStorage.setItem(STORAGE_KEY, urlNetwork);
       } catch { }
-      const chainId = NETWORK_TO_CHAIN_ID[urlNetwork!];
+      const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
       if (chainId && chainId !== chain?.id) {
         try {
           void switchChain?.({ chainId });
@@ -186,7 +221,38 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networks, defaultNetwork]);
 
-  const handleNetworkChange = (networkId: string, { trackEvent = true }: { trackEvent?: boolean } = {}) => {
+  // 4) Sync wallet network changes (from navbar) back to the filter
+  useEffect(() => {
+    if (!chain?.id) return;
+
+    // If we initiated the chain switch, skip syncing back
+    if (weInitiatedChainSwitchRef.current) {
+      weInitiatedChainSwitchRef.current = false;
+      return;
+    }
+
+    // Map chain ID to network filter ID
+    const networkId = CHAIN_ID_TO_NETWORK_ID[chain.id];
+    if (!networkId || !isValid(networkId)) return;
+
+    // Only update if different from current selection
+    if (networkId !== selectedRef.current) {
+      setSelectedNetwork(networkId);
+      onNetworkChange(networkId);
+
+      // Update cache
+      try {
+        localStorage.setItem(STORAGE_KEY, networkId);
+      } catch { }
+
+      // Update URL
+      if (SHALLOW_URL_SYNC) {
+        shallowUpdateUrl(networkId, "replace");
+      }
+    }
+  }, [chain?.id, isValid, onNetworkChange, shallowUpdateUrl]);
+
+  const handleNetworkChange = useCallback((networkId: string, { trackEvent = true }: { trackEvent?: boolean } = {}) => {
     if (!isValid(networkId) || networkId === selectedRef.current) return;
 
     if (trackEvent) {
@@ -206,11 +272,13 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     } catch { }
 
     // Switch wallet network if it's an EVM network (non-blocking)
-    const chainId = NETWORK_TO_CHAIN_ID[networkId];
+    const chainId = NETWORK_ID_TO_CHAIN_ID[networkId];
     if (chainId && chainId !== chain?.id) {
       try {
+        weInitiatedChainSwitchRef.current = true; // Prevent sync loop
         void switchChain?.({ chainId });
       } catch (e) {
+        weInitiatedChainSwitchRef.current = false;
         console.warn("Auto network switch failed", e);
       }
     }
@@ -221,7 +289,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     );
     if (params.get("network") !== networkId) {
       if (SHALLOW_URL_SYNC) {
-        shallowUpdateUrl(networkId, HISTORY_MODE); // ← no navigation
+        shallowUpdateUrl(networkId, HISTORY_MODE); // no navigation
       } else {
         // Fallback to Next navigation (rare case if you really need it)
         const next = new URLSearchParams(searchParams.toString());
@@ -231,12 +299,19 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         router.replace(`${pathname}?${next.toString()}`, { scroll: false });
       }
     }
-  };
+  }, [isValid, pathname, onNetworkChange, chain?.id, switchChain, searchParams, shallowUpdateUrl, router]);
 
   // Track button refs for measuring positions
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null);
+
+  // Callback for storing button refs
+  const handleButtonRef = useCallback((id: string, el: HTMLButtonElement | null) => {
+    if (el) {
+      buttonRefs.current.set(id, el);
+    }
+  }, []);
 
   // Update indicator position when selection changes
   useEffect(() => {
@@ -252,52 +327,39 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     }
   }, [selectedNetwork, networks]);
 
+  // Memoize the indicator style object
+  const indicatorStyleObject = useMemo(() => {
+    if (!indicatorStyle) return undefined;
+    return {
+      left: indicatorStyle.left,
+      width: indicatorStyle.width,
+    };
+  }, [indicatorStyle]);
+
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex items-center gap-0.5 p-1 bg-base-200/50 rounded-lg border border-base-content/10"
+      className="bg-base-200/50 border-base-content/10 relative inline-flex items-center gap-0.5 rounded-lg border p-1 transition-[width] duration-200 ease-out"
     >
       {/* Animated sliding indicator */}
-      {indicatorStyle && (
+      {indicatorStyleObject && (
         <div
-          className="absolute top-1 bottom-1 bg-base-content/10 rounded-md transition-all duration-300 ease-out"
-          style={{
-            left: indicatorStyle.left,
-            width: indicatorStyle.width,
-          }}
+          className="bg-base-content/10 absolute inset-y-1 rounded-md transition-all duration-200 ease-out"
+          style={indicatorStyleObject}
         />
       )}
 
       {networks.map((network) => {
         const isActive = selectedNetwork === network.id;
         return (
-          <button
+          <NetworkButton
             key={network.id}
-            ref={(el) => {
-              if (el) buttonRefs.current.set(network.id, el);
-            }}
-            type="button"
-            aria-pressed={isActive}
-            className={`
-              relative z-10 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-md transition-colors duration-200 min-w-[90px]
-              ${isActive
-                ? "text-base-content"
-                : "text-base-content/35 hover:text-base-content/60"
-              }
-            `}
-            onClick={() => handleNetworkChange(network.id)}
-          >
-            <div className="w-4 h-4 relative shrink-0">
-              <Image
-                src={getNetworkLogo(network, isDarkMode)}
-                alt={network.name}
-                fill
-                sizes="16px"
-                className="object-contain"
-              />
-            </div>
-            <span className="whitespace-nowrap">{network.name}</span>
-          </button>
+            network={network}
+            isActive={isActive}
+            isDarkMode={isDarkMode}
+            onNetworkChange={handleNetworkChange}
+            onRef={handleButtonRef}
+          />
         );
       })}
     </div>
@@ -305,35 +367,38 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 };
 
 export const NetworkFilter: React.FC<NetworkFilterProps> = (props) => {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex items-center gap-4 p-4 bg-transparent rounded-lg">
-          <div className="flex items-center gap-2">
-            {props.networks.map((network) => (
-              <button
-                key={network.id}
-                type="button"
-                disabled
-                // keep pointer-events enabled for other parts of the page:
-                className="btn btn-sm normal-case inline-flex items-center gap-2 btn-outline opacity-60"
-              >
-                <div className="w-5 h-5 relative">
-                  <Image
-                    src={network.logo}
-                    alt={network.name}
-                    fill
-                    sizes="20px"
-                    className="object-contain"
-                  />
-                </div>
-                <span className="whitespace-nowrap">{network.name}</span>
-              </button>
-            ))}
-          </div>
+  // Memoize fallback JSX to avoid re-creating on each render
+  const suspenseFallback = useMemo(
+    () => (
+      <div className="flex items-center gap-1 rounded-lg bg-transparent p-1">
+        <div className="flex items-center gap-0.5">
+          {props.networks.map((network) => (
+            <button
+              key={network.id}
+              type="button"
+              disabled
+              className="inline-flex min-w-[65px] items-center justify-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold uppercase opacity-60"
+            >
+              <div className="relative size-3">
+                <Image
+                  src={network.logo}
+                  alt={network.name}
+                  fill
+                  sizes="12px"
+                  className="object-contain"
+                />
+              </div>
+              <span className="whitespace-nowrap">{network.name}</span>
+            </button>
+          ))}
         </div>
-      }
-    >
+      </div>
+    ),
+    [props.networks],
+  );
+
+  return (
+    <Suspense fallback={suspenseFallback}>
       <NetworkFilterInner {...props} />
     </Suspense>
   );
