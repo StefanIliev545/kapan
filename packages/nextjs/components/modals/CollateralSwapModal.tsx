@@ -158,46 +158,9 @@ function validateLimitOrderResult(result: BuildOrderResult): void {
 }
 
 /**
- * Executes the limit order using batched calls (EIP-5792).
- */
-async function executeBatchedOrder(
-    params: OrderExecutionParams,
-    notificationId: string,
-    onClose: () => void,
-    txBeginProps: Record<string, string | number | boolean | null>
-): Promise<void> {
-    const { limitOrderResult, chainId, orderManagerAddress, sendCallsAsync } = params;
-
-    if (!sendCallsAsync) {
-        throw new Error("sendCallsAsync not available");
-    }
-
-    const { id: batchId } = await sendCallsAsync({
-        calls: limitOrderResult.calls,
-        experimental_fallback: true,
-    });
-
-    notification.remove(notificationId);
-
-    const explorerUrl = orderManagerAddress
-        ? getCowExplorerAddressUrl(chainId, orderManagerAddress)
-        : undefined;
-
-    notification.success(
-        <TransactionToast
-            step="confirmed"
-            message="Limit order created!"
-            secondaryLink={explorerUrl}
-            secondaryLinkText="View on CoW Explorer"
-        />
-    );
-
-    track("collateral_swap_limit_order_complete", { ...txBeginProps, status: "success", batchId });
-    onClose();
-}
-
-/**
- * Executes the limit order sequentially (fallback for non-batching wallets).
+ * Executes the limit order sequentially.
+ * We always use sequential execution for limit orders because MetaMask
+ * has issues with approvals in batched calls that may go unused.
  */
 async function executeSequentialOrder(
     params: OrderExecutionParams,
@@ -1177,11 +1140,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         };
 
         try {
-            // Prefer batched execution (EIP-5792) if available, otherwise fall back to sequential
-            const canUseBatchedExecution = typeof sendCallsAsync === "function";
-            if (canUseBatchedExecution) {
-                await executeBatchedOrder(executionParams, notificationId as string, onClose, txBeginProps);
-            } else if (walletClient && publicClient) {
+            // Always use sequential execution for limit orders
+            // MetaMask has issues with approvals in batched calls that may go unused
+            if (walletClient && publicClient) {
                 await executeSequentialOrder(executionParams, notificationId as string, onClose, txBeginProps);
             } else {
                 throw new Error("Wallet not connected");

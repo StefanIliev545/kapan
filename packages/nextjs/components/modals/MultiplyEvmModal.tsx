@@ -30,14 +30,13 @@ import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAd
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
-import { LimitOrderConfig, type LimitOrderResult } from "~~/components/LimitOrderConfig";
+import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { saveOrderNote, createLeverageUpNote } from "~~/utils/orderNotes";
 import { executeSequentialTransactions, type TransactionCall } from "~~/utils/transactionSimulation";
 
 // Import helper functions to reduce cognitive complexity
 import {
   getBestQuote,
-  calculateMarketRate,
   calculateQuotesPriceImpact,
   calculatePositionMetrics,
   calculateNetApyAndYield,
@@ -109,18 +108,20 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const [limitSlippage, setLimitSlippage] = useState<number>(0.1);
   const [hasAutoSetLimitSlippage, setHasAutoSetLimitSlippage] = useState(false);
   const [customMinPrice, setCustomMinPrice] = useState<string>("");
-  const [showAdvancedPricing, setShowAdvancedPricing] = useState(false);
-  const [lastOrderSalt, setLastOrderSalt] = useState<string | null>(null);
-  const [limitOrderNotificationId, setLimitOrderNotificationId] = useState<string | number | null>(null);
   const cowAvailable = isCowProtocolSupported(chainId);
 
   const isDevEnvironment = process.env.NODE_ENV === 'development';
 
   // Flash loan toggle for limit orders
-  const [useFlashLoan, setUseFlashLoan] = useState<boolean>(true);
-  const [flashLoanChunks, setFlashLoanChunks] = useState<number>(1);
-  const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
-  const [useBatchedTx, setUseBatchedTx] = useState<boolean>(false);
+  const [useFlashLoan] = useState<boolean>(true);
+  const [chunksInput, setChunksInput] = useState<string>("1");
+  const [limitOrderConfig] = useState<LimitOrderResult | null>(null);
+
+  // Derive flashLoanChunks directly from chunksInput (synchronous, no delay)
+  const flashLoanChunks = useMemo(() => {
+    const parsed = parseInt(chunksInput) || 1;
+    return Math.max(1, Math.min(100, parsed));
+  }, [chunksInput]);
 
   // Get user address for CoW order creation
   const { address: userAddress } = useAccount();
@@ -205,7 +206,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // ==================== Wallet Balances ====================
 
   const allTokens = useMemo(() => {
-    const tokens = [...collaterals.map(c => ({ address: c.address, decimals: c.decimals }))];
+    const tokens = collaterals.map(c => ({ address: c.address, decimals: c.decimals }));
     debtOptions.forEach(d => {
       if (!tokens.find(t => t.address.toLowerCase() === d.address.toLowerCase())) {
         tokens.push({ address: d.address, decimals: d.decimals });
@@ -314,19 +315,6 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     tokenAddress: debt?.address as Address, amount: flashLoanAmountRaw, chainId,
   });
 
-  // ==================== Limit Order Config Callback ====================
-
-  const handleLimitOrderConfigChange = useCallback((config: LimitOrderResult) => {
-    setLimitOrderConfig(config);
-  }, []);
-
-  const limitOrderSellToken = useMemo(() =>
-    debt ? {
-      symbol: debt.symbol,
-      decimals: debt.decimals,
-      address: debt.address,
-    } : null,
-  [debt]);
 
   // ==================== Swap Quotes ====================
 
@@ -380,11 +368,6 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   }), [oneInchQuote, pendleQuote, cowQuote]);
 
   const bestQuote = useMemo(() => getBestQuote(quoteData), [quoteData]);
-
-  const marketRate = useMemo(() =>
-    calculateMarketRate(bestQuote, debt, collateral, swapQuoteAmount),
-    [bestQuote, debt, collateral, swapQuoteAmount]
-  );
 
   const quotesPriceImpact = useMemo(() =>
     calculateQuotesPriceImpact(swapRouter, quoteData.pendleQuote, quoteData.oneInchQuote),
@@ -446,34 +429,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // ==================== Router and Transaction Flow ====================
 
-  const { buildMultiplyFlow, sendCallsAsync, setBatchId, setSuppressBatchNotifications, isBatchConfirmed, routerContract } = useKapanRouterV2();
-
-  useEffect(() => {
-    if (isBatchConfirmed && executionType === "limit" && userAddress) {
-      console.log("[Limit Order] Batch confirmed, showing success and closing modal");
-
-      if (limitOrderNotificationId) {
-        notification.remove(limitOrderNotificationId);
-        setLimitOrderNotificationId(null);
-      }
-
-      const cowExplorerUrl = orderManagerAddress
-        ? getCowExplorerAddressUrl(chainId, orderManagerAddress)
-        : undefined;
-      const shortSalt = lastOrderSalt ? `${lastOrderSalt.slice(0, 10)}...${lastOrderSalt.slice(-6)}` : "";
-
-      notification.success(
-        <TransactionToast
-          step="confirmed"
-          message={`Limit order created!${shortSalt ? ` (${shortSalt})` : ""}`}
-          secondaryLink={cowExplorerUrl}
-          secondaryLinkText="View on CoW Explorer"
-        />
-      );
-
-      onClose();
-    }
-  }, [isBatchConfirmed, executionType, orderManagerAddress, chainId, lastOrderSalt, limitOrderNotificationId, onClose, userAddress]);
+  const { buildMultiplyFlow, routerContract } = useKapanRouterV2();
 
   // ==================== Build Flow for Market Orders ====================
 
@@ -539,6 +495,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
     // Flash loan mode calculation
     if (useFlashLoan) {
+      console.log("[ChunkParams] Flash loan mode, flashLoanChunks:", flashLoanChunks, "chunksInput:", chunksInput);
       return calculateFlashLoanChunkParams(flashLoanAmountRaw, debt, {
         useFlashLoan,
         flashLoanChunks,
@@ -572,7 +529,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     });
 
     return result;
-  }, [executionType, collateral, debt, flashLoanAmountRaw, marginAmountRaw, collateralConfig, isEModeActive, eMode, maxLtvBps, bestQuote, swapQuoteAmount, useFlashLoan, flashLoanChunks, chainId, limitOrderConfig]);
+  }, [executionType, collateral, debt, flashLoanAmountRaw, marginAmountRaw, collateralConfig, isEModeActive, eMode, maxLtvBps, bestQuote, swapQuoteAmount, useFlashLoan, flashLoanChunks, chainId, limitOrderConfig, chunksInput]);
 
   // ==================== CoW Instructions Using Helper ====================
 
@@ -639,15 +596,6 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const handleSetExecutionMarket = useCallback(() => setExecutionType("market"), []);
   const handleSetExecutionLimit = useCallback(() => setExecutionType("limit"), []);
 
-  const handleLimitSlippageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setLimitSlippage(parseFloat(e.target.value));
-    setCustomMinPrice("");
-    setHasAutoSetLimitSlippage(true);
-  }, []);
-
-  const handleToggleAdvancedPricing = useCallback(() => setShowAdvancedPricing(prev => !prev), []);
-  const handleCustomMinPriceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setCustomMinPrice(e.target.value), []);
-  const handleUseBatchedTxChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setUseBatchedTx(e.target.checked), []);
   const handleZapModeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setZapMode(e.target.checked), []);
   const handleSwapRouterChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => setSwapRouter(e.target.value as SwapRouter), []);
   const handleSlippageChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => setSlippage(parseFloat(e.target.value)), []);
@@ -702,7 +650,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       marginAmount, leverage
     });
 
-    if (!collateral || !debt || !userAddress || !orderManagerAddress || !routerContract || !sendCallsAsync) {
+    if (!collateral || !debt || !userAddress || !orderManagerAddress || !routerContract) {
       throw new Error("Missing required data for limit order");
     }
 
@@ -849,52 +797,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     );
 
     try {
-      if (useBatchedTx && !!sendCallsAsync) {
-        await executeBatchedLimitOrder(allCalls, cowCalls, notificationId);
-      } else {
-        await executeSequentialLimitOrder(allCalls, cowCalls, notificationId);
-      }
+      // Always use sequential execution for limit orders
+      // MetaMask has issues with approvals in batched calls that may go unused
+      await executeSequentialLimitOrder(allCalls, cowCalls, notificationId);
     } catch (batchError: unknown) {
       notification.remove(notificationId);
       throw batchError;
     }
-  };
-
-  // ==================== Batched Limit Order Execution ====================
-
-  const executeBatchedLimitOrder = async (
-    allCalls: { to: Address; data: Hex }[],
-    cowCalls: { salt: string; appDataHash: string },
-    notificationId: string | number
-  ) => {
-    console.log("[Limit Order] Using batched TX mode (EIP-5792)");
-
-    if (!sendCallsAsync) throw new Error("sendCallsAsync not available");
-
-    const { id: newBatchId } = await sendCallsAsync({
-      calls: allCalls,
-      experimental_fallback: true,
-    });
-
-    setLastOrderSalt(cowCalls.salt);
-    setSuppressBatchNotifications(true);
-    setBatchId(newBatchId);
-
-    notification.remove(notificationId);
-
-    const loadingId = notification.loading(
-      <TransactionToast
-        step="sent"
-        message="Limit order submitted - waiting for confirmation..."
-      />
-    );
-    setLimitOrderNotificationId(loadingId);
-
-    console.log("[Limit Order] Batch submitted:", newBatchId);
-    console.log("[Limit Order] Salt:", cowCalls.salt);
-    console.log("[Limit Order] AppData Hash:", cowCalls.appDataHash);
-
-    track("multiply_limit_order_complete", { status: "submitted", batchId: newBatchId });
   };
 
   // ==================== Sequential Limit Order Execution ====================
@@ -945,9 +854,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     }
 
     notification.remove(notificationId);
-    setLastOrderSalt(cowCalls.salt);
 
-    const explorerUrl = getCowExplorerAddressUrl(chainId, userAddress);
+    const explorerUrl = orderManagerAddress ? getCowExplorerAddressUrl(chainId, orderManagerAddress) : undefined;
     notification.success(
       <TransactionToast
         step="confirmed"
@@ -1075,29 +983,15 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             handleSetExecutionLimit={handleSetExecutionLimit}
             cowContractAvailable={cowContractAvailable}
             isDevEnvironment={isDevEnvironment}
-            limitSlippage={limitSlippage}
-            handleLimitSlippageChange={handleLimitSlippageChange}
-            isSwapQuoteLoading={isSwapQuoteLoading}
-            marketRate={marketRate}
             debt={debt}
             collateral={collateral}
             bestQuote={bestQuote}
             minCollateralOut={minCollateralOut}
-            showAdvancedPricing={showAdvancedPricing}
-            handleToggleAdvancedPricing={handleToggleAdvancedPricing}
             customMinPrice={customMinPrice}
-            handleCustomMinPriceChange={handleCustomMinPriceChange}
-            limitOrderSellToken={limitOrderSellToken}
-            chainId={chainId}
-            flashLoanAmountRaw={flashLoanAmountRaw}
-            handleLimitOrderConfigChange={handleLimitOrderConfigChange}
-            useFlashLoan={useFlashLoan}
-            setUseFlashLoan={setUseFlashLoan}
-            flashLoanChunks={flashLoanChunks}
-            setFlashLoanChunks={setFlashLoanChunks}
+            setCustomMinPrice={setCustomMinPrice}
             chunkParams={chunkParams}
-            useBatchedTx={useBatchedTx}
-            handleUseBatchedTxChange={handleUseBatchedTxChange}
+            chunksInput={chunksInput}
+            setChunksInput={setChunksInput}
             zapMode={zapMode}
             handleZapModeChange={handleZapModeChange}
             swapRouter={swapRouter}
@@ -1335,29 +1229,15 @@ interface LeverageSectionProps {
   handleSetExecutionLimit: () => void;
   cowContractAvailable: boolean;
   isDevEnvironment: boolean;
-  limitSlippage: number;
-  handleLimitSlippageChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  isSwapQuoteLoading: boolean;
-  marketRate: number | null;
   debt: SwapAsset | undefined;
   collateral: SwapAsset | undefined;
   bestQuote: { source: string; amount: bigint } | null;
   minCollateralOut: { raw: bigint; formatted: string };
-  showAdvancedPricing: boolean;
-  handleToggleAdvancedPricing: () => void;
   customMinPrice: string;
-  handleCustomMinPriceChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  limitOrderSellToken: { symbol: string; decimals: number; address: Address } | null;
-  chainId: number;
-  flashLoanAmountRaw: bigint;
-  handleLimitOrderConfigChange: (config: LimitOrderResult) => void;
-  useFlashLoan: boolean;
-  setUseFlashLoan: (v: boolean) => void;
-  flashLoanChunks: number;
-  setFlashLoanChunks: (v: number) => void;
+  setCustomMinPrice: (v: string) => void;
   chunkParams: ChunkParamsResult;
-  useBatchedTx: boolean;
-  handleUseBatchedTxChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  chunksInput: string;
+  setChunksInput: (v: string) => void;
   zapMode: boolean;
   handleZapModeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   swapRouter: SwapRouter;
@@ -1376,11 +1256,10 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
   const {
     leverage, leverageInput, maxLeverage, ticks, handleLeverageInputChange, handleLeverageInputBlur,
     handleLeverageSliderChange, cowAvailable, executionType, handleSetExecutionMarket, handleSetExecutionLimit,
-    cowContractAvailable, isDevEnvironment, limitSlippage, handleLimitSlippageChange, isSwapQuoteLoading,
-    marketRate, debt, collateral, bestQuote, minCollateralOut, showAdvancedPricing, handleToggleAdvancedPricing,
-    customMinPrice, handleCustomMinPriceChange, limitOrderSellToken, chainId, flashLoanAmountRaw,
-    handleLimitOrderConfigChange, useFlashLoan, setUseFlashLoan, flashLoanChunks, setFlashLoanChunks,
-    chunkParams, useBatchedTx, handleUseBatchedTxChange, zapMode, handleZapModeChange, swapRouter,
+    cowContractAvailable, isDevEnvironment,
+    debt, collateral, bestQuote, minCollateralOut,
+    customMinPrice, setCustomMinPrice, chunkParams, chunksInput, setChunksInput,
+    zapMode, handleZapModeChange, swapRouter,
     handleSwapRouterChange, oneInchAvailable, pendleAvailable, slippage, handleSlippageChange,
     selectedProvider, handleFlashLoanProviderChange, providerOptions, liquidityData,
   } = props;
@@ -1440,29 +1319,15 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
       {/* Limit Order Pricing */}
       {executionType === "limit" && (
         <LimitOrderPricingSection
-          limitSlippage={limitSlippage}
-          handleLimitSlippageChange={handleLimitSlippageChange}
-          isSwapQuoteLoading={isSwapQuoteLoading}
-          marketRate={marketRate}
           debt={debt}
           collateral={collateral}
           bestQuote={bestQuote}
           minCollateralOut={minCollateralOut}
-          showAdvancedPricing={showAdvancedPricing}
-          handleToggleAdvancedPricing={handleToggleAdvancedPricing}
           customMinPrice={customMinPrice}
-          handleCustomMinPriceChange={handleCustomMinPriceChange}
-          limitOrderSellToken={limitOrderSellToken}
-          chainId={chainId}
-          flashLoanAmountRaw={flashLoanAmountRaw}
-          handleLimitOrderConfigChange={handleLimitOrderConfigChange}
-          useFlashLoan={useFlashLoan}
-          setUseFlashLoan={setUseFlashLoan}
-          flashLoanChunks={flashLoanChunks}
-          setFlashLoanChunks={setFlashLoanChunks}
+          setCustomMinPrice={setCustomMinPrice}
           chunkParams={chunkParams}
-          useBatchedTx={useBatchedTx}
-          handleUseBatchedTxChange={handleUseBatchedTxChange}
+          chunksInput={chunksInput}
+          setChunksInput={setChunksInput}
         />
       )}
 
@@ -1508,168 +1373,119 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
 };
 
 interface LimitOrderPricingSectionProps {
-  limitSlippage: number;
-  handleLimitSlippageChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  isSwapQuoteLoading: boolean;
-  marketRate: number | null;
   debt: SwapAsset | undefined;
   collateral: SwapAsset | undefined;
   bestQuote: { source: string; amount: bigint } | null;
   minCollateralOut: { raw: bigint; formatted: string };
-  showAdvancedPricing: boolean;
-  handleToggleAdvancedPricing: () => void;
   customMinPrice: string;
-  handleCustomMinPriceChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  limitOrderSellToken: { symbol: string; decimals: number; address: Address } | null;
-  chainId: number;
-  flashLoanAmountRaw: bigint;
-  handleLimitOrderConfigChange: (config: LimitOrderResult) => void;
-  useFlashLoan: boolean;
-  setUseFlashLoan: (v: boolean) => void;
-  flashLoanChunks: number;
-  setFlashLoanChunks: (v: number) => void;
+  setCustomMinPrice: (v: string) => void;
   chunkParams: ChunkParamsResult;
-  useBatchedTx: boolean;
-  handleUseBatchedTxChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  chunksInput: string;
+  setChunksInput: (v: string) => void;
 }
 
 const LimitOrderPricingSection: FC<LimitOrderPricingSectionProps> = (props) => {
   const {
-    limitSlippage, handleLimitSlippageChange, isSwapQuoteLoading, marketRate, debt, collateral,
-    bestQuote, minCollateralOut, showAdvancedPricing, handleToggleAdvancedPricing, customMinPrice,
-    handleCustomMinPriceChange, limitOrderSellToken, chainId, flashLoanAmountRaw,
-    handleLimitOrderConfigChange, useFlashLoan, setUseFlashLoan, flashLoanChunks, setFlashLoanChunks,
-    chunkParams, useBatchedTx, handleUseBatchedTxChange,
+    debt, collateral, bestQuote,
+    minCollateralOut, customMinPrice, setCustomMinPrice, chunkParams, chunksInput, setChunksInput,
   } = props;
 
+  // Format price with appropriate precision (preserve significant digits)
+  const formatPrice = (value: number): string => {
+    if (value === 0) return "0";
+    // Use token decimals but cap at reasonable display precision
+    const precision = Math.min(collateral?.decimals ?? 18, 18);
+    // For very small numbers, use more decimals; for larger numbers, use fewer
+    const magnitude = Math.floor(Math.log10(Math.abs(value)));
+    const displayDecimals = Math.max(2, Math.min(precision, 6 - magnitude));
+    return value.toFixed(Math.max(0, displayDecimals));
+  };
+
+  // Adjust price by percentage
+  const adjustByPercent = (delta: number) => {
+    if (!bestQuote || !collateral) return;
+    const marketAmount = Number(formatUnits(bestQuote.amount, collateral.decimals));
+    const newAmount = marketAmount * (1 + delta / 100);
+    setCustomMinPrice(formatPrice(newAmount));
+  };
+
+  // Reset to market price
+  const resetToMarket = () => {
+    if (!bestQuote || !collateral) return;
+    const marketAmount = Number(formatUnits(bestQuote.amount, collateral.decimals));
+    setCustomMinPrice(formatPrice(marketAmount));
+  };
+
   return (
-    <div className="bg-base-200/60 border-base-300/30 mt-3 rounded-lg border p-3 text-xs">
-      {/* Market Rate Display */}
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-base-content/60">Market Rate</span>
-        <div className="flex items-center gap-1.5">
-          {isSwapQuoteLoading ? (
-            <span className="loading loading-dots loading-xs" />
-          ) : marketRate ? (
-            <>
-              <span className="font-medium">1 {debt?.symbol} = {marketRate.toFixed(6)} {collateral?.symbol}</span>
-              <span className="text-base-content/40 text-[10px]">({bestQuote?.source})</span>
-            </>
-          ) : (
-            <span className="text-base-content/40">-</span>
-          )}
-        </div>
-      </div>
-
-      {/* Slippage Slider */}
-      <div className="mb-2">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-base-content/60">Max Slippage</span>
-          <span className="text-warning font-medium">
-            {limitSlippage < 0.1 ? limitSlippage.toFixed(2) : limitSlippage.toFixed(1)}%
-          </span>
-        </div>
-        <input type="range" min="0" max="5" step="0.01" value={limitSlippage} onChange={handleLimitSlippageChange} className="range range-warning range-xs w-full" />
-        <div className="text-base-content/40 mt-0.5 flex justify-between text-[10px]">
-          <span>0%</span><span>0.1%</span><span>1%</span><span>5%</span>
-        </div>
-        {limitSlippage === 0 && (
-          <div className="text-warning mt-1 text-[10px]">0% slippage - order may not fill if price moves</div>
+    <div className="bg-base-200/60 border-base-300/30 mt-2 space-y-1 rounded border p-1.5 text-xs">
+      {/* Row 1: Order type + Flash loan + Chunks */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-primary text-[10px] font-medium">Sell Order</span>
+        {chunkParams.useFlashLoan && (
+          <span className="text-base-content/50 text-[10px]">Morpho FL</span>
         )}
-      </div>
-
-      {/* Min Output */}
-      <div className="border-base-300/30 flex items-center justify-between border-t py-2">
-        <span className="text-base-content/60">Min Output</span>
-        <span className="text-success font-medium">
-          {minCollateralOut.raw > 0n ? `${Number(minCollateralOut.formatted).toFixed(6)} ${collateral?.symbol}` : "-"}
-        </span>
-      </div>
-
-      {/* Advanced Pricing */}
-      <button onClick={handleToggleAdvancedPricing} className="text-base-content/50 hover:text-base-content/70 mt-1 flex items-center gap-1 text-[10px]">
-        <svg className={`size-3 transition-transform${showAdvancedPricing ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        Set custom min output
-      </button>
-
-      {showAdvancedPricing && (
-        <div className="border-base-300/30 mt-2 border-t pt-2">
-          <div className="flex items-center gap-2">
-            <input type="number" value={customMinPrice} onChange={handleCustomMinPriceChange} placeholder={minCollateralOut.formatted} className="bg-base-300/50 flex-1 rounded px-2 py-1 text-xs outline-none" />
-            <span className="text-base-content/50">{collateral?.symbol}</span>
-          </div>
-          {customMinPrice && (
-            <p className="text-warning mt-1 text-[10px]">Using custom min output. Order will only fill if you receive at least this amount.</p>
-          )}
-        </div>
-      )}
-
-      {/* Flash Loan Config */}
-      {debt && limitOrderSellToken && (
-        <div className="border-base-300/30 mt-2 border-t pt-2">
-          <LimitOrderConfig
-            chainId={chainId}
-            sellToken={limitOrderSellToken}
-            totalAmount={flashLoanAmountRaw}
-            onConfigChange={handleLimitOrderConfigChange}
-            useFlashLoan={useFlashLoan}
-            setUseFlashLoan={setUseFlashLoan}
-            numChunks={flashLoanChunks}
-            setNumChunks={setFlashLoanChunks}
-            compact
+        <div className="flex items-center gap-1">
+          <span className="text-base-content/50 text-[10px]">Chunks:</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            className="border-base-300 bg-base-100 text-base-content w-8 rounded border px-1 py-0 text-center text-[10px] font-medium"
+            value={chunksInput}
+            onChange={(e) => setChunksInput(e.target.value)}
+            onBlur={() => {
+              const parsed = parseInt(chunksInput) || 1;
+              setChunksInput(String(Math.max(1, Math.min(100, parsed))));
+            }}
           />
         </div>
-      )}
+      </div>
 
-      {/* Chunk Info */}
-      {!chunkParams.useFlashLoan && chunkParams.needsChunking && (
-        <div className="border-base-300/30 mt-2 flex items-start gap-1.5 border-t pt-2 text-[10px]">
-          <svg className="text-info mt-0.5 size-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <div>
-            <span className="text-info font-medium">Multi-chunk execution: {chunkParams.numChunks} iterations</span>
-            <p className="text-base-content/50 mt-0.5">{chunkParams.explanation}</p>
+      {/* Row 2: Limit Price Input */}
+      {collateral && debt && (
+        <>
+          <div className="flex items-center gap-1">
+            <span className="text-base-content/50 shrink-0 text-[10px]">1 {debt.symbol} =</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              className="border-base-300 bg-base-100 text-base-content min-w-0 flex-1 rounded border px-1 py-0 text-[10px] font-medium"
+              value={customMinPrice || minCollateralOut.formatted}
+              onChange={(e) => setCustomMinPrice(e.target.value)}
+              placeholder={minCollateralOut.formatted}
+            />
+            <span className="text-base-content/50 shrink-0 text-[10px]">{collateral.symbol}</span>
           </div>
-        </div>
-      )}
 
-      {/* Batched TX Toggle */}
-      <div className="border-base-300/30 mt-2 flex items-center justify-between border-t pt-2">
-        <div className="flex items-center gap-1.5">
-          <span className="text-base-content/60">Batched TX</span>
-          <span className="text-base-content/40 text-[10px]">(EIP-5792)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-base-content/40 text-[10px]">{useBatchedTx ? "faster" : "compatible"}</span>
-          <input type="checkbox" checked={useBatchedTx} onChange={handleUseBatchedTxChange} className="toggle toggle-primary toggle-xs" />
-        </div>
-      </div>
-      {!useBatchedTx && (
-        <div className="mt-1 flex items-start gap-1.5 text-[10px]">
-          <svg className="text-warning mt-0.5 size-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <span className="text-warning/80">Sequential mode: each step requires separate wallet confirmation. More compatible with MetaMask.</span>
-        </div>
+          {/* Row 3: Price Adjustment Buttons */}
+          <div className="flex items-center justify-center gap-0.5">
+            {[-1, -0.5].map(delta => (
+              <button
+                key={delta}
+                onClick={() => adjustByPercent(delta)}
+                className="bg-base-300/50 hover:bg-base-300 rounded px-1 py-0 text-[9px]"
+              >
+                {delta}%
+              </button>
+            ))}
+            <button
+              onClick={resetToMarket}
+              className="bg-primary/20 text-primary hover:bg-primary/30 rounded px-1 py-0 text-[9px] font-medium"
+            >
+              Mkt
+            </button>
+            {[0.5, 1].map(delta => (
+              <button
+                key={delta}
+                onClick={() => adjustByPercent(delta)}
+                className="bg-base-300/50 hover:bg-base-300 rounded px-1 py-0 text-[9px]"
+              >
+                +{delta}%
+              </button>
+            ))}
+          </div>
+        </>
       )}
-
-      {/* Info note */}
-      <div className="border-base-300/30 text-base-content/50 mt-2 flex items-start gap-1.5 border-t pt-2 text-[10px]">
-        <ClockIcon className="mt-0.5 size-3 shrink-0" />
-        <span>
-          {chunkParams.useFlashLoan
-            ? "Single transaction via CoW flash loan. MEV protected."
-            : chunkParams.needsChunking
-              ? `Each chunk executes when solvers find a good price. Est. ${chunkParams.numChunks * 2}-${chunkParams.numChunks * 5} min total.`
-              : "Order executes only when solvers find a price at or above your minimum."
-          }
-          {!chunkParams.useFlashLoan && " No flash loan fees."}
-          {" "}MEV protected.
-        </span>
-      </div>
     </div>
   );
 };

@@ -2,7 +2,6 @@ import { FC, useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
-import { useSendCalls } from "wagmi/experimental";
 import { parseAmount } from "~~/utils/validation";
 import { PositionManager } from "~~/utils/position";
 import * as Tooltip from "@radix-ui/react-tooltip";
@@ -37,7 +36,7 @@ import { useMorphoDebtSwapMarkets, marketToContext } from "~~/hooks/useMorphoDeb
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { encodeAbiParameters } from "viem";
-import { getCowExplorerAddressUrl, getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
+import { getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
@@ -58,7 +57,6 @@ import {
     buildLimitOrderCallParams,
     handleLimitOrderBuildFailure,
     saveLimitOrderNote,
-    executeBatchedLimitOrder,
     executeSequentialLimitOrder,
     handleLimitOrderError,
     shouldSwitchSwapRouter,
@@ -132,9 +130,6 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     void _collateralDecimals;
     const {
         buildDebtSwapFlow,
-        setBatchId,
-        setSuppressBatchNotifications,
-        isBatchConfirmed,
     } = useKapanRouterV2();
 
     // ========================================================================
@@ -241,9 +236,6 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
     const [numChunks, setNumChunks] = useState(1);
     const [isLimitSubmitting, setIsLimitSubmitting] = useState(false);
-    const [useBatchedTx] = useState<boolean>(false);
-    const [lastOrderSalt, setLastOrderSalt] = useState<string | null>(null);
-    const [limitOrderNotificationId, setLimitOrderNotificationId] = useState<string | number | null>(null);
     const cowAvailable = isCowProtocolSupported(chainId);
     // Custom buy amount for limit orders (user-editable)
     const [customBuyAmount, setCustomBuyAmount] = useState<string>("");
@@ -252,7 +244,6 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     // Wallet hooks for limit order
     const { data: walletClient } = useWalletClient();
     const publicClient = usePublicClient();
-    const { sendCallsAsync } = useSendCalls();
 
     // CoW limit order hook
     const {
@@ -353,29 +344,6 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             setSwapRouter("pendle");
         }
     }, [debtFromName, selectedTo, pendleAvailable]);
-
-    // Handle batch confirmation for limit orders
-    useEffect(() => {
-        const shouldHandleBatchConfirmation = isBatchConfirmed && executionType === "limit" && orderManagerAddress && lastOrderSalt;
-        if (!shouldHandleBatchConfirmation) return;
-
-        if (limitOrderNotificationId) {
-            notification.remove(limitOrderNotificationId);
-        }
-
-        const explorerUrl = getCowExplorerAddressUrl(chainId, orderManagerAddress);
-        notification.success(
-            <TransactionToast
-                step="confirmed"
-                message="Limit order created!"
-                blockExplorerLink={explorerUrl}
-            />
-        );
-
-        setLastOrderSalt(null);
-        setLimitOrderNotificationId(null);
-        onClose();
-    }, [isBatchConfirmed, executionType, orderManagerAddress, chainId, lastOrderSalt, limitOrderNotificationId, onClose]);
 
     // Amount to repay in raw
     const repayAmountRaw = useMemo(() => {
@@ -887,37 +855,25 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 <TransactionToast step="pending" message={`Creating limit order (${allCalls.length} operations)...`} />
             );
 
-            if (useBatchedTx) {
-                await executeBatchedLimitOrder({
-                    allCalls,
-                    sendCallsAsync: (params) => sendCallsAsync(params),
-                    setSuppressBatchNotifications,
-                    setBatchId,
-                    setLastOrderSalt,
-                    setLimitOrderNotificationId,
-                    salt: limitOrderResult.salt,
-                    notificationId,
-                    analyticsProps,
-                });
-            } else {
-                await executeSequentialLimitOrder({
-                    allCalls,
-                    walletClient,
-                    publicClient,
-                    chainId,
-                    orderManagerAddress,
-                    analyticsProps,
-                    onClose,
-                    notificationId,
-                });
-            }
+            // Always use sequential execution for limit orders
+            // MetaMask has issues with approvals in batched calls that may go unused
+            await executeSequentialLimitOrder({
+                allCalls,
+                walletClient,
+                publicClient,
+                chainId,
+                orderManagerAddress,
+                analyticsProps,
+                onClose,
+                notificationId,
+            });
         } catch (e) {
             handleLimitOrderError(e, notificationId, analyticsProps);
             throw e;
         } finally {
             setIsLimitSubmitting(false);
         }
-    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, limitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, useBatchedTx, sendCallsAsync, setSuppressBatchNotifications, setBatchId, onClose, limitOrderBuyAmount]);
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, limitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose, limitOrderBuyAmount]);
 
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && requiredNewDebt > 0n && hasAdapter;
     const canSubmitLimit = executionType === "limit" && limitOrderReady && !!cowFlashLoanInfo &&

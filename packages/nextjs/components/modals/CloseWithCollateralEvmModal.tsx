@@ -16,7 +16,7 @@ import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { useCowLimitOrder } from "~~/hooks/useCowLimitOrder";
 import { useCowQuote } from "~~/hooks/useCowQuote";
 import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
-import { getCowExplorerAddressUrl, getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
+import { getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
 import { is1inchSupported, isPendleSupported, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
@@ -28,7 +28,6 @@ import {
 } from "./common";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
-import { useSendCalls } from "wagmi/experimental";
 import {
     trackModalOpen,
     createLimitOrderAnalyticsProps,
@@ -38,7 +37,6 @@ import {
     buildLimitOrderCallParams,
     handleLimitOrderBuildFailure,
     saveLimitOrderNote,
-    executeBatchedLimitOrder,
     executeSequentialLimitOrder,
     handleLimitOrderError,
     shouldSwitchSwapRouter,
@@ -90,9 +88,6 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 }) => {
     const {
         buildCloseWithCollateralFlow,
-        setBatchId,
-        setSuppressBatchNotifications,
-        isBatchConfirmed,
     } = useKapanRouterV2();
 
     // Check swap router availability and get adapter info directly from deployed contracts
@@ -169,9 +164,6 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const [limitOrderConfig, setLimitOrderConfig] = useState<LimitOrderResult | null>(null);
     const [numChunks, setNumChunks] = useState(1);
     const [isLimitSubmitting, setIsLimitSubmitting] = useState(false);
-    const [useBatchedTx, _setUseBatchedTx] = useState<boolean>(false);
-    const [lastOrderSalt, setLastOrderSalt] = useState<string | null>(null);
-    const [limitOrderNotificationId, setLimitOrderNotificationId] = useState<string | number | null>(null);
     const cowAvailable = isCowProtocolSupported(chainId);
     // Custom buy amount for limit orders (user-editable)
     const [customBuyAmount, setCustomBuyAmount] = useState<string>("");
@@ -181,7 +173,6 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const { address: userAddress } = useAccount();
     const { data: walletClient } = useWalletClient();
     const publicClient = usePublicClient();
-    const { sendCallsAsync } = useSendCalls();
 
     // CoW limit order hook
     const {
@@ -249,33 +240,6 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             setSwapRouter("pendle");
         }
     }, [selectedTo, pendleAvailable]);
-
-    // Handle batch confirmation for limit orders
-    useEffect(() => {
-        const shouldHandleBatchConfirmation = isBatchConfirmed && executionType === "limit" && orderManagerAddress && lastOrderSalt;
-        if (!shouldHandleBatchConfirmation) return;
-
-        if (limitOrderNotificationId) {
-            notification.remove(limitOrderNotificationId);
-        }
-
-        const explorerUrl = getCowExplorerAddressUrl(chainId, orderManagerAddress);
-        notification.success(
-            <TransactionToast
-                step="confirmed"
-                message="Limit order created! Position will close when order fills."
-                blockExplorerLink={explorerUrl}
-            />
-        );
-
-        console.log("[Limit Order] Batch confirmed, salt:", lastOrderSalt);
-        console.log("[Limit Order] Batch confirmed - check CoW Explorer for order status");
-
-        setLastOrderSalt(null);
-        setLimitOrderNotificationId(null);
-        setIsLimitSubmitting(false);
-        onClose();
-    }, [isBatchConfirmed, executionType, orderManagerAddress, chainId, lastOrderSalt, limitOrderNotificationId, onClose]);
 
     // Amount of debt to repay in raw
     const repayAmountRaw = useMemo(() => {
@@ -603,45 +567,28 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 <TransactionToast step="pending" message={`Creating limit order (${allCalls.length} operations)...`} />
             );
 
-            if (useBatchedTx) {
-                // Wrap sendCallsAsync to match the expected signature
-                const wrappedSendCalls = async (params: { calls: readonly { to: `0x${string}`; data?: `0x${string}`; value?: bigint }[] }): Promise<{ id: string }> => {
-                    return sendCallsAsync({ calls: params.calls });
-                };
-                await executeBatchedLimitOrder({
-                    allCalls,
-                    sendCallsAsync: wrappedSendCalls,
-                    setSuppressBatchNotifications,
-                    setBatchId,
-                    setLastOrderSalt,
-                    setLimitOrderNotificationId,
-                    salt: limitOrderResult.salt,
-                    appDataHash: limitOrderResult.appDataHash,
-                    notificationId,
-                    analyticsProps,
-                });
-            } else {
-                await executeSequentialLimitOrder({
-                    allCalls,
-                    walletClient,
-                    publicClient,
-                    chainId,
-                    orderManagerAddress,
-                    userAddress,
-                    salt: limitOrderResult.salt,
-                    appDataHash: limitOrderResult.appDataHash,
-                    analyticsProps,
-                    onClose,
-                    notificationId,
-                });
-            }
+            // Always use sequential execution for limit orders
+            // MetaMask has issues with approvals in batched calls that may go unused
+            await executeSequentialLimitOrder({
+                allCalls,
+                walletClient,
+                publicClient,
+                chainId,
+                orderManagerAddress,
+                userAddress,
+                salt: limitOrderResult.salt,
+                appDataHash: limitOrderResult.appDataHash,
+                analyticsProps,
+                onClose,
+                notificationId,
+            });
         } catch (e) {
             handleLimitOrderError(e, notificationId, analyticsProps);
             throw e;
         } finally {
             setIsLimitSubmitting(false);
         }
-    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, limitOrderBuyAmount, debtDecimals, limitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, useBatchedTx, sendCallsAsync, setBatchId, setSuppressBatchNotifications, onClose]);
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, limitOrderBuyAmount, debtDecimals, limitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose]);
 
     // Can submit based on execution type
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter;
