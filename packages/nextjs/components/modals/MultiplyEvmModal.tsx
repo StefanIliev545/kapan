@@ -111,7 +111,6 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const [customMinPrice, setCustomMinPrice] = useState<string>("");
   const cowAvailable = isCowProtocolSupported(chainId);
 
-  const isDevEnvironment = process.env.NODE_ENV === 'development';
 
   // Flash loan toggle for limit orders
   const [useFlashLoan] = useState<boolean>(true);
@@ -328,7 +327,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     slippage, enabled: oneInchAvailable && swapRouter === "1inch" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!oneInchAdapter,
   });
 
-  const { data: pendleQuote, isLoading: isPendleLoading } = usePendleConvert({
+  const pendleConvertResult = usePendleConvert({
     chainId,
     receiver: pendleAdapter?.address as Address,
     tokensIn: debt?.address as Address,
@@ -337,6 +336,21 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     slippage: slippage / 100,
     enabled: pendleAvailable && swapRouter === "pendle" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!pendleAdapter,
   });
+  const { data: pendleQuote, isLoading: isPendleLoading } = pendleConvertResult;
+
+  // Ref to store latest quote values to avoid stale closures in submit handlers
+  // This fixes the issue where handleSubmit's useCallback captures old quote references
+  const quotesRef = useRef<{
+    oneInchQuote: typeof oneInchQuote;
+    pendleQuote: typeof pendleQuote;
+    oneInchAdapter: typeof oneInchAdapter;
+    pendleAdapter: typeof pendleAdapter;
+  }>({ oneInchQuote: undefined, pendleQuote: undefined, oneInchAdapter, pendleAdapter });
+
+  // Keep ref in sync with latest values
+  useEffect(() => {
+    quotesRef.current = { oneInchQuote, pendleQuote, oneInchAdapter, pendleAdapter };
+  }, [oneInchQuote, pendleQuote, oneInchAdapter, pendleAdapter]);
 
   const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
     sellToken: debt?.address || "",
@@ -473,19 +487,31 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // ==================== Build Flow for Market Orders ====================
 
   const buildFlow = () => {
-    if (!collateral || !debt || flashLoanAmountRaw === 0n) return [];
+    if (!collateral || !debt || flashLoanAmountRaw === 0n) {
+      console.warn("[buildFlow] Early exit:", { collateral: !!collateral, debt: !!debt, flashLoanAmountRaw: flashLoanAmountRaw.toString() });
+      return [];
+    }
+
+    // Use ref to get latest quote values (avoids stale closure issues)
+    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, oneInchAdapter: currentOneInchAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
 
     let swapData: string;
     let minOut: string;
 
     if (swapRouter === "1inch") {
-      if (!oneInchQuote || !oneInchAdapter) return [];
-      swapData = oneInchQuote.tx.data;
+      if (!currentOneInchQuote || !currentOneInchAdapter) {
+        console.warn("[buildFlow] 1inch not ready:", { oneInchQuote: !!currentOneInchQuote, oneInchAdapter: !!currentOneInchAdapter });
+        return [];
+      }
+      swapData = currentOneInchQuote.tx.data;
       minOut = minCollateralOut.formatted;
     } else {
-      if (!pendleQuote || !pendleAdapter) return [];
-      swapData = pendleQuote.transaction.data;
-      minOut = pendleQuote.data.minPtOut || pendleQuote.data.minTokenOut || minCollateralOut.formatted;
+      if (!currentPendleQuote || !currentPendleAdapter) {
+        console.warn("[buildFlow] Pendle not ready:", { pendleQuote: !!currentPendleQuote, pendleAdapter: !!currentPendleAdapter });
+        return [];
+      }
+      swapData = currentPendleQuote.transaction.data;
+      minOut = currentPendleQuote.data.minPtOut || currentPendleQuote.data.minTokenOut || minCollateralOut.formatted;
     }
 
     const flowParams = {
@@ -928,6 +954,18 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // ==================== Market Order Submit Logic ====================
 
   const handleMarketOrderSubmit = async () => {
+    // Use ref to get latest quote values for logging (same ref used in buildFlow)
+    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, oneInchAdapter: currentOneInchAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
+    console.log("[handleMarketOrderSubmit] State at submit (from ref):", {
+      swapRouter,
+      hasOneInchQuote: !!currentOneInchQuote,
+      hasOneInchAdapter: !!currentOneInchAdapter,
+      hasPendleQuote: !!currentPendleQuote,
+      hasPendleAdapter: !!currentPendleAdapter,
+      flashLoanAmountRaw: flashLoanAmountRaw.toString(),
+      collateral: collateral?.symbol,
+      debt: debt?.symbol,
+    });
     track("multiply_tx_begin", {
       protocol: protocolName, chainId,
       collateral: collateral?.symbol ?? "unknown",
@@ -946,7 +984,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
 
   const canSubmitMarket = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && hasQuote && hasAdapter && !isSwapQuoteLoading;
-  const canSubmitLimit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && cowContractAvailable && !isCowCreating && isDevEnvironment;
+  const canSubmitLimit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && cowContractAvailable && !isCowCreating;
   const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
 
   const isSubmittingAny = isSubmitting || isCowCreating;
@@ -1035,7 +1073,6 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             handleSetExecutionMarket={handleSetExecutionMarket}
             handleSetExecutionLimit={handleSetExecutionLimit}
             cowContractAvailable={cowContractAvailable}
-            isDevEnvironment={isDevEnvironment}
             debt={debt}
             collateral={collateral}
             marketRate={marketRate}
@@ -1280,7 +1317,6 @@ interface LeverageSectionProps {
   handleSetExecutionMarket: () => void;
   handleSetExecutionLimit: () => void;
   cowContractAvailable: boolean;
-  isDevEnvironment: boolean;
   debt: SwapAsset | undefined;
   collateral: SwapAsset | undefined;
   marketRate: { raw: bigint; formatted: string } | null;
@@ -1307,7 +1343,7 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
   const {
     leverage, leverageInput, maxLeverage, ticks, handleLeverageInputChange, handleLeverageInputBlur,
     handleLeverageSliderChange, cowAvailable, executionType, handleSetExecutionMarket, handleSetExecutionLimit,
-    cowContractAvailable, isDevEnvironment,
+    cowContractAvailable,
     debt, collateral, marketRate,
     customMinPrice, setCustomMinPrice, chunkParams, chunksInput, setChunksInput,
     zapMode, handleZapModeChange, swapRouter,
@@ -1353,13 +1389,11 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
           <button
             onClick={handleSetExecutionLimit}
             className={`btn btn-xs flex-1 ${executionType === "limit" ? "btn-primary" : "btn-ghost"}`}
-            disabled={!cowContractAvailable || !isDevEnvironment}
+            disabled={!cowContractAvailable}
             title={
-              !isDevEnvironment
-                ? "Limit orders are only available in development environment"
-                : !cowContractAvailable
-                  ? "CoW contracts not deployed on this chain"
-                  : "Execute via CoW Protocol limit order"
+              !cowContractAvailable
+                ? "CoW contracts not deployed on this chain"
+                : "Execute via CoW Protocol limit order"
             }
           >
             <ClockIcon className="mr-1 size-3" /> Limit
