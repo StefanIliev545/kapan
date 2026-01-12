@@ -445,15 +445,26 @@ export function saveLimitOrderNote(
     selectedToSymbol: string,
     chainId: number
 ): void {
-    if (!salt) return;
+    if (!salt) {
+        console.warn("[saveLimitOrderNote] No salt provided, skipping note save");
+        return;
+    }
 
-    saveOrderNote(createDebtSwapNote(
+    const note = createDebtSwapNote(
         salt,
         protocolName,
         debtFromName,      // old debt being repaid
         selectedToSymbol,  // new debt being taken on
         chainId
-    ));
+    );
+    console.log("[saveLimitOrderNote] Saving note:", {
+        salt,
+        protocolName,
+        sellToken: note.sellToken,
+        buyToken: note.buyToken,
+        chainId,
+    });
+    saveOrderNote(note);
 }
 
 export async function executeBatchedLimitOrder(params: {
@@ -664,16 +675,9 @@ function getUnitOutput(
 export function calculateLimitOrderNewDebt(
     cowQuote: CowQuoteResponse | null | undefined,
     selectedTo: SwapAsset | null,
-    slippage: number
 ): bigint {
     if (!cowQuote || !selectedTo) return 0n;
 
-    const baseSellAmount = getCowQuoteSellAmount(cowQuote);
-    if (baseSellAmount === 0n) return 0n;
-
-    // Apply slippage buffer
-    const slippageBps = BigInt(Math.round(slippage * 100));
-    const withSlippage = (baseSellAmount * (10000n + slippageBps)) / 10000n;
-
-    return withSlippage;
+    // Return raw quote - users set their own price via +/- buttons
+    return getCowQuoteSellAmount(cowQuote);
 }

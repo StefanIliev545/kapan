@@ -47,7 +47,7 @@ const prodConfig = {
       ],
       afterFiles: [
         {
-          source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
+          source: "/:path((?!app/|api/|_next/|\\.well-known/|orders/|markets/).*)",
           has: [{ type: "host", value: "app.kapan.finance" }],
           destination: "/app/:path*",
         },
@@ -70,7 +70,7 @@ const devConfig = {
       ],
       afterFiles: [
         {
-          source: "/:path((?!app/|api/|_next/|\\.well-known/).*)",
+          source: "/:path((?!app/|api/|_next/|\\.well-known/|orders/|markets/).*)",
           has: [{ type: "host", value: "app.localhost:3000" }],
           destination: "/app/:path*",
         },
