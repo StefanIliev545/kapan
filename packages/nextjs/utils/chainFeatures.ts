@@ -24,6 +24,7 @@ const COW_PROTOCOL_AVAILABLE = new Set([
   42161, // Arbitrum
   8453,  // Base
   59144, // Linea
+  9745,  // Plasma
   31337, // Hardhat (for local dev with fork)
 ]);
 

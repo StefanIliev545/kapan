@@ -368,10 +368,21 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         enabled: cowAvailable && executionType === "limit" && limitOrderBuyAmount > 0n && !!selectedTo && !!userAddress && isOpen,
     });
 
-    // ============ Limit Order: Collateral from CoW Quote ============
+    // ============ Limit Order: Collateral from CoW Quote (or fallback to 1inch/Pendle) ============
     const limitOrderCollateral = useMemo(() => {
-        return calculateLimitOrderCollateral(cowQuote, selectedTo, slippage);
-    }, [cowQuote, selectedTo, slippage]);
+        // Try CoW quote first
+        const cowCollateral = calculateLimitOrderCollateral(cowQuote, selectedTo, slippage);
+        if (cowCollateral > 0n) return cowCollateral;
+
+        // Fallback to 1inch/Pendle quote if CoW fails
+        // This allows limit orders to work even when CoW can't quote the pair
+        if (requiredCollateral > 0n) {
+            console.log("[Limit Order] CoW quote unavailable, using 1inch/Pendle quote as fallback");
+            return requiredCollateral;
+        }
+
+        return 0n;
+    }, [cowQuote, selectedTo, slippage, requiredCollateral]);
 
     // amountOut = required collateral (what user will sell)
     const amountOut = useMemo(() => {

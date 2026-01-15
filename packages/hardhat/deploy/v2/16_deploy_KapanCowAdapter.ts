@@ -41,6 +41,7 @@ const deployKapanCowAdapter: DeployFunction = async function (hre: HardhatRuntim
     42161: "0x794a61358D6845594F94dc1DB02A252b5b4814aD", // Arbitrum
     8453: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",  // Base
     59144: "0x2f9bB73a8e98793e26Cb2F6C4ad037BDf1C6B269", // Linea
+    9745: "0x925a2A7214Ed92428B5b1B090F80b25700095e12",  // Plasma
   };
 
   // Balancer V2 Vault (same on all chains)
@@ -54,6 +55,7 @@ const deployKapanCowAdapter: DeployFunction = async function (hre: HardhatRuntim
     8453: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",  // Base
     10: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",    // Optimism
     100: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",   // Gnosis
+    9745: "0xbA1333333333a1BA1108E8412f11850A5C319bA9",  // Plasma
     // Note: NOT on Linea - Balancer V3 not deployed there
   };
 

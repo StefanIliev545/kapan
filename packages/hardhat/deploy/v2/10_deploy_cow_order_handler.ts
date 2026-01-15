@@ -18,6 +18,7 @@ const COW_SUPPORTED_CHAINS = [
   43114,  // Avalanche
   56,     // BNB Chain
   59144,  // Linea
+  9745,   // Plasma
 ];
 
 const deployKapanOrderHandler: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {

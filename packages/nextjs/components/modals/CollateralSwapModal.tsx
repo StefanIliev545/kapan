@@ -504,10 +504,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const [customBuyAmount, setCustomBuyAmount] = useState<string>("");
     const [useCustomBuyAmount, setUseCustomBuyAmount] = useState(false);
     const cowAvailable = isCowProtocolSupported(chainId);
-    
-    // Check if we're in a dev environment
-    const isDevEnvironment = process.env.NODE_ENV === 'development';
-    
+
     // Get user address for CoW order creation
     const { address: userAddress } = useAccount();
     const { data: walletClient } = useWalletClient();
@@ -1227,9 +1224,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
     
     // For market orders: need quote and adapter
-    // For limit orders: need CoW contract available (quote optional) and dev environment
+    // For limit orders: need CoW contract available (quote optional)
     const canSubmitMarket = hasQuote && hasAdapter && parseFloat(amountIn) > 0;
-    const canSubmitLimit = !!selectedFrom && !!selectedTo && parseFloat(amountIn) > 0 && limitOrderReady && !!cowFlashLoanInfo && isDevEnvironment;
+    const canSubmitLimit = !!selectedFrom && !!selectedTo && parseFloat(amountIn) > 0 && limitOrderReady && !!cowFlashLoanInfo;
     const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
 
     // Info content for "How it works" tab
@@ -1332,13 +1329,11 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 value={executionType}
                 onChange={setExecutionType}
                 limitAvailable={cowAvailable}
-                limitReady={limitOrderReady && isDevEnvironment}
+                limitReady={limitOrderReady}
                 limitDisabledReason={
-                    !isDevEnvironment
-                        ? "Limit orders are only available in development environment"
-                        : !limitOrderReady
-                            ? "CoW contracts not deployed on this chain"
-                            : undefined
+                    !limitOrderReady
+                        ? "CoW contracts not deployed on this chain"
+                        : undefined
                 }
             />
 
@@ -1513,7 +1508,6 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         setExecutionType,
         cowAvailable,
         limitOrderReady,
-        isDevEnvironment,
         isQuoteLoading,
         marketRate,
         selectedFrom,
