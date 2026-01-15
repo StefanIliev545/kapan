@@ -158,6 +158,11 @@ export const FLASH_LOAN_LENDERS: Record<number, Record<string, string>> = {
   43114: {
     aaveV3: requireAddress(AAVE_V3_POOLS[43114], "AAVE_V3_POOLS[43114]"),
   },
+  // Plasma - Balancer V3 and Aave V3
+  9745: {
+    aaveV3: requireAddress(AAVE_V3_POOLS[9745], "AAVE_V3_POOLS[9745]"),
+    balancerV3: BALANCER.v3Vault,
+  },
   // Localhost/Hardhat - Same as Arbitrum (default fork)
   31337: {
     aaveV3: requireAddress(AAVE_V3_POOLS[31337], "AAVE_V3_POOLS[31337]"),
@@ -231,6 +236,11 @@ export const COW_FLASH_LOAN_PROVIDERS: Record<number, CowFlashLoanProvider[]> = 
     { address: BALANCER.v3Vault, provider: "balancerV3", feeBps: 0, name: BALANCER_V3_NAME },
     { address: requireAddress(AAVE_V3_POOLS[31337], "AAVE_V3_POOLS[31337]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
   ],
+  // Plasma - Aave V3 and Balancer V3
+  9745: [
+    { address: BALANCER.v3Vault, provider: "balancerV3", feeBps: 0, name: BALANCER_V3_NAME },
+    { address: requireAddress(AAVE_V3_POOLS[9745], "AAVE_V3_POOLS[9745]"), provider: "aaveV3", feeBps: 5, name: "Aave V3" },
+  ],
 };
 
 /**
@@ -246,6 +256,7 @@ export const COW_FLASH_LOAN_LENDERS: Record<number, string | undefined> = {
   100: BALANCER.v2Vault,   // Gnosis - Balancer V2
   59144: AAVE_V3_POOLS[59144], // Linea - Aave V3
   43114: AAVE_V3_POOLS[43114], // Avalanche - Aave V3
+  9745: BALANCER.v3Vault,  // Plasma - Balancer V3 (preferred) or Aave V3
   31337: MORPHO_BLUE[31337],   // Localhost/Hardhat - Same as Arbitrum (default fork)
 };
 

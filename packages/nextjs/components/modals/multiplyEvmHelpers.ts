@@ -334,6 +334,8 @@ export interface ChunkParamsResult extends ChunkCalculationResult {
   useFlashLoan?: boolean;
   flashLoanFee?: bigint;
   flashLoanLender?: string;
+  /** The selected provider type (e.g., "morpho", "balancerV3", "aaveV3") for fee calculation */
+  selectedProviderType?: string;
 }
 
 /**
@@ -411,6 +413,7 @@ export function calculateFlashLoanChunkParams(
     useFlashLoan: true,
     flashLoanFee: flashLoanFeePerChunk,
     flashLoanLender,
+    selectedProviderType: providerType,
     explanation: numChunks === 1
       ? (flashLoanFeePerChunk > 0n
           ? `Flash loan: single tx execution (fee: ${formatUnits(flashLoanFeePerChunk, debt.decimals)} ${debt.symbol})`
@@ -463,7 +466,7 @@ function buildDepositInstructions(
  * Build flash loan mode chunk instructions.
  */
 function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInstructions[] {
-  const { collateral, debt, userAddress, flashLoanAmountRaw, marginAmountRaw, protocolName, morphoContext, market, chunkParams, chainId } = params;
+  const { collateral, debt, userAddress, flashLoanAmountRaw, marginAmountRaw, protocolName, morphoContext, market, chunkParams } = params;
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
   const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
@@ -476,7 +479,8 @@ function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInst
   const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
   const numChunks = chunkParams.numChunks;
-  const lenderInfo = getPreferredFlashLoanLender(chainId);
+  // Use the selected provider type from chunkParams for correct fee calculation
+  const selectedProviderType = chunkParams.selectedProviderType ?? "morpho";
 
   // Split margin across chunks (last chunk gets remainder)
   const baseMarginPerChunk = marginAmountRaw / BigInt(numChunks);
@@ -488,7 +492,7 @@ function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInst
     const isLastChunk = i === numChunks - 1;
     const marginThisChunk = isLastChunk ? baseMarginPerChunk + marginRemainder : baseMarginPerChunk;
     const chunkSize = chunkParams.chunkSizes[i];
-    const feeThisChunk = lenderInfo ? calculateFlashLoanFee(chunkSize, lenderInfo.provider) : 0n;
+    const feeThisChunk = calculateFlashLoanFee(chunkSize, selectedProviderType);
     const chunkRepayAmount = chunkSize + feeThisChunk;
 
     const postInstructions: ProtocolInstruction[] = [

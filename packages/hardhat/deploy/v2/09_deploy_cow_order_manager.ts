@@ -28,6 +28,7 @@ const COW_SUPPORTED_CHAINS = [
   42161,  // Arbitrum One
   8453,   // Base
   59144,  // Linea
+  9745,   // Plasma
 ];
 
 const deployKapanOrderManager: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {

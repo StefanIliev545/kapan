@@ -101,6 +101,7 @@ export const AAVE_V3_POOL_ADDRESSES: Record<number, Address | undefined> = {
   [CHAIN_IDS.AVALANCHE]: "0x794a61358D6845594F94dc1DB02A252b5b4814aD",
   [CHAIN_IDS.BASE]: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
   [CHAIN_IDS.LINEA]: "0x3E5f750726cc1D0d4a9c62c507f890f984576507",
+  [CHAIN_IDS.PLASMA]: "0x925a2A7214Ed92428B5b1B090F80b25700095e12",
   [CHAIN_IDS.HARDHAT]: "0x794a61358D6845594F94dc1DB02A252b5b4814aD", // Same as Arbitrum (default fork)
 };
 
@@ -163,6 +164,7 @@ export const COW_API_URLS: Record<number, string | undefined> = {
   [CHAIN_IDS.AVALANCHE]: "https://api.cow.fi/avalanche",
   [CHAIN_IDS.BNB]: "https://api.cow.fi/bnb",
   [CHAIN_IDS.LINEA]: "https://api.cow.fi/linea",
+  [CHAIN_IDS.PLASMA]: "https://api.cow.fi/plasma",
 };
 
 /**
@@ -178,6 +180,7 @@ export const COW_EXPLORER_URLS: Record<number, string | undefined> = {
   [CHAIN_IDS.AVALANCHE]: "https://explorer.cow.fi/avalanche",
   [CHAIN_IDS.BNB]: "https://explorer.cow.fi/bnb",
   [CHAIN_IDS.LINEA]: "https://explorer.cow.fi/linea",
+  [CHAIN_IDS.PLASMA]: "https://explorer.cow.fi/plasma",
 };
 
 // ==================== MORPHO ====================
@@ -209,6 +212,7 @@ const COW_SUPPORTED: Set<number> = new Set([
   CHAIN_IDS.ARBITRUM,
   CHAIN_IDS.BASE,
   CHAIN_IDS.LINEA,
+  CHAIN_IDS.PLASMA,
   CHAIN_IDS.HARDHAT,
 ]);
 
