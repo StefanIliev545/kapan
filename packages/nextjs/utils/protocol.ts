@@ -12,6 +12,7 @@ const AAVE_LOGO = "/logos/aave.svg";
 const COMPOUND_LOGO = "/logos/compound.svg";
 const MORPHO_LOGO = "/logos/morpho.svg";
 const VESU_LOGO = "/logos/vesu.svg";
+const EULER_LOGO = "/logos/euler.svg";
 
 /**
  * Get the logo URL for a specific protocol
@@ -51,6 +52,10 @@ export const getProtocolLogo = (protocolName: string): string => {
     // Nostra variants
     "Nostra": "/logos/nostra.svg",
     "nostra": "/logos/nostra.svg",
+    // Euler variants
+    "Euler": EULER_LOGO,
+    "euler": EULER_LOGO,
+    "euler-v2": EULER_LOGO,
   };
   
   return protocolLogos[protocolName] || tokenNameToLogo(protocolName);

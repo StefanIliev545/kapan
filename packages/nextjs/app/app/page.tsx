@@ -57,6 +57,11 @@ const SparkProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Spark" /> }
 );
 
+const EulerProtocolView = dynamic(
+  () => import("~~/components/specific/euler/EulerProtocolView").then(m => m.EulerProtocolView),
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Euler" /> }
+);
+
 // Network options (memo for referential stability)
 const networkOptions: NetworkOption[] = [
   { id: "ethereum", name: "Ethereum", logo: "/logos/ethereum.svg" },
@@ -76,7 +81,7 @@ const protocolCountByNetwork: Record<string, number> = {
   ethereum: 4, // Aave, Morpho, Spark, Compound (ZeroLend frozen)
   base: 5, // Aave, ZeroLend, Compound, Venus, Morpho
   unichain: 3, // Morpho, Compound, Venus
-  arbitrum: 4, // Aave, Compound, Venus, Morpho
+  arbitrum: 5, // Aave, Morpho, Euler, Compound, Venus
   optimism: 3, // Aave, Morpho, Compound
   linea: 3,
   starknet: 2,
@@ -121,6 +126,7 @@ const App: NextPage = () => {
         import("~~/components/specific/venus/VenusProtocolView");
         import("~~/components/specific/morpho/MorphoProtocolView");
         import("~~/components/specific/spark/SparkProtocolView");
+        import("~~/components/specific/euler/EulerProtocolView");
       } else {
         import("~~/components/specific/vesu/VesuProtocolView");
         import("~~/components/specific/nostra/NostraProtocolView");
@@ -229,6 +235,9 @@ const App: NextPage = () => {
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <MorphoProtocolView chainId={arbitrum.id} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <EulerProtocolView chainId={arbitrum.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />

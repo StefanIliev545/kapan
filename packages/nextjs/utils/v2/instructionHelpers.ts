@@ -366,3 +366,43 @@ export function encodeSubtract(minuendIndex: number, subtrahendIndex: number): s
   );
 }
 
+/**
+ * Euler vault context interface for encoding
+ */
+export interface EulerVaultContextForEncoding {
+  borrowVault: string;
+  collateralVault: string;
+}
+
+/**
+ * Encode Euler vault context into bytes for lending instructions
+ * Euler expects: (address borrowVault, address collateralVault)
+ */
+export function encodeEulerContext(context: EulerVaultContextForEncoding): string {
+  return coder.encode(
+    ["address", "address"],
+    [context.borrowVault, context.collateralVault]
+  );
+}
+
+/**
+ * Helper to create a lending instruction for Euler V2
+ * @param op - Lending operation type
+ * @param token - Token address (underlying asset)
+ * @param user - User address
+ * @param amount - Amount for the operation
+ * @param eulerContext - Euler vault context (borrowVault, collateralVault)
+ * @param inputIndex - UTXO index to use as input (default 999 for invalid)
+ */
+export function createEulerInstruction(
+  op: LendingOp,
+  token: string,
+  user: string,
+  amount: bigint,
+  eulerContext: EulerVaultContextForEncoding,
+  inputIndex = 999
+): ProtocolInstruction {
+  const context = encodeEulerContext(eulerContext);
+  return createProtocolInstruction("euler", encodeLendingInstruction(op, token, user, amount, context, inputIndex));
+}
+

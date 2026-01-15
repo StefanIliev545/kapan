@@ -19,6 +19,16 @@ import {
   Tooltip,
 } from "@radix-ui/themes";
 import { Search, X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  flexRender,
+  createColumnHelper,
+  type SortingState,
+} from "@tanstack/react-table";
 
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -43,9 +53,6 @@ import {
 const SEARCH_ICON_SIZE = { width: 12, height: 12 };
 const ICON_BUTTON_ARIA_LABEL = "Clear search";
 
-type SortKey = "tvl" | "supplyApy" | "borrowApy" | "utilization";
-type SortDirection = "desc" | "asc";
-
 interface MorphoMarketsSectionProps {
   markets: MorphoMarket[];
   marketPairs: Map<string, MorphoMarket[]>;
@@ -64,6 +71,24 @@ interface MorphoMarketsSectionProps {
 }
 
 const DEFAULT_PAGE_SIZE = 20;
+
+// Row data type for TanStack Table
+interface MarketRow {
+  market: MorphoMarket;
+  collateralSymbol: string;
+  loanSymbol: string;
+  liquidityUsd: number;
+  supplyUsd: number;
+  borrowUsd: number;
+  utilization01: number;
+  supplyApy01: number;
+  borrowApy01: number;
+  lltv01: number;
+  impliedApy: number | null; // PT implied yield for collateral (as percentage, e.g., 15.5)
+  collateralAddress: string;
+}
+
+const columnHelper = createColumnHelper<MarketRow>();
 
 // Minimal utilization indicator - just bar, no text
 function UtilizationBar({ value }: { value: number }) {
@@ -225,11 +250,11 @@ function OptionButton({
   );
 }
 
-// Searchable Select Component with token icons and category tabs (uses portal to avoid clipping)
+// Searchable Select Component with token icons, category tabs, and multi-select support
 interface SearchableSelectProps {
   options: string[];
-  value: string;
-  onValueChange: (value: string) => void;
+  value: string[];
+  onValueChange: (value: string[]) => void;
   placeholder: string;
   allLabel: string;
 }
@@ -243,23 +268,20 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  // Memoized handlers to avoid inline functions
+  const isAllSelected = value.length === 0;
+  const selectedSet = React.useMemo(() => new Set(value), [value]);
+
   const handleClearSearchTerm = React.useCallback(() => setSearchTerm(""), []);
   const handleToggleOpen = React.useCallback(() => setIsOpen(prev => !prev), []);
   const handleStopPropagation = React.useCallback((e: React.MouseEvent) => e.stopPropagation(), []);
 
-  // Calculate dropdown position
   const updatePosition = React.useCallback(() => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 4,
-        left: rect.left,
-      });
+      setPosition({ top: rect.bottom + 4, left: rect.left });
     }
   }, []);
 
-  // Update position when opening and on scroll/resize
   React.useEffect(() => {
     if (isOpen) {
       updatePosition();
@@ -272,10 +294,8 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
     }
   }, [isOpen, updatePosition]);
 
-  // Close dropdown on outside click
   React.useEffect(() => {
     if (!isOpen) return;
-    
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
@@ -287,31 +307,28 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
         setActiveCategory("all");
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  // Filter options based on search term and category
   const filteredOptions = React.useMemo(() => {
     let filtered = options;
-    
     if (activeCategory !== "all") {
       filtered = filtered.filter(opt => matchesCategory(opt, activeCategory));
     }
-    
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(opt => opt.toLowerCase().includes(term));
     }
-    
     return filtered;
   }, [options, searchTerm, activeCategory]);
 
-  // Get display value
-  const displayValue = value === "all" ? allLabel : value;
+  const displayValue = React.useMemo(() => {
+    if (isAllSelected) return allLabel;
+    if (value.length === 1) return value[0];
+    return `${value.length} selected`;
+  }, [isAllSelected, value, allLabel]);
 
-  // Focus input when opened
   React.useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 0);
@@ -319,25 +336,28 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   }, [isOpen]);
 
   const handleSelect = React.useCallback((option: string) => {
-    onValueChange(option);
-    setIsOpen(false);
-    setSearchTerm("");
-    setActiveCategory("all");
-  }, [onValueChange]);
+    if (option === "all") {
+      onValueChange([]);
+    } else {
+      if (selectedSet.has(option)) {
+        onValueChange(value.filter(v => v !== option));
+      } else {
+        onValueChange([...value, option]);
+      }
+    }
+  }, [onValueChange, value, selectedSet]);
 
   const handleClear = React.useCallback(() => {
-    onValueChange("all");
+    onValueChange([]);
     setSearchTerm("");
     setActiveCategory("all");
   }, [onValueChange]);
 
-  // Memoized style for dropdown position
   const dropdownStyle = React.useMemo(
     () => position ? { top: position.top, left: position.left } : undefined,
     [position]
   );
 
-  // Dropdown content (rendered via portal)
   const dropdownContent = isOpen && position && typeof document !== "undefined" ? (
     <div
       ref={dropdownRef}
@@ -345,7 +365,6 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
       style={dropdownStyle}
       onClick={handleStopPropagation}
     >
-      {/* Search Input */}
       <div className="border-base-300 border-b p-3">
         <div className="relative">
           <Search className="text-base-content/50 absolute left-3 top-1/2 size-4 -translate-y-1/2" />
@@ -367,8 +386,6 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
           )}
         </div>
       </div>
-
-      {/* Category Tabs */}
       <div className="border-base-300 border-b px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
           {(Object.keys(TOKEN_CATEGORIES) as TokenCategory[]).map(category => (
@@ -380,36 +397,19 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
             />
           ))}
           <div className="flex-1" />
-          <button
-            onClick={handleClear}
-            className="btn btn-xs btn-ghost text-base-content/60"
-          >
-            Clear
-          </button>
+          <button onClick={handleClear} className="btn btn-xs btn-ghost text-base-content/60">Clear</button>
         </div>
       </div>
-
-      {/* Options List */}
       <div className="max-h-72 overflow-y-auto p-2">
-        {/* All Option */}
-        <OptionButton
-          option="all"
-          isSelected={value === "all"}
-          onSelect={handleSelect}
-          displayLabel={allLabel}
-        />
-
-        {/* Token Options */}
+        <OptionButton option="all" isSelected={isAllSelected} onSelect={handleSelect} displayLabel={allLabel} />
         {filteredOptions.length === 0 ? (
-          <div className="text-base-content/50 py-8 text-center text-sm">
-            No matches found
-          </div>
+          <div className="text-base-content/50 py-8 text-center text-sm">No matches found</div>
         ) : (
           filteredOptions.map(option => (
             <OptionButton
               key={option}
               option={option}
-              isSelected={value === option}
+              isSelected={selectedSet.has(option)}
               onSelect={handleSelect}
               showIcon
             />
@@ -421,7 +421,6 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
 
   return (
     <>
-      {/* Trigger Button */}
       <button
         ref={triggerRef}
         type="button"
@@ -429,15 +428,20 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
         onClick={handleToggleOpen}
       >
         <div className="flex items-center gap-2 overflow-hidden">
-          {value !== "all" && <TokenIcon symbol={value} size={18} />}
+          {!isAllSelected && value.length === 1 && <TokenIcon symbol={value[0]} size={18} />}
+          {!isAllSelected && value.length > 1 && (
+            <div className="flex -space-x-1">
+              {value.slice(0, 3).map((v, i) => (
+                <div key={v} className="ring-base-100 rounded-full ring-1" style={{ zIndex: 3 - i }}>
+                  <TokenIcon symbol={v} size={16} />
+                </div>
+              ))}
+            </div>
+          )}
           <span className="truncate text-sm">{displayValue}</span>
         </div>
-        <ChevronDown 
-          className={`size-4 flex-shrink-0 opacity-60 transition-transform${isOpen ? 'rotate-180' : ''}`} 
-        />
+        <ChevronDown className={`size-4 flex-shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-
-      {/* Portal dropdown to body to avoid clipping */}
       {typeof document !== "undefined" && ReactDOM.createPortal(dropdownContent, document.body)}
     </>
   );
@@ -455,6 +459,7 @@ interface MobileMarketRowProps {
     supplyApy01: number;
     borrowApy01: number;
     lltv01: number;
+    impliedApy: number | null;
   };
   pairName: string;
   usd: Intl.NumberFormat;
@@ -487,67 +492,6 @@ function MobileMarketRowItem({ row, usd, chainId, onSupply, onLoop }: MobileMark
       onSupply={handleSupply}
       onLoop={handleLoop}
     />
-  );
-}
-
-// Desktop market row component to avoid inline functions
-interface DesktopMarketRowProps {
-  row: MobileMarketRowItemProps["row"];
-  usd: Intl.NumberFormat;
-  chainId: number;
-  onSupply: (market: MorphoMarket) => void;
-  onLoop: (market: MorphoMarket) => void;
-}
-
-function DesktopMarketRow({ row, usd, chainId, onSupply, onLoop }: DesktopMarketRowProps) {
-  const { market } = row;
-  const morphoUrl = getMorphoMarketUrl(chainId, market.uniqueKey, row.collateralSymbol, row.loanSymbol);
-  const handleSupply = React.useCallback(() => onSupply(market), [market, onSupply]);
-  const handleLoop = React.useCallback(() => onLoop(market), [market, onLoop]);
-
-  return (
-    <tr className="border-base-300/50 hover:bg-base-200/30 border-b transition-colors">
-      <td className="py-2.5 pl-3">
-        <div className="flex items-center gap-2">
-          <TokenPairAvatars collateralSymbol={row.collateralSymbol} loanSymbol={row.loanSymbol} />
-          {morphoUrl ? (
-            <a
-              href={morphoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary group/link flex items-center gap-1 font-medium transition-colors"
-            >
-              {row.collateralSymbol}/{row.loanSymbol}
-              <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
-            </a>
-          ) : (
-            <span className="font-medium">{row.collateralSymbol}/{row.loanSymbol}</span>
-          )}
-        </div>
-      </td>
-      <td className="py-2.5 pr-4 text-right tabular-nums">
-        {usd.format(row.supplyUsd)}
-      </td>
-      <td className="py-2.5 text-center">
-        <UtilizationBar value={row.utilization01} />
-      </td>
-      <td className="text-success py-2.5 pr-4 text-right tabular-nums">
-        {formatPercent(row.supplyApy01, 2)}
-      </td>
-      <td className="py-2.5 pr-4 text-right tabular-nums">
-        {formatPercent(row.borrowApy01, 2)}
-      </td>
-      <td className="py-2.5 pr-3 text-right">
-        <div className="inline-flex items-center gap-1.5">
-          <Button size="1" variant="soft" onClick={handleSupply}>
-            Supply
-          </Button>
-          <Button size="1" variant="outline" onClick={handleLoop}>
-            Loop
-          </Button>
-        </div>
-      </td>
-    </tr>
   );
 }
 
@@ -613,6 +557,9 @@ function MobileMarketRow({ row, pairName, usd, chainId, onSupply, onLoop }: Mobi
           <div className="text-base-content/50 flex flex-1 items-center gap-3 text-[10px]">
             <span>Util: <span className="text-base-content/70">{formatPercent(row.utilization01, 0)}</span></span>
             <span>LTV: <span className="text-base-content/70">{formatPercent(row.lltv01, 0)}</span></span>
+            {row.impliedApy !== null && (
+              <span>Implied: <span className="text-info">{formatPercent(row.impliedApy / 100, 2)}</span></span>
+            )}
           </div>
           <button
             className="btn btn-xs btn-primary"
@@ -640,45 +587,13 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   onSupply,
   pageSize = DEFAULT_PAGE_SIZE,
 }) => {
-  const [sortKey, setSortKey] = React.useState<SortKey>("tvl");
-  const [sortDirection, setSortDirection] = React.useState<SortDirection>("desc");
-  
-  const handleSort = React.useCallback((key: SortKey) => {
-    if (sortKey === key) {
-      setSortDirection(d => d === "desc" ? "asc" : "desc");
-    } else {
-      setSortKey(key);
-      setSortDirection("desc");
-    }
-  }, [sortKey]);
-  const [search, setSearch] = React.useState("");
-  const deferredSearch = React.useDeferredValue(search);
-  const [visibleCount, setVisibleCount] = React.useState(pageSize);
-  const [selectedCollateral, setSelectedCollateral] = React.useState<string>("all");
-  const [selectedDebtAsset, setSelectedDebtAsset] = React.useState<string>("all");
+  const [sorting, setSorting] = React.useState<SortingState>([{ id: "supplyUsd", desc: true }]);
+  const [globalFilter, setGlobalFilter] = React.useState("");
+  const [selectedCollaterals, setSelectedCollaterals] = React.useState<string[]>([]);
+  const [selectedDebtAssets, setSelectedDebtAssets] = React.useState<string[]>([]);
+  const deferredGlobalFilter = React.useDeferredValue(globalFilter);
 
   const usd = React.useMemo(() => makeUsdFormatter(), []);
-
-  // Memoized handlers to avoid inline functions in JSX
-  const handleSearchChange = React.useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.currentTarget.value),
-    []
-  );
-  const handleClearSearch = React.useCallback(() => setSearch(""), []);
-  const handleResetAll = React.useCallback(() => {
-    setSearch("");
-    setSortKey("tvl");
-    setSortDirection("desc");
-    setSelectedCollateral("all");
-    setSelectedDebtAsset("all");
-  }, []);
-  const handleShowMore = React.useCallback(
-    () => setVisibleCount(v => v + pageSize),
-    [pageSize]
-  );
-  const handleSortTvl = React.useCallback(() => handleSort("tvl"), [handleSort]);
-  const handleSortSupplyApy = React.useCallback(() => handleSort("supplyApy"), [handleSort]);
-  const handleSortBorrowApy = React.useCallback(() => handleSort("borrowApy"), [handleSort]);
 
   const depositModal = useModal();
   const loopModal = useModal();
@@ -689,62 +604,36 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   // Fetch Pendle PT yields for PT tokens
   const { yieldsByAddress, yieldsBySymbol } = usePendlePTYields(chainId);
 
-  // Extract unique collateral and debt assets from markets
-  const { collateralAssets, debtAssets } = React.useMemo(() => {
-    const collateralSet = new Set<string>();
-    const debtSet = new Set<string>();
+  // Memoize filter sets for performance
+  const collateralFilterSet = React.useMemo(() => new Set(selectedCollaterals), [selectedCollaterals]);
+  const debtFilterSet = React.useMemo(() => new Set(selectedDebtAssets), [selectedDebtAssets]);
 
-    markets.forEach(m => {
-      if (m.collateralAsset?.symbol) {
-        collateralSet.add(m.collateralAsset.symbol);
-      }
-      if (m.loanAsset?.symbol) {
-        debtSet.add(m.loanAsset.symbol);
-      }
-    });
-
-    return {
-      collateralAssets: Array.from(collateralSet).sort(),
-      debtAssets: Array.from(debtSet).sort(),
-    };
-  }, [markets]);
-
-  const resetPaging = React.useCallback(() => setVisibleCount(pageSize), [pageSize]);
-
-  React.useEffect(() => {
-    resetPaging();
-  }, [deferredSearch, sortKey, sortDirection, selectedCollateral, selectedDebtAsset, resetPaging]);
-
-  const rows = React.useMemo(() => {
-    const searchValue = deferredSearch.trim().toLowerCase();
-
-    const candidates = markets
-      .filter(m => Boolean(m.collateralAsset)) // only pairs (as in your original)
+  // Transform markets to row data
+  const data = React.useMemo<MarketRow[]>(() => {
+    return markets
+      .filter(m => Boolean(m.collateralAsset))
       .filter(m => {
-        // Filter by selected collateral asset
-        if (selectedCollateral !== "all" && m.collateralAsset?.symbol !== selectedCollateral) return false;
-        // Filter by selected debt asset
-        if (selectedDebtAsset !== "all" && m.loanAsset?.symbol !== selectedDebtAsset) return false;
+        // Collateral filter - empty array means all
+        if (collateralFilterSet.size > 0 && !collateralFilterSet.has(m.collateralAsset?.symbol ?? "")) return false;
+        // Debt filter - empty array means all
+        if (debtFilterSet.size > 0 && !debtFilterSet.has(m.loanAsset?.symbol ?? "")) return false;
         return true;
       })
       .map(m => {
         const loanDecimals = toNumberSafe(m.loanAsset?.decimals);
         const loanPriceUsd = toNumberSafe(m.loanAsset?.priceUsd);
 
-        // Prefer USD values directly from API if available (more accurate)
         const supplyAssetsUsd = toNumberSafe(m.state?.supplyAssetsUsd);
         const borrowAssetsUsd = toNumberSafe(m.state?.borrowAssetsUsd);
         const liquidityAssetsUsd = toNumberSafe(m.state?.liquidityAssetsUsd);
 
-        // Fallback to calculating from raw assets if USD values not available
         const supplyAssetsRaw = toNumberSafe(m.state?.supplyAssets);
         const borrowAssetsRaw = toNumberSafe(m.state?.borrowAssets);
         const liquidityAssetsRaw = toNumberSafe(m.state?.liquidityAssets ?? m.state?.supplyAssets);
         const denom = pow10(loanDecimals);
 
-        // Use API USD values if available, otherwise calculate
-        const supplyUsd = supplyAssetsUsd > 0 
-          ? supplyAssetsUsd 
+        const supplyUsd = supplyAssetsUsd > 0
+          ? supplyAssetsUsd
           : (denom > 0 ? (supplyAssetsRaw / denom) * loanPriceUsd : 0);
         const borrowUsd = borrowAssetsUsd > 0
           ? borrowAssetsUsd
@@ -753,103 +642,212 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           ? liquidityAssetsUsd
           : (denom > 0 ? (liquidityAssetsRaw / denom) * loanPriceUsd : 0);
 
-        const utilization01 = toNumberSafe(m.state?.utilization);
-        const supplyApy01 = toNumberSafe(m.state?.supplyApy);
-        const borrowApy01 = toNumberSafe(m.state?.borrowApy);
-
-        const lltv01 = toNumberSafe(m.lltv) / 1e18;
-
+        // Look up PT implied yield for collateral token
         const collateralSymbol = m.collateralAsset?.symbol ?? "";
-        const loanSymbol = m.loanAsset?.symbol ?? "";
+        const collateralAddress = (m.collateralAsset?.address ?? "").toLowerCase();
+        let impliedApy: number | null = null;
 
-        const searchable = `${collateralSymbol}/${loanSymbol} ${collateralSymbol} ${loanSymbol} ${m.uniqueKey}`.toLowerCase();
+        if (isPTToken(collateralSymbol)) {
+          const ptYield = yieldsByAddress.get(collateralAddress) || yieldsBySymbol.get(collateralSymbol.toLowerCase());
+          if (ptYield) {
+            impliedApy = ptYield.fixedApy;
+          }
+        }
 
         return {
           market: m,
           collateralSymbol,
-          loanSymbol,
+          loanSymbol: m.loanAsset?.symbol ?? "",
+          collateralAddress,
           liquidityUsd,
           supplyUsd,
           borrowUsd,
-          utilization01,
-          supplyApy01,
-          borrowApy01,
-          lltv01,
-          searchable,
+          utilization01: toNumberSafe(m.state?.utilization),
+          supplyApy01: toNumberSafe(m.state?.supplyApy),
+          borrowApy01: toNumberSafe(m.state?.borrowApy),
+          lltv01: toNumberSafe(m.lltv) / 1e18,
+          impliedApy,
         };
-      })
-      .filter(r => (searchValue ? r.searchable.includes(searchValue) : true));
+      });
+  }, [markets, collateralFilterSet, debtFilterSet, yieldsByAddress, yieldsBySymbol]);
 
-    const sorted = [...candidates].sort((a, b) => {
-      let delta = 0;
-
-      switch (sortKey) {
-        case "tvl":
-          delta = a.supplyUsd - b.supplyUsd;
-          break;
-        case "supplyApy":
-          delta = a.supplyApy01 - b.supplyApy01;
-          break;
-        case "borrowApy":
-          delta = a.borrowApy01 - b.borrowApy01;
-          break;
-        case "utilization":
-          delta = a.utilization01 - b.utilization01;
-          break;
-        default:
-          delta = 0;
-      }
-
-      return sortDirection === "asc" ? delta : -delta;
+  // Extract unique collateral and debt assets from markets
+  const { collateralAssets, debtAssets } = React.useMemo(() => {
+    const collateralSet = new Set<string>();
+    const debtSet = new Set<string>();
+    markets.forEach(m => {
+      if (m.collateralAsset?.symbol) collateralSet.add(m.collateralAsset.symbol);
+      if (m.loanAsset?.symbol) debtSet.add(m.loanAsset.symbol);
     });
+    return {
+      collateralAssets: Array.from(collateralSet).sort(),
+      debtAssets: Array.from(debtSet).sort(),
+    };
+  }, [markets]);
 
-    return sorted;
-  }, [markets, deferredSearch, sortKey, sortDirection, selectedCollateral, selectedDebtAsset]);
+  // Column definitions
+  const columns = React.useMemo(() => [
+    columnHelper.accessor("market", {
+      id: "market",
+      header: "Market",
+      enableSorting: false,
+      cell: info => {
+        const row = info.row.original;
+        const morphoUrl = getMorphoMarketUrl(chainId, row.market.uniqueKey, row.collateralSymbol, row.loanSymbol);
+        const pairLabel = `${row.collateralSymbol}/${row.loanSymbol}`;
+        return (
+          <div className="flex items-center gap-2">
+            <TokenPairAvatars collateralSymbol={row.collateralSymbol} loanSymbol={row.loanSymbol} />
+            <div className="flex flex-col">
+              {morphoUrl ? (
+                <a
+                  href={morphoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary group/link flex items-center gap-1 font-medium transition-colors"
+                >
+                  {pairLabel}
+                  <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
+                </a>
+              ) : (
+                <span className="font-medium">{pairLabel}</span>
+              )}
+              <span className="text-base-content/50 text-[10px]">LLTV {formatPercent(row.lltv01, 0)}</span>
+            </div>
+          </div>
+        );
+      },
+    }),
+    columnHelper.accessor("supplyUsd", {
+      header: "TVL",
+      cell: info => usd.format(info.getValue()),
+      sortingFn: "basic",
+    }),
+    columnHelper.accessor("utilization01", {
+      id: "util",
+      header: "Util",
+      cell: info => <UtilizationBar value={info.getValue()} />,
+      sortingFn: "basic",
+    }),
+    columnHelper.accessor("impliedApy", {
+      id: "implied",
+      header: () => (
+        <Tooltip content="Implied APY for PT collateral tokens (Pendle fixed yield)">
+          <span className="cursor-help border-b border-dashed border-current">Implied</span>
+        </Tooltip>
+      ),
+      cell: info => {
+        const value = info.getValue();
+        if (value === null) return <span className="text-base-content/30">—</span>;
+        return <span className="text-info">{formatPercent(value / 100, 2)}</span>;
+      },
+      sortingFn: (rowA, rowB) => {
+        const a = rowA.original.impliedApy ?? -Infinity;
+        const b = rowB.original.impliedApy ?? -Infinity;
+        return a - b;
+      },
+    }),
+    columnHelper.accessor("supplyApy01", {
+      header: "Earn",
+      cell: info => <span className="text-success">{formatPercent(info.getValue(), 2)}</span>,
+      sortingFn: "basic",
+    }),
+    columnHelper.accessor("borrowApy01", {
+      header: "Borrow",
+      cell: info => formatPercent(info.getValue(), 2),
+      sortingFn: "basic",
+    }),
+    columnHelper.display({
+      id: "actions",
+      header: "",
+      cell: info => (
+        <Flex gap="1">
+          <Button size="1" variant="soft" onClick={() => handleSupplyClick(info.row.original.market)}>
+            Supply
+          </Button>
+          <Button size="1" variant="outline" onClick={() => handleLoopClick(info.row.original.market)}>
+            Loop
+          </Button>
+        </Flex>
+      ),
+    }),
+  ], [chainId, usd]);
 
-  const handleSupply = React.useCallback(
+  const table = useReactTable({
+    data,
+    columns,
+    state: {
+      sorting,
+      globalFilter: deferredGlobalFilter,
+    },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    globalFilterFn: (row, _columnId, filterValue) => {
+      if (!filterValue) return true;
+      const r = row.original;
+      const searchable = `${r.collateralSymbol}/${r.loanSymbol} ${r.collateralSymbol} ${r.loanSymbol} ${r.market.uniqueKey}`.toLowerCase();
+      return searchable.includes(filterValue.toLowerCase());
+    },
+    initialState: {
+      pagination: { pageSize },
+    },
+  });
+
+  const handleSearchChange = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => setGlobalFilter(e.currentTarget.value),
+    []
+  );
+  const handleClearSearch = React.useCallback(() => setGlobalFilter(""), []);
+  const handleResetAll = React.useCallback(() => {
+    setGlobalFilter("");
+    setSorting([{ id: "supplyUsd", desc: true }]);
+    setSelectedCollaterals([]);
+    setSelectedDebtAssets([]);
+  }, []);
+
+  const handleSupplyClick = React.useCallback(
     (m: MorphoMarket) => {
       if (onSupply) {
         onSupply(m);
         return;
       }
-      
-      // Check if wallet is connected
       if (!walletAddress) {
         notification.error("Please connect your wallet to deposit");
         return;
       }
-      
-      // Check if wallet is on the correct chain
       if (walletChainId !== chainId) {
         notification.error(`Please switch to chain ID ${chainId} to deposit`);
         return;
       }
-      
       setSelectedMarket(m);
       depositModal.open();
     },
     [onSupply, depositModal, walletAddress, walletChainId, chainId]
   );
 
-  const handleLoop = React.useCallback(
+  const handleLoopClick = React.useCallback(
     (m: MorphoMarket) => {
-      // Check if wallet is connected
       if (!walletAddress) {
         notification.error("Please connect your wallet to create a loop");
         return;
       }
-      
-      // Check if wallet is on the correct chain
       if (walletChainId !== chainId) {
         notification.error(`Please switch to chain ID ${chainId} to create a loop`);
         return;
       }
-      
       setLoopMarket(m);
       loopModal.open();
     },
     [loopModal, walletAddress, walletChainId, chainId]
   );
+
+  const rows = table.getRowModel().rows;
+  const canLoadMore = table.getCanNextPage();
+  const handleShowMore = React.useCallback(() => table.nextPage(), [table]);
 
   const handleCloseDepositModal = React.useCallback(() => {
     depositModal.close();
@@ -980,14 +978,14 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
             size="1"
             variant="surface"
             placeholder="Search..."
-            value={search}
+            value={globalFilter}
             onChange={handleSearchChange}
           >
             <TextField.Slot>
               <Search {...SEARCH_ICON_SIZE} />
             </TextField.Slot>
 
-            {search ? (
+            {globalFilter ? (
               <TextField.Slot side="right">
                 <IconButton
                   size="1"
@@ -1004,16 +1002,16 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
 
         <SearchableSelect
           options={collateralAssets}
-          value={selectedCollateral}
-          onValueChange={setSelectedCollateral}
+          value={selectedCollaterals}
+          onValueChange={setSelectedCollaterals}
           placeholder="Collateral"
           allLabel="All Collaterals"
         />
 
         <SearchableSelect
           options={debtAssets}
-          value={selectedDebtAsset}
-          onValueChange={setSelectedDebtAsset}
+          value={selectedDebtAssets}
+          onValueChange={setSelectedDebtAssets}
           placeholder="Debt"
           allLabel="All Debt"
         />
@@ -1033,7 +1031,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
               Try a different symbol or clear the search filter.
             </Text>
             <Flex gap="2">
-              <Button variant="soft" onClick={handleClearSearch} disabled={!search}>
+              <Button variant="soft" onClick={handleClearSearch} disabled={!globalFilter}>
                 Clear search
               </Button>
               <Button
@@ -1049,14 +1047,14 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
         <>
           {/* Mobile: Card-based layout */}
           <div className="block space-y-2 md:hidden">
-            {rows.slice(0, visibleCount).map(r => (
+            {rows.map(row => (
               <MobileMarketRowItem
-                key={r.market.uniqueKey}
-                row={r}
+                key={row.original.market.uniqueKey}
+                row={row.original}
                 usd={usd}
                 chainId={chainId}
-                onSupply={handleSupply}
-                onLoop={handleLoop}
+                onSupply={handleSupplyClick}
+                onLoop={handleLoopClick}
               />
             ))}
           </div>
@@ -1069,37 +1067,46 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                 <Box px="3" pb="3">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-base-content/70 border-base-300 border-b text-xs">
-                        <th className="py-2.5 pl-3 text-left font-medium">Market</th>
-                        <th className="hover:text-base-content cursor-pointer py-2.5 pr-4 text-right font-medium" onClick={handleSortTvl}>
-                          <span className={`inline-flex items-center gap-0.5 ${sortKey === "tvl" ? "text-primary" : ""}`}>
-                            TVL {sortKey === "tvl" && (sortDirection === "desc" ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
-                          </span>
-                        </th>
-                        <th className="w-16 py-2.5 text-center font-medium">Util</th>
-                        <th className="hover:text-base-content cursor-pointer py-2.5 pr-4 text-right font-medium" onClick={handleSortSupplyApy}>
-                          <span className={`inline-flex items-center gap-0.5 ${sortKey === "supplyApy" ? "text-primary" : ""}`}>
-                            Earn {sortKey === "supplyApy" && (sortDirection === "desc" ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
-                          </span>
-                        </th>
-                        <th className="hover:text-base-content cursor-pointer py-2.5 pr-4 text-right font-medium" onClick={handleSortBorrowApy}>
-                          <span className={`inline-flex items-center gap-0.5 ${sortKey === "borrowApy" ? "text-primary" : ""}`}>
-                            Borrow {sortKey === "borrowApy" && (sortDirection === "desc" ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />)}
-                          </span>
-                        </th>
-                        <th className="w-28"></th>
-                      </tr>
+                      {table.getHeaderGroups().map(headerGroup => (
+                        <tr key={headerGroup.id} className="text-base-content/70 border-base-300 border-b text-xs">
+                          {headerGroup.headers.map(header => (
+                            <th
+                              key={header.id}
+                              className={`py-2.5 font-medium ${
+                                header.id === "market" ? "pl-3 text-left" :
+                                header.id === "util" ? "w-16 text-center" :
+                                header.id === "actions" ? "w-28" :
+                                "pr-4 text-right"
+                              } ${header.column.getCanSort() ? "hover:text-base-content cursor-pointer" : ""}`}
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              <span className={`inline-flex items-center gap-0.5 ${header.column.getIsSorted() ? "text-primary" : ""}`}>
+                                {flexRender(header.column.columnDef.header, header.getContext())}
+                                {header.column.getIsSorted() === "desc" && <ChevronDown className="size-3" />}
+                                {header.column.getIsSorted() === "asc" && <ChevronUp className="size-3" />}
+                              </span>
+                            </th>
+                          ))}
+                        </tr>
+                      ))}
                     </thead>
                     <tbody>
-                      {rows.slice(0, visibleCount).map(r => (
-                        <DesktopMarketRow
-                          key={r.market.uniqueKey}
-                          row={r}
-                          usd={usd}
-                          chainId={chainId}
-                          onSupply={handleSupply}
-                          onLoop={handleLoop}
-                        />
+                      {rows.map(row => (
+                        <tr key={row.id} className="border-base-300/50 hover:bg-base-200/30 border-b transition-colors">
+                          {row.getVisibleCells().map(cell => (
+                            <td
+                              key={cell.id}
+                              className={`py-2.5 ${
+                                cell.column.id === "market" ? "pl-3" :
+                                cell.column.id === "util" ? "text-center" :
+                                cell.column.id === "actions" ? "pr-3 text-right" :
+                                "pr-4 text-right tabular-nums"
+                              }`}
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </td>
+                          ))}
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -1111,7 +1118,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
         </>
       )}
 
-      {rows.length > visibleCount && (
+      {canLoadMore && (
         <Flex align="center" justify="center" py="2">
           <Button variant="soft" onClick={handleShowMore}>
             Show more

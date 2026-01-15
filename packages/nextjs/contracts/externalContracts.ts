@@ -237,11 +237,23 @@ export const contractNameToLogo = (contractName: keyof typeof contractLogos) => 
 };
 
 export const tokenNameToLogo = (tokenName: string) => {
-  if (tokenName == "USD₮0") {
-    // stupid shit
+  // Handle special characters and Euler vault tokens
+  if (tokenName === "USD₮0" || tokenName.toLowerCase() === "usd₮0" || tokenName.toLowerCase() === "usdt0") {
     return "/logos/usdt.svg";
   }
   const lower = tokenName.toLowerCase();
+
+  // Map tokens without dedicated logos to similar token logos
+  const tokenFallbacks: Record<string, string> = {
+    autousdai: "/logos/usdai.png", // Auto-compounding USDai
+    thbill: "/logos/usdc.svg",     // T-Bill token, use stable coin icon
+    rlp: "/logos/default.svg",     // Resolv LP token
+    syrupusdc: "/logos/usdc.svg",  // Syrup USDC
+    teth: "/logos/ethereum.svg",   // Threshold ETH
+  };
+
+  const fallback = tokenFallbacks[lower];
+  if (fallback) return fallback;
 
   // Handle Pendle PT tokens (e.g., "PT-USDe-15JAN2026" -> "ptusde")
   // Strip dates like "-15JAN2026" or Unix timestamps like "-1750896023"
@@ -284,6 +296,7 @@ export const tokenNameToLogo = (tokenName: string) => {
     unibtc: "/logos/unibtc.png",
     xsbtc: "/logos/xsolvbtc.png",
     lyu: "/logos/lyu.png",
+    usdai: "/logos/usdai.png",
   };
 
   const png = pngLogoMap[lower];
