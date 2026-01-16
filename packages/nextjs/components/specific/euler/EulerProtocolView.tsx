@@ -15,14 +15,16 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { SupplyPosition } from "~~/components/SupplyPosition";
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { LoadingSpinner } from "~~/components/common/Loading";
+import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
+import { AddEulerCollateralModal } from "~~/components/modals/AddEulerCollateralModal";
 import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
 import { useTokenPrices } from "~~/hooks/useTokenPrice";
-import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useGlobalState } from "~~/services/store/store";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
-import { HealthStatus } from "../common/HealthStatus";
 import { formatSignedPercent } from "../utils";
+import { useModal } from "~~/hooks/useModal";
+import { BasicCollateral } from "~~/hooks/useMovePositionData";
 
 /**
  * Reusable collapsible section with animated expand/collapse.
@@ -52,7 +54,8 @@ interface PositionMetrics {
   netBalance: number;
   netYield30d: number;
   netApyPercent: number | null;
-  avgUtilization: number;
+  /** Number of position groups with debt */
+  positionsWithDebt: number;
 }
 
 /** Default metrics when no positions exist */
@@ -60,42 +63,46 @@ const EMPTY_METRICS: PositionMetrics = {
   netBalance: 0,
   netYield30d: 0,
   netApyPercent: null,
-  avgUtilization: 0,
+  positionsWithDebt: 0,
 };
 
 /**
- * Calculate position metrics from rows
+ * Calculate position metrics from enriched position groups
+ * Uses on-chain liquidity data for accurate USD values
  */
-function calculatePositionMetrics(
-  rows: { supplyBalanceUsd: number; borrowBalanceUsd: number; supplyApy: number; borrowApy: number; hasDebt: boolean }[]
+function calculatePositionMetricsFromGroups(
+  groups: EulerPositionGroupWithBalances[]
 ): PositionMetrics {
-  if (!rows || rows.length === 0) {
+  if (!groups || groups.length === 0) {
     return EMPTY_METRICS;
   }
 
-  const suppliedPositions = rows.map(row => ({
-    balance: row.supplyBalanceUsd,
-    currentRate: row.supplyApy,
-  }));
+  // Sum up collateral and liability values from liquidity data
+  // Values are in 18 decimals (unit of account, usually USD)
+  let totalCollateralValue = 0;
+  let totalLiabilityValue = 0;
+  let positionsWithDebt = 0;
 
-  const borrowedPositions = rows
-    .filter(row => row.hasDebt)
-    .map(row => ({
-      balance: row.borrowBalanceUsd,
-      currentRate: row.borrowApy,
-    }));
+  for (const group of groups) {
+    if (group.liquidity) {
+      // Convert from 18 decimals to human-readable
+      // Use liquidation collateral value
+      totalCollateralValue += Number(group.liquidity.collateralValueLiquidation) / 1e18;
+      totalLiabilityValue += Number(group.liquidity.liabilityValue) / 1e18;
+      positionsWithDebt++;
+    }
+  }
 
-  const yieldMetrics = calculateNetYieldMetrics(suppliedPositions, borrowedPositions);
+  // Net balance = collateral - liability
+  const netBalance = totalCollateralValue - totalLiabilityValue;
 
-  const avgUtilization = yieldMetrics.totalSupplied > 0
-    ? (yieldMetrics.totalBorrowed / yieldMetrics.totalSupplied) * 100
-    : 0;
-
+  // For yield calculations, we need APY data which we don't have aggregated
+  // Just show the net balance for now
   return {
-    netBalance: yieldMetrics.netBalance,
-    netYield30d: yieldMetrics.netYield30d,
-    netApyPercent: yieldMetrics.netApyPercent,
-    avgUtilization,
+    netBalance,
+    netYield30d: 0, // Would need APY-weighted calculation
+    netApyPercent: null, // Would need APY data
+    positionsWithDebt,
   };
 }
 
@@ -130,6 +137,32 @@ function formatApyValue(hasPositions: boolean, apyValue: number | null): string 
   return formatSignedPercent(apyValue);
 }
 
+/** Collateral swap state for tracking which collateral is being swapped */
+interface CollateralSwapState {
+  isOpen: boolean;
+  collateralVault: string;
+  borrowVault: string;
+  tokenAddress: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  balance: bigint;
+  context: `0x${string}`;
+  /** All collaterals in the group for target asset selection */
+  allCollaterals: BasicCollateral[];
+}
+
+const INITIAL_SWAP_STATE: CollateralSwapState = {
+  isOpen: false,
+  collateralVault: "",
+  borrowVault: "",
+  tokenAddress: "",
+  tokenSymbol: "",
+  tokenDecimals: 18,
+  balance: 0n,
+  context: "0x",
+  allCollaterals: [],
+};
+
 /**
  * Display a single position group (1 debt + N collaterals) side by side
  * Uses SupplyPosition for collaterals (left) and BorrowPosition for debt (right)
@@ -143,6 +176,9 @@ interface EulerPositionGroupRowProps {
 
 const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId, pricesRaw }) => {
   const { debt, collaterals, isMainAccount } = group;
+  const swapModal = useModal();
+  const addCollateralModal = useModal();
+  const [swapState, setSwapState] = useState<CollateralSwapState>(INITIAL_SWAP_STATE);
 
   // Helper to get token icon
   const getIcon = (symbol: string) => {
@@ -174,20 +210,118 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
     disableCollateralSelection: false,
   }), [collaterals]);
 
+  // Build available collaterals for swap modal (all collaterals in group)
+  const allCollateralsForSwap: BasicCollateral[] = useMemo(() =>
+    collaterals.map((col) => ({
+      address: col.vault.asset.address,
+      symbol: col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol,
+      decimals: col.vault.asset.decimals,
+      rawBalance: col.balance,
+      balance: Number(col.balance) / (10 ** col.vault.asset.decimals),
+      icon: getIcon(col.vault.asset.symbol),
+      price: pricesRaw[col.vault.asset.symbol?.toLowerCase()] ?? 0n,
+    })),
+    [collaterals, pricesRaw, getIcon]
+  );
+
+  // Handler to open collateral swap modal
+  const handleOpenSwap = useCallback((collateral: typeof collaterals[0]) => {
+    const symbol = collateral.vault.asset.symbol === "???" ? "unknown" : collateral.vault.asset.symbol;
+    const context = encodeEulerContext({
+      borrowVault: borrowVaultAddress,
+      collateralVault: collateral.vault.address,
+    }) as `0x${string}`;
+    setSwapState({
+      isOpen: true,
+      collateralVault: collateral.vault.address,
+      borrowVault: borrowVaultAddress,
+      tokenAddress: collateral.vault.asset.address,
+      tokenSymbol: symbol,
+      tokenDecimals: collateral.vault.asset.decimals,
+      balance: collateral.balance,
+      context,
+      allCollaterals: allCollateralsForSwap,
+    });
+    swapModal.open();
+  }, [borrowVaultAddress, allCollateralsForSwap, swapModal]);
+
+  // Handler to close collateral swap modal
+  const handleCloseSwap = useCallback(() => {
+    swapModal.close();
+    setSwapState(INITIAL_SWAP_STATE);
+  }, [swapModal]);
+
+  // Get health status color and label based on how close currentLtv is to LLTV
+  const getHealthStatus = () => {
+    if (!group.liquidity) return null;
+    const { currentLtv, effectiveLltv, liquidationHealth } = group.liquidity;
+
+    // Color based on how close to liquidation
+    // currentLtv / effectiveLltv gives us utilization of the LLTV
+    const utilizationOfLltv = effectiveLltv > 0 ? (currentLtv / effectiveLltv) * 100 : 0;
+
+    let colorClass = TEXT_SUCCESS;
+    let label = "Healthy";
+    if (liquidationHealth < 1.0) {
+      colorClass = TEXT_ERROR;
+      label = "Liquidatable";
+    } else if (utilizationOfLltv > 90) {
+      colorClass = TEXT_ERROR;
+      label = "At Risk";
+    } else if (utilizationOfLltv > 75) {
+      colorClass = "text-warning";
+      label = "Caution";
+    }
+
+    return { currentLtv, effectiveLltv, colorClass, label };
+  };
+
+  const healthStatus = getHealthStatus();
+
   return (
     <div className="bg-base-300/30 rounded-lg p-3">
-      {/* Sub-account label */}
-      {!isMainAccount && (
-        <div className="mb-2 text-[10px] font-medium text-base-content/40 uppercase tracking-wider">
-          Sub-account
+      {/* Header: Sub-account label + Health indicator */}
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          {!isMainAccount && (
+            <span className="text-[10px] font-medium text-base-content/40 uppercase tracking-wider">
+              Sub-account
+            </span>
+          )}
         </div>
-      )}
+        {/* Health indicator for positions with debt - similar to Morpho display */}
+        {healthStatus && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-base-content/60">
+              LTV:{" "}
+              <span className={`font-mono font-semibold ${healthStatus.colorClass}`}>
+                {healthStatus.currentLtv.toFixed(1)}%
+              </span>
+              <span className="text-base-content/50">/{healthStatus.effectiveLltv.toFixed(0)}%</span>
+            </span>
+            <span className={`text-[10px] font-medium uppercase ${healthStatus.colorClass}`}>
+              {healthStatus.label}
+            </span>
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
         {/* Left side: Collaterals */}
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-base-content/50 mb-2">
-            Collateral
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-base-content/50">
+              Collateral
+            </div>
+            {debt && (
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost text-primary hover:bg-primary/10"
+                onClick={addCollateralModal.open}
+              >
+                Add Collateral
+              </button>
+            )}
           </div>
           {collaterals.length === 0 ? (
             <div className="text-sm text-base-content/40 italic">None</div>
@@ -217,6 +351,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
                     chainId={chainId}
                     protocolContext={context}
                     availableActions={{ deposit: true, withdraw: true, move: true, swap: true }}
+                    onSwap={() => handleOpenSwap(col)}
                   />
                 );
               })}
@@ -265,6 +400,37 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
           })()}
         </div>
       </div>
+
+      {/* Collateral Swap Modal */}
+      <CollateralSwapModal
+        isOpen={swapModal.isOpen}
+        onClose={handleCloseSwap}
+        protocolName="Euler"
+        availableAssets={swapState.allCollaterals}
+        initialFromTokenAddress={swapState.tokenAddress}
+        chainId={chainId}
+        context={swapState.context}
+        position={{
+          name: swapState.tokenSymbol,
+          tokenAddress: swapState.tokenAddress,
+          decimals: swapState.tokenDecimals,
+          balance: swapState.balance,
+          type: "supply",
+        }}
+        eulerBorrowVault={swapState.borrowVault}
+        eulerCollateralVault={swapState.collateralVault}
+      />
+
+      {/* Add Collateral Modal */}
+      {debt && (
+        <AddEulerCollateralModal
+          isOpen={addCollateralModal.isOpen}
+          onClose={addCollateralModal.close}
+          chainId={chainId}
+          borrowVaultAddress={debt.vault.address}
+          existingCollateralVaults={collaterals.map(c => c.vault.address)}
+        />
+      )}
     </div>
   );
 };
@@ -344,23 +510,31 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     enabled: tokenSymbols.length > 0,
   });
 
-  // Compute metrics
+  // Compute metrics from enriched position groups (uses on-chain liquidity data)
   const metrics = useMemo(
-    () => calculatePositionMetrics(rows),
-    [rows]
+    () => calculatePositionMetricsFromGroups(enrichedPositionGroups),
+    [enrichedPositionGroups]
   );
 
-  // Report totals to global state
+  // Report totals to global state (using liquidity data)
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
   useEffect(() => {
     if (!hasLoadedOnce) return;
 
-    const totalSupplied = rows.reduce((sum, row) => sum + row.supplyBalanceUsd, 0);
-    const totalBorrowed = rows.reduce((sum, row) => sum + row.borrowBalanceUsd, 0);
+    // Sum collateral and liability from all position groups
+    let totalSupplied = 0;
+    let totalBorrowed = 0;
+    for (const group of enrichedPositionGroups) {
+      if (group.liquidity) {
+        // Use liquidation collateral value (it's LTV-adjusted but close enough for display)
+        totalSupplied += Number(group.liquidity.collateralValueLiquidation) / 1e18;
+        totalBorrowed += Number(group.liquidity.liabilityValue) / 1e18;
+      }
+    }
 
     setProtocolTotals("Euler", totalSupplied, totalBorrowed);
-  }, [hasLoadedOnce, rows, setProtocolTotals, effectiveChainId]);
+  }, [hasLoadedOnce, enrichedPositionGroups, setProtocolTotals, effectiveChainId]);
 
   const hasPositions = rows.length > 0;
 
@@ -449,12 +623,10 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
                 </span>
               </div>
               <div className="flex flex-col items-center py-1">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">LTV</span>
-                {hasPositions ? (
-                  <HealthStatus utilizationPercentage={metrics.avgUtilization} />
-                ) : (
-                  <span className="text-base-content/40 font-mono text-xs font-bold tabular-nums">—</span>
-                )}
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Positions</span>
+                <span className={`font-mono text-xs font-bold tabular-nums ${hasPositions ? 'text-base-content' : TEXT_MUTED}`}>
+                  {hasPositions ? metrics.positionsWithDebt : "—"}
+                </span>
               </div>
             </div>
           </div>
@@ -503,12 +675,10 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
               </div>
 
               <div className="group/util hover:bg-base-200/30 flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                <span className="label-text-xs-semibold">Utilization</span>
-                {hasPositions ? (
-                  <HealthStatus utilizationPercentage={metrics.avgUtilization} />
-                ) : (
-                  <span className="text-base-content/40 font-mono text-sm font-bold tabular-nums">—</span>
-                )}
+                <span className="label-text-xs-semibold">Positions</span>
+                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${hasPositions ? 'text-base-content' : TEXT_MUTED}`}>
+                  {hasPositions ? metrics.positionsWithDebt : "—"}
+                </span>
               </div>
             </div>
 

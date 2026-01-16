@@ -1278,18 +1278,243 @@ describe("v2 Euler Gateway (fork)", function () {
       console.log(`✓ Debt migrated: ~${ethers.formatUnits(borrowAmount, 6)} USDC`);
     });
   });
+
+  // ============================================================
+  // SECTION 8: Sub-Account Operations
+  // ============================================================
+  describe("Sub-Account Operations", function () {
+    it("should create position on sub-account 1 (not main account)", async function () {
+      this.timeout(180000);
+
+      const [deployer] = await ethers.getSigners();
+      const evcCode = await ethers.provider.getCode(evcAddress);
+      if (evcCode === "0x") this.skip();
+
+      // Check USDC vault has liquidity
+      const usdcVault = await ethers.getContractAt("IEulerVault", ARB_EULER_VAULTS.USDC.vault);
+      const vaultLiquidity = await usdcVault.totalAssets();
+      if (vaultLiquidity < BigInt(500e6)) {
+        console.log(`USDC vault has insufficient liquidity, skipping`);
+        this.skip();
+      }
+
+      console.log("\n=== Sub-Account Test: Position on Sub-Account 1 ===");
+
+      // Setup infrastructure
+      const { router, syncGateway, routerAddress } = await deployRouterWithAuthHelper(ethers, deployer.address);
+
+      const EulerGateway = await ethers.getContractFactory("EulerGatewayWrite");
+      const gateway = await EulerGateway.deploy(routerAddress, deployer.address, evcAddress);
+      await gateway.waitForDeployment();
+      const gatewayAddress = await gateway.getAddress();
+      await router.addGateway("euler", gatewayAddress);
+      await syncGateway("euler", gatewayAddress);
+      console.log(`✓ Infrastructure deployed`);
+
+      // Create and fund test user
+      const user = ethers.Wallet.createRandom().connect(ethers.provider);
+      await deployer.sendTransaction({ to: user.address, value: ethers.parseEther("1") });
+
+      // Calculate sub-account address
+      const subAccountIndex = 1;
+      const subAccount = getSubAccount(user.address, subAccountIndex);
+      console.log(`User main account: ${user.address}`);
+      console.log(`User sub-account 1: ${subAccount}`);
+
+      // Fund user with wstETH
+      await network.provider.send("hardhat_setBalance", [ARB_WHALES.wstETH, "0x56BC75E2D63100000"]);
+      await network.provider.request({ method: "hardhat_impersonateAccount", params: [ARB_WHALES.wstETH] });
+      const whale = await ethers.getSigner(ARB_WHALES.wstETH);
+
+      const wstEth = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", ARB_EULER_VAULTS.wstETH.asset) as IERC20;
+      const collateralAmount = ethers.parseEther("0.5"); // 0.5 wstETH
+      await wstEth.connect(whale).transfer(user.address, collateralAmount);
+      await network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [ARB_WHALES.wstETH] });
+      console.log(`✓ User funded with ${ethers.formatEther(collateralAmount)} wstETH`);
+
+      // Setup EVC authorization for SUB-ACCOUNT
+      const evc = await ethers.getContractAt("IEVC", evcAddress);
+      const borrowVault = ARB_EULER_VAULTS.USDC.vault;
+      const collateralVault = ARB_EULER_VAULTS.wstETH.vault;
+
+      // Encode context with sub-account index 1
+      const eulerContext = encodeEulerContext(borrowVault, collateralVault, subAccountIndex);
+
+      // Enable collateral and controller for SUB-ACCOUNT
+      await evc.connect(user).enableCollateral(subAccount, collateralVault);
+      await evc.connect(user).enableController(subAccount, borrowVault);
+      // Set gateway as operator for SUB-ACCOUNT
+      await evc.connect(user).setAccountOperator(subAccount, gatewayAddress, true);
+      console.log(`✓ EVC authorization complete for sub-account 1`);
+
+      // STEP 1: Deposit collateral to sub-account
+      console.log("\n--- Step 1: Deposit Collateral to Sub-Account 1 ---");
+      await (wstEth.connect(user) as IERC20).approve(routerAddress, collateralAmount);
+
+      const depositInstrs = [
+        createRouterInstruction(encodePullToken(collateralAmount, ARB_EULER_VAULTS.wstETH.asset, user.address)),
+        createRouterInstruction(encodeApprove(0, "euler")),
+        createProtocolInstruction(
+          "euler",
+          encodeLendingInstruction(LendingOp.DepositCollateral, ARB_EULER_VAULTS.wstETH.asset, user.address, 0n, eulerContext, 0)
+        ),
+      ];
+
+      await router.connect(user).processProtocolInstructions(depositInstrs);
+
+      // Verify deposit on SUB-ACCOUNT (not main account)
+      const wstEthVault = await ethers.getContractAt("IEulerVault", collateralVault);
+
+      // Sub-account should have shares
+      const subAccountShares = await wstEthVault.balanceOf(subAccount);
+      const subAccountAssets = await wstEthVault.convertToAssets(subAccountShares);
+      console.log(`Sub-account 1 collateral: ${ethers.formatEther(subAccountAssets)} wstETH`);
+
+      // Main account should have 0 shares (position is on sub-account)
+      const mainAccountShares = await wstEthVault.balanceOf(user.address);
+      console.log(`Main account collateral: ${ethers.formatEther(mainAccountShares)} wstETH (shares)`);
+
+      expect(subAccountAssets).to.be.closeTo(collateralAmount, ethers.parseEther("0.01"));
+      expect(mainAccountShares).to.equal(0n);
+      console.log(`✓ Collateral deposited to sub-account 1, main account empty`);
+
+      // STEP 2: Borrow USDC from sub-account
+      console.log("\n--- Step 2: Borrow USDC from Sub-Account 1 ---");
+      const borrowAmount = BigInt(100e6); // 100 USDC
+
+      const borrowInstrs = [
+        createProtocolInstruction(
+          "euler",
+          encodeLendingInstruction(LendingOp.Borrow, ARB_EULER_VAULTS.USDC.asset, user.address, borrowAmount, eulerContext, 999)
+        ),
+        createRouterInstruction(encodePushToken(0, user.address)),
+      ];
+
+      await router.connect(user).processProtocolInstructions(borrowInstrs, { gasLimit: 1_500_000 });
+
+      // Verify borrow
+      const usdc = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", ARB_EULER_VAULTS.USDC.asset) as IERC20;
+      const userUsdcBalance = await usdc.balanceOf(user.address);
+      console.log(`User received: ${ethers.formatUnits(userUsdcBalance, 6)} USDC`);
+
+      // Debt should be on SUB-ACCOUNT
+      const subAccountDebt = await usdcVault.debtOf(subAccount);
+      const mainAccountDebt = await usdcVault.debtOf(user.address);
+      console.log(`Sub-account 1 debt: ${ethers.formatUnits(subAccountDebt, 6)} USDC`);
+      console.log(`Main account debt: ${ethers.formatUnits(mainAccountDebt, 6)} USDC`);
+
+      expect(userUsdcBalance).to.equal(borrowAmount);
+      expect(subAccountDebt).to.be.closeTo(borrowAmount, BigInt(1e6));
+      expect(mainAccountDebt).to.equal(0n);
+      console.log(`✓ Debt recorded on sub-account 1, main account has no debt`);
+
+      // STEP 3: Repay debt on sub-account
+      console.log("\n--- Step 3: Repay Debt on Sub-Account 1 ---");
+
+      // Fund user with extra USDC for interest
+      await network.provider.send("hardhat_setBalance", [ARB_WHALES.USDC, "0x56BC75E2D63100000"]);
+      await network.provider.request({ method: "hardhat_impersonateAccount", params: [ARB_WHALES.USDC] });
+      const usdcWhale = await ethers.getSigner(ARB_WHALES.USDC);
+      await (usdc.connect(usdcWhale) as IERC20).transfer(user.address, BigInt(10e6));
+      await network.provider.request({ method: "hardhat_stopImpersonatingAccount", params: [ARB_WHALES.USDC] });
+
+      const repayApproval = borrowAmount + BigInt(10e6);
+      await (usdc.connect(user) as IERC20).approve(routerAddress, repayApproval);
+
+      const repayInstrs = [
+        createProtocolInstruction(
+          "euler",
+          encodeLendingInstruction(LendingOp.GetBorrowBalance, ARB_EULER_VAULTS.USDC.asset, user.address, 0n, eulerContext, 999)
+        ),
+        createRouterInstruction(encodePullToken(repayApproval, ARB_EULER_VAULTS.USDC.asset, user.address)),
+        createRouterInstruction(encodeApprove(1, "euler")),
+        createProtocolInstruction(
+          "euler",
+          encodeLendingInstruction(LendingOp.Repay, ARB_EULER_VAULTS.USDC.asset, user.address, 0n, eulerContext, 0)
+        ),
+        createRouterInstruction(encodePushToken(3, user.address)),
+      ];
+
+      await router.connect(user).processProtocolInstructions(repayInstrs, { gasLimit: 1_500_000 });
+
+      const debtAfterRepay = await usdcVault.debtOf(subAccount);
+      console.log(`Sub-account 1 debt after repay: ${ethers.formatUnits(debtAfterRepay, 6)} USDC`);
+      expect(debtAfterRepay).to.equal(0n);
+      console.log(`✓ Sub-account 1 debt fully repaid`);
+
+      console.log("\n=== Sub-Account Test Complete ===");
+      console.log(`✓ Position created on sub-account 1 (not main account)`);
+      console.log(`✓ Collateral: ${ethers.formatEther(subAccountAssets)} wstETH`);
+      console.log(`✓ Borrowed: ${ethers.formatUnits(borrowAmount, 6)} USDC`);
+      console.log(`✓ Repaid: All debt`);
+    });
+
+    it("should verify sub-account address derivation matches Euler EVC", async function () {
+      const [deployer] = await ethers.getSigners();
+      const evcCode = await ethers.provider.getCode(evcAddress);
+      if (evcCode === "0x") this.skip();
+
+      // Test that our getSubAccount helper matches what Euler EVC expects
+      const user = deployer.address;
+
+      console.log("\n=== Sub-Account Address Verification ===");
+      console.log(`User address: ${user}`);
+
+      // Test sub-account indices 0, 1, 2, 255
+      for (const index of [0, 1, 2, 255]) {
+        const derivedSubAccount = getSubAccount(user, index);
+        console.log(`Sub-account ${index}: ${derivedSubAccount}`);
+
+        // Verify the derivation formula
+        if (index === 0) {
+          expect(derivedSubAccount).to.equal(user);
+        } else {
+          // Sub-account should differ only in last byte
+          const subAccountLast2Chars = derivedSubAccount.slice(-2).toLowerCase();
+          const expectedLast2Chars = index.toString(16).padStart(2, "0").toLowerCase();
+
+          expect(subAccountLast2Chars).to.equal(expectedLast2Chars);
+
+          // First 38 characters should be same (0x + 18 bytes = 38 chars)
+          // Actually: addresses are 20 bytes = 40 hex chars + "0x" = 42 chars
+          // We mask the last byte (2 hex chars), so first 40 chars should match after clearing last byte of user
+          const userPrefix = (BigInt(user) & ~BigInt(0xFF)).toString(16).padStart(40, "0");
+          const subAccountBigInt = BigInt(derivedSubAccount);
+          const subAccountPrefix = (subAccountBigInt & ~BigInt(0xFF)).toString(16).padStart(40, "0");
+
+          expect(subAccountPrefix).to.equal(userPrefix);
+        }
+      }
+
+      console.log(`✓ Sub-account derivation formula verified`);
+    });
+  });
 });
 
 // ============ Helper Functions ============
 
 /**
  * Encode Euler vault context for use in LendingInstruction context
+ * @param borrowVault - The vault to borrow from (controller)
+ * @param collateralVault - The vault where collateral is deposited
+ * @param subAccountIndex - Sub-account index (0-255), 0 = main account (default)
  */
-export function encodeEulerContext(borrowVault: string, collateralVault: string): string {
+export function encodeEulerContext(borrowVault: string, collateralVault: string, subAccountIndex: number = 0): string {
   return ethers.AbiCoder.defaultAbiCoder().encode(
-    ["address", "address"],
-    [borrowVault, collateralVault]
+    ["address", "address", "uint8"],
+    [borrowVault, collateralVault, subAccountIndex]
   );
+}
+
+/**
+ * Derive sub-account address from user address and index
+ * Sub-account = (user & 0xFF...FF00) | subAccountIndex
+ */
+export function getSubAccount(user: string, subAccountIndex: number): string {
+  if (subAccountIndex === 0) return user;
+  const userBigInt = BigInt(user);
+  const mask = ~BigInt(0xFF);
+  return ethers.getAddress("0x" + ((userBigInt & mask) | BigInt(subAccountIndex)).toString(16).padStart(40, "0"));
 }
 
 /**

@@ -39,6 +39,34 @@ const EULER_VAULT_ABI = [
     inputs: [],
     outputs: [{ name: "", type: "address" }],
   },
+  // LTV and liquidity functions
+  {
+    name: "LTVBorrow",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "collateral", type: "address" }],
+    outputs: [{ name: "", type: "uint16" }],
+  },
+  {
+    name: "LTVLiquidation",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "collateral", type: "address" }],
+    outputs: [{ name: "", type: "uint16" }],
+  },
+  {
+    name: "accountLiquidity",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "account", type: "address" },
+      { name: "liquidation", type: "bool" },
+    ],
+    outputs: [
+      { name: "collateralValue", type: "uint256" },
+      { name: "liabilityValue", type: "uint256" },
+    ],
+  },
 ] as const;
 
 // Re-export API types for convenience
@@ -54,11 +82,42 @@ export interface EulerDebtWithBalance {
   balance: bigint; // Debt balance
 }
 
+/** LTV configuration for a collateral */
+export interface EulerCollateralLtv {
+  collateralVault: string;
+  /** Borrow LTV in percentage (e.g., 80 = 80%) */
+  borrowLtv: number;
+  /** Liquidation LTV in percentage (e.g., 90 = 90%) */
+  liquidationLtv: number;
+}
+
+/** Account liquidity data from on-chain */
+export interface EulerAccountLiquidity {
+  /** Total collateral value adjusted by liquidation LTV (18 decimals) */
+  collateralValueLiquidation: bigint;
+  /** Total collateral value adjusted by borrow LTV (18 decimals) */
+  collateralValueBorrow: bigint;
+  /** Total liability/debt value (18 decimals) */
+  liabilityValue: bigint;
+  /** Liquidation health: collateralValueLiquidation / liabilityValue (< 1.0 = liquidatable) */
+  liquidationHealth: number;
+  /** LTV configs for each collateral in this position */
+  collateralLtvs: EulerCollateralLtv[];
+  /** Effective LLTV for the position (weighted or min if multiple collaterals) */
+  effectiveLltv: number;
+  /** Effective max LTV for borrowing */
+  effectiveMaxLtv: number;
+  /** Current LTV: calculated from actual position values */
+  currentLtv: number;
+}
+
 export interface EulerPositionGroupWithBalances {
   subAccount: string;
   isMainAccount: boolean;
   debt: EulerDebtWithBalance | null;
   collaterals: EulerCollateralWithBalance[];
+  /** Account liquidity/health data (only available if there's debt) */
+  liquidity: EulerAccountLiquidity | null;
 }
 
 // ============ Types ============
@@ -332,6 +391,150 @@ export function useEulerLendingPositions(
     },
   });
 
+  // Build liquidity and LTV queries for position groups with debt
+  // For each group: accountLiquidity(true), accountLiquidity(false), and LTV configs per collateral
+  const liquidityContracts = useMemo(() => {
+    if (!positionGroups.length) return [];
+
+    type LiquidityContract = {
+      address: `0x${string}`;
+      abi: typeof EULER_VAULT_ABI;
+      functionName: "accountLiquidity" | "LTVBorrow" | "LTVLiquidation";
+      args: [`0x${string}`, boolean] | [`0x${string}`];
+      chainId: number;
+    };
+
+    const contracts: LiquidityContract[] = [];
+
+    for (const group of positionGroups) {
+      if (group.debt) {
+        const borrowVault = group.debt.vault.address as `0x${string}`;
+        const subAccount = group.subAccount as `0x${string}`;
+
+        // accountLiquidity(subAccount, true) - liquidation mode
+        contracts.push({
+          address: borrowVault,
+          abi: EULER_VAULT_ABI,
+          functionName: "accountLiquidity",
+          args: [subAccount, true],
+          chainId,
+        });
+
+        // accountLiquidity(subAccount, false) - borrow mode
+        contracts.push({
+          address: borrowVault,
+          abi: EULER_VAULT_ABI,
+          functionName: "accountLiquidity",
+          args: [subAccount, false],
+          chainId,
+        });
+
+        // LTV configs for each collateral
+        for (const col of group.collaterals) {
+          const collateralVault = col.vault.address as `0x${string}`;
+
+          // LTVBorrow(collateralVault)
+          contracts.push({
+            address: borrowVault,
+            abi: EULER_VAULT_ABI,
+            functionName: "LTVBorrow",
+            args: [collateralVault],
+            chainId,
+          });
+
+          // LTVLiquidation(collateralVault)
+          contracts.push({
+            address: borrowVault,
+            abi: EULER_VAULT_ABI,
+            functionName: "LTVLiquidation",
+            args: [collateralVault],
+            chainId,
+          });
+        }
+      }
+    }
+
+    return contracts;
+  }, [positionGroups, chainId]);
+
+  // Fetch liquidity and LTV data
+  const { data: liquidityResults } = useReadContracts({
+    contracts: liquidityContracts,
+    query: {
+      enabled: liquidityContracts.length > 0,
+      staleTime: 30_000,
+    },
+  });
+
+  // Parse liquidity results into a map with all the data we need
+  const liquidityMap = useMemo(() => {
+    const map = new Map<string, {
+      collateralValueLiq: bigint;
+      liabilityValueLiq: bigint;
+      collateralValueBorrow: bigint;
+      liabilityValueBorrow: bigint;
+      collateralLtvs: EulerCollateralLtv[];
+    }>();
+    if (!liquidityResults || liquidityResults.length === 0) return map;
+
+    let resultIndex = 0;
+    for (const group of positionGroups) {
+      if (group.debt && resultIndex < liquidityResults.length) {
+        // accountLiquidity(true) - liquidation mode
+        const liqResult = liquidityResults[resultIndex];
+        resultIndex++;
+
+        // accountLiquidity(false) - borrow mode
+        const borrowResult = liquidityResults[resultIndex];
+        resultIndex++;
+
+        let collateralValueLiq = 0n;
+        let liabilityValueLiq = 0n;
+        let collateralValueBorrow = 0n;
+        let liabilityValueBorrow = 0n;
+
+        if (liqResult?.status === "success") {
+          [collateralValueLiq, liabilityValueLiq] = liqResult.result as [bigint, bigint];
+        }
+        if (borrowResult?.status === "success") {
+          [collateralValueBorrow, liabilityValueBorrow] = borrowResult.result as [bigint, bigint];
+        }
+
+        // Parse LTV configs for each collateral
+        const collateralLtvs: EulerCollateralLtv[] = [];
+        for (const col of group.collaterals) {
+          const borrowLtvResult = liquidityResults[resultIndex];
+          resultIndex++;
+          const liqLtvResult = liquidityResults[resultIndex];
+          resultIndex++;
+
+          const borrowLtv = borrowLtvResult?.status === "success"
+            ? Number(borrowLtvResult.result as bigint) / 100 // 1e4 scale to percentage
+            : 0;
+          const liquidationLtv = liqLtvResult?.status === "success"
+            ? Number(liqLtvResult.result as bigint) / 100 // 1e4 scale to percentage
+            : 0;
+
+          collateralLtvs.push({
+            collateralVault: col.vault.address,
+            borrowLtv,
+            liquidationLtv,
+          });
+        }
+
+        map.set(group.subAccount.toLowerCase(), {
+          collateralValueLiq,
+          liabilityValueLiq,
+          collateralValueBorrow,
+          liabilityValueBorrow,
+          collateralLtvs,
+        });
+      }
+    }
+
+    return map;
+  }, [liquidityResults, positionGroups]);
+
   // Parse balance results into a map: vaultAddress -> { shares, debt }
   const balanceMap = useMemo(() => {
     const map = new Map<string, { shares: bigint; debt: bigint }>();
@@ -350,7 +553,7 @@ export function useEulerLendingPositions(
     return map;
   }, [balanceResults, vaultAddresses]);
 
-  // Enrich position groups with on-chain balance data
+  // Enrich position groups with on-chain balance and liquidity data
   const enrichedPositionGroups = useMemo<EulerPositionGroupWithBalances[]>(() => {
     if (!positionGroups.length) return [];
 
@@ -372,14 +575,65 @@ export function useEulerLendingPositions(
           }
         : null;
 
+      // Get liquidity data for this position group
+      let liquidity: EulerAccountLiquidity | null = null;
+      if (enrichedDebt) {
+        const liquidityData = liquidityMap.get(group.subAccount.toLowerCase());
+        if (liquidityData && liquidityData.liabilityValueLiq > 0n) {
+          const {
+            collateralValueLiq,
+            liabilityValueLiq,
+            collateralValueBorrow,
+            collateralLtvs,
+          } = liquidityData;
+
+          // Liquidation health: collateralValueLiq / liabilityValueLiq
+          // If < 1.0, position is liquidatable
+          const liquidationHealth = Number(collateralValueLiq) / Number(liabilityValueLiq);
+
+          // Calculate effective LLTV and max LTV from collateral configs
+          // Use minimum LLTV if multiple collaterals (most conservative)
+          let effectiveLltv = 100;
+          let effectiveMaxLtv = 100;
+          for (const ltv of collateralLtvs) {
+            if (ltv.liquidationLtv > 0 && ltv.liquidationLtv < effectiveLltv) {
+              effectiveLltv = ltv.liquidationLtv;
+            }
+            if (ltv.borrowLtv > 0 && ltv.borrowLtv < effectiveMaxLtv) {
+              effectiveMaxLtv = ltv.borrowLtv;
+            }
+          }
+
+          // Current LTV calculation:
+          // Raw collateral value = collateralValueLiq / effectiveLltv * 100
+          // Current LTV = liabilityValue / rawCollateralValue * 100
+          // Simplified: currentLtv = (liabilityValue / collateralValueLiq) * effectiveLltv
+          const currentLtv = collateralValueLiq > 0n
+            ? (Number(liabilityValueLiq) / Number(collateralValueLiq)) * effectiveLltv
+            : 0;
+
+          liquidity = {
+            collateralValueLiquidation: collateralValueLiq,
+            collateralValueBorrow,
+            liabilityValue: liabilityValueLiq,
+            liquidationHealth,
+            collateralLtvs,
+            effectiveLltv,
+            effectiveMaxLtv,
+            currentLtv,
+          };
+        }
+      }
+
       return {
         subAccount: group.subAccount,
         isMainAccount: group.isMainAccount,
         debt: enrichedDebt,
         collaterals: enrichedCollaterals,
+        liquidity,
       };
     });
-  }, [positionGroups, balanceMap]);
+  }, [positionGroups, balanceMap, liquidityMap]);
 
   // Build position rows with on-chain balances
   const rows = useMemo<EulerPositionRow[]>(() => {

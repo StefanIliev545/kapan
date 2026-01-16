@@ -31,9 +31,11 @@ import {
   LendingOp,
   normalizeProtocolName,
   encodeMorphoContext,
+  encodeEulerContext,
   type MorphoMarketContextForEncoding,
 } from "~~/utils/v2/instructionHelpers";
 import { useMorphoCollateralSwapMarkets, marketToContext } from "~~/hooks/useMorphoCollateralSwapMarkets";
+import { useEulerCollateralSwapVaults } from "~~/hooks/useEulerCollateralSwapVaults";
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
@@ -380,6 +382,10 @@ interface CollateralSwapModalProps {
     morphoContext?: MorphoMarketContextForEncoding;
     /** Morpho-specific: Debt token address for finding compatible markets */
     debtTokenAddress?: string;
+    /** Euler-specific: Borrow vault address (extracted from context) */
+    eulerBorrowVault?: string;
+    /** Euler-specific: Current collateral vault address */
+    eulerCollateralVault?: string;
 }
 
 export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
@@ -393,9 +399,12 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     position,
     morphoContext,
     debtTokenAddress,
+    eulerBorrowVault,
+    eulerCollateralVault,
 }) => {
     const { buildCollateralSwapFlow } = useKapanRouterV2();
     const isMorpho = normalizeProtocolName(protocolName) === "morpho-blue";
+    const isEuler = normalizeProtocolName(protocolName) === "euler";
 
     // Morpho: Fetch compatible target markets (same debt, different collateral)
     const { targetMarkets: morphoTargetMarkets, isLoading: isMorphoMarketsLoading } = useMorphoCollateralSwapMarkets({
@@ -403,6 +412,25 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         debtTokenAddress: debtTokenAddress || "",
         currentCollateralAddress: initialFromTokenAddress || "",
         enabled: isMorpho && isOpen && !!debtTokenAddress,
+    });
+
+    // Euler: Get target collateral symbols from available assets (excluding current)
+    const eulerTargetSymbols = useMemo(() => {
+        if (!isEuler) return [];
+        return availableAssets
+            .filter(a => a.address.toLowerCase() !== initialFromTokenAddress?.toLowerCase())
+            .map(a => a.symbol);
+    }, [isEuler, availableAssets, initialFromTokenAddress]);
+
+    // Euler: Fetch compatible collateral vaults for the borrow vault
+    const {
+        targetVaultsBySymbol: eulerTargetVaults,
+        isLoading: isEulerVaultsLoading,
+    } = useEulerCollateralSwapVaults({
+        chainId,
+        borrowVaultAddress: eulerBorrowVault || "",
+        targetCollateralSymbols: eulerTargetSymbols,
+        enabled: isEuler && isOpen && !!eulerBorrowVault,
     });
 
     // Morpho: Selected target market state
@@ -519,6 +547,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     // Filter "To" assets (exclude selected "From")
     // For Morpho: derive from compatible target markets (same debt, different collateral)
+    // For Euler: filter to only show assets that have compatible collateral vaults
     // Deduplicate by collateral address (pick first/best market for each collateral)
     const targetAssets = useMemo(() => {
         if (isMorpho && morphoTargetMarkets.length > 0) {
@@ -547,8 +576,19 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                     marketId: m.uniqueKey,
                 } as SwapAsset));
         }
+        // For Euler: only show assets that have a compatible collateral vault
+        if (isEuler && Object.keys(eulerTargetVaults).length > 0) {
+            return availableAssets
+                .filter(a => {
+                    if (a.address.toLowerCase() === selectedFrom?.address.toLowerCase()) return false;
+                    // Check if this asset's symbol has a compatible vault
+                    const normalizedSymbol = a.symbol.toLowerCase();
+                    return !!eulerTargetVaults[normalizedSymbol];
+                })
+                .map(a => a as SwapAsset);
+        }
         return availableAssets.filter(a => a.address.toLowerCase() !== selectedFrom?.address.toLowerCase()) as SwapAsset[];
-    }, [isMorpho, morphoTargetMarkets, availableAssets, selectedFrom]);
+    }, [isMorpho, morphoTargetMarkets, availableAssets, selectedFrom, isEuler, eulerTargetVaults]);
 
     // Sync selectedMorphoMarket when user selects a "to" asset
     useEffect(() => {
@@ -560,6 +600,28 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             setSelectedMorphoMarket(matchingMarket);
         }
     }, [isMorpho, selectedTo, morphoTargetMarkets, selectedMorphoMarket]);
+
+    // Euler: Encode contexts for instructions
+    // Old context: withdraw from current collateral vault
+    const oldEulerContextEncoded = useMemo(() => {
+        if (!isEuler || !eulerBorrowVault || !eulerCollateralVault) return undefined;
+        return encodeEulerContext({
+            borrowVault: eulerBorrowVault as Address,
+            collateralVault: eulerCollateralVault as Address,
+        });
+    }, [isEuler, eulerBorrowVault, eulerCollateralVault]);
+
+    // New context: deposit to target collateral vault (determined by selectedTo)
+    const newEulerContextEncoded = useMemo(() => {
+        if (!isEuler || !eulerBorrowVault || !selectedTo) return undefined;
+        const normalizedSymbol = selectedTo.symbol.toLowerCase();
+        const targetVault = eulerTargetVaults[normalizedSymbol];
+        if (!targetVault) return undefined;
+        return encodeEulerContext({
+            borrowVault: eulerBorrowVault as Address,
+            collateralVault: targetVault.vaultAddress as Address,
+        });
+    }, [isEuler, eulerBorrowVault, selectedTo, eulerTargetVaults]);
 
     // Auto-switch to Pendle when a PT token is involved in the swap
     useEffect(() => {
@@ -622,11 +684,12 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     });
 
     // Unified quote data
-    // Include Morpho markets loading for Morpho protocol
+    // Include Morpho markets loading for Morpho protocol, Euler vaults loading for Euler
     const isQuoteLoading = (executionType === "limit"
         ? isCowQuoteLoading
         : (swapRouter === "1inch" ? is1inchLoading : isPendleLoading))
-        || (isMorpho && isMorphoMarketsLoading);
+        || (isMorpho && isMorphoMarketsLoading)
+        || (isEuler && isEulerVaultsLoading);
     const quoteError = swapRouter === "1inch" ? oneInchError : pendleError;
     
     // Get best quote from available sources (for limit orders, use CoW quote)
@@ -850,6 +913,77 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         }
 
         // ========================================================================
+        // EULER: Different contexts for old vs new collateral vaults
+        // ========================================================================
+        if (isEuler && oldEulerContextEncoded && newEulerContextEncoded) {
+            console.log("[buildCowInstructions] Euler collateral swap:", {
+                sellToken: selectedFrom.symbol,
+                buyToken: selectedTo.symbol,
+                chunkWithdrawAmount: formatUnits(chunkWithdrawAmount, selectedFrom.decimals),
+                flow: "swap[0] -> approve[1] -> deposit(NEW_VAULT) -> withdraw(OLD_VAULT)[2]",
+            });
+
+            return Array(numChunks).fill(null).map(() => {
+                /**
+                 * Euler Collateral Swap (Limit Order):
+                 *
+                 * UTXO Layout (OrderManager prepends ToOutput for swap result):
+                 * [0] = swap output (new collateral, from OrderManager ToOutput prepend)
+                 * [1] Approve(0, euler) -> dummy
+                 *     DepositCollateral(input=0, NEW_VAULT_CONTEXT) -> NO OUTPUT
+                 * [2] WithdrawCollateral(OLD_VAULT_CONTEXT) -> withdrawn collateral
+                 * [N] PushToken(2, borrower) -> repay flash loan (appended by hook)
+                 */
+                const postInstructions: ProtocolInstruction[] = [
+                    // 1. Approve new collateral for deposit -> [1]
+                    createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+
+                    // 2. Deposit new collateral into NEW vault -> NO OUTPUT
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.DepositCollateral, selectedTo.address, userAddress, 0n, newEulerContextEncoded, 0)
+                    ),
+
+                    // 3. Withdraw old collateral from OLD vault -> [2]
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, chunkWithdrawAmount, oldEulerContextEncoded, 999)
+                    ),
+                ];
+
+                // For isMax: Add dust clearing instructions
+                if (isMax) {
+                    // [3] GetSupplyBalance(oldCollateral, OLD_VAULT) -> UTXO[3]
+                    postInstructions.push(
+                        createProtocolInstruction(
+                            normalizedProtocol,
+                            encodeLendingInstruction(LendingOp.GetSupplyBalance, selectedFrom.address, userAddress, 0n, oldEulerContextEncoded, 999)
+                        )
+                    );
+
+                    // [4] WithdrawCollateral(oldCollateral, input=3, OLD_VAULT) -> UTXO[4]
+                    postInstructions.push(
+                        createProtocolInstruction(
+                            normalizedProtocol,
+                            encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, oldEulerContextEncoded, 3)
+                        )
+                    );
+
+                    // [5] PushToken(4, userAddress) -> send dust to user
+                    postInstructions.push(
+                        createRouterInstruction(encodePushToken(4, userAddress))
+                    );
+                }
+
+                return {
+                    preInstructions: [],
+                    postInstructions,
+                    flashLoanRepaymentUtxoIndex: 2, // [2] = Withdraw output (for flash loan repay)
+                };
+            });
+        }
+
+        // ========================================================================
         // Standard flow (Aave, Compound, Venus) - shared pool model
         // ========================================================================
         console.log("[buildCowInstructions] Collateral swap (KIND_SELL):", {
@@ -927,7 +1061,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 // ensuring the second WithdrawCollateral gets proper authorization for dust.
             };
         });
-    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, numChunks, isMax, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, debtTokenAddress, morphoContext, newMorphoContext]);
+    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, numChunks, isMax, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, debtTokenAddress, morphoContext, newMorphoContext, isEuler, oldEulerContextEncoded, newEulerContextEncoded]);
 
     const buildFlow = () => {
         if (!selectedFrom || !selectedTo || !userAddress) return [];
@@ -1051,6 +1185,80 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 createProtocolInstruction(
                     "morpho-blue",
                     encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, withdrawAmount, oldMorphoContextEncoded, 999)
+                )
+            );
+
+            return instructions;
+        }
+
+        // ========================================================================
+        // EULER: Different contexts for old vs new collateral vaults
+        // ========================================================================
+        if (isEuler && oldEulerContextEncoded && newEulerContextEncoded) {
+            const minAmountOutBigInt = BigInt(minOut);
+            const swapContext = encodeAbiParameters(
+                [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+                [selectedTo.address as Address, minAmountOutBigInt, swapData as `0x${string}`]
+            );
+
+            /**
+             * Euler Collateral Swap (Market Order):
+             *
+             * UTXO Layout:
+             * 0. ToOutput(amountIn, oldColl) -> [0]
+             * 1. FlashLoan(provider, input=0) -> [1] (flash loaned tokens)
+             * 2. Approve(1, swap) -> [2] (dummy)
+             * 3. Swap(oldColl -> newColl, input=1) -> [3] newColl, [4] refund
+             * 4. Approve(3, euler) -> [5] (dummy)
+             * 5. DepositCollateral(newColl, input=3, NEW_VAULT) -> NO OUTPUT
+             * 6. WithdrawCollateral(oldColl, amount, OLD_VAULT) -> [6]
+             * [Implicit: Router uses [6] to repay flash loan]
+             */
+            const instructions: ProtocolInstruction[] = [];
+
+            // 0. Create UTXO for flash loan amount reference -> [0]
+            instructions.push(
+                createRouterInstruction(encodeToOutput(amountInBigInt, selectedFrom.address))
+            );
+
+            // 1. Flash Loan old collateral (references [0]) -> [1]
+            instructions.push(
+                createRouterInstruction(encodeFlashLoan(providerEnum, 0))
+            );
+
+            // 2. Approve swap protocol for old collateral ([1]) -> [2]
+            instructions.push(
+                createRouterInstruction(encodeApprove(1, swapProtocol))
+            );
+
+            // 3. Swap old -> new collateral (input=1) -> [3] newColl, [4] refund
+            instructions.push(
+                createProtocolInstruction(
+                    swapProtocol,
+                    encodeLendingInstruction(LendingOp.Swap, selectedFrom.address, userAddress, 0n, swapContext, 1)
+                )
+            );
+
+            // 4. Approve Euler for new collateral ([3]) -> [5]
+            instructions.push(
+                createRouterInstruction(encodeApprove(3, "euler"))
+            );
+
+            // 5. Deposit new collateral to NEW vault (input=3) -> NO OUTPUT
+            instructions.push(
+                createProtocolInstruction(
+                    "euler",
+                    encodeLendingInstruction(LendingOp.DepositCollateral, selectedTo.address, userAddress, 0n, newEulerContextEncoded, 3)
+                )
+            );
+
+            // 6. Withdraw old collateral from OLD vault -> [6]
+            // Use amountInBigInt + small buffer for flash loan fee (if any)
+            const withdrawAmount = amountInBigInt + (amountInBigInt / 1000n); // 0.1% buffer
+            instructions.push(
+                createProtocolInstruction(
+                    "euler",
+                    encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, withdrawAmount, oldEulerContextEncoded, 999)
                 )
             );
 

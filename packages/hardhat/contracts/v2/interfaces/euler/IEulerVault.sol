@@ -83,6 +83,60 @@ interface IEulerVault {
     /// @notice Interest accumulator for debt calculation
     function interestAccumulator() external view returns (uint256);
 
+    // ============ LTV Configuration ============
+
+    /// @notice Get the borrow LTV for a collateral (max LTV for new borrows)
+    /// @param collateral The collateral vault address
+    /// @return Borrow LTV in 1e4 scale (8000 = 80%)
+    function LTVBorrow(address collateral) external view returns (uint16);
+
+    /// @notice Get the liquidation LTV for a collateral (LLTV threshold)
+    /// @param collateral The collateral vault address
+    /// @return Liquidation LTV in 1e4 scale (9000 = 90%)
+    function LTVLiquidation(address collateral) external view returns (uint16);
+
+    /// @notice Get full LTV configuration including ramping parameters
+    /// @param collateral The collateral vault address
+    /// @return borrowLTV The borrow LTV
+    /// @return liquidationLTV The current liquidation LTV
+    /// @return initialLiquidationLTV The initial liquidation LTV before ramping
+    /// @return targetTimestamp When ramping completes
+    /// @return rampDuration Duration of the ramp
+    function LTVFull(address collateral) external view returns (
+        uint16 borrowLTV,
+        uint16 liquidationLTV,
+        uint16 initialLiquidationLTV,
+        uint48 targetTimestamp,
+        uint32 rampDuration
+    );
+
+    /// @notice Get list of all collaterals with configured LTVs
+    /// @return Array of collateral vault addresses
+    function LTVList() external view returns (address[] memory);
+
+    // ============ Account Liquidity ============
+
+    /// @notice Get account liquidity (health check)
+    /// @param account The account to check
+    /// @param liquidation If true, use liquidation LTV; if false, use borrow LTV
+    /// @return collateralValue Total collateral value in unit of account
+    /// @return liabilityValue Total liability value in unit of account
+    function accountLiquidity(address account, bool liquidation)
+        external view returns (uint256 collateralValue, uint256 liabilityValue);
+
+    /// @notice Get detailed account liquidity per collateral
+    /// @param account The account to check
+    /// @param liquidation If true, use liquidation LTV; if false, use borrow LTV
+    /// @return collaterals Array of collateral addresses
+    /// @return collateralValues Array of collateral values
+    /// @return liabilityValue Total liability value
+    function accountLiquidityFull(address account, bool liquidation)
+        external view returns (
+            address[] memory collaterals,
+            uint256[] memory collateralValues,
+            uint256 liabilityValue
+        );
+
     // ============ Vault Info ============
 
     /// @notice Name of the vault token
