@@ -1,7 +1,65 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useReadContracts } from "wagmi";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import type {
+  EulerVaultInfo,
+  EulerCollateralPosition,
+  EulerPositionGroup,
+} from "~~/app/api/euler/[chainId]/positions/route";
+
+// Euler vault ABI for balance queries
+const EULER_VAULT_ABI = [
+  {
+    name: "balanceOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "debtOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "convertToAssets",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "asset",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
+
+// Re-export API types for convenience
+export type { EulerVaultInfo, EulerCollateralPosition, EulerPositionGroup };
+
+// Enriched types with balance data
+export interface EulerCollateralWithBalance extends EulerCollateralPosition {
+  balance: bigint; // Supply balance (shares)
+}
+
+export interface EulerDebtWithBalance {
+  vault: EulerVaultInfo;
+  balance: bigint; // Debt balance
+}
+
+export interface EulerPositionGroupWithBalances {
+  subAccount: string;
+  isMainAccount: boolean;
+  debt: EulerDebtWithBalance | null;
+  collaterals: EulerCollateralWithBalance[];
+}
 
 // ============ Types ============
 
@@ -113,23 +171,31 @@ async function fetchEulerVaults(chainId: number, search?: string): Promise<Euler
   }
 }
 
+interface PositionsApiResponse {
+  positions: EulerPosition[];
+  positionGroups: EulerPositionGroup[];
+}
+
 async function fetchEulerPositions(
   chainId: number,
   userAddress: string
-): Promise<EulerPosition[]> {
+): Promise<PositionsApiResponse> {
   try {
     const response = await fetch(
       `/api/euler/${chainId}/positions?user=${userAddress}`
     );
     if (!response.ok) {
       console.error(`[useEulerLendingPositions] Positions API error: ${response.status}`);
-      return [];
+      return { positions: [], positionGroups: [] };
     }
     const data = await response.json();
-    return data?.positions || [];
+    return {
+      positions: data?.positions || [],
+      positionGroups: data?.positionGroups || [],
+    };
   } catch (error) {
     console.error("[useEulerLendingPositions] Failed to fetch positions:", error);
-    return [];
+    return { positions: [], positionGroups: [] };
   }
 }
 
@@ -138,8 +204,12 @@ async function fetchEulerPositions(
 interface UseEulerLendingPositionsResult {
   // All vaults available on this chain
   vaults: EulerVault[];
-  // User positions as rows
+  // User positions as rows (legacy format)
   rows: EulerPositionRow[];
+  // Grouped positions (1 debt + N collaterals per sub-account)
+  positionGroups: EulerPositionGroup[];
+  // Enriched grouped positions with on-chain balance data
+  enrichedPositionGroups: EulerPositionGroupWithBalances[];
   // Positions with supply (for supply display)
   suppliedPositions: ProtocolPosition[];
   // Positions with debt (for borrow display)
@@ -182,7 +252,7 @@ export function useEulerLendingPositions(
 
   // Fetch user positions
   const {
-    data: positions = [],
+    data: positionsData,
     isLoading: isLoadingPositions,
     isFetching: isFetchingPositions,
     error: positionsError,
@@ -207,8 +277,113 @@ export function useEulerLendingPositions(
     setHasLoadedOnce(false);
   }, [userAddress, chainId]);
 
-  // Build position rows
+  // Extract position groups from API response
+  const positionGroups = positionsData?.positionGroups ?? [];
+
+  // Get vault addresses for on-chain balance queries
+  const vaultAddresses = useMemo(() => {
+    const positions = positionsData?.positions ?? [];
+    return positions
+      .filter((pos) => pos.supplyShares !== "0" || pos.borrowShares !== "0")
+      .map((pos) => pos.vault.address as `0x${string}`);
+  }, [positionsData]);
+
+  // Build multicall contracts for balance queries
+  // For each vault: balanceOf(user), debtOf(user)
+  const balanceContracts = useMemo(() => {
+    if (!userAddress || vaultAddresses.length === 0) return [];
+
+    const contracts: Array<{
+      address: `0x${string}`;
+      abi: typeof EULER_VAULT_ABI;
+      functionName: "balanceOf" | "debtOf";
+      args: [`0x${string}`];
+      chainId: number;
+    }> = [];
+
+    for (const vaultAddr of vaultAddresses) {
+      // balanceOf - returns shares
+      contracts.push({
+        address: vaultAddr,
+        abi: EULER_VAULT_ABI,
+        functionName: "balanceOf",
+        args: [userAddress as `0x${string}`],
+        chainId,
+      });
+      // debtOf - returns debt in asset units
+      contracts.push({
+        address: vaultAddr,
+        abi: EULER_VAULT_ABI,
+        functionName: "debtOf",
+        args: [userAddress as `0x${string}`],
+        chainId,
+      });
+    }
+
+    return contracts;
+  }, [userAddress, vaultAddresses, chainId]);
+
+  // Fetch on-chain balances
+  const { data: balanceResults } = useReadContracts({
+    contracts: balanceContracts,
+    query: {
+      enabled: balanceContracts.length > 0,
+      staleTime: 30_000,
+    },
+  });
+
+  // Parse balance results into a map: vaultAddress -> { shares, debt }
+  const balanceMap = useMemo(() => {
+    const map = new Map<string, { shares: bigint; debt: bigint }>();
+    if (!balanceResults || balanceResults.length === 0) return map;
+
+    for (let i = 0; i < vaultAddresses.length; i++) {
+      const sharesResult = balanceResults[i * 2];
+      const debtResult = balanceResults[i * 2 + 1];
+
+      const shares = sharesResult?.status === "success" ? (sharesResult.result as bigint) : 0n;
+      const debt = debtResult?.status === "success" ? (debtResult.result as bigint) : 0n;
+
+      map.set(vaultAddresses[i].toLowerCase(), { shares, debt });
+    }
+
+    return map;
+  }, [balanceResults, vaultAddresses]);
+
+  // Enrich position groups with on-chain balance data
+  const enrichedPositionGroups = useMemo<EulerPositionGroupWithBalances[]>(() => {
+    if (!positionGroups.length) return [];
+
+    return positionGroups.map((group): EulerPositionGroupWithBalances => {
+      // Enrich collaterals with balance data
+      const enrichedCollaterals: EulerCollateralWithBalance[] = group.collaterals.map((col) => {
+        const balanceData = balanceMap.get(col.vault.address.toLowerCase());
+        return {
+          ...col,
+          balance: balanceData?.shares ?? 0n,
+        };
+      });
+
+      // Enrich debt with balance data
+      const enrichedDebt: EulerDebtWithBalance | null = group.debt
+        ? {
+            vault: group.debt.vault,
+            balance: balanceMap.get(group.debt.vault.address.toLowerCase())?.debt ?? 0n,
+          }
+        : null;
+
+      return {
+        subAccount: group.subAccount,
+        isMainAccount: group.isMainAccount,
+        debt: enrichedDebt,
+        collaterals: enrichedCollaterals,
+      };
+    });
+  }, [positionGroups, balanceMap]);
+
+  // Build position rows with on-chain balances
   const rows = useMemo<EulerPositionRow[]>(() => {
+    const positions = positionsData?.positions ?? [];
     if (!positions.length) return [];
 
     return positions
@@ -217,10 +392,12 @@ export function useEulerLendingPositions(
         const vault = pos.vault;
         const decimals = vault.asset.decimals;
 
-        // For now, use placeholder balances (subgraph returns shares, not assets)
-        // In production, you'd convert shares to assets using vault's exchange rate
-        const supplyBalance = BigInt(pos.supplyShares);
-        const borrowBalance = BigInt(pos.borrowShares);
+        // Get on-chain balances (shares for supply, debt for borrow)
+        const onChainData = balanceMap.get(vault.address.toLowerCase());
+        // For supply, shares ARE the balance (ERC4626 vault shares)
+        // We'd need convertToAssets to get actual asset amount, but shares work for display
+        const supplyBalance = onChainData?.shares ?? 0n;
+        const borrowBalance = onChainData?.debt ?? 0n;
 
         // Placeholder USD values (would need price feed integration)
         const supplyBalanceUsd = 0;
@@ -241,45 +418,55 @@ export function useEulerLendingPositions(
           borrowBalance,
           borrowBalanceUsd,
           borrowDecimals: decimals,
-          supplyApy: vault.supplyApy * 100,
-          borrowApy: vault.borrowApy * 100,
+          supplyApy: (vault.supplyApy ?? 0) * 100,
+          borrowApy: (vault.borrowApy ?? 0) * 100,
           hasSupply: supplyBalance > 0n,
           hasDebt: borrowBalance > 0n,
         };
       });
-  }, [positions]);
+  }, [positionsData, balanceMap]);
 
   // Convert to ProtocolPosition format for compatibility
   const suppliedPositions = useMemo<ProtocolPosition[]>(() => {
     return rows
       .filter((r) => r.hasSupply)
-      .map((row) => ({
-        icon: tokenNameToLogo(row.assetSymbol.toLowerCase()),
-        name: row.assetSymbol,
-        balance: row.supplyBalanceUsd,
-        tokenBalance: row.supplyBalance,
-        currentRate: row.supplyApy,
-        tokenAddress: row.vault.asset.address,
-        tokenDecimals: row.supplyDecimals,
-        tokenPrice: 0n, // Would need price feed
-        tokenSymbol: row.assetSymbol,
-      }));
+      .map((row) => {
+        // Handle unknown symbols - use "default" for logo lookup
+        const symbol = row.assetSymbol === "???" ? "unknown" : row.assetSymbol;
+        const icon = symbol === "unknown" ? "/logos/default.svg" : tokenNameToLogo(symbol.toLowerCase());
+        return {
+          icon,
+          name: symbol,
+          balance: row.supplyBalanceUsd ?? 0,
+          tokenBalance: row.supplyBalance,
+          currentRate: row.supplyApy ?? 0,
+          tokenAddress: row.vault.asset.address,
+          tokenDecimals: row.supplyDecimals,
+          tokenPrice: 0n, // Would need price feed
+          tokenSymbol: symbol,
+        };
+      });
   }, [rows]);
 
   const borrowedPositions = useMemo<ProtocolPosition[]>(() => {
     return rows
       .filter((r) => r.hasDebt)
-      .map((row) => ({
-        icon: tokenNameToLogo(row.assetSymbol.toLowerCase()),
-        name: row.assetSymbol,
-        balance: row.borrowBalanceUsd,
-        tokenBalance: row.borrowBalance,
-        currentRate: row.borrowApy,
-        tokenAddress: row.vault.asset.address,
-        tokenDecimals: row.borrowDecimals,
-        tokenPrice: 0n, // Would need price feed
-        tokenSymbol: row.assetSymbol,
-      }));
+      .map((row) => {
+        // Handle unknown symbols - use "default" for logo lookup
+        const symbol = row.assetSymbol === "???" ? "unknown" : row.assetSymbol;
+        const icon = symbol === "unknown" ? "/logos/default.svg" : tokenNameToLogo(symbol.toLowerCase());
+        return {
+          icon,
+          name: symbol,
+          balance: row.borrowBalanceUsd ?? 0,
+          tokenBalance: row.borrowBalance,
+          currentRate: row.borrowApy ?? 0,
+          tokenAddress: row.vault.asset.address,
+          tokenDecimals: row.borrowDecimals,
+          tokenPrice: 0n, // Would need price feed
+          tokenSymbol: symbol,
+        };
+      });
   }, [rows]);
 
   const isUpdating =
@@ -289,6 +476,8 @@ export function useEulerLendingPositions(
   return {
     vaults,
     rows,
+    positionGroups,
+    enrichedPositionGroups,
     suppliedPositions,
     borrowedPositions,
     isLoadingVaults,

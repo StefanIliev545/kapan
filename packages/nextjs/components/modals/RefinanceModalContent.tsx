@@ -335,6 +335,10 @@ export type RefinanceModalContentProps = {
   morphoSupportedCollaterals?: Record<string, boolean>;
   isLoadingMorphoMarkets?: boolean;
   chainId?: number;
+
+  // Euler-specific props (EVM only)
+  isEulerSelected?: boolean;
+  eulerSupportedCollaterals?: Record<string, boolean>;
 };
 
 export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
@@ -406,14 +410,19 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
   morphoSupportedCollaterals,
   isLoadingMorphoMarkets,
   chainId,
+  // Euler-specific props
+  isEulerSelected,
+  eulerSupportedCollaterals,
 }) => {
   const addrKey = (a?: string) => (a ?? "").toLowerCase();
 
   // Determine effective supported collateral map
-  // When Morpho is selected, use morphoSupportedCollaterals instead
+  // When Morpho or Euler is selected, use their respective support maps
   const effectiveCollateralSupport = isMorphoSelected && morphoSupportedCollaterals
     ? morphoSupportedCollaterals
-    : effectiveSupportedMap;
+    : isEulerSelected && eulerSupportedCollaterals
+      ? eulerSupportedCollaterals
+      : effectiveSupportedMap;
 
   // Motion animation constants
   const motionInitial = useMemo(() => ({ opacity: 0, x: -12 }), []);

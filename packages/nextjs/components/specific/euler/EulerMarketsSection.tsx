@@ -10,7 +10,6 @@ import {
   Card,
   Flex,
   IconButton,
-  Inset,
   ScrollArea,
   Spinner,
   Text,
@@ -33,6 +32,7 @@ import {
 import type { EulerVault, EulerCollateralInfo } from "~~/hooks/useEulerLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
+import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { useModal } from "~~/hooks/useModal";
 import { DepositModal } from "~~/components/modals/DepositModal";
 import { useAccount } from "wagmi";
@@ -507,10 +507,9 @@ function MobileVaultRow({ row, usd, chainId, onSupply }: MobileVaultRowProps) {
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleStopPropagation}
-              className="hover:text-primary truncate text-sm font-medium transition-colors"
-              title={row.vault.name}
+              className="hover:text-primary truncate transition-colors"
             >
-              {row.vault.name}
+              <TokenSymbolDisplay symbol={row.assetSymbol} size="sm" variant="inline" />
             </a>
             <a
               href={eulerUrl}
@@ -522,7 +521,7 @@ function MobileVaultRow({ row, usd, chainId, onSupply }: MobileVaultRowProps) {
               <ExternalLink className="size-3" />
             </a>
           </div>
-          <span className="text-base-content/60 text-xs">{row.assetSymbol}</span>
+          <span className="text-base-content/50 truncate text-[10px]">{row.vault.symbol}</span>
         </div>
 
         {/* Stats */}
@@ -687,12 +686,14 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                 href={eulerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-primary group/link flex items-center gap-1 font-medium transition-colors"
+                className="hover:text-primary group/link flex items-center gap-1 transition-colors"
               >
-                {row.vault.name}
+                <TokenSymbolDisplay symbol={row.assetSymbol} size="sm" variant="inline" />
                 <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
               </a>
-              <span className="text-base-content/60 text-xs">{row.assetSymbol}</span>
+              <span className="text-base-content/50 max-w-[180px] truncate text-[10px]" title={row.vault.name}>
+                {row.vault.symbol}
+              </span>
             </div>
           </div>
         );
@@ -973,82 +974,78 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
 
           {/* Desktop: Table layout */}
           <div className="hidden md:block">
-            <Card size="2">
-              <Inset side="x" my="3">
-                <ScrollArea scrollbars="horizontal" type="auto">
-                  <Box px="3" pb="3">
-                    <table className="w-full text-sm">
-                      <thead>
-                        {table.getHeaderGroups().map(headerGroup => (
-                          <tr key={headerGroup.id} className="text-base-content/70 border-base-300 border-b text-xs">
-                            {headerGroup.headers.map(header => {
-                              const canSort = header.column.getCanSort();
-                              const columnId = header.column.id;
-                              // Custom styles per column
-                              const isMarket = columnId === "market";
-                              const isCollaterals = columnId === "collaterals";
-                              const isUtil = columnId === "util";
-                              const isActions = columnId === "actions";
+            <ScrollArea scrollbars="horizontal" type="auto">
+              <table className="w-full text-sm">
+                <thead>
+                  {table.getHeaderGroups().map(headerGroup => (
+                    <tr key={headerGroup.id}>
+                      {headerGroup.headers.map(header => {
+                        const canSort = header.column.getCanSort();
+                        const columnId = header.column.id;
+                        const isMarket = columnId === "market";
+                        const isCollaterals = columnId === "collaterals";
+                        const isUtil = columnId === "util";
+                        const isActions = columnId === "actions";
 
-                              return (
-                                <th
-                                  key={header.id}
-                                  className={`py-2.5 font-medium ${
-                                    isMarket ? "pl-3 text-left" :
-                                    isCollaterals ? "px-3 text-left" :
-                                    isUtil ? "w-16 text-center" :
-                                    isActions ? "w-24" :
-                                    "pr-4 text-right"
-                                  } ${canSort ? "hover:text-base-content cursor-pointer" : ""}`}
-                                  onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
-                                >
-                                  {!header.isPlaceholder && (
-                                    <span className={`inline-flex items-center gap-0.5 ${isSorted(columnId) ? "text-primary" : ""}`}>
-                                      {flexRender(header.column.columnDef.header, header.getContext())}
-                                      {getSortIcon(columnId)}
-                                    </span>
-                                  )}
-                                </th>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </thead>
-                      <tbody>
-                        {rows.map(row => (
-                          <tr key={row.id} className="border-base-300/50 hover:bg-base-200/30 border-b transition-colors">
-                            {row.getVisibleCells().map(cell => {
-                              const columnId = cell.column.id;
-                              const isMarket = columnId === "market";
-                              const isCollaterals = columnId === "collaterals";
-                              const isUtil = columnId === "util";
-                              const isEarn = columnId === "supplyApy01";
-                              const isActions = columnId === "actions";
+                        return (
+                          <th
+                            key={header.id}
+                            className={`label-text-xs pb-2 ${
+                              isMarket ? "text-left" :
+                              isCollaterals ? "px-3 text-left" :
+                              isUtil ? "w-20 text-center" :
+                              isActions ? "w-28" :
+                              "text-right"
+                            } ${canSort ? "cursor-pointer transition-colors hover:text-base-content/60" : ""}`}
+                            onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                          >
+                            {!header.isPlaceholder && (
+                              <span className={`inline-flex items-center gap-1 ${isSorted(columnId) ? "text-primary" : ""}`}>
+                                {flexRender(header.column.columnDef.header, header.getContext())}
+                                {getSortIcon(columnId)}
+                              </span>
+                            )}
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {rows.map(row => (
+                    <tr
+                      key={row.id}
+                      className="group"
+                    >
+                      {row.getVisibleCells().map(cell => {
+                        const columnId = cell.column.id;
+                        const isMarket = columnId === "market";
+                        const isCollaterals = columnId === "collaterals";
+                        const isUtil = columnId === "util";
+                        const isEarn = columnId === "supplyApy01";
+                        const isActions = columnId === "actions";
 
-                              return (
-                                <td
-                                  key={cell.id}
-                                  className={`py-2.5 ${
-                                    isMarket ? "pl-3" :
-                                    isCollaterals ? "px-3" :
-                                    isUtil ? "text-center" :
-                                    isEarn ? "pr-4 text-right tabular-nums" :
-                                    isActions ? "pr-3 text-right" :
-                                    "pr-4 text-right tabular-nums"
-                                  }`}
-                                >
-                                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </Box>
-                </ScrollArea>
-              </Inset>
-            </Card>
+                        return (
+                          <td
+                            key={cell.id}
+                            className={`py-2.5 transition-colors group-hover:bg-base-200/30 ${
+                              isMarket ? "rounded-l-lg pl-3" :
+                              isCollaterals ? "px-3" :
+                              isUtil ? "text-center" :
+                              isEarn ? "text-right tabular-nums" :
+                              isActions ? "rounded-r-lg pr-3 text-right" :
+                              "text-right tabular-nums"
+                            }`}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </ScrollArea>
           </div>
         </>
       )}

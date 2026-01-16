@@ -405,10 +405,10 @@ export const useKapanRouterV2 = () => {
     const amountBigInt = parseUnits(amount, decimals);
     const isCompound = normalizedProtocol === "compound";
     const isMorpho = normalizedProtocol === "morpho-blue";
-    // Morpho uses DepositCollateral for collateral deposits (which is what we do when there's a position with debt)
-    // Compound also uses DepositCollateral
+    const isEuler = normalizedProtocol === "euler";
+    // Morpho, Compound, and Euler use DepositCollateral for collateral deposits
     // Other protocols use Deposit
-    const lendingOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    const lendingOp = (isCompound || isMorpho || isEuler) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
     return [
       createRouterInstruction(encodePullToken(amountBigInt, tokenAddress, userAddress)),
@@ -1869,9 +1869,9 @@ export const useKapanRouterV2 = () => {
         addRouter(encodeApprove(utxoIndexForWithdraw, to) as `0x${string}`, true);
         
         // Deposit collateral to destination protocol
-        // For Morpho Blue, use DepositCollateral (supplies collateral for borrowing)
+        // For Morpho Blue and Euler V2, use DepositCollateral (supplies collateral for borrowing)
         // For other protocols, use Deposit (which handles collateral deposits)
-        const depositOp = to === "morpho-blue" ? LendingOp.DepositCollateral : LendingOp.Deposit;
+        const depositOp = (to === "morpho-blue" || to === "euler") ? LendingOp.DepositCollateral : LendingOp.Deposit;
         addProto(to, encodeLendingInstruction(depositOp, collateralToken, userAddress, 0n, toCtx, utxoIndexForWithdraw) as `0x${string}`, false);
       },
 

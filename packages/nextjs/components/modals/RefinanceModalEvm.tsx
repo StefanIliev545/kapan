@@ -17,7 +17,8 @@ import { useMovePositionState } from "~~/hooks/useMovePositionState";
 import { RefinanceModalContent } from "./RefinanceModalContent";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useMorphoMarketSupport } from "~~/hooks/useMorphoMarketSupport";
-import { encodeMorphoContext, type MorphoMarketContextForEncoding } from "~~/utils/v2/instructionHelpers";
+import { useEulerMarketSupport } from "~~/hooks/useEulerMarketSupport";
+import { encodeMorphoContext, encodeEulerContext, type MorphoMarketContextForEncoding, type EulerVaultContextForEncoding } from "~~/utils/v2/instructionHelpers";
 import {
   useMergedCollaterals,
   usePreselectedCollateralsEffect,
@@ -277,6 +278,94 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     return morphoMarketsByCollateral[selectedCollateralAddr] || [];
   }, [isMorphoSelected, addedCollaterals, morphoMarketsByCollateral]);
 
+  /* ---------------------- Euler vault support ---------------------- */
+  const isEulerSelected = selectedProtocol === "Euler V2";
+
+  // Get collateral symbols for Euler market matching
+  const collateralSymbols = useMemo(() =>
+    collateralAddresses.map(addr => {
+      const c = collaterals.find(col => addrKey(col.address) === addrKey(addr));
+      return c?.symbol || "";
+    }),
+    [collateralAddresses, collaterals]
+  );
+
+  const {
+    supportedCollaterals: eulerSupportedCollaterals,
+    vaultsByCollateral: eulerVaultsByCollateral,
+    isLoading: isLoadingEulerVaults,
+  } = useEulerMarketSupport({
+    chainId: chainId || 42161, // Default to Arbitrum
+    loanTokenAddress: position.tokenAddress,
+    collateralAddresses: collateralAddresses.map(a => a.toLowerCase()),
+    collateralSymbols,
+    enabled: isOpen && isEulerSelected && collateralAddresses.length > 0,
+  });
+
+  // Get vaults for the currently selected collateral (for Euler)
+  const eulerVaultsForSelectedCollateral = useMemo(() => {
+    if (!isEulerSelected) return [];
+    const selectedCollateralAddr = Object.keys(addedCollaterals)[0]?.toLowerCase();
+    if (!selectedCollateralAddr) return [];
+    return eulerVaultsByCollateral[selectedCollateralAddr] || [];
+  }, [isEulerSelected, addedCollaterals, eulerVaultsByCollateral]);
+
+  // State for selected Euler vault
+  const [selectedEulerVault, setSelectedEulerVault] = useState<string | null>(null);
+
+  // Auto-select first Euler vault when available
+  useEffect(() => {
+    if (!isEulerSelected || eulerVaultsForSelectedCollateral.length === 0) {
+      setSelectedEulerVault(null);
+      return;
+    }
+    // Auto-select best vault (lowest borrow APY - already sorted)
+    if (!selectedEulerVault || !eulerVaultsForSelectedCollateral.find(v => v.address === selectedEulerVault)) {
+      setSelectedEulerVault(eulerVaultsForSelectedCollateral[0]?.address || null);
+    }
+  }, [isEulerSelected, eulerVaultsForSelectedCollateral, selectedEulerVault]);
+
+  // Build Euler context for the selected vault
+  const eulerContext = useMemo((): EulerVaultContextForEncoding | undefined => {
+    if (!isEulerSelected || !selectedEulerVault) {
+      console.log("[Euler Context] Early return - isEulerSelected:", isEulerSelected, "selectedEulerVault:", selectedEulerVault);
+      return undefined;
+    }
+    const vault = eulerVaultsForSelectedCollateral.find(v => v.address === selectedEulerVault);
+    if (!vault) {
+      console.log("[Euler Context] Vault not found for address:", selectedEulerVault, "in", eulerVaultsForSelectedCollateral.map(v => v.address));
+      return undefined;
+    }
+
+    // Get the collateral vault address for the user's collateral
+    const selectedCollateralAddr = Object.keys(addedCollaterals)[0]?.toLowerCase();
+    const userCollateralSymbol = collaterals.find(c => addrKey(c.address) === selectedCollateralAddr)?.symbol;
+    if (!userCollateralSymbol) {
+      console.log("[Euler Context] No user collateral symbol found for addr:", selectedCollateralAddr);
+      return undefined;
+    }
+
+    // Find the matching collateral vault in the selected borrow vault
+    const normalizedSymbol = userCollateralSymbol.toLowerCase();
+    console.log("[Euler Context] Looking for collateral match - userSymbol:", userCollateralSymbol, "normalizedSymbol:", normalizedSymbol);
+    console.log("[Euler Context] Available vault collaterals:", vault.collaterals.map(c => ({ tokenSymbol: c.tokenSymbol, vaultAddress: c.vaultAddress })));
+
+    const collateralVault = vault.collaterals.find(c =>
+      c.tokenSymbol.toLowerCase() === normalizedSymbol ||
+      c.tokenSymbol.toLowerCase().replace('w', '') === normalizedSymbol.replace('w', '')
+    );
+    if (!collateralVault) {
+      console.log("[Euler Context] No matching collateral vault found");
+      return undefined;
+    }
+
+    console.log("[Euler Context] Found match - borrowVault:", vault.address, "collateralVault:", collateralVault.vaultAddress);
+    return {
+      borrowVault: vault.address,
+      collateralVault: collateralVault.vaultAddress,
+    };
+  }, [isEulerSelected, selectedEulerVault, eulerVaultsForSelectedCollateral, addedCollaterals, collaterals]);
+
   // Auto pick a destination once, based on support + balances
   useEffect(() => {
     if (!isOpen || autoSelectedDest) return;
@@ -520,16 +609,23 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   const isActionDisabled = useMemo(() => {
     if (!debtConfirmed || !selectedProtocol) return true;
     if (Object.keys(addedCollaterals).length === 0) return true;
-    
+
     // For Morpho, must have a market selected
     if (isMorphoSelected && !selectedMorphoMarket) return true;
-    
+
+    // For Euler, must have a vault selected with valid context
+    if (isEulerSelected && !eulerContext) return true;
+
     // Check collateral support based on protocol
-    const supportMap = isMorphoSelected ? morphoSupportedCollaterals : effectiveSupportedMap;
+    const supportMap = isMorphoSelected
+      ? morphoSupportedCollaterals
+      : isEulerSelected
+        ? eulerSupportedCollaterals
+        : effectiveSupportedMap;
     if (Object.keys(addedCollaterals).some(addr => supportMap?.[addrKey(addr)] === false)) return true;
-    
+
     return false;
-  }, [debtConfirmed, selectedProtocol, addedCollaterals, isMorphoSelected, selectedMorphoMarket, morphoSupportedCollaterals, effectiveSupportedMap]);
+  }, [debtConfirmed, selectedProtocol, addedCollaterals, isMorphoSelected, selectedMorphoMarket, morphoSupportedCollaterals, isEulerSelected, eulerContext, eulerSupportedCollaterals, effectiveSupportedMap]);
 
   const handleExecuteMove = useCallback(async () => {
     if (!debtConfirmed || !selectedProtocol) return;
@@ -573,10 +669,11 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         builder.setCompoundMarket(position.tokenAddress as Address);
       }
 
-      // Check if source is Morpho Blue (need to pass fromContext)
+      // Check if source protocol requires context (Morpho Blue, Euler)
       const isFromMorpho = normalizedFromProtocol === "morphoblue" || fromProtocol.toLowerCase().includes("morpho");
-      const sourceContext: `0x${string}` = (isFromMorpho && fromContext) 
-        ? fromContext as `0x${string}` 
+      const isFromEuler = normalizedFromProtocol === "euler" || fromProtocol.toLowerCase().includes("euler");
+      const sourceContext: `0x${string}` = ((isFromMorpho || isFromEuler) && fromContext)
+        ? fromContext as `0x${string}`
         : "0x";
 
       builder.buildUnlockDebt({
@@ -593,9 +690,29 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       });
 
       // Prepare Morpho context if destination is Morpho Blue
-      const morphoEncodedContext: `0x${string}` | undefined = isMorphoSelected && morphoContext 
+      const morphoEncodedContext: `0x${string}` | undefined = isMorphoSelected && morphoContext
         ? encodeMorphoContext(morphoContext as MorphoMarketContextForEncoding) as `0x${string}`
         : undefined;
+
+      // Prepare Euler context if destination is Euler V2
+      const eulerEncodedContext: `0x${string}` | undefined = isEulerSelected && eulerContext
+        ? encodeEulerContext(eulerContext) as `0x${string}`
+        : undefined;
+
+      // Debug logging for Euler context
+      if (isEulerSelected) {
+        console.log("[Euler Debug] isEulerSelected:", isEulerSelected);
+        console.log("[Euler Debug] eulerContext:", eulerContext);
+        console.log("[Euler Debug] eulerEncodedContext:", eulerEncodedContext);
+        console.log("[Euler Debug] selectedEulerVault:", selectedEulerVault);
+        console.log("[Euler Debug] eulerVaultsForSelectedCollateral:", eulerVaultsForSelectedCollateral);
+      }
+
+      // Use protocol-specific context for destination
+      const destinationContext: `0x${string}` = morphoEncodedContext || eulerEncodedContext || "0x";
+
+      console.log("[Euler Debug] destinationContext:", destinationContext);
+      console.log("[Euler Debug] selectedProtocol:", selectedProtocol);
 
       Object.entries(addedCollaterals).forEach(([addr, amt]) => {
         const meta = collaterals.find(c => addrKey(c.address) === addrKey(addr));
@@ -607,11 +724,10 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
           collateralToken: addr as Address,
           withdraw: isMax ? { max: true } : { amount: amt },
           collateralDecimals: meta.decimals,
-          // Pass source context when moving FROM Morpho Blue
+          // Pass source context when moving FROM Morpho Blue or Euler
           fromContext: sourceContext,
-          // Pass Morpho context when destination is Morpho Blue
-          // Note: For Morpho, we use DepositCollateral (not Deposit) which is handled by the gateway
-          toContext: morphoEncodedContext || "0x",
+          // Pass protocol-specific context when destination requires it (Morpho, Euler)
+          toContext: destinationContext,
         });
       });
 
@@ -622,11 +738,18 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         decimals: position.decimals,
         extraBps: 5,
         approveToRouter: true,
-        // Pass Morpho context for borrow when destination is Morpho Blue
-        toContext: morphoEncodedContext || "0x",
+        // Pass protocol-specific context for borrow
+        toContext: destinationContext,
       });
 
       const flow = builder.build();
+
+      // Debug: log the built instructions
+      console.log("[Euler Debug] Built flow instructions:", flow.length);
+      flow.forEach((inst, i) => {
+        console.log(`[Euler Debug] Instruction ${i}:`, inst.protocolName, inst.data?.slice(0, 66) + "...");
+      });
+
       const res = await executeFlowBatchedIfPossible(flow, preferBatching, { revokePermissions });
       batchingUsed = res?.kind === "batch";
       if (!res) {
@@ -683,6 +806,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     chainId,
     isMorphoSelected,
     selectedMorphoMarket,
+    isEulerSelected,
+    eulerContext,
     debtAmountBigInt,
     addedCollaterals,
     collaterals,
@@ -767,8 +892,11 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       selectedMorphoMarket={selectedMorphoMarket}
       onMorphoMarketSelect={onMorphoMarketSelect}
       morphoSupportedCollaterals={morphoSupportedCollaterals}
-      isLoadingMorphoMarkets={isLoadingMorphoMarkets}
+      isLoadingMorphoMarkets={isLoadingMorphoMarkets || isLoadingEulerVaults}
       chainId={chainId}
+      // Euler-specific props
+      isEulerSelected={isEulerSelected}
+      eulerSupportedCollaterals={eulerSupportedCollaterals}
     />
   );
 };

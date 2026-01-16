@@ -121,10 +121,16 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         uint256 amount,
         address user
     ) internal nonReentrant returns (uint256) {
-        // Clamp to available balance
-        uint256 maxWithdraw = IEulerVault(vault).maxWithdraw(user);
-        if (amount > maxWithdraw) {
-            amount = maxWithdraw;
+        // Get user's actual balance (shares converted to assets)
+        // Note: We don't use maxWithdraw() here because it considers health factor,
+        // but EVC batch uses deferred liquidity checks - the health check happens
+        // at the END of the batch, not during the withdrawal operation.
+        uint256 shares = IEulerVault(vault).balanceOf(user);
+        uint256 userBalance = IEulerVault(vault).convertToAssets(shares);
+
+        // Clamp to user's actual balance (can't withdraw more than they have)
+        if (amount > userBalance) {
+            amount = userBalance;
         }
 
         if (amount == 0) return 0;
@@ -134,6 +140,9 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
 
         // Use EVC batch to withdraw on behalf of user
         // Gateway must be authorized as operator via EVC
+        // The EVC batch uses deferred liquidity checks - health is validated
+        // at the end of the batch, allowing withdrawals that would fail
+        // if checked immediately (e.g., partial withdrawals with active debt)
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
         items[0] = IEVC.BatchItem({
             targetContract: vault,

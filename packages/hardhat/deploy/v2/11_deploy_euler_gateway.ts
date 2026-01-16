@@ -78,6 +78,7 @@ const deployEulerGateway: DeployFunction = async function (hre: HardhatRuntimeEn
   // ============ Register Gateway with Router ============
   await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["euler", eulerGatewayWrite.address], { waitConfirmations: 1 });
   console.log(`EulerGatewayWrite registered with KapanRouter as "euler"`);
+  // Gateway sync with AuthorizationHelper is handled by 99_sync_authorization_helper.ts to avoid nonce race conditions
 
   // No market registration needed - vaults are discovered via Euler's subgraph
   console.log(`✓ Euler V2 setup complete (vaults discovered via subgraph)`);

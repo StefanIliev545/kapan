@@ -78,7 +78,7 @@ export type UseMovePositionDataResult = {
   vesuPools?: VesuPoolsData;
 };
 
-import { isZeroLendSupported, isVenusSupported, isMorphoBlueSupported, isSparkSupported } from "~~/utils/chainFeatures";
+import { isZeroLendSupported, isVenusSupported, isMorphoBlueSupported, isSparkSupported, isEulerSupported } from "~~/utils/chainFeatures";
 import { getAvailableFlashLoanProviders, FlashLoanProvider, type FlashLoanProviderOption } from "~~/utils/flashLoan";
 
 export function useMovePositionData(params: MovePositionInput): UseMovePositionDataResult {
@@ -139,7 +139,10 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
       if (isVenusSupported(chainId)) {
         protocols.push({ name: "Venus", logo: getProtocolLogo("Venus") });
       }
-      
+      if (isEulerSupported(chainId)) {
+        protocols.push({ name: "Euler V2", logo: getProtocolLogo("Euler V2") });
+      }
+
       return protocols.filter(
         p => p.name.toLowerCase() !== fromProtocol.toLowerCase(),
       );

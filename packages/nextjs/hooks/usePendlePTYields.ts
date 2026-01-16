@@ -111,18 +111,136 @@ export function isPTToken(symbol: string): boolean {
 }
 
 /**
+ * Parsed PT token information
+ */
+export interface ParsedPTToken {
+  isPT: true;
+  originalSymbol: string;
+  /** Short display name without date, e.g., "PT-sUSDai" */
+  shortName: string;
+  /** The underlying token symbol, e.g., "sUSDai" */
+  baseToken: string;
+  /** Raw date string from symbol, e.g., "20NOV2025" */
+  rawMaturityDate: string | null;
+  /** Parsed maturity date if available */
+  maturityDate: Date | null;
+  /** Formatted maturity date string, e.g., "Nov 20, 2025" */
+  formattedMaturity: string | null;
+  /** Chain suffix if present, e.g., "ARB" from "(ARB)" */
+  chainSuffix: string | null;
+}
+
+export interface ParsedNonPTToken {
+  isPT: false;
+  originalSymbol: string;
+}
+
+export type ParsedToken = ParsedPTToken | ParsedNonPTToken;
+
+// Month name to number mapping
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+/**
+ * Parse a PT token symbol into its components
+ * e.g., "PT-sUSDai-20NOV2025-(ARB)" -> { shortName: "PT-sUSDai", baseToken: "sUSDai", maturityDate: Date, ... }
+ */
+export function parsePTToken(symbol: string): ParsedToken {
+  if (!isPTToken(symbol)) {
+    return { isPT: false, originalSymbol: symbol };
+  }
+
+  let workingSymbol = symbol;
+
+  // Extract chain suffix like "(ARB)", "(ETH)"
+  let chainSuffix: string | null = null;
+  const chainMatch = workingSymbol.match(/-?\(([A-Z]+)\)$/i);
+  if (chainMatch) {
+    chainSuffix = chainMatch[1].toUpperCase();
+    workingSymbol = workingSymbol.replace(/-?\([A-Z]+\)$/i, "");
+  }
+
+  // Extract date pattern: -DDMMMYYYY (e.g., -20NOV2025) or -1XXXXXXXXX (Unix timestamp)
+  let rawMaturityDate: string | null = null;
+  let maturityDate: Date | null = null;
+
+  const dateMatch = workingSymbol.match(/-(\d{1,2})([A-Z]{3})(\d{4})$/i);
+  if (dateMatch) {
+    const [, day, month, year] = dateMatch;
+    rawMaturityDate = `${day}${month.toUpperCase()}${year}`;
+
+    const monthNum = MONTH_MAP[month.toLowerCase()];
+    if (monthNum !== undefined) {
+      maturityDate = new Date(parseInt(year), monthNum, parseInt(day));
+    }
+    workingSymbol = workingSymbol.replace(/-\d{1,2}[A-Z]{3}\d{4}$/i, "");
+  } else {
+    // Try Unix timestamp pattern
+    const timestampMatch = workingSymbol.match(/-(\d{10})$/);
+    if (timestampMatch) {
+      const timestamp = parseInt(timestampMatch[1]) * 1000;
+      maturityDate = new Date(timestamp);
+      rawMaturityDate = timestampMatch[1];
+      workingSymbol = workingSymbol.replace(/-\d{10}$/, "");
+    }
+  }
+
+  // What remains is "PT-baseToken"
+  const shortName = workingSymbol;
+  const baseToken = workingSymbol.replace(/^pt[-\s]/i, "");
+
+  // Format the maturity date nicely
+  let formattedMaturity: string | null = null;
+  if (maturityDate && !isNaN(maturityDate.getTime())) {
+    formattedMaturity = maturityDate.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  return {
+    isPT: true,
+    originalSymbol: symbol,
+    shortName,
+    baseToken,
+    rawMaturityDate,
+    maturityDate,
+    formattedMaturity,
+    chainSuffix,
+  };
+}
+
+/**
+ * Get a compact display name for a PT token
+ * Returns just the short name (e.g., "PT-sUSDai") without the date
+ */
+export function getPTShortName(symbol: string): string {
+  const parsed = parsePTToken(symbol);
+  if (!parsed.isPT) return symbol;
+  return parsed.shortName;
+}
+
+/**
+ * Get the maturity info string for a PT token
+ * Returns formatted date or null if not a PT token
+ */
+export function getPTMaturityInfo(symbol: string): string | null {
+  const parsed = parsePTToken(symbol);
+  if (!parsed.isPT) return null;
+  return parsed.formattedMaturity;
+}
+
+/**
  * Extract the base token from a PT token name
  * e.g., "PT-USDe-15JAN2026" -> "usde"
  */
 export function extractPTBaseToken(symbol: string): string {
-  const lower = symbol.toLowerCase();
-  if (!lower.startsWith("pt-") && !lower.startsWith("pt ")) return "";
-  
-  // Remove "pt-" prefix
-  const withoutPrefix = lower.replace(/^pt[-\s]/, "");
-  // Remove date suffix (e.g., "-15jan2026")
-  const baseToken = withoutPrefix.replace(/-?\d{1,2}[a-z]{3}\d{4}$/i, "");
-  return baseToken.replace(/-$/, ""); // Remove trailing dash if any
+  const parsed = parsePTToken(symbol);
+  if (!parsed.isPT) return "";
+  return parsed.baseToken.toLowerCase();
 }
 
 /**

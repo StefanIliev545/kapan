@@ -11,7 +11,6 @@ import {
   Card,
   Flex,
   IconButton,
-  Inset,
   ScrollArea,
   Spinner,
   Text,
@@ -41,6 +40,7 @@ import { useAccount } from "wagmi";
 import { notification } from "~~/utils/scaffold-eth/notification";
 import { parseUnits } from "viem";
 import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
+import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { createTextChangeHandler } from "~~/utils/handlers";
 import {
   toNumberSafe,
@@ -461,7 +461,6 @@ interface MobileMarketRowProps {
     lltv01: number;
     impliedApy: number | null;
   };
-  pairName: string;
   usd: Intl.NumberFormat;
   chainId: number;
   onSupply: () => void;
@@ -479,14 +478,12 @@ interface MobileMarketRowItemProps {
 
 function MobileMarketRowItem({ row, usd, chainId, onSupply, onLoop }: MobileMarketRowItemProps) {
   const { market } = row;
-  const pairName = `${row.collateralSymbol}/${row.loanSymbol}`;
   const handleSupply = React.useCallback(() => onSupply(market), [market, onSupply]);
   const handleLoop = React.useCallback(() => onLoop(market), [market, onLoop]);
 
   return (
     <MobileMarketRow
       row={row}
-      pairName={pairName}
       usd={usd}
       chainId={chainId}
       onSupply={handleSupply}
@@ -495,7 +492,7 @@ function MobileMarketRowItem({ row, usd, chainId, onSupply, onLoop }: MobileMark
   );
 }
 
-function MobileMarketRow({ row, pairName, usd, chainId, onSupply, onLoop }: MobileMarketRowProps) {
+function MobileMarketRow({ row, usd, chainId, onSupply, onLoop }: MobileMarketRowProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const morphoUrl = getMorphoMarketUrl(chainId, row.market.uniqueKey, row.collateralSymbol, row.loanSymbol);
 
@@ -525,7 +522,9 @@ function MobileMarketRow({ row, pairName, usd, chainId, onSupply, onLoop }: Mobi
         <TokenPairAvatars collateralSymbol={row.collateralSymbol} loanSymbol={row.loanSymbol} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
-            <span className="truncate text-sm font-medium" title={pairName}>{pairName}</span>
+            <TokenSymbolDisplay symbol={row.collateralSymbol} size="xs" variant="inline" />
+            <span className="text-base-content/50 text-xs">/</span>
+            <span className="text-xs font-medium">{row.loanSymbol}</span>
             {morphoUrl && (
               <a
                 href={morphoUrl}
@@ -694,7 +693,6 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       cell: info => {
         const row = info.row.original;
         const morphoUrl = getMorphoMarketUrl(chainId, row.market.uniqueKey, row.collateralSymbol, row.loanSymbol);
-        const pairLabel = `${row.collateralSymbol}/${row.loanSymbol}`;
         return (
           <div className="flex items-center gap-2">
             <TokenPairAvatars collateralSymbol={row.collateralSymbol} loanSymbol={row.loanSymbol} />
@@ -704,13 +702,19 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                   href={morphoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-primary group/link flex items-center gap-1 font-medium transition-colors"
+                  className="hover:text-primary group/link flex items-center gap-1 transition-colors"
                 >
-                  {pairLabel}
+                  <TokenSymbolDisplay symbol={row.collateralSymbol} size="sm" variant="inline" />
+                  <span className="text-base-content/50">/</span>
+                  <span className="font-medium">{row.loanSymbol}</span>
                   <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
                 </a>
               ) : (
-                <span className="font-medium">{pairLabel}</span>
+                <span className="flex items-center gap-1">
+                  <TokenSymbolDisplay symbol={row.collateralSymbol} size="sm" variant="inline" />
+                  <span className="text-base-content/50">/</span>
+                  <span className="font-medium">{row.loanSymbol}</span>
+                </span>
               )}
               <span className="text-base-content/50 text-[10px]">LLTV {formatPercent(row.lltv01, 0)}</span>
             </div>
@@ -1061,59 +1065,61 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
 
           {/* Desktop: Table layout */}
           <div className="hidden md:block">
-          <Card size="2">
-            <Inset side="x" my="3">
-              <ScrollArea scrollbars="horizontal" type="auto">
-                <Box px="3" pb="3">
-                  <table className="w-full text-sm">
-                    <thead>
-                      {table.getHeaderGroups().map(headerGroup => (
-                        <tr key={headerGroup.id} className="text-base-content/70 border-base-300 border-b text-xs">
-                          {headerGroup.headers.map(header => (
-                            <th
-                              key={header.id}
-                              className={`py-2.5 font-medium ${
-                                header.id === "market" ? "pl-3 text-left" :
-                                header.id === "util" ? "w-16 text-center" :
-                                header.id === "actions" ? "w-28" :
-                                "pr-4 text-right"
-                              } ${header.column.getCanSort() ? "hover:text-base-content cursor-pointer" : ""}`}
-                              onClick={header.column.getToggleSortingHandler()}
-                            >
-                              <span className={`inline-flex items-center gap-0.5 ${header.column.getIsSorted() ? "text-primary" : ""}`}>
-                                {flexRender(header.column.columnDef.header, header.getContext())}
-                                {header.column.getIsSorted() === "desc" && <ChevronDown className="size-3" />}
-                                {header.column.getIsSorted() === "asc" && <ChevronUp className="size-3" />}
-                              </span>
-                            </th>
-                          ))}
-                        </tr>
+            <ScrollArea scrollbars="horizontal" type="auto">
+              <table className="w-full text-sm">
+                <thead>
+                  {table.getHeaderGroups().map(headerGroup => (
+                    <tr key={headerGroup.id}>
+                      {headerGroup.headers.map(header => (
+                        <th
+                          key={header.id}
+                          className={`label-text-xs pb-2 ${
+                            header.id === "market" ? "text-left" :
+                            header.id === "util" ? "w-20 text-center" :
+                            header.id === "actions" ? "w-28" :
+                            "text-right"
+                          } ${header.column.getCanSort() ? "cursor-pointer transition-colors hover:text-base-content/60" : ""}`}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          <span className={`inline-flex items-center gap-1 ${header.column.getIsSorted() ? "text-primary" : ""}`}>
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {header.column.getIsSorted() === "desc" && <ChevronDown className="size-3" />}
+                            {header.column.getIsSorted() === "asc" && <ChevronUp className="size-3" />}
+                          </span>
+                        </th>
                       ))}
-                    </thead>
-                    <tbody>
-                      {rows.map(row => (
-                        <tr key={row.id} className="border-base-300/50 hover:bg-base-200/30 border-b transition-colors">
-                          {row.getVisibleCells().map(cell => (
-                            <td
-                              key={cell.id}
-                              className={`py-2.5 ${
-                                cell.column.id === "market" ? "pl-3" :
-                                cell.column.id === "util" ? "text-center" :
-                                cell.column.id === "actions" ? "pr-3 text-right" :
-                                "pr-4 text-right tabular-nums"
-                              }`}
-                            >
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </Box>
-              </ScrollArea>
-            </Inset>
-          </Card>
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {rows.map(row => (
+                    <tr
+                      key={row.id}
+                      className="group"
+                    >
+                      {row.getVisibleCells().map((cell, idx, cells) => {
+                        const isFirst = idx === 0;
+                        const isLast = idx === cells.length - 1;
+
+                        return (
+                          <td
+                            key={cell.id}
+                            className={`py-2.5 transition-colors group-hover:bg-base-200/30 ${
+                              cell.column.id === "market" ? "pl-3" :
+                              cell.column.id === "util" ? "text-center" :
+                              cell.column.id === "actions" ? "pr-3 text-right" :
+                              "text-right tabular-nums"
+                            } ${isFirst ? "rounded-l-lg" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </ScrollArea>
           </div>
         </>
       )}

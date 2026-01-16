@@ -8,8 +8,15 @@ import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import {
   useEulerLendingPositions,
   useEulerVaults,
+  type EulerPositionGroupWithBalances,
 } from "~~/hooks/useEulerLendingPositions";
 import { EulerMarketsSection } from "./EulerMarketsSection";
+import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { SupplyPosition } from "~~/components/SupplyPosition";
+import { BorrowPosition } from "~~/components/BorrowPosition";
+import { LoadingSpinner } from "~~/components/common/Loading";
+import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
+import { useTokenPrices } from "~~/hooks/useTokenPrice";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useGlobalState } from "~~/services/store/store";
@@ -123,6 +130,145 @@ function formatApyValue(hasPositions: boolean, apyValue: number | null): string 
   return formatSignedPercent(apyValue);
 }
 
+/**
+ * Display a single position group (1 debt + N collaterals) side by side
+ * Uses SupplyPosition for collaterals (left) and BorrowPosition for debt (right)
+ */
+interface EulerPositionGroupRowProps {
+  group: EulerPositionGroupWithBalances;
+  chainId: number;
+  /** Map of lowercase symbol -> price in raw format (8 decimals) */
+  pricesRaw: Record<string, bigint>;
+}
+
+const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId, pricesRaw }) => {
+  const { debt, collaterals, isMainAccount } = group;
+
+  // Helper to get token icon
+  const getIcon = (symbol: string) => {
+    if (!symbol || symbol === "???") return "/logos/default.svg";
+    return tokenNameToLogo(symbol.toLowerCase());
+  };
+
+  // Helper to get token price
+  const getPrice = (symbol: string): bigint => {
+    if (!symbol || symbol === "???") return 0n;
+    return pricesRaw[symbol.toLowerCase()] ?? 0n;
+  };
+
+  // Get the borrow vault address (needed for context)
+  // Use zero address if no debt - empty string causes ABI encoding errors
+  const borrowVaultAddress = debt?.vault.address || "0x0000000000000000000000000000000000000000";
+
+  // Build moveSupport with preselected collaterals for refinance modal
+  const moveSupport = useMemo(() => ({
+    preselectedCollaterals: collaterals.map((col) => ({
+      token: col.vault.asset.address,
+      symbol: col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol,
+      decimals: col.vault.asset.decimals,
+      amount: col.balance,
+      maxAmount: col.balance,
+      supported: true,
+    })),
+    // Euler allows multiple collaterals, so don't disable selection
+    disableCollateralSelection: false,
+  }), [collaterals]);
+
+  return (
+    <div className="bg-base-300/30 rounded-lg p-3">
+      {/* Sub-account label */}
+      {!isMainAccount && (
+        <div className="mb-2 text-[10px] font-medium text-base-content/40 uppercase tracking-wider">
+          Sub-account
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Left side: Collaterals */}
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-base-content/50 mb-2">
+            Collateral
+          </div>
+          {collaterals.length === 0 ? (
+            <div className="text-sm text-base-content/40 italic">None</div>
+          ) : (
+            <div className="space-y-2">
+              {collaterals.map((col, idx) => {
+                const symbol = col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol;
+                // Encode Euler context: borrowVault + collateralVault
+                const context = encodeEulerContext({
+                  borrowVault: borrowVaultAddress,
+                  collateralVault: col.vault.address,
+                });
+                return (
+                  <SupplyPosition
+                    key={col.vault.address || idx}
+                    icon={getIcon(col.vault.asset.symbol)}
+                    name={symbol}
+                    tokenSymbol={symbol}
+                    balance={0}
+                    tokenBalance={col.balance}
+                    currentRate={(col.vault.supplyApy ?? 0) * 100}
+                    tokenAddress={col.vault.asset.address}
+                    tokenDecimals={col.vault.asset.decimals}
+                    tokenPrice={getPrice(col.vault.asset.symbol)}
+                    protocolName="Euler"
+                    networkType="evm"
+                    chainId={chainId}
+                    protocolContext={context}
+                    availableActions={{ deposit: true, withdraw: true, move: true, swap: true }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="hidden sm:block w-px bg-base-content/10 self-stretch" />
+        <div className="sm:hidden h-px bg-base-content/10 w-full" />
+
+        {/* Right side: Debt */}
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-base-content/50 mb-2">
+            Debt
+          </div>
+          {!debt ? (
+            <div className="text-sm text-base-content/40 italic">None</div>
+          ) : (() => {
+            const debtSymbol = debt.vault.asset.symbol === "???" ? "unknown" : debt.vault.asset.symbol;
+            // For debt, use the first collateral vault (or borrow vault itself if no collaterals)
+            const primaryCollateralVault = collaterals[0]?.vault.address || debt.vault.address;
+            const debtContext = encodeEulerContext({
+              borrowVault: debt.vault.address,
+              collateralVault: primaryCollateralVault,
+            });
+            return (
+              <BorrowPosition
+                icon={getIcon(debt.vault.asset.symbol)}
+                name={debtSymbol}
+                tokenSymbol={debtSymbol}
+                balance={0}
+                tokenBalance={debt.balance}
+                currentRate={(debt.vault.borrowApy ?? 0) * 100}
+                tokenAddress={debt.vault.asset.address}
+                tokenDecimals={debt.vault.asset.decimals}
+                tokenPrice={getPrice(debt.vault.asset.symbol)}
+                protocolName="Euler"
+                networkType="evm"
+                chainId={chainId}
+                protocolContext={debtContext}
+                availableActions={{ borrow: true, repay: true, move: true }}
+                moveSupport={moveSupport}
+              />
+            );
+          })()}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CollapsibleSection: FC<CollapsibleSectionProps> = ({ isOpen, children }) => (
   <AnimatePresence initial={false}>
     {isOpen && (
@@ -172,8 +318,31 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
   // Fetch user positions
   const {
     rows,
+    enrichedPositionGroups,
     hasLoadedOnce,
+    isLoadingPositions,
   } = useEulerLendingPositions(effectiveChainId, connectedAddress);
+
+  // Extract unique token symbols for price fetching
+  const tokenSymbols = useMemo(() => {
+    const symbols = new Set<string>();
+    for (const group of enrichedPositionGroups) {
+      if (group.debt?.vault.asset.symbol && group.debt.vault.asset.symbol !== "???") {
+        symbols.add(group.debt.vault.asset.symbol);
+      }
+      for (const col of group.collaterals) {
+        if (col.vault.asset.symbol && col.vault.asset.symbol !== "???") {
+          symbols.add(col.vault.asset.symbol);
+        }
+      }
+    }
+    return Array.from(symbols);
+  }, [enrichedPositionGroups]);
+
+  // Fetch token prices
+  const { pricesRaw } = useTokenPrices(tokenSymbols, {
+    enabled: tokenSymbols.length > 0,
+  });
 
   // Compute metrics
   const metrics = useMemo(
@@ -369,8 +538,24 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
         />
       </CollapsibleSection>
 
-      {/* Positions would go here - for now just show markets */}
-      {/* TODO: Add EulerPositionsSection when positions are fetched */}
+      {/* Positions Section - grouped by sub-account with collaterals left, debt right */}
+      {!isCollapsed && hasPositions && (
+        <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-md">
+          <div className="card-body p-4">
+            {isLoadingPositions && !hasLoadedOnce ? (
+              <div className="flex justify-center py-4">
+                <LoadingSpinner />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {enrichedPositionGroups.map((group, idx) => (
+                  <EulerPositionGroupRow key={group.subAccount || idx} group={group} chainId={effectiveChainId} pricesRaw={pricesRaw} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

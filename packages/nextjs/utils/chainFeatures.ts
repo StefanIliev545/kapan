@@ -104,6 +104,14 @@ const VENUS_AVAILABLE = new Set([
   130,   // Unichain
 ]);
 
+// Euler V2 (from 11_deploy_euler_gateway.ts CONFIG)
+const EULER_AVAILABLE = new Set([
+  1,     // Mainnet
+  42161, // Arbitrum
+  8453,  // Base
+  10,    // Optimism
+]);
+
 // Flash loan fees in basis points (1 bps = 0.01%)
 export const FLASH_LOAN_FEES_BPS = {
   BalancerV2: 0,
@@ -217,6 +225,11 @@ export function isSparkSupported(chainId: number | undefined): boolean {
 export function isVenusSupported(chainId: number | undefined): boolean {
   if (chainId === undefined) return false;
   return VENUS_AVAILABLE.has(chainId);
+}
+
+export function isEulerSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return EULER_AVAILABLE.has(chainId);
 }
 
 // Morpho Blue as destination uses the same availability as flash loan

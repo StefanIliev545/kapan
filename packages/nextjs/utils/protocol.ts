@@ -54,6 +54,7 @@ export const getProtocolLogo = (protocolName: string): string => {
     "nostra": "/logos/nostra.svg",
     // Euler variants
     "Euler": EULER_LOGO,
+    "Euler V2": EULER_LOGO,
     "euler": EULER_LOGO,
     "euler-v2": EULER_LOGO,
   };
