@@ -26,25 +26,18 @@ import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { saveOrderNote, createDebtSwapNote } from "~~/utils/orderNotes";
 import { getCowQuoteSellAmount, type CowQuoteResponse } from "~~/hooks/useCowQuote";
-import type { ChunkInstructions, BuildOrderResult } from "~~/hooks/useCowLimitOrder";
+import type { ChunkInstructions } from "~~/hooks/useCowLimitOrder";
 
-/** Alias for backwards compatibility */
-export type LimitOrderBuildResult = BuildOrderResult;
 import type { SwapAsset } from "./SwapModalShell";
 import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
 import type { WalletClient, PublicClient } from "viem";
+// Shared types for CoW swap operations
+import { type FlashLoanInfo, type LimitOrderBuildResult } from "./common/swapTypes";
+export type { FlashLoanInfo, LimitOrderBuildResult };
 
 // ============ Types ============
 
 export type DebtSwapAnalyticsProps = Record<string, string | number | boolean | null | undefined>;
-
-export interface FlashLoanInfo {
-    lender: string;
-    provider: string;
-    fee: bigint;
-    amount: bigint;
-    token: string;
-}
 
 export interface CowChunkParams {
     selectedTo: SwapAsset;

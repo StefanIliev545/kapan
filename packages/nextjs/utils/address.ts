@@ -69,6 +69,22 @@ export function formatAddressForDisplay(
 // ============================================================================
 
 /**
+ * Normalizes an address to lowercase for use as a map/object key.
+ * Handles undefined/null by returning empty string.
+ *
+ * @param address - The address to normalize
+ * @returns Lowercase address string, or empty string if input is falsy
+ *
+ * @example
+ * ```ts
+ * addrKey("0xAbCdEf123456")  // "0xabcdef123456"
+ * addrKey(undefined)         // ""
+ * addrKey(null)              // ""
+ * ```
+ */
+export const addrKey = (address?: string | null): string => (address ?? "").toLowerCase();
+
+/**
  * Attempts to normalize a user-provided address for either EVM or Starknet networks.
  * Returns a checksum address for EVM inputs or the canonical Starknet representation when valid.
  *

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { EulerVaultResponse, CollateralInfo } from "~~/app/api/euler/[chainId]/vaults/route";
+import type { CollateralInfo } from "~~/app/api/euler/[chainId]/vaults/route";
+import { useEulerVaultsQuery, type EulerVaultResponse } from "~~/utils/euler/vaultApi";
 
 // ============ Types ============
 
@@ -25,52 +25,23 @@ export interface UseEulerMarketSupportResult {
   error: Error | null;
 }
 
-// ============ API Fetcher ============
-
-async function fetchEulerVaults(chainId: number): Promise<EulerVaultResponse[]> {
-  try {
-    const params = new URLSearchParams({
-      first: "500",
-    });
-
-    const response = await fetch(`/api/euler/${chainId}/vaults?${params.toString()}`);
-    if (!response.ok) {
-      console.error(`[useEulerMarketSupport] Vaults API error: ${response.status}`);
-      return [];
-    }
-    const data = await response.json();
-    return data?.vaults || [];
-  } catch (error) {
-    console.error("[useEulerMarketSupport] Failed to fetch vaults:", error);
-    return [];
-  }
-}
-
 // ============ Helper Functions ============
 
 /**
- * Normalize symbol for comparison (case-insensitive, handles wrapped variants)
+ * Check if a vault's collateral matches a user's collateral by address
+ * Falls back to symbol matching if address not available
  */
-function normalizeSymbol(symbol: string): string {
-  const s = symbol.toLowerCase().trim();
-  // Map common variants
-  if (s === "weth" || s === "eth") return "eth";
-  if (s === "wbtc" || s === "btc") return "btc";
-  if (s === "wsteth" || s === "steth") return "steth";
-  return s;
-}
-
-/**
- * Check if a vault's collateral matches a user's collateral
- */
-function collateralMatches(
+function collateralMatchesByAddress(
   vaultCollaterals: CollateralInfo[],
-  userCollateralSymbol: string
+  userCollateralAddress: string
 ): boolean {
-  const normalized = normalizeSymbol(userCollateralSymbol);
+  const normalizedUserAddr = userCollateralAddress.toLowerCase();
   return vaultCollaterals.some(c => {
-    const collateralNormalized = normalizeSymbol(c.tokenSymbol);
-    return collateralNormalized === normalized;
+    // Primary: match by underlying token address
+    if (c.tokenAddress && c.tokenAddress.toLowerCase() === normalizedUserAddr) {
+      return true;
+    }
+    return false;
   });
 }
 
@@ -83,17 +54,13 @@ export function useEulerMarketSupport({
   collateralSymbols,
   enabled = true,
 }: UseEulerMarketSupportParams): UseEulerMarketSupportResult {
-  // Fetch all vaults for this chain (with caching)
+  // Fetch all vaults for this chain (with caching via shared hook)
   const {
     data: allVaults,
     isLoading,
     error,
-  } = useQuery({
-    queryKey: ["euler-vaults-support", chainId],
-    queryFn: () => fetchEulerVaults(chainId),
+  } = useEulerVaultsQuery(chainId, {
     enabled: enabled && !!chainId,
-    staleTime: 5 * 60 * 1000, // 5 min cache
-    gcTime: 10 * 60 * 1000, // 10 min garbage collection
   });
 
   // Filter and group vaults by user's collateral
@@ -115,29 +82,28 @@ export function useEulerMarketSupport({
     );
     console.log("[useEulerMarketSupport] Vaults matching loan token:", vaultsWithMatchingLoan.length, "for loanAddr:", loanAddr);
 
-    // Build lookup: collateral address -> symbol
+    // Build lookup: collateral address -> symbol (for logging)
     const addrToSymbol: Record<string, string> = {};
     for (let i = 0; i < collateralAddresses.length; i++) {
       addrToSymbol[collateralAddresses[i].toLowerCase()] = collateralSymbols[i] || "";
     }
 
-    // Group by user's collateral
+    // Group by user's collateral - match by underlying token address
     const byCollateral: Record<string, EulerVaultResponse[]> = {};
     const supported: Record<string, boolean> = {};
 
     for (const collateralAddr of collateralAddresses) {
       const addr = collateralAddr.toLowerCase();
-      const symbol = addrToSymbol[addr];
-      if (!symbol) continue;
+      const symbol = addrToSymbol[addr] || "???";
 
-      // Find vaults that accept this collateral
+      // Find vaults that accept this collateral (by token address)
       const matchingVaults = vaultsWithMatchingLoan.filter(v =>
-        collateralMatches(v.collaterals, symbol)
+        collateralMatchesByAddress(v.collaterals, addr)
       );
 
       console.log("[useEulerMarketSupport] Checking collateral:", symbol, "addr:", addr, "matchingVaults:", matchingVaults.length);
       if (matchingVaults.length > 0) {
-        console.log("[useEulerMarketSupport] Found vaults for", symbol, ":", matchingVaults.map(v => ({ address: v.address, symbol: v.symbol, collaterals: v.collaterals.map(c => c.tokenSymbol) })));
+        console.log("[useEulerMarketSupport] Found vaults for", symbol, ":", matchingVaults.map(v => ({ address: v.address, symbol: v.symbol, collaterals: v.collaterals.map(c => ({ symbol: c.tokenSymbol, addr: c.tokenAddress })) })));
         byCollateral[addr] = matchingVaults;
         supported[addr] = true;
       }

@@ -178,14 +178,18 @@ function getClickHandlers(config: ClickHandlers & { protocolName: string }) {
   const { networkType, onBorrow, onClosePosition, onSwap, borrowModalOpen, closeWithCollateralModalOpen, debtSwapModalOpen, protocolName } = config;
   const noop = () => { return; };
 
-  // Morpho requires custom handler (external modal has Morpho-specific props)
+  // Morpho and Euler require custom handler (external modal has protocol-specific props)
   const isMorpho = protocolName.toLowerCase().includes("morpho");
+  const isEuler = protocolName.toLowerCase().includes("euler");
+  const needsCustomSwapHandler = (isMorpho || isEuler) && onSwap;
+  const needsCustomCloseHandler = isEuler && onClosePosition;
 
   return {
     handleBorrowClick: onBorrow ?? borrowModalOpen,
-    handleCloseClick: networkType === "evm" ? closeWithCollateralModalOpen : (onClosePosition ?? noop),
-    // Morpho uses custom handler; other EVM protocols use internal modal; non-EVM uses custom handler
-    handleSwapClick: isMorpho && onSwap ? onSwap : (networkType === "evm" ? debtSwapModalOpen : (onSwap ?? noop)),
+    // Euler uses custom handler; other EVM protocols use internal modal; non-EVM uses custom handler
+    handleCloseClick: needsCustomCloseHandler ? onClosePosition : (networkType === "evm" ? closeWithCollateralModalOpen : (onClosePosition ?? noop)),
+    // Morpho/Euler use custom handler; other EVM protocols use internal modal; non-EVM uses custom handler
+    handleSwapClick: needsCustomSwapHandler ? onSwap : (networkType === "evm" ? debtSwapModalOpen : (onSwap ?? noop)),
   };
 }
 

@@ -24,7 +24,7 @@ export type CollateralMeta = {
 };
 
 /* ------------------------------ Helpers ------------------------------ */
-const addrKey = (a?: string) => (a ?? "").toLowerCase();
+import { addrKey } from "~~/utils/address";
 
 /* ------------------------------ Effects ------------------------------ */
 

@@ -371,14 +371,15 @@ export function encodeSubtract(minuendIndex: number, subtrahendIndex: number): s
  */
 export interface EulerVaultContextForEncoding {
   borrowVault: string;
-  collateralVault: string;
+  /** Single collateral vault (legacy) or array of all collateral vaults */
+  collateralVault: string | string[];
   /** Sub-account index (0-255). Default 0 = main account */
   subAccountIndex?: number;
 }
 
 /**
  * Encode Euler vault context into bytes for lending instructions
- * Euler expects: (address borrowVault, address collateralVault, uint8 subAccountIndex)
+ * Euler expects: (address borrowVault, address[] collateralVaults, uint8 subAccountIndex)
  *
  * Sub-account support:
  * - Index 0 = main account (default)
@@ -387,9 +388,13 @@ export interface EulerVaultContextForEncoding {
  */
 export function encodeEulerContext(context: EulerVaultContextForEncoding): string {
   const subAccountIndex = context.subAccountIndex ?? 0;
+  // Support both single collateral (legacy) and array of collaterals
+  const collateralVaults = Array.isArray(context.collateralVault)
+    ? context.collateralVault
+    : [context.collateralVault];
   return coder.encode(
-    ["address", "address", "uint8"],
-    [context.borrowVault, context.collateralVault, subAccountIndex]
+    ["address", "address[]", "uint8"],
+    [context.borrowVault, collateralVaults, subAccountIndex]
   );
 }
 

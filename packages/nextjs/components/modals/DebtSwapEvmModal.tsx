@@ -1,4 +1,5 @@
 import { FC, useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { useDebounceValue } from "usehooks-ts";
 import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
@@ -30,9 +31,11 @@ import {
     encodeAdd,
     LendingOp,
     encodeMorphoContext,
+    encodeEulerContext,
     type MorphoMarketContextForEncoding,
 } from "~~/utils/v2/instructionHelpers";
 import { useMorphoDebtSwapMarkets, marketToContext } from "~~/hooks/useMorphoDebtSwapMarkets";
+import { useEulerDebtSwapVaults } from "~~/hooks/useEulerDebtSwapVaults";
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { encodeAbiParameters } from "viem";
@@ -103,6 +106,15 @@ interface DebtSwapEvmModalProps {
     collateralBalance?: bigint;
     /** Morpho: Collateral decimals */
     collateralDecimals?: number;
+    // ========================================================================
+    // Euler-specific props
+    // ========================================================================
+    /** Euler: Current borrow vault address */
+    eulerBorrowVault?: string;
+    /** Euler: User's collateral vault addresses in the current position */
+    eulerCollateralVaults?: string[];
+    /** Euler: Sub-account index (0 = main account) */
+    eulerSubAccountIndex?: number;
 }
 
 export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
@@ -124,6 +136,10 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     collateralTokenSymbol: _collateralTokenSymbol,
     collateralBalance,
     collateralDecimals: _collateralDecimals,
+    // Euler-specific props
+    eulerBorrowVault,
+    eulerCollateralVaults,
+    eulerSubAccountIndex,
 }) => {
     // Prefixed with _ to indicate intentionally unused (reserved for future display)
     void _collateralTokenSymbol;
@@ -133,9 +149,10 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     } = useKapanRouterV2();
 
     // ========================================================================
-    // Morpho Detection & Market Discovery
+    // Protocol Detection & Market Discovery
     // ========================================================================
     const isMorpho = protocolName.toLowerCase().includes("morpho");
+    const isEuler = protocolName.toLowerCase().includes("euler");
     const { address: userAddress } = useAccount();
 
     // Fetch compatible Morpho markets (same collateral, different debt)
@@ -144,6 +161,14 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         collateralTokenAddress: collateralTokenAddress || "",
         currentDebtAddress: debtFromToken,
         enabled: isMorpho && isOpen && !!collateralTokenAddress,
+    });
+
+    // Fetch compatible Euler borrow vaults (accept same collaterals, different debt)
+    const { targetVaultsByAddress: eulerTargetVaults } = useEulerDebtSwapVaults({
+        chainId,
+        currentDebtTokenAddress: debtFromToken,
+        userCollateralVaultAddresses: eulerCollateralVaults || [],
+        enabled: isEuler && isOpen && !!eulerBorrowVault && (eulerCollateralVaults?.length ?? 0) > 0,
     });
 
     // Track selected new Morpho market
@@ -226,6 +251,32 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     const [selectedFrom, setSelectedFrom] = useState<SwapAsset | null>(fromAsset);
     const [selectedTo, setSelectedTo] = useState<SwapAsset | null>(null);
+
+    // Euler: Encode OLD borrow vault context (current position)
+    // Uses the first collateral vault for context (all collaterals share the same sub-account)
+    const oldEulerContextEncoded = useMemo(() => {
+        if (!isEuler || !eulerBorrowVault || !eulerCollateralVaults?.length) return undefined;
+        return encodeEulerContext({
+            borrowVault: eulerBorrowVault as Address,
+            collateralVault: eulerCollateralVaults[0] as Address,
+            subAccountIndex: eulerSubAccountIndex,
+        });
+    }, [isEuler, eulerBorrowVault, eulerCollateralVaults, eulerSubAccountIndex]);
+
+    // Euler: Encode NEW borrow vault context (selected target)
+    // Uses the same collateral vault - collaterals stay in place, only borrow vault changes
+    const newEulerContextEncoded = useMemo(() => {
+        if (!isEuler || !selectedTo || !eulerCollateralVaults?.length) return undefined;
+        // Get the new borrow vault from the selected asset
+        const newBorrowVault = (selectedTo as SwapAsset & { eulerBorrowVault?: string }).eulerBorrowVault;
+        if (!newBorrowVault) return undefined;
+        return encodeEulerContext({
+            borrowVault: newBorrowVault as Address,
+            collateralVault: eulerCollateralVaults[0] as Address,
+            subAccountIndex: eulerSubAccountIndex,
+        });
+    }, [isEuler, selectedTo, eulerCollateralVaults, eulerSubAccountIndex]);
+
     const [slippage, setSlippage] = useState<number>(0.1); // Start with minimum, will auto-adjust
     const [amountIn, setAmountIn] = useState(""); // Amount of current debt to repay
     const [isMax, setIsMax] = useState(false);
@@ -294,6 +345,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // Filter "To" assets (exclude current debt)
     // For Morpho: derive from compatible target markets (same collateral, different debt)
+    // For Euler: derive from compatible borrow vaults (accept same collaterals, different debt)
     const toAssets = useMemo(() => {
         if (isMorpho && morphoTargetMarkets.length > 0) {
             // Build SwapAsset array from Morpho target markets
@@ -320,8 +372,23 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                     marketId: m.uniqueKey,
                 } as SwapAsset));
         }
+        // For Euler: build target assets from compatible borrow vaults
+        if (isEuler && Object.keys(eulerTargetVaults).length > 0) {
+            return Object.values(eulerTargetVaults).map(vault => ({
+                symbol: vault.tokenSymbol,
+                address: vault.tokenAddress as Address,
+                decimals: vault.decimals,
+                rawBalance: 0n,
+                balance: 0,
+                icon: tokenNameToLogo(vault.tokenSymbol.toLowerCase()),
+                price: undefined,
+                borrowApy: vault.borrowApy,
+                // Store vault address for context encoding
+                eulerBorrowVault: vault.vaultAddress,
+            } as SwapAsset));
+        }
         return (availableAssets || []).filter(a => a.address.toLowerCase() !== debtFromToken.toLowerCase());
-    }, [isMorpho, morphoTargetMarkets, availableAssets, debtFromToken]);
+    }, [isMorpho, morphoTargetMarkets, isEuler, eulerTargetVaults, availableAssets, debtFromToken]);
 
     // Sync selectedMorphoMarket when user selects a "to" asset
     useEffect(() => {
@@ -345,11 +412,19 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         }
     }, [debtFromName, selectedTo, pendleAvailable]);
 
-    // Amount to repay in raw
+    // Debounce amountIn to prevent race conditions in two-stage quote system
+    // When user rapidly changes amount, this ensures we don't fire swap quotes
+    // for stale requiredNewDebt values calculated from outdated unit quotes
+    const [debouncedAmountIn] = useDebounceValue(amountIn, 300);
+
+    // Track whether input is still settling (user is typing)
+    const isInputSettling = amountIn !== debouncedAmountIn;
+
+    // Amount to repay in raw (uses debounced value for quote calculations)
     const repayAmountRaw = useMemo(() => {
-        const result = parseAmount(amountIn || "0", debtFromDecimals);
+        const result = parseAmount(debouncedAmountIn || "0", debtFromDecimals);
         return result.value ?? 0n;
-    }, [amountIn, debtFromDecimals]);
+    }, [debouncedAmountIn, debtFromDecimals]);
 
     // For limit orders with max: apply dust buffer to buy slightly more than current debt
     // This accounts for interest accrual between order creation and execution
@@ -454,7 +529,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     const isSwapQuoteLoading = swapRouter === "1inch" ? is1inchSwapQuoteLoading : isPendleQuoteLoading;
     const quoteError = swapRouter === "1inch" ? oneInchQuoteError : pendleQuoteError;
-    const isQuoteLoading = isUnitQuoteLoading || isSwapQuoteLoading;
+    // Include isInputSettling to show loading state while user is typing
+    // This prevents displaying stale quotes that don't match current input
+    const isQuoteLoading = isUnitQuoteLoading || isSwapQuoteLoading || isInputSettling;
 
     // Check adapter availability
     const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
@@ -716,6 +793,92 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             );
 
             // 10. Push refunds to user
+            instructions.push(
+                createRouterInstruction(encodePushToken(6, userAddress!)) // repay refund
+            );
+            instructions.push(
+                createRouterInstruction(encodePushToken(4, userAddress!)) // swap refund
+            );
+
+            return instructions;
+        }
+
+        // ========================================================================
+        // EULER: Simpler than Morpho - no collateral movement needed
+        // Collaterals stay in place, only the controller (borrow vault) changes
+        // ========================================================================
+        if (isEuler && oldEulerContextEncoded && newEulerContextEncoded) {
+            const minAmountOutBigInt = repayAmountRaw;
+            const swapContext = encodeAbiParameters(
+                [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+                [debtFromToken as Address, minAmountOutBigInt, swapQuote.tx.data as `0x${string}`]
+            );
+
+            /**
+             * Euler Debt Swap (Market Order):
+             *
+             * Unlike Morpho, Euler collaterals don't need to move - they stay enabled
+             * in the sub-account. Only the controller (borrow vault) changes.
+             *
+             * UTXO Layout:
+             * [0] ToOutput(maxNewDebt) -> amount ref
+             * [1] FlashLoan(0) -> new debt tokens
+             * [2] Approve(1, swap) -> dummy
+             * [3],[4] SwapExactOut(1) -> oldDebt, newDebt refund
+             * [5] Approve(3, euler) -> dummy
+             * [6] Repay(3, OLD_VAULT) -> repay refund (removes old controller)
+             * [7] Borrow(0, NEW_VAULT) -> to repay flash loan (sets new controller)
+             */
+            const instructions: ProtocolInstruction[] = [];
+
+            // 0. ToOutput(maxNewDebt) -> [0]
+            instructions.push(
+                createRouterInstruction(encodeToOutput(requiredNewDebt, selectedTo.address))
+            );
+
+            // 1. FlashLoan(0) -> [1]
+            instructions.push(
+                createRouterInstruction(encodeFlashLoan(providerEnum, 0))
+            );
+
+            // 2. Approve swap protocol for new debt ([1]) -> [2]
+            instructions.push(
+                createRouterInstruction(encodeApprove(1, swapProtocol))
+            );
+
+            // 3. SwapExactOut new debt -> old debt (input=1) -> [3] oldDebt, [4] newDebt refund
+            instructions.push(
+                createProtocolInstruction(
+                    swapProtocol,
+                    encodeLendingInstruction(LendingOp.SwapExactOut, selectedTo.address, userAddress!, 0n, swapContext, 1)
+                )
+            );
+
+            // 4. Approve Euler for old debt ([3]) -> [5]
+            instructions.push(
+                createRouterInstruction(encodeApprove(3, "euler"))
+            );
+
+            // 5. Repay old debt on OLD vault (input=3) -> [6]
+            // This removes the old borrow vault as controller
+            instructions.push(
+                createProtocolInstruction(
+                    "euler",
+                    encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress!, 0n, oldEulerContextEncoded, 3)
+                )
+            );
+
+            // 6. Borrow new debt from NEW vault (amount from [0]) -> [7]
+            // This sets the new borrow vault as controller
+            // The new vault must accept our existing collaterals (checked by useEulerDebtSwapVaults)
+            instructions.push(
+                createProtocolInstruction(
+                    "euler",
+                    encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress!, 0n, newEulerContextEncoded, 0)
+                )
+            );
+
+            // 7. Push refunds to user
             instructions.push(
                 createRouterInstruction(encodePushToken(6, userAddress!)) // repay refund
             );
@@ -1143,7 +1306,8 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // Pre-compute execution type dependent props to reduce cognitive complexity in JSX
     const isMarketExecution = executionType === "market";
-    const quoteLoadingProp = isMarketExecution ? isQuoteLoading : isCowQuoteLoading;
+    // Include isInputSettling for both market and limit orders to prevent stale quotes
+    const quoteLoadingProp = isMarketExecution ? isQuoteLoading : (isCowQuoteLoading || isInputSettling);
     const quoteErrorProp = isMarketExecution ? quoteError : null;
     const preferBatchingProp = isMarketExecution ? preferBatching : undefined;
     const setPreferBatchingProp = isMarketExecution ? setPreferBatching : undefined;

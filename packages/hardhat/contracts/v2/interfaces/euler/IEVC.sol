@@ -17,6 +17,19 @@ interface IEVC {
     /// @param items Array of batch items to execute
     function batch(BatchItem[] calldata items) external payable;
 
+    /// @notice Execute a call on behalf of an account
+    /// @param targetContract The contract to call
+    /// @param onBehalfOfAccount The account context for the call
+    /// @param value ETH value to send
+    /// @param data The calldata to execute
+    /// @return result The return data from the call
+    function call(
+        address targetContract,
+        address onBehalfOfAccount,
+        uint256 value,
+        bytes calldata data
+    ) external payable returns (bytes memory result);
+
     /// @notice Enable a vault as collateral for an account
     /// @param account The account to enable collateral for
     /// @param vault The vault to enable as collateral

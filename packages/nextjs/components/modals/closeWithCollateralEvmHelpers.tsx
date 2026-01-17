@@ -28,13 +28,14 @@ import { TransactionToast } from "~~/components/TransactionToast";
 import { saveOrderNote, createClosePositionNote } from "~~/utils/orderNotes";
 import { getCowQuoteSellAmount, type CowQuoteResponse } from "~~/hooks/useCowQuote";
 import { executeSequentialTransactions, type TransactionCall } from "~~/utils/transactionSimulation";
-import type { ChunkInstructions, BuildOrderResult } from "~~/hooks/useCowLimitOrder";
+import type { ChunkInstructions } from "~~/hooks/useCowLimitOrder";
 
-/** Alias for backwards compatibility */
-export type LimitOrderBuildResult = BuildOrderResult;
 import type { SwapAsset } from "./SwapModalShell";
 import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
 import type { WalletClient, PublicClient } from "viem";
+// Shared types for CoW swap operations
+import { type FlashLoanInfo, type CowChunkParams, type LimitOrderBuildResult } from "./common/swapTypes";
+export type { FlashLoanInfo, CowChunkParams, LimitOrderBuildResult };
 
 // ============ Types ============
 
@@ -58,30 +59,6 @@ export interface ClosePositionAnalyticsProps {
     market?: string | null;
     // Index signature for compatibility with Vercel Analytics track() function
     [key: string]: string | number | boolean | null | undefined;
-}
-
-export interface FlashLoanInfo {
-    lender: string;
-    provider: string;
-    fee: bigint;
-    amount: bigint;
-    token: string;
-}
-
-export interface CowChunkParams {
-    selectedTo: SwapAsset;
-    userAddress: string;
-    repayAmountRaw: bigint;
-    orderManagerAddress: string;
-    protocolName: string;
-    context: string | undefined;
-    debtToken: string;
-    debtName: string;
-    debtDecimals: number;
-    cowFlashLoanInfo: FlashLoanInfo;
-    limitOrderConfig: LimitOrderResult | null;
-    /** When true, adds a small buffer to handle interest accrual and pushes any refund to user */
-    isMax?: boolean;
 }
 
 // ============ Analytics Helpers ============

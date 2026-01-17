@@ -21,13 +21,14 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
  *   - bytes context = abi.encode(address borrowVault, address collateralVault, uint8 subAccountIndex)
  *   - borrowVault: The vault to borrow from (becomes controller)
  *   - collateralVault: The vault where collateral is deposited
- *   - subAccountIndex: Sub-account index (0-255), 0 = main account
+ *   - subAccountIndex: Sub-account index (0-255)
  *
  * Sub-Account Model:
  *   - Each user has 256 possible sub-accounts (index 0-255)
  *   - Sub-account address = (userAddress & 0xFF...FF00) | subAccountIndex
  *   - Each sub-account can have at most 1 controller (debt) + N collaterals
- *   - Sub-account 0 is the main account (matches user address)
+ *   - User's "main" account has index = last byte of their wallet address
+ *     (e.g., wallet 0x...a3 → main account is index 163)
  *
  * EVC Authorization Model:
  *   - Users must enable collateral vaults via EVC before they can back debt
@@ -60,7 +61,7 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         bytes calldata data
     ) external onlyRouter returns (ProtocolTypes.Output[] memory) {
         ProtocolTypes.LendingInstruction memory ins = abi.decode(data, (ProtocolTypes.LendingInstruction));
-        (address borrowVault, address collateralVault, uint8 subAccountIndex) = _decodeContext(ins.context);
+        (address borrowVault, address[] memory collateralVaults, uint8 subAccountIndex) = _decodeContext(ins.context);
 
         // Derive sub-account address from user + index
         address subAccount = _getSubAccount(ins.user, subAccountIndex);
@@ -68,6 +69,8 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         // Resolve amount from input if referenced
         uint256 amount = ins.input.index < inputs.length ? inputs[ins.input.index].amount : ins.amount;
 
+        // For single-vault operations, use the first collateral vault
+        address collateralVault = collateralVaults.length > 0 ? collateralVaults[0] : address(0);
         return _dispatch(ins.op, borrowVault, collateralVault, amount, subAccount);
     }
 
@@ -262,9 +265,10 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         uint256 outCount = _countOutputs(instrs);
         produced = new ProtocolTypes.Output[](outCount);
 
-        // Maximum possible targets: operator + collateral enable + controller enable per instruction
-        targets = new address[](1 + instrs.length * 2);
-        data = new bytes[](1 + instrs.length * 2);
+        // Maximum possible targets: operator + multiple collateral enables + controller disable + controller enable per instruction
+        // Assuming max 10 collaterals per instruction to be safe
+        targets = new address[](1 + instrs.length * 12);
+        data = new bytes[](1 + instrs.length * 12);
 
         AuthState memory state;
         // Note: isOperator is checked per sub-account in _processAuthInstruction
@@ -304,9 +308,12 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         ProtocolTypes.Output[] memory produced,
         AuthState memory state
     ) internal view {
-        (address borrowVault, address collateralVault, uint8 subAccountIndex) = _decodeContext(ins.context);
+        (address borrowVault, address[] memory collateralVaults, uint8 subAccountIndex) = _decodeContext(ins.context);
         address subAccount = _getSubAccount(caller, subAccountIndex);
         uint256 amount = ins.input.index < inputs.length ? inputs[ins.input.index].amount : ins.amount;
+
+        // For single-vault operations, use the first collateral vault
+        address collateralVault = collateralVaults.length > 0 ? collateralVaults[0] : address(0);
 
         // Update state with current sub-account and check operator status
         if (state.subAccount != subAccount) {
@@ -320,13 +327,19 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         } else if (ins.op == ProtocolTypes.LendingOp.WithdrawCollateral) {
             _authWithdrawCollateral(subAccount, collateralVault, ins.token, amount, targets, data, produced, state);
         } else if (ins.op == ProtocolTypes.LendingOp.Borrow) {
-            _authBorrow(subAccount, borrowVault, collateralVault, ins.token, amount, targets, data, produced, state);
+            // For borrow, enable ALL collateral vaults for sufficient LTV
+            _authBorrow(subAccount, borrowVault, collateralVaults, ins.token, amount, targets, data, produced, state);
         } else if (ins.op == ProtocolTypes.LendingOp.GetBorrowBalance) {
-            // For auth, use placeholder - actual balance queried at execution time
-            produced[state.pIdx++] = ProtocolTypes.Output({ token: ins.token, amount: ins.amount });
+            // Query actual balance from vault and apply 0.1% buffer to handle interest accrual
+            uint256 bal = IEulerVault(borrowVault).debtOf(subAccount);
+            bal = (bal * 1001) / 1000; // 0.1% buffer
+            produced[state.pIdx++] = ProtocolTypes.Output({ token: ins.token, amount: bal });
         } else if (ins.op == ProtocolTypes.LendingOp.GetSupplyBalance) {
-            // For auth, use placeholder - actual balance queried at execution time
-            produced[state.pIdx++] = ProtocolTypes.Output({ token: ins.token, amount: ins.amount });
+            // Query actual balance from vault and apply 0.1% buffer
+            uint256 shares = IEulerVault(collateralVault).balanceOf(subAccount);
+            uint256 bal = IEulerVault(collateralVault).convertToAssets(shares);
+            bal = (bal * 1001) / 1000; // 0.1% buffer
+            produced[state.pIdx++] = ProtocolTypes.Output({ token: ins.token, amount: bal });
         } else if (ins.op == ProtocolTypes.LendingOp.Repay) {
             produced[state.pIdx++] = ProtocolTypes.Output({ token: ins.token, amount: 0 });
         }
@@ -368,7 +381,7 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
     function _authBorrow(
         address caller,
         address borrowVault,
-        address collateralVault,
+        address[] memory collateralVaults,
         address token,
         uint256 amount,
         address[] memory targets,
@@ -383,14 +396,43 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
             state.targetIdx++;
             state.operatorEmitted = true;
         }
-        // Enable collateral
-        if (!evc.isCollateralEnabled(caller, collateralVault)) {
-            targets[state.targetIdx] = address(evc);
-            data[state.targetIdx] = abi.encodeWithSelector(IEVC.enableCollateral.selector, caller, collateralVault);
-            state.targetIdx++;
+        // Enable ALL collateral vaults for sufficient LTV
+        for (uint256 i = 0; i < collateralVaults.length; i++) {
+            address collateralVault = collateralVaults[i];
+            if (collateralVault != address(0) && !evc.isCollateralEnabled(caller, collateralVault)) {
+                targets[state.targetIdx] = address(evc);
+                data[state.targetIdx] = abi.encodeWithSelector(IEVC.enableCollateral.selector, caller, collateralVault);
+                state.targetIdx++;
+            }
         }
-        // Enable controller
+        // Enable controller - but first check if we need to disable an old one
+        // In Euler V2, a sub-account can only have ONE controller at a time
         if (!evc.isControllerEnabled(caller, borrowVault)) {
+            // Check for existing controllers that need to be disabled
+            address[] memory existingControllers = evc.getControllers(caller);
+            for (uint256 i = 0; i < existingControllers.length; i++) {
+                address existingController = existingControllers[i];
+                if (existingController != borrowVault) {
+                    // Check if debt is 0 - only then can we disable the old controller
+                    uint256 debt = IEulerVault(existingController).debtOf(caller);
+                    if (debt == 0) {
+                        // Use evc.call() to invoke vault.disableController() in sub-account context
+                        // This is the correct Euler V2 pattern per docs
+                        targets[state.targetIdx] = address(evc);
+                        data[state.targetIdx] = abi.encodeWithSelector(
+                            IEVC.call.selector,
+                            existingController,  // target = the old borrow vault
+                            caller,              // onBehalfOfAccount = sub-account
+                            uint256(0),          // value = 0
+                            abi.encodeWithSelector(IEulerVault.disableController.selector)
+                        );
+                        state.targetIdx++;
+                    }
+                    // Note: if debt > 0, the enableController will fail, which is correct behavior
+                    // User must repay existing debt before switching to a new borrow vault
+                }
+            }
+            // Now enable the new controller
             targets[state.targetIdx] = address(evc);
             data[state.targetIdx] = abi.encodeWithSelector(IEVC.enableController.selector, caller, borrowVault);
             state.targetIdx++;
@@ -451,31 +493,25 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
 
     /**
      * @notice Decode context bytes into vault addresses and sub-account index
-     * @dev Supports both old format (64 bytes) and new format (65+ bytes with subAccountIndex)
+     * @dev Context format: abi.encode(address borrowVault, address collateralVault, uint8 subAccountIndex)
      */
-    function _decodeContext(bytes memory ctx) internal pure returns (address borrowVault, address collateralVault, uint8 subAccountIndex) {
-        if (ctx.length < 64) revert InvalidContext();
-
-        if (ctx.length >= 65) {
-            // New format with sub-account index
-            (borrowVault, collateralVault, subAccountIndex) = abi.decode(ctx, (address, address, uint8));
-        } else {
-            // Legacy format - default to main account (index 0)
-            (borrowVault, collateralVault) = abi.decode(ctx, (address, address));
-            subAccountIndex = 0;
-        }
+    function _decodeContext(bytes memory ctx) internal pure returns (address borrowVault, address[] memory collateralVaults, uint8 subAccountIndex) {
+        (borrowVault, collateralVaults, subAccountIndex) = abi.decode(ctx, (address, address[], uint8));
     }
 
     /**
      * @notice Derive sub-account address from user address and index
      * @param user The main user address
-     * @param subAccountIndex Index 0-255 (0 = main account)
+     * @param subAccountIndex Index 0-255
      * @return The sub-account address
      * @dev Sub-account = (user & 0xFF...FF00) | subAccountIndex
-     *      For index 0, returns the user address unchanged
+     *      The user's "main" account has index = last byte of their address.
+     *      For example, user 0x...a3 has main account at index 163 (0xa3).
+     *      Index 0 is a sub-account at address 0x...00 (NOT the same as user address
+     *      unless user address happens to end with 0x00).
      */
     function _getSubAccount(address user, uint8 subAccountIndex) internal pure returns (address) {
-        if (subAccountIndex == 0) return user;
+        // Always apply the formula - don't special-case index 0
         return address(uint160(uint160(user) & ~uint160(0xFF)) | uint160(subAccountIndex));
     }
 

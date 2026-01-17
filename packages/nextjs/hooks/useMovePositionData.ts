@@ -125,7 +125,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
         { name: "Aave V3", logo: getProtocolLogo("Aave V3") },
         { name: "Compound V3", logo: getProtocolLogo("Compound V3") },
       ];
-      
+
       // Add chain-specific protocols
       if (isSparkSupported(chainId)) {
         protocols.push({ name: "Spark", logo: getProtocolLogo("Spark") });
@@ -205,7 +205,21 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     tokenToPrices: string;
   }>({ evmCollaterals: '', supportedCollaterals: '', tokenToPrices: '' });
 
-  // Normalize EVM collaterals into BasicCollateral - FIXED VERSION
+  // Track previous loading state to avoid unnecessary updates that cause re-renders
+  const prevEvmLoadingRef = useRef<boolean | null>(null);
+
+  // Separate effect for EVM loading state - only updates when loading actually changes
+  useEffect(() => {
+    if (networkType !== "evm") return;
+
+    const currentLoading = evmIsLoadingCollats || isLoadingSupport;
+    if (prevEvmLoadingRef.current !== currentLoading) {
+      prevEvmLoadingRef.current = currentLoading;
+      setIsLoadingCollaterals(currentLoading);
+    }
+  }, [networkType, evmIsLoadingCollats, isLoadingSupport]);
+
+  // Normalize EVM collaterals into BasicCollateral - data only effect
   useEffect(() => {
     if (networkType !== "evm") return;
 
@@ -213,7 +227,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     const currentSupportedCollaterals = stringifyWithBigInt(supportedCollaterals);
     const currentTokenToPrices = stringifyWithBigInt(tokenToPrices);
 
-    // Only update if something actually changed
+    // Only update collaterals/support if data actually changed (to avoid re-renders)
     if (
       prevEvmDataRef.current.evmCollaterals === currentEvmCollaterals &&
       prevEvmDataRef.current.supportedCollaterals === currentSupportedCollaterals &&
@@ -221,8 +235,6 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
     ) {
       return;
     }
-
-    setIsLoadingCollaterals(evmIsLoadingCollats || isLoadingSupport);
 
     const normalized = evmCollaterals.map(c => ({
       address: c.address,
@@ -246,8 +258,6 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
   }, [
     networkType,
     evmCollaterals,
-    evmIsLoadingCollats,
-    isLoadingSupport,
     supportedCollaterals,
     tokenToPrices,
   ]);

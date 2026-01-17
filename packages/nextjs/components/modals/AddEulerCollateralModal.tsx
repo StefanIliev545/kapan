@@ -2,7 +2,6 @@
 
 import { FC, useState, useMemo, useCallback } from "react";
 import { formatUnits } from "viem";
-import { useQuery } from "@tanstack/react-query";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useWalletTokenBalances, normalizeAddress } from "~~/hooks/useWalletTokenBalances";
 import { useTokenSelectModal } from "./common/useTokenSelectModal";
@@ -14,7 +13,7 @@ import {
 import { DepositModal } from "./DepositModal";
 import { buildModalTokenInfo } from "./common/modalUtils";
 import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
-import type { EulerVaultResponse } from "~~/app/api/euler/[chainId]/vaults/route";
+import { useEulerVaultsQuery } from "~~/utils/euler/vaultApi";
 
 interface AddEulerCollateralModalProps {
   isOpen: boolean;
@@ -33,18 +32,6 @@ interface CollateralOption {
   tokenAddress: string;
   tokenDecimals: number;
   supplyApy: number;
-}
-
-// Fetch vaults from API
-async function fetchEulerVaults(chainId: number): Promise<EulerVaultResponse[]> {
-  try {
-    const response = await fetch(`/api/euler/${chainId}/vaults?first=500`);
-    if (!response.ok) return [];
-    const data = await response.json();
-    return data?.vaults || [];
-  } catch {
-    return [];
-  }
 }
 
 export const AddEulerCollateralModal: FC<AddEulerCollateralModalProps> = ({
@@ -67,11 +54,8 @@ export const AddEulerCollateralModal: FC<AddEulerCollateralModalProps> = ({
   } = useTokenSelectModal<CollateralOption>({ onClose });
 
   // Fetch all vaults to get collateral info
-  const { data: allVaults = [], isLoading: isLoadingVaults } = useQuery({
-    queryKey: ["euler-vaults-add-collateral", chainId],
-    queryFn: () => fetchEulerVaults(chainId),
+  const { data: allVaults = [], isLoading: isLoadingVaults } = useEulerVaultsQuery(chainId, {
     enabled: isOpen && !!chainId,
-    staleTime: 5 * 60 * 1000,
   });
 
   // Find the borrow vault and its accepted collaterals

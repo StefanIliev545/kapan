@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatUnits } from "viem";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { qk } from "~~/lib/queryKeys";
 import { logger } from "~~/utils/logger";
 
 // ============ Types ============
@@ -146,39 +147,8 @@ export function sortMarketsByLiquidityDesc(markets: MorphoMarket[]): MorphoMarke
 
 // ============ API Fetchers ============
 
-async function fetchMorphoMarkets(chainId: number, search?: string): Promise<MorphoMarket[]> {
-  try {
-    const params = new URLSearchParams({
-      first: "2000",
-      // Use curated mode (default): includes whitelisted markets + markets listed via vaults, excludes HIGH warnings
-      curation: "curated",
-      // Optional safety rails (opt-in to avoid filtering everything)
-      minLiquidityUsd: "10000",
-      hideSaturated: "true",
-    });
-
-    // Forward search parameter to API if provided
-    if (search && search.trim().length > 0) {
-      params.set("search", search.trim());
-    }
-
-    const response = await fetch(`/api/morpho/${chainId}/markets?${params.toString()}`);
-    if (!response.ok) {
-      console.error(`[useMorphoLendingPositions] Markets API error: ${response.status}`);
-      return [];
-    }
-    const data = await response.json();
-    const items: MorphoMarket[] = data?.markets?.items || [];
-
-    console.log(`[useMorphoLendingPositions] Fetched ${items.length} markets`);
-
-    // Client-side safety net (ensures liquidity-first ordering even if server-side ordering was unavailable)
-    return sortMarketsByLiquidityDesc(items);
-  } catch (error) {
-    console.error("[useMorphoLendingPositions] Failed to fetch markets:", error);
-    return [];
-  }
-}
+// fetchMorphoMarkets is imported from ~~/utils/morpho/marketApi
+import { fetchMorphoMarkets as fetchMorphoMarketsApi } from "~~/utils/morpho/marketApi";
 
 async function fetchMorphoPositions(
   chainId: number,
@@ -243,8 +213,8 @@ export function useMorphoLendingPositions(
     error: marketsError,
     refetch: refetchMarkets,
   } = useQuery({
-    queryKey: ["morpho-markets", chainId],
-    queryFn: () => fetchMorphoMarkets(chainId),
+    queryKey: qk.morpho.markets(chainId),
+    queryFn: () => fetchMorphoMarketsApi(chainId),
     staleTime: 10_000, // 1 minute
     refetchOnWindowFocus: false,
     enabled: chainId > 0,
@@ -258,7 +228,7 @@ export function useMorphoLendingPositions(
     error: positionsError,
     refetch: refetchPositions,
   } = useQuery({
-    queryKey: ["morpho-positions", chainId, userAddress],
+    queryKey: qk.morpho.positions(chainId, userAddress as string),
     queryFn: () => fetchMorphoPositions(chainId, userAddress as string),
     staleTime: 30_000, // 30 seconds
     refetchOnWindowFocus: false,
@@ -404,10 +374,10 @@ export function useMorphoMarkets(chainId: number, search?: string) {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["morpho-markets", chainId, normalizedSearch],
+    queryKey: qk.morpho.markets(chainId, normalizedSearch),
     queryFn: () => {
       logger.debug("[useMorphoMarkets] Fetching markets with search:", normalizedSearch || "(none)");
-      return fetchMorphoMarkets(chainId, normalizedSearch);
+      return fetchMorphoMarketsApi(chainId, { search: normalizedSearch });
     },
     staleTime: 30_000, // Reduced from 60s to 30s for search responsiveness
     refetchOnWindowFocus: false,

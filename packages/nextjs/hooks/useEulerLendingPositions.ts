@@ -3,11 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useReadContracts } from "wagmi";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { qk } from "~~/lib/queryKeys";
 import type {
   EulerVaultInfo,
   EulerCollateralPosition,
   EulerPositionGroup,
 } from "~~/app/api/euler/[chainId]/positions/route";
+import { fetchEulerVaults as fetchEulerVaultsApi } from "~~/utils/euler/vaultApi";
 
 // Euler vault ABI for balance queries
 const EULER_VAULT_ABI = [
@@ -204,31 +206,7 @@ export interface EulerPositionRow {
 
 // ============ API Fetchers ============
 
-async function fetchEulerVaults(chainId: number, search?: string): Promise<EulerVault[]> {
-  try {
-    const params = new URLSearchParams({
-      first: "500",
-    });
-
-    if (search && search.trim().length > 0) {
-      params.set("search", search.trim());
-    }
-
-    const response = await fetch(`/api/euler/${chainId}/vaults?${params.toString()}`);
-    if (!response.ok) {
-      console.error(`[useEulerLendingPositions] Vaults API error: ${response.status}`);
-      return [];
-    }
-    const data = await response.json();
-    const vaults: EulerVault[] = data?.vaults || [];
-
-    console.log(`[useEulerLendingPositions] Fetched ${vaults.length} vaults`);
-    return vaults;
-  } catch (error) {
-    console.error("[useEulerLendingPositions] Failed to fetch vaults:", error);
-    return [];
-  }
-}
+// fetchEulerVaults is imported from ~~/utils/euler/vaultApi
 
 interface PositionsApiResponse {
   positions: EulerPosition[];
@@ -302,8 +280,8 @@ export function useEulerLendingPositions(
     error: vaultsError,
     refetch: refetchVaults,
   } = useQuery({
-    queryKey: ["euler-vaults", chainId],
-    queryFn: () => fetchEulerVaults(chainId),
+    queryKey: qk.euler.vaults(chainId),
+    queryFn: () => fetchEulerVaultsApi(chainId),
     staleTime: 60_000, // 1 minute
     refetchOnWindowFocus: false,
     enabled: chainId > 0,
@@ -317,7 +295,7 @@ export function useEulerLendingPositions(
     error: positionsError,
     refetch: refetchPositions,
   } = useQuery({
-    queryKey: ["euler-positions", chainId, userAddress],
+    queryKey: qk.euler.positions(chainId, userAddress as string),
     queryFn: () => fetchEulerPositions(chainId, userAddress as string),
     staleTime: 30_000, // 30 seconds
     refetchOnWindowFocus: false,
@@ -336,21 +314,17 @@ export function useEulerLendingPositions(
     setHasLoadedOnce(false);
   }, [userAddress, chainId]);
 
-  // Extract position groups from API response
-  const positionGroups = positionsData?.positionGroups ?? [];
+  // Extract position groups from API response - memoized to ensure stable reference
+  // and avoid dependency warnings in downstream useMemo hooks
+  const positionGroups = useMemo(() => {
+    return positionsData?.positionGroups ?? [];
+  }, [positionsData?.positionGroups]);
 
-  // Get vault addresses for on-chain balance queries
-  const vaultAddresses = useMemo(() => {
-    const positions = positionsData?.positions ?? [];
-    return positions
-      .filter((pos) => pos.supplyShares !== "0" || pos.borrowShares !== "0")
-      .map((pos) => pos.vault.address as `0x${string}`);
-  }, [positionsData]);
-
-  // Build multicall contracts for balance queries
-  // For each vault: balanceOf(user), debtOf(user)
+  // Build multicall contracts for balance queries using sub-account addresses
+  // IMPORTANT: Euler V2 uses sub-accounts, so we must query balanceOf/debtOf
+  // using the sub-account address, NOT the main user address!
   const balanceContracts = useMemo(() => {
-    if (!userAddress || vaultAddresses.length === 0) return [];
+    if (!positionGroups.length) return [];
 
     const contracts: Array<{
       address: `0x${string}`;
@@ -358,29 +332,40 @@ export function useEulerLendingPositions(
       functionName: "balanceOf" | "debtOf";
       args: [`0x${string}`];
       chainId: number;
+      // Track which sub-account and vault type for parsing results
+      _meta: { subAccount: string; vaultAddress: string; type: "collateral" | "debt" };
     }> = [];
 
-    for (const vaultAddr of vaultAddresses) {
-      // balanceOf - returns shares
-      contracts.push({
-        address: vaultAddr,
-        abi: EULER_VAULT_ABI,
-        functionName: "balanceOf",
-        args: [userAddress as `0x${string}`],
-        chainId,
-      });
-      // debtOf - returns debt in asset units
-      contracts.push({
-        address: vaultAddr,
-        abi: EULER_VAULT_ABI,
-        functionName: "debtOf",
-        args: [userAddress as `0x${string}`],
-        chainId,
-      });
+    for (const group of positionGroups) {
+      const subAccount = group.subAccount as `0x${string}`;
+
+      // Query balanceOf for each collateral vault (using sub-account address)
+      for (const col of group.collaterals) {
+        contracts.push({
+          address: col.vault.address as `0x${string}`,
+          abi: EULER_VAULT_ABI,
+          functionName: "balanceOf",
+          args: [subAccount],
+          chainId,
+          _meta: { subAccount: group.subAccount, vaultAddress: col.vault.address, type: "collateral" },
+        });
+      }
+
+      // Query debtOf for debt vault (using sub-account address)
+      if (group.debt) {
+        contracts.push({
+          address: group.debt.vault.address as `0x${string}`,
+          abi: EULER_VAULT_ABI,
+          functionName: "debtOf",
+          args: [subAccount],
+          chainId,
+          _meta: { subAccount: group.subAccount, vaultAddress: group.debt.vault.address, type: "debt" },
+        });
+      }
     }
 
     return contracts;
-  }, [userAddress, vaultAddresses, chainId]);
+  }, [positionGroups, chainId]);
 
   // Fetch on-chain balances
   const { data: balanceResults } = useReadContracts({
@@ -535,43 +520,91 @@ export function useEulerLendingPositions(
     return map;
   }, [liquidityResults, positionGroups]);
 
-  // Parse balance results into a map: vaultAddress -> { shares, debt }
+  // Parse balance results into a map: "subAccount:vaultAddress" -> { shares, debt }
+  // We key by both sub-account and vault since the same vault can have different
+  // balances on different sub-accounts
   const balanceMap = useMemo(() => {
     const map = new Map<string, { shares: bigint; debt: bigint }>();
-    if (!balanceResults || balanceResults.length === 0) return map;
+    if (!balanceResults || balanceResults.length === 0 || !balanceContracts.length) return map;
 
-    for (let i = 0; i < vaultAddresses.length; i++) {
-      const sharesResult = balanceResults[i * 2];
-      const debtResult = balanceResults[i * 2 + 1];
-
-      const shares = sharesResult?.status === "success" ? (sharesResult.result as bigint) : 0n;
-      const debt = debtResult?.status === "success" ? (debtResult.result as bigint) : 0n;
-
-      map.set(vaultAddresses[i].toLowerCase(), { shares, debt });
+    // Validate array alignment - this should never happen, but guard against race conditions
+    if (balanceResults.length !== balanceContracts.length) {
+      console.error(
+        `[useEulerLendingPositions] Balance data mismatch: ${balanceResults.length} results vs ${balanceContracts.length} contracts. ` +
+        `This may cause missing balance data. The arrays should be aligned.`
+      );
     }
 
+    for (let i = 0; i < balanceResults.length; i++) {
+      const result = balanceResults[i];
+      const contract = balanceContracts[i];
+
+      // Log error instead of silently skipping when _meta is missing
+      // This indicates a data integrity issue that should be investigated
+      if (!contract?._meta) {
+        console.error(
+          `[useEulerLendingPositions] Missing _meta for contract at index ${i}. ` +
+          `Contract: ${JSON.stringify(contract)}. ` +
+          `This entry will be skipped, which may cause incorrect balance display.`
+        );
+        continue;
+      }
+
+      const { subAccount, vaultAddress, type } = contract._meta;
+      const key = `${subAccount.toLowerCase()}:${vaultAddress.toLowerCase()}`;
+
+      // Get or create entry
+      const existing = map.get(key) ?? { shares: 0n, debt: 0n };
+
+      if (result?.status === "success") {
+        const value = result.result as bigint;
+        if (type === "collateral") {
+          existing.shares = value;
+        } else {
+          existing.debt = value;
+        }
+      } else if (result?.status === "failure") {
+        // Log failed balance queries for debugging
+        console.warn(
+          `[useEulerLendingPositions] Balance query failed for ${type} at vault ${vaultAddress} ` +
+          `(subAccount: ${subAccount}): ${result.error}`
+        );
+      }
+
+      map.set(key, existing);
+    }
+
+    console.log("[useEulerLendingPositions] Balance map:", Array.from(map.entries()).map(([k, v]) => ({
+      key: k,
+      shares: v.shares.toString(),
+      debt: v.debt.toString(),
+    })));
+
     return map;
-  }, [balanceResults, vaultAddresses]);
+  }, [balanceResults, balanceContracts]);
 
   // Enrich position groups with on-chain balance and liquidity data
   const enrichedPositionGroups = useMemo<EulerPositionGroupWithBalances[]>(() => {
     if (!positionGroups.length) return [];
 
     return positionGroups.map((group): EulerPositionGroupWithBalances => {
-      // Enrich collaterals with balance data
+      const subAccountLower = group.subAccount.toLowerCase();
+
+      // Enrich collaterals with balance data (using subAccount:vault key)
       const enrichedCollaterals: EulerCollateralWithBalance[] = group.collaterals.map((col) => {
-        const balanceData = balanceMap.get(col.vault.address.toLowerCase());
+        const key = `${subAccountLower}:${col.vault.address.toLowerCase()}`;
+        const balanceData = balanceMap.get(key);
         return {
           ...col,
           balance: balanceData?.shares ?? 0n,
         };
       });
 
-      // Enrich debt with balance data
+      // Enrich debt with balance data (using subAccount:vault key)
       const enrichedDebt: EulerDebtWithBalance | null = group.debt
         ? {
             vault: group.debt.vault,
-            balance: balanceMap.get(group.debt.vault.address.toLowerCase())?.debt ?? 0n,
+            balance: balanceMap.get(`${subAccountLower}:${group.debt.vault.address.toLowerCase()}`)?.debt ?? 0n,
           }
         : null;
 
@@ -635,50 +668,88 @@ export function useEulerLendingPositions(
     });
   }, [positionGroups, balanceMap, liquidityMap]);
 
-  // Build position rows with on-chain balances
+  // Build position rows from enriched position groups (for legacy flat view)
+  // Each row represents a vault within a specific sub-account
   const rows = useMemo<EulerPositionRow[]>(() => {
-    const positions = positionsData?.positions ?? [];
-    if (!positions.length) return [];
+    const result: EulerPositionRow[] = [];
 
-    return positions
-      .filter((pos) => pos.supplyShares !== "0" || pos.borrowShares !== "0")
-      .map((pos): EulerPositionRow => {
-        const vault = pos.vault;
-        const decimals = vault.asset.decimals;
+    for (const group of enrichedPositionGroups) {
+      // Add rows for collateral positions (supply)
+      for (const col of group.collaterals) {
+        const vault = col.vault;
+        const supplyBalance = col.balance;
 
-        // Get on-chain balances (shares for supply, debt for borrow)
-        const onChainData = balanceMap.get(vault.address.toLowerCase());
-        // For supply, shares ARE the balance (ERC4626 vault shares)
-        // We'd need convertToAssets to get actual asset amount, but shares work for display
-        const supplyBalance = onChainData?.shares ?? 0n;
-        const borrowBalance = onChainData?.debt ?? 0n;
+        // Only include if has balance
+        if (supplyBalance === 0n) continue;
 
-        // Placeholder USD values (would need price feed integration)
-        const supplyBalanceUsd = 0;
-        const borrowBalanceUsd = 0;
+        const context = createEulerContext(
+          group.debt?.vault.address ?? vault.address, // borrow vault (or self if no debt)
+          vault.address // collateral vault
+        );
 
-        // Context uses the vault as both borrow and collateral by default
-        // In multi-vault scenarios, this would be different
-        const context = createEulerContext(vault.address, vault.address);
-
-        return {
-          key: vault.address,
-          vault,
+        result.push({
+          key: `${group.subAccount}:${vault.address}`,
+          vault: {
+            address: vault.address,
+            name: vault.name,
+            symbol: vault.symbol,
+            asset: vault.asset,
+            supplyApy: vault.supplyApy,
+            borrowApy: vault.borrowApy,
+          },
           context,
           assetSymbol: vault.asset.symbol,
           supplyBalance,
-          supplyBalanceUsd,
-          supplyDecimals: decimals,
-          borrowBalance,
-          borrowBalanceUsd,
-          borrowDecimals: decimals,
+          supplyBalanceUsd: 0, // Would need price feed
+          supplyDecimals: vault.asset.decimals,
+          borrowBalance: 0n,
+          borrowBalanceUsd: 0,
+          borrowDecimals: vault.asset.decimals,
           supplyApy: (vault.supplyApy ?? 0) * 100,
           borrowApy: (vault.borrowApy ?? 0) * 100,
-          hasSupply: supplyBalance > 0n,
-          hasDebt: borrowBalance > 0n,
-        };
-      });
-  }, [positionsData, balanceMap]);
+          hasSupply: true,
+          hasDebt: false,
+        });
+      }
+
+      // Add row for debt position if exists
+      if (group.debt && group.debt.balance > 0n) {
+        const vault = group.debt.vault;
+        const borrowBalance = group.debt.balance;
+
+        const context = createEulerContext(
+          vault.address,
+          group.collaterals[0]?.vault.address ?? vault.address
+        );
+
+        result.push({
+          key: `${group.subAccount}:${vault.address}:debt`,
+          vault: {
+            address: vault.address,
+            name: vault.name,
+            symbol: vault.symbol,
+            asset: vault.asset,
+            supplyApy: vault.supplyApy,
+            borrowApy: vault.borrowApy,
+          },
+          context,
+          assetSymbol: vault.asset.symbol,
+          supplyBalance: 0n,
+          supplyBalanceUsd: 0,
+          supplyDecimals: vault.asset.decimals,
+          borrowBalance,
+          borrowBalanceUsd: 0, // Would need price feed
+          borrowDecimals: vault.asset.decimals,
+          supplyApy: (vault.supplyApy ?? 0) * 100,
+          borrowApy: (vault.borrowApy ?? 0) * 100,
+          hasSupply: false,
+          hasDebt: true,
+        });
+      }
+    }
+
+    return result;
+  }, [enrichedPositionGroups]);
 
   // Convert to ProtocolPosition format for compatibility
   const suppliedPositions = useMemo<ProtocolPosition[]>(() => {
@@ -756,8 +827,8 @@ export function useEulerVaults(chainId: number, search?: string) {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["euler-vaults", chainId, normalizedSearch],
-    queryFn: () => fetchEulerVaults(chainId, normalizedSearch),
+    queryKey: qk.euler.vaults(chainId, normalizedSearch),
+    queryFn: () => fetchEulerVaultsApi(chainId, { search: normalizedSearch }),
     staleTime: 60_000,
     refetchOnWindowFocus: false,
     enabled: chainId > 0,

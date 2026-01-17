@@ -137,6 +137,13 @@ interface IEulerVault {
             uint256 liabilityValue
         );
 
+    // ============ Controller Management ============
+
+    /// @notice Disable this vault as controller for the authenticated account
+    /// @dev Must be called through EVC.call() with proper onBehalfOfAccount context
+    ///      Reverts if the account has outstanding debt to this vault
+    function disableController() external;
+
     // ============ Vault Info ============
 
     /// @notice Name of the vault token

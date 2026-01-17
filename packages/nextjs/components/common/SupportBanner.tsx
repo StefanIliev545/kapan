@@ -23,7 +23,7 @@ export const SupportBanner: React.FC<SupportBannerProps> = ({ className = "" }) 
             transform: rotate(360deg);
           }
         }
-        
+
         .animate-rotate-glow {
           animation: rotateGlow 4s linear infinite;
         }

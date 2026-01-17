@@ -1,4 +1,5 @@
 import { FC, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useDebounceValue } from "usehooks-ts";
 import { track } from "@vercel/analytics";
 import { formatUnits, parseUnits, Address, PublicClient, WalletClient, encodeAbiParameters } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
@@ -386,6 +387,8 @@ interface CollateralSwapModalProps {
     eulerBorrowVault?: string;
     /** Euler-specific: Current collateral vault address */
     eulerCollateralVault?: string;
+    /** Euler-specific: Sub-account index (0-255) */
+    eulerSubAccountIndex?: number;
 }
 
 export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
@@ -401,6 +404,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     debtTokenAddress,
     eulerBorrowVault,
     eulerCollateralVault,
+    eulerSubAccountIndex,
 }) => {
     const { buildCollateralSwapFlow } = useKapanRouterV2();
     const isMorpho = normalizeProtocolName(protocolName) === "morpho-blue";
@@ -414,22 +418,15 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         enabled: isMorpho && isOpen && !!debtTokenAddress,
     });
 
-    // Euler: Get target collateral symbols from available assets (excluding current)
-    const eulerTargetSymbols = useMemo(() => {
-        if (!isEuler) return [];
-        return availableAssets
-            .filter(a => a.address.toLowerCase() !== initialFromTokenAddress?.toLowerCase())
-            .map(a => a.symbol);
-    }, [isEuler, availableAssets, initialFromTokenAddress]);
-
-    // Euler: Fetch compatible collateral vaults for the borrow vault
+    // Euler: Fetch ALL compatible collateral vaults for the borrow vault
+    // Uses token addresses (not symbols) for reliable matching
     const {
-        targetVaultsBySymbol: eulerTargetVaults,
+        targetVaultsByAddress: eulerTargetVaults,
         isLoading: isEulerVaultsLoading,
     } = useEulerCollateralSwapVaults({
         chainId,
         borrowVaultAddress: eulerBorrowVault || "",
-        targetCollateralSymbols: eulerTargetSymbols,
+        currentCollateralAddress: initialFromTokenAddress || "",
         enabled: isEuler && isOpen && !!eulerBorrowVault,
     });
 
@@ -522,6 +519,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const [isMax, setIsMax] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Debounce amountIn to prevent race conditions where quotes return for stale inputs
+    const [debouncedAmountIn] = useDebounceValue(amountIn, 300);
+    const isInputSettling = amountIn !== debouncedAmountIn;
+
     // Execution type: "market" (flash loan, instant) vs "limit" (CoW, async)
     const [executionType, setExecutionType] = useState<ExecutionType>("market");
     
@@ -576,16 +577,26 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                     marketId: m.uniqueKey,
                 } as SwapAsset));
         }
-        // For Euler: only show assets that have a compatible collateral vault
+        // For Euler: build target assets from ALL accepted collaterals (by address)
+        // This allows swapping to any collateral the borrow vault accepts, not just existing ones
         if (isEuler && Object.keys(eulerTargetVaults).length > 0) {
-            return availableAssets
-                .filter(a => {
-                    if (a.address.toLowerCase() === selectedFrom?.address.toLowerCase()) return false;
-                    // Check if this asset's symbol has a compatible vault
-                    const normalizedSymbol = a.symbol.toLowerCase();
-                    return !!eulerTargetVaults[normalizedSymbol];
+            return Object.values(eulerTargetVaults)
+                .filter(vault => {
+                    // Exclude currently selected "from" asset
+                    if (vault.tokenAddress.toLowerCase() === selectedFrom?.address.toLowerCase()) return false;
+                    return true;
                 })
-                .map(a => a as SwapAsset);
+                .map(vault => ({
+                    symbol: vault.tokenSymbol,
+                    address: vault.tokenAddress as Address,
+                    decimals: vault.decimals,
+                    rawBalance: 0n, // No existing balance for new collateral
+                    balance: 0,
+                    icon: tokenNameToLogo(vault.tokenSymbol.toLowerCase()),
+                    price: undefined, // Price will be fetched if needed
+                    // Store vault address for context encoding
+                    eulerCollateralVault: vault.vaultAddress,
+                } as SwapAsset));
         }
         return availableAssets.filter(a => a.address.toLowerCase() !== selectedFrom?.address.toLowerCase()) as SwapAsset[];
     }, [isMorpho, morphoTargetMarkets, availableAssets, selectedFrom, isEuler, eulerTargetVaults]);
@@ -608,20 +619,32 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         return encodeEulerContext({
             borrowVault: eulerBorrowVault as Address,
             collateralVault: eulerCollateralVault as Address,
+            subAccountIndex: eulerSubAccountIndex,
         });
-    }, [isEuler, eulerBorrowVault, eulerCollateralVault]);
+    }, [isEuler, eulerBorrowVault, eulerCollateralVault, eulerSubAccountIndex]);
 
     // New context: deposit to target collateral vault (determined by selectedTo)
     const newEulerContextEncoded = useMemo(() => {
         if (!isEuler || !eulerBorrowVault || !selectedTo) return undefined;
-        const normalizedSymbol = selectedTo.symbol.toLowerCase();
-        const targetVault = eulerTargetVaults[normalizedSymbol];
+        // First check if the selectedTo asset has an eulerCollateralVault attached (from our target assets)
+        const eulerVaultFromAsset = (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault;
+        if (eulerVaultFromAsset) {
+            return encodeEulerContext({
+                borrowVault: eulerBorrowVault as Address,
+                collateralVault: eulerVaultFromAsset as Address,
+                subAccountIndex: eulerSubAccountIndex,
+            });
+        }
+        // Fallback: look up by token address in the target vaults map
+        const tokenAddr = selectedTo.address.toLowerCase();
+        const targetVault = eulerTargetVaults[tokenAddr];
         if (!targetVault) return undefined;
         return encodeEulerContext({
             borrowVault: eulerBorrowVault as Address,
             collateralVault: targetVault.vaultAddress as Address,
+            subAccountIndex: eulerSubAccountIndex,
         });
-    }, [isEuler, eulerBorrowVault, selectedTo, eulerTargetVaults]);
+    }, [isEuler, eulerBorrowVault, selectedTo, eulerTargetVaults, eulerSubAccountIndex]);
 
     // Auto-switch to Pendle when a PT token is involved in the swap
     useEffect(() => {
@@ -685,11 +708,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     // Unified quote data
     // Include Morpho markets loading for Morpho protocol, Euler vaults loading for Euler
+    // Include isInputSettling to show loading state while user is typing (prevents stale quotes)
     const isQuoteLoading = (executionType === "limit"
         ? isCowQuoteLoading
         : (swapRouter === "1inch" ? is1inchLoading : isPendleLoading))
         || (isMorpho && isMorphoMarketsLoading)
-        || (isEuler && isEulerVaultsLoading);
+        || (isEuler && isEulerVaultsLoading)
+        || isInputSettling;
     const quoteError = swapRouter === "1inch" ? oneInchError : pendleError;
     
     // Get best quote from available sources (for limit orders, use CoW quote)

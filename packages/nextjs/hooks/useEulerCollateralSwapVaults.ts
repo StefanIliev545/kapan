@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { EulerVaultResponse, CollateralInfo } from "~~/app/api/euler/[chainId]/vaults/route";
+import type { CollateralInfo } from "~~/app/api/euler/[chainId]/vaults/route";
+import { useEulerVaultsQuery } from "~~/utils/euler/vaultApi";
 
 /**
  * Hook to find compatible Euler collateral vaults for collateral swap.
@@ -25,105 +25,94 @@ export interface UseEulerCollateralSwapVaultsParams {
   chainId: number;
   /** The user's current borrow vault address */
   borrowVaultAddress: string;
-  /** Symbols of tokens user wants to swap TO (for matching) */
-  targetCollateralSymbols: string[];
+  /** Optional: Current collateral token address to exclude from targets */
+  currentCollateralAddress?: string;
   enabled?: boolean;
 }
 
 export interface UseEulerCollateralSwapVaultsResult {
-  /** Map of token symbol (lowercase) → EulerCollateralSwapTarget */
-  targetVaultsBySymbol: Record<string, EulerCollateralSwapTarget>;
+  /** Map of token address (lowercase) → EulerCollateralSwapTarget */
+  targetVaultsByAddress: Record<string, EulerCollateralSwapTarget>;
   /** All accepted collateral vaults for the borrow vault */
   allAcceptedCollaterals: CollateralInfo[];
   isLoading: boolean;
   error: Error | null;
 }
 
-async function fetchEulerVaults(chainId: number): Promise<EulerVaultResponse[]> {
-  try {
-    const response = await fetch(`/api/euler/${chainId}/vaults?first=500`);
-    if (!response.ok) return [];
-    const data = await response.json();
-    return data?.vaults || [];
-  } catch {
-    return [];
-  }
-}
-
-function normalizeSymbol(symbol: string): string {
-  const s = symbol.toLowerCase().trim();
-  if (s === "weth" || s === "eth") return "eth";
-  if (s === "wbtc" || s === "btc") return "btc";
-  if (s === "wsteth" || s === "steth") return "steth";
-  return s;
-}
-
 export function useEulerCollateralSwapVaults({
   chainId,
   borrowVaultAddress,
-  targetCollateralSymbols,
+  currentCollateralAddress,
   enabled = true,
 }: UseEulerCollateralSwapVaultsParams): UseEulerCollateralSwapVaultsResult {
   const {
     data: allVaults,
     isLoading,
     error,
-  } = useQuery({
-    queryKey: ["euler-vaults-collateral-swap", chainId],
-    queryFn: () => fetchEulerVaults(chainId),
+  } = useEulerVaultsQuery(chainId, {
     enabled: enabled && !!chainId && !!borrowVaultAddress,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
   });
 
-  const { targetVaultsBySymbol, allAcceptedCollaterals } = useMemo(() => {
+  const { targetVaultsByAddress, allAcceptedCollaterals } = useMemo(() => {
     if (!allVaults || !borrowVaultAddress) {
-      return { targetVaultsBySymbol: {}, allAcceptedCollaterals: [] };
+      return { targetVaultsByAddress: {}, allAcceptedCollaterals: [] };
     }
 
     const borrowAddr = borrowVaultAddress.toLowerCase();
+    const excludeAddr = currentCollateralAddress?.toLowerCase();
 
     // Find the borrow vault
     const borrowVault = allVaults.find(v => v.address.toLowerCase() === borrowAddr);
     if (!borrowVault) {
-      return { targetVaultsBySymbol: {}, allAcceptedCollaterals: [] };
+      console.log("[useEulerCollateralSwapVaults] Borrow vault not found:", borrowAddr);
+      return { targetVaultsByAddress: {}, allAcceptedCollaterals: [] };
     }
 
     // Get all collaterals accepted by this borrow vault
     const acceptedCollaterals = borrowVault.collaterals || [];
+    console.log("[useEulerCollateralSwapVaults] Accepted collaterals for borrow vault:", acceptedCollaterals.length);
 
-    // Build map of target symbols to vault info
-    const targetSymbolsNormalized = new Set(
-      targetCollateralSymbols.map(s => normalizeSymbol(s))
-    );
-
-    const bySymbol: Record<string, EulerCollateralSwapTarget> = {};
+    // Build map of token address -> vault info
+    // Include ALL accepted collaterals (excluding current)
+    const byAddress: Record<string, EulerCollateralSwapTarget> = {};
 
     for (const collateral of acceptedCollaterals) {
-      const normalized = normalizeSymbol(collateral.tokenSymbol);
-      if (targetSymbolsNormalized.has(normalized)) {
-        // Look up the vault details from allVaults to get token address and decimals
-        const vaultDetails = allVaults.find(
-          v => v.address.toLowerCase() === collateral.vaultAddress.toLowerCase()
-        );
-        bySymbol[normalized] = {
-          vaultAddress: collateral.vaultAddress,
-          tokenAddress: vaultDetails?.asset?.address || "",
-          tokenSymbol: collateral.tokenSymbol,
-          decimals: vaultDetails?.asset?.decimals || 18,
-          ltv: 0, // LTV not available in CollateralInfo, will be determined by borrow vault
-        };
+      // Look up the vault details from allVaults to get token address and decimals
+      const vaultDetails = allVaults.find(
+        v => v.address.toLowerCase() === collateral.vaultAddress.toLowerCase()
+      );
+
+      const tokenAddress = vaultDetails?.asset?.address?.toLowerCase() || "";
+
+      // Skip if no token address found
+      if (!tokenAddress) {
+        continue;
       }
+
+      // Skip if this is the current collateral (by token address)
+      if (excludeAddr && tokenAddress === excludeAddr) {
+        continue;
+      }
+
+      byAddress[tokenAddress] = {
+        vaultAddress: collateral.vaultAddress,
+        tokenAddress: vaultDetails?.asset?.address || "",
+        tokenSymbol: collateral.tokenSymbol,
+        decimals: vaultDetails?.asset?.decimals || 18,
+        ltv: 0, // LTV not available in CollateralInfo, will be determined by borrow vault
+      };
     }
 
+    console.log("[useEulerCollateralSwapVaults] Target vaults by address:", Object.keys(byAddress));
+
     return {
-      targetVaultsBySymbol: bySymbol,
+      targetVaultsByAddress: byAddress,
       allAcceptedCollaterals: acceptedCollaterals,
     };
-  }, [allVaults, borrowVaultAddress, targetCollateralSymbols]);
+  }, [allVaults, borrowVaultAddress, currentCollateralAddress]);
 
   return {
-    targetVaultsBySymbol,
+    targetVaultsByAddress,
     allAcceptedCollaterals,
     isLoading,
     error: error as Error | null,

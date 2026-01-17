@@ -3,6 +3,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckIcon } from "@heroicons/react/24/outline";
 import { formatUnits } from "viem";
+import { addrKey } from "~~/utils/address";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
 import { MorphoMarketSelector } from "../common/MorphoMarketSelector";
 import { ErrorDisplay } from "../common/ErrorDisplay";
@@ -167,9 +168,9 @@ const CollateralTile = memo<CollateralTileProps>(({
   const c = collateral;
 
   const handleClick = useCallback(() => {
-    if (c.balance <= 0 || disableCollateralSelection || morphoHasOtherSelected) return;
+    if (c.balance <= 0 || morphoHasOtherSelected) return;
     onTileClick(c.address);
-  }, [c.balance, c.address, disableCollateralSelection, morphoHasOtherSelected, onTileClick]);
+  }, [c.balance, c.address, morphoHasOtherSelected, onTileClick]);
 
   const handleMaxClick = useCallback(() => {
     onMaxClick(c.rawBalance, c.decimals);
@@ -205,22 +206,10 @@ const CollateralTile = memo<CollateralTileProps>(({
         </span>
       </div>
 
-      {isExpanded && !disableCollateralSelection && (
+      {isExpanded && (
         <CollateralAmountInputStyled
           variant="expanded"
           value={tempAmount}
-          onChange={onInputChange}
-          onMaxClick={handleMaxClick}
-          onConfirm={handleConfirm}
-          rawBalance={c.rawBalance}
-          decimals={c.decimals}
-          balance={c.balance}
-        />
-      )}
-      {disableCollateralSelection && !isAdded && (
-        <CollateralAmountInputStyled
-          variant="preselected"
-          value={tempAmount || ""}
           onChange={onInputChange}
           onMaxClick={handleMaxClick}
           onConfirm={handleConfirm}
@@ -299,6 +288,8 @@ export type RefinanceModalContentProps = {
     amount?: bigint;
     maxAmount?: bigint;
     inputValue?: string;
+    /** Euler-specific: The collateral vault address for this collateral */
+    eulerCollateralVault?: string;
   }>;
   getUsdValue: (address: string, amount: string) => number;
 
@@ -339,6 +330,10 @@ export type RefinanceModalContentProps = {
   // Euler-specific props (EVM only)
   isEulerSelected?: boolean;
   eulerSupportedCollaterals?: Record<string, boolean>;
+  /** Euler sub-account index (0 = main account, 1-255 = sub-accounts) */
+  eulerSubAccountIndex?: number;
+  /** Whether this will create a new Euler sub-account vs adding to existing */
+  isNewEulerSubAccount?: boolean;
 };
 
 export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
@@ -413,9 +408,9 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
   // Euler-specific props
   isEulerSelected,
   eulerSupportedCollaterals,
+  eulerSubAccountIndex,
+  isNewEulerSubAccount,
 }) => {
-  const addrKey = (a?: string) => (a ?? "").toLowerCase();
-
   // Determine effective supported collateral map
   // When Morpho or Euler is selected, use their respective support maps
   const effectiveCollateralSupport = isMorphoSelected && morphoSupportedCollaterals
@@ -700,6 +695,29 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Euler sub-account indicator */}
+            {isEulerSelected && eulerSubAccountIndex !== undefined && (
+              <div className="bg-base-200 mt-2 rounded-lg px-3 py-2 text-sm">
+                <span className="text-base-content/70">
+                  {isNewEulerSubAccount ? (
+                    <>
+                      Will create <span className="text-warning font-medium">new position</span>
+                      {eulerSubAccountIndex > 0 && (
+                        <span className="text-base-content/50"> (sub-account #{eulerSubAccountIndex})</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      Will add to <span className="text-success font-medium">existing position</span>
+                      {eulerSubAccountIndex > 0 && (
+                        <span className="text-base-content/50"> (sub-account #{eulerSubAccountIndex})</span>
+                      )}
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="divider my-2" />

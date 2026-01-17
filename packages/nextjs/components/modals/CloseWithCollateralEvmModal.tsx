@@ -1,6 +1,7 @@
 import { FC, useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { useDebounceValue } from "usehooks-ts";
 import { track } from "@vercel/analytics";
-import { formatUnits, parseUnits, Address } from "viem";
+import { formatUnits, parseUnits, Address, encodeAbiParameters, type Hex } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { parseAmount } from "~~/utils/validation";
 import { Tooltip } from "@radix-ui/themes";
@@ -15,7 +16,19 @@ import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { useCowLimitOrder } from "~~/hooks/useCowLimitOrder";
 import { useCowQuote } from "~~/hooks/useCowQuote";
-import { FlashLoanProvider } from "~~/utils/v2/instructionHelpers";
+import {
+    FlashLoanProvider,
+    ProtocolInstruction,
+    createRouterInstruction,
+    createProtocolInstruction,
+    encodeApprove,
+    encodeFlashLoan,
+    encodeLendingInstruction,
+    encodePushToken,
+    encodeToOutput,
+    LendingOp,
+    encodeEulerContext,
+} from "~~/utils/v2/instructionHelpers";
 import { getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
 import { is1inchSupported, isPendleSupported, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
@@ -70,6 +83,15 @@ interface CloseWithCollateralEvmModalProps {
     availableCollaterals: SwapAsset[];
     /** Pre-encoded protocol context (e.g., Morpho MarketParams, Compound market address) */
     context?: string;
+    // ========================================================================
+    // Euler-specific props
+    // ========================================================================
+    /** Euler: Current borrow vault address */
+    eulerBorrowVault?: string;
+    /** Euler: User's collateral vault addresses */
+    eulerCollateralVaults?: string[];
+    /** Euler: Sub-account index (0-255) */
+    eulerSubAccountIndex?: number;
 }
 
 export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> = ({
@@ -85,10 +107,17 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     debtBalance,
     availableCollaterals,
     context,
+    // Euler-specific props
+    eulerBorrowVault,
+    eulerCollateralVaults,
+    eulerSubAccountIndex,
 }) => {
     const {
         buildCloseWithCollateralFlow,
     } = useKapanRouterV2();
+
+    // Protocol detection
+    const isEuler = protocolName.toLowerCase().includes("euler");
 
     // Check swap router availability and get adapter info directly from deployed contracts
     const oneInchAvailable = is1inchSupported(chainId);
@@ -154,10 +183,31 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     const [selectedFrom, setSelectedFrom] = useState<SwapAsset | null>(fromAsset);
     const [selectedTo, setSelectedTo] = useState<SwapAsset | null>(null); // Collateral to sell
+
+    // Euler: Encode context for instructions
+    // Uses the selected collateral vault for context
+    const eulerContextEncoded = useMemo(() => {
+        if (!isEuler || !eulerBorrowVault || !selectedTo) return undefined;
+        // Find the collateral vault for the selected collateral token
+        const selectedCollateralVault = (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault
+            || eulerCollateralVaults?.[0];
+        if (!selectedCollateralVault) return undefined;
+        return encodeEulerContext({
+            borrowVault: eulerBorrowVault as Address,
+            collateralVault: selectedCollateralVault as Address,
+            subAccountIndex: eulerSubAccountIndex,
+        });
+    }, [isEuler, eulerBorrowVault, eulerCollateralVaults, eulerSubAccountIndex, selectedTo]);
+
     const [slippage, setSlippage] = useState<number>(0.1); // Managed by useAutoSlippage after quotes
     const [amountIn, setAmountIn] = useState(""); // Amount of debt to repay
     const [isMax, setIsMax] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Debounce amountIn to prevent race conditions in two-stage quote system
+    // When user rapidly changes amount, this ensures we don't display stale quotes
+    const [debouncedAmountIn] = useDebounceValue(amountIn, 300);
+    const isInputSettling = amountIn !== debouncedAmountIn;
 
     // ============ Limit Order State ============
     const [executionType, setExecutionType] = useState<ExecutionType>("market");
@@ -241,11 +291,11 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         }
     }, [selectedTo, pendleAvailable]);
 
-    // Amount of debt to repay in raw
+    // Amount of debt to repay in raw (uses debounced value for quote calculations)
     const repayAmountRaw = useMemo(() => {
-        const result = parseAmount(amountIn || "0", debtDecimals);
+        const result = parseAmount(debouncedAmountIn || "0", debtDecimals);
         return result.value ?? 0n;
-    }, [amountIn, debtDecimals]);
+    }, [debouncedAmountIn, debtDecimals]);
 
     // For max limit orders, add a small buffer to account for interest accrual
     // between quote time and order fill time. The buffer ensures we buy enough
@@ -352,7 +402,9 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     const isSwapQuoteLoading = swapRouter === "1inch" ? is1inchSwapQuoteLoading : isPendleQuoteLoading;
     const quoteError = swapRouter === "1inch" ? oneInchQuoteError : pendleQuoteError;
-    const isQuoteLoading = isUnitQuoteLoading || isSwapQuoteLoading;
+    // Include isInputSettling to show loading state while user is typing
+    // This prevents displaying stale quotes that don't match current input
+    const isQuoteLoading = isUnitQuoteLoading || isSwapQuoteLoading || isInputSettling;
 
     // Check adapter availability
     const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
@@ -428,7 +480,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         });
     }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtToken, debtName, debtDecimals, cowFlashLoanInfo, limitOrderConfig, isMax]);
 
-    const buildFlow = () => {
+    const buildFlow = (): ProtocolInstruction[] => {
         if (!swapQuote || !selectedTo || !hasAdapter || requiredCollateral === 0n) return [];
 
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
@@ -439,6 +491,89 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             ? repayAmountRaw + (repayAmountRaw * AAVE_FLASH_LOAN_FEE_BPS / 10000n)
             : repayAmountRaw;
 
+        // ========================================================================
+        // EULER: Custom flow with proper context encoding
+        // ========================================================================
+        if (isEuler && eulerContextEncoded && userAddress) {
+            const swapProtocol = swapRouter === "1inch" ? "oneinch" : "pendle";
+            const swapContext = encodeAbiParameters(
+                [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+                [debtToken as Address, swapMinAmountOut, swapQuote.tx.data as Hex]
+            );
+
+            /**
+             * Euler Close with Collateral (Market Order):
+             *
+             * UTXO Layout:
+             * [0] ToOutput(requiredCollateral) -> amount ref
+             * [1] FlashLoan(0) -> collateral tokens
+             * [2] Approve(1, swap) -> dummy
+             * [3],[4] Swap(1) -> debt tokens, collateral refund
+             * [5] Approve(3, euler) -> dummy
+             * [6] Repay(3) -> repay refund
+             * [7] WithdrawCollateral(0) -> to repay flash loan
+             * Push refunds to user
+             */
+            const instructions: ProtocolInstruction[] = [];
+
+            // 0. ToOutput(requiredCollateral) -> [0]
+            instructions.push(
+                createRouterInstruction(encodeToOutput(requiredCollateral, selectedTo.address))
+            );
+
+            // 1. FlashLoan(0) -> [1]
+            instructions.push(
+                createRouterInstruction(encodeFlashLoan(providerEnum, 0))
+            );
+
+            // 2. Approve swap protocol for collateral ([1]) -> [2]
+            instructions.push(
+                createRouterInstruction(encodeApprove(1, swapProtocol))
+            );
+
+            // 3. Swap collateral -> debt (input=1) -> [3] debt, [4] collateral refund
+            instructions.push(
+                createProtocolInstruction(
+                    swapProtocol,
+                    encodeLendingInstruction(LendingOp.Swap, selectedTo.address, userAddress, 0n, swapContext, 1)
+                )
+            );
+
+            // 4. Approve Euler for debt ([3]) -> [5]
+            instructions.push(
+                createRouterInstruction(encodeApprove(3, "euler"))
+            );
+
+            // 5. Repay debt (input=3) -> [6]
+            instructions.push(
+                createProtocolInstruction(
+                    "euler",
+                    encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, eulerContextEncoded, 3)
+                )
+            );
+
+            // 6. Withdraw collateral to repay flash loan (amount from [0]) -> [7]
+            instructions.push(
+                createProtocolInstruction(
+                    "euler",
+                    encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedTo.address, userAddress, 0n, eulerContextEncoded, 0)
+                )
+            );
+
+            // 7. Push refunds to user
+            instructions.push(
+                createRouterInstruction(encodePushToken(6, userAddress)) // repay refund
+            );
+            instructions.push(
+                createRouterInstruction(encodePushToken(4, userAddress)) // swap collateral refund
+            );
+
+            return instructions;
+        }
+
+        // ========================================================================
+        // Standard flow (Aave, Compound, Venus)
+        // ========================================================================
         return buildCloseWithCollateralFlow(
             protocolName,
             selectedTo.address,      // collateral to sell
@@ -846,7 +981,8 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     // Pre-compute execution type dependent props to reduce cognitive complexity in JSX
     const isMarketExecution = executionType === "market";
-    const quoteLoadingProp = isMarketExecution ? isQuoteLoading : isCowQuoteLoading;
+    // Include isInputSettling for both market and limit orders to prevent stale quotes
+    const quoteLoadingProp = isMarketExecution ? isQuoteLoading : (isCowQuoteLoading || isInputSettling);
     const quoteErrorProp = isMarketExecution ? quoteError : null;
     const preferBatchingProp = isMarketExecution ? preferBatching : undefined;
     const setPreferBatchingProp = isMarketExecution ? setPreferBatching : undefined;

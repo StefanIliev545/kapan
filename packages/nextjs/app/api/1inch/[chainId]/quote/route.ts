@@ -29,7 +29,18 @@ export async function GET(
             },
         });
 
-        const data = await response.json();
+        // Parse response text first to handle non-JSON responses
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            console.error("1inch Quote: Invalid JSON response:", text.slice(0, 200));
+            return NextResponse.json(
+                { error: "1inch API returned invalid response", details: text.slice(0, 200) },
+                { status: 500 }
+            );
+        }
 
         if (!response.ok) {
             return NextResponse.json(data, { status: response.status });

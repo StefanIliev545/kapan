@@ -16,7 +16,11 @@ import { SupplyPosition } from "~~/components/SupplyPosition";
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { LoadingSpinner } from "~~/components/common/Loading";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
+import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
+import { CloseWithCollateralEvmModal } from "~~/components/modals/CloseWithCollateralEvmModal";
 import { AddEulerCollateralModal } from "~~/components/modals/AddEulerCollateralModal";
+import { EulerBorrowModal } from "~~/components/modals/EulerBorrowModal";
+import type { SwapAsset } from "~~/components/modals/SwapModalShell";
 import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
 import { useTokenPrices } from "~~/hooks/useTokenPrice";
 import { getEffectiveChainId } from "~~/utils/forkChain";
@@ -163,6 +167,62 @@ const INITIAL_SWAP_STATE: CollateralSwapState = {
   allCollaterals: [],
 };
 
+/** Debt swap state for tracking which debt is being swapped */
+interface DebtSwapState {
+  isOpen: boolean;
+  borrowVault: string;
+  tokenAddress: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  balance: bigint;
+  tokenPrice: bigint;
+  context: `0x${string}`;
+  /** All collateral vault addresses in the position */
+  collateralVaults: string[];
+  subAccountIndex: number;
+}
+
+const INITIAL_DEBT_SWAP_STATE: DebtSwapState = {
+  isOpen: false,
+  borrowVault: "",
+  tokenAddress: "",
+  tokenSymbol: "",
+  tokenDecimals: 18,
+  balance: 0n,
+  tokenPrice: 0n,
+  context: "0x",
+  collateralVaults: [],
+  subAccountIndex: 0,
+};
+
+/** Close modal state for tracking debt position to close */
+interface CloseModalState {
+  isOpen: boolean;
+  borrowVault: string;
+  tokenAddress: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
+  balance: bigint;
+  tokenPrice: bigint;
+  context: `0x${string}`;
+  /** All collateral vault addresses in the position */
+  collateralVaults: string[];
+  subAccountIndex: number;
+}
+
+const INITIAL_CLOSE_STATE: CloseModalState = {
+  isOpen: false,
+  borrowVault: "",
+  tokenAddress: "",
+  tokenSymbol: "",
+  tokenDecimals: 18,
+  balance: 0n,
+  tokenPrice: 0n,
+  context: "0x",
+  collateralVaults: [],
+  subAccountIndex: 0,
+};
+
 /**
  * Display a single position group (1 debt + N collaterals) side by side
  * Uses SupplyPosition for collaterals (left) and BorrowPosition for debt (right)
@@ -175,10 +235,24 @@ interface EulerPositionGroupRowProps {
 }
 
 const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId, pricesRaw }) => {
-  const { debt, collaterals, isMainAccount } = group;
+  const { debt, collaterals, isMainAccount, subAccount } = group;
   const swapModal = useModal();
+  const debtSwapModal = useModal();
+  const closeModal = useModal();
   const addCollateralModal = useModal();
+  const borrowModal = useModal();
   const [swapState, setSwapState] = useState<CollateralSwapState>(INITIAL_SWAP_STATE);
+  const [debtSwapState, setDebtSwapState] = useState<DebtSwapState>(INITIAL_DEBT_SWAP_STATE);
+  const [closeState, setCloseState] = useState<CloseModalState>(INITIAL_CLOSE_STATE);
+
+  // Extract sub-account index from sub-account address (last byte)
+  // Sub-account address = (userAddress & ~0xFF) | subAccountIndex
+  const subAccountIndex = useMemo(() => {
+    if (!subAccount) return 0;
+    // Get last byte of address
+    const lastByte = parseInt(subAccount.slice(-2), 16);
+    return lastByte;
+  }, [subAccount]);
 
   // Helper to get token icon
   const getIcon = (symbol: string) => {
@@ -197,6 +271,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
   const borrowVaultAddress = debt?.vault.address || "0x0000000000000000000000000000000000000000";
 
   // Build moveSupport with preselected collaterals for refinance modal
+  // Include eulerCollateralVault and eulerSubAccountIndex for each collateral to enable per-collateral source contexts
   const moveSupport = useMemo(() => ({
     preselectedCollaterals: collaterals.map((col) => ({
       token: col.vault.asset.address,
@@ -205,10 +280,13 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
       amount: col.balance,
       maxAmount: col.balance,
       supported: true,
+      // Euler-specific: include the collateral vault address and sub-account index for source context
+      eulerCollateralVault: col.vault.address,
+      eulerSubAccountIndex: subAccountIndex,
     })),
     // Euler allows multiple collaterals, so don't disable selection
     disableCollateralSelection: false,
-  }), [collaterals]);
+  }), [collaterals, subAccountIndex]);
 
   // Build available collaterals for swap modal (all collaterals in group)
   const allCollateralsForSwap: BasicCollateral[] = useMemo(() =>
@@ -230,6 +308,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
     const context = encodeEulerContext({
       borrowVault: borrowVaultAddress,
       collateralVault: collateral.vault.address,
+      subAccountIndex,
     }) as `0x${string}`;
     setSwapState({
       isOpen: true,
@@ -243,13 +322,75 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
       allCollaterals: allCollateralsForSwap,
     });
     swapModal.open();
-  }, [borrowVaultAddress, allCollateralsForSwap, swapModal]);
+  }, [borrowVaultAddress, allCollateralsForSwap, swapModal, subAccountIndex]);
 
   // Handler to close collateral swap modal
   const handleCloseSwap = useCallback(() => {
     swapModal.close();
     setSwapState(INITIAL_SWAP_STATE);
   }, [swapModal]);
+
+  // Handler to open debt swap modal
+  const handleOpenDebtSwap = useCallback(() => {
+    if (!debt) return;
+    const symbol = debt.vault.asset.symbol === "???" ? "unknown" : debt.vault.asset.symbol;
+    const primaryCollateralVault = collaterals[0]?.vault.address || debt.vault.address;
+    const context = encodeEulerContext({
+      borrowVault: debt.vault.address,
+      collateralVault: primaryCollateralVault,
+      subAccountIndex,
+    }) as `0x${string}`;
+    setDebtSwapState({
+      isOpen: true,
+      borrowVault: debt.vault.address,
+      tokenAddress: debt.vault.asset.address,
+      tokenSymbol: symbol,
+      tokenDecimals: debt.vault.asset.decimals,
+      balance: debt.balance,
+      tokenPrice: pricesRaw[symbol.toLowerCase()] ?? 0n,
+      context,
+      collateralVaults: collaterals.map(c => c.vault.address),
+      subAccountIndex,
+    });
+    debtSwapModal.open();
+  }, [debt, collaterals, subAccountIndex, pricesRaw, debtSwapModal]);
+
+  // Handler to close debt swap modal
+  const handleCloseDebtSwap = useCallback(() => {
+    debtSwapModal.close();
+    setDebtSwapState(INITIAL_DEBT_SWAP_STATE);
+  }, [debtSwapModal]);
+
+  // Handler to open close with collateral modal
+  const handleOpenCloseModal = useCallback(() => {
+    if (!debt) return;
+    const symbol = debt.vault.asset.symbol === "???" ? "unknown" : debt.vault.asset.symbol;
+    const primaryCollateralVault = collaterals[0]?.vault.address || debt.vault.address;
+    const context = encodeEulerContext({
+      borrowVault: debt.vault.address,
+      collateralVault: primaryCollateralVault,
+      subAccountIndex,
+    }) as `0x${string}`;
+    setCloseState({
+      isOpen: true,
+      borrowVault: debt.vault.address,
+      tokenAddress: debt.vault.asset.address,
+      tokenSymbol: symbol,
+      tokenDecimals: debt.vault.asset.decimals,
+      balance: debt.balance,
+      tokenPrice: pricesRaw[symbol.toLowerCase()] ?? 0n,
+      context,
+      collateralVaults: collaterals.map(c => c.vault.address),
+      subAccountIndex,
+    });
+    closeModal.open();
+  }, [debt, collaterals, subAccountIndex, pricesRaw, closeModal]);
+
+  // Handler to close close modal
+  const handleCloseCloseModal = useCallback(() => {
+    closeModal.close();
+    setCloseState(INITIAL_CLOSE_STATE);
+  }, [closeModal]);
 
   // Get health status color and label based on how close currentLtv is to LLTV
   const getHealthStatus = () => {
@@ -329,10 +470,11 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
             <div className="space-y-2">
               {collaterals.map((col, idx) => {
                 const symbol = col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol;
-                // Encode Euler context: borrowVault + collateralVault
+                // Encode Euler context: borrowVault + collateralVault + subAccountIndex
                 const context = encodeEulerContext({
                   borrowVault: borrowVaultAddress,
                   collateralVault: col.vault.address,
+                  subAccountIndex,
                 });
                 return (
                   <SupplyPosition
@@ -369,7 +511,18 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
             Debt
           </div>
           {!debt ? (
-            <div className="text-sm text-base-content/40 italic">None</div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-base-content/40 italic">None</span>
+              {collaterals.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-xs btn-ghost text-primary hover:bg-primary/10"
+                  onClick={borrowModal.open}
+                >
+                  Borrow
+                </button>
+              )}
+            </div>
           ) : (() => {
             const debtSymbol = debt.vault.asset.symbol === "???" ? "unknown" : debt.vault.asset.symbol;
             // For debt, use the first collateral vault (or borrow vault itself if no collaterals)
@@ -377,6 +530,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
             const debtContext = encodeEulerContext({
               borrowVault: debt.vault.address,
               collateralVault: primaryCollateralVault,
+              subAccountIndex,
             });
             return (
               <BorrowPosition
@@ -393,8 +547,11 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
                 networkType="evm"
                 chainId={chainId}
                 protocolContext={debtContext}
-                availableActions={{ borrow: true, repay: true, move: true }}
+                availableActions={{ borrow: true, repay: true, move: true, close: collaterals.length > 0, swap: collaterals.length > 0 }}
                 moveSupport={moveSupport}
+                availableAssets={allCollateralsForSwap}
+                onSwap={collaterals.length > 0 ? handleOpenDebtSwap : undefined}
+                onClosePosition={collaterals.length > 0 ? handleOpenCloseModal : undefined}
               />
             );
           })()}
@@ -419,6 +576,54 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
         }}
         eulerBorrowVault={swapState.borrowVault}
         eulerCollateralVault={swapState.collateralVault}
+        eulerSubAccountIndex={subAccountIndex}
+      />
+
+      {/* Debt Swap Modal */}
+      <DebtSwapEvmModal
+        isOpen={debtSwapModal.isOpen}
+        onClose={handleCloseDebtSwap}
+        protocolName="Euler"
+        chainId={chainId}
+        debtFromToken={debtSwapState.tokenAddress as `0x${string}`}
+        debtFromName={debtSwapState.tokenSymbol}
+        debtFromIcon={getIcon(debtSwapState.tokenSymbol)}
+        debtFromDecimals={debtSwapState.tokenDecimals}
+        debtFromPrice={debtSwapState.tokenPrice}
+        currentDebtBalance={debtSwapState.balance}
+        availableAssets={[]}
+        context={debtSwapState.context}
+        eulerBorrowVault={debtSwapState.borrowVault}
+        eulerCollateralVaults={debtSwapState.collateralVaults}
+        eulerSubAccountIndex={debtSwapState.subAccountIndex}
+      />
+
+      {/* Close with Collateral Modal */}
+      <CloseWithCollateralEvmModal
+        isOpen={closeModal.isOpen}
+        onClose={handleCloseCloseModal}
+        protocolName="Euler"
+        chainId={chainId}
+        debtToken={closeState.tokenAddress as `0x${string}`}
+        debtName={closeState.tokenSymbol}
+        debtIcon={getIcon(closeState.tokenSymbol)}
+        debtDecimals={closeState.tokenDecimals}
+        debtPrice={closeState.tokenPrice}
+        debtBalance={closeState.balance}
+        availableCollaterals={collaterals.map((col): SwapAsset => ({
+          symbol: col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol,
+          address: col.vault.asset.address,
+          decimals: col.vault.asset.decimals,
+          rawBalance: col.balance,
+          balance: Number(col.balance) / (10 ** col.vault.asset.decimals),
+          icon: getIcon(col.vault.asset.symbol),
+          price: pricesRaw[col.vault.asset.symbol?.toLowerCase()] ?? 0n,
+          eulerCollateralVault: col.vault.address,
+        }))}
+        context={closeState.context}
+        eulerBorrowVault={closeState.borrowVault}
+        eulerCollateralVaults={closeState.collateralVaults}
+        eulerSubAccountIndex={closeState.subAccountIndex}
       />
 
       {/* Add Collateral Modal */}
@@ -429,6 +634,25 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
           chainId={chainId}
           borrowVaultAddress={debt.vault.address}
           existingCollateralVaults={collaterals.map(c => c.vault.address)}
+        />
+      )}
+
+      {/* Borrow Modal - shown when user has collateral but no debt */}
+      {!debt && collaterals.length > 0 && (
+        <EulerBorrowModal
+          isOpen={borrowModal.isOpen}
+          onClose={borrowModal.close}
+          chainId={chainId}
+          collateralVaultAddresses={collaterals.map(c => c.vault.address)}
+          subAccountIndex={subAccountIndex}
+          collateralData={collaterals.map(col => ({
+            vaultAddress: col.vault.address,
+            tokenAddress: col.vault.asset.address,
+            tokenSymbol: col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol,
+            tokenDecimals: col.vault.asset.decimals,
+            balance: col.balance,
+            priceRaw: pricesRaw[col.vault.asset.symbol?.toLowerCase()] ?? 0n,
+          }))}
         />
       )}
     </div>

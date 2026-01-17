@@ -97,6 +97,7 @@
     "@typescript-eslint/eslint-plugin": "~5.40.0",
     "abitype": "1.0.6",
     "autoprefixer": "~10.4.20",
+    "babel-plugin-react-compiler": "latest",
     "dpdm-fast": "^1.0.14",
     "eslint": "~8.57.1",
     "eslint-config-next": "15",

@@ -67,6 +67,34 @@ const KNOWN_ERRORS: Record<string, string> = {
   "0x494e7807": "InvalidMarketParams - invalid Morpho market parameters",
 
   // ========================================================================
+  // Euler V2 / EVC Errors
+  // ========================================================================
+  // EVC errors
+  "0xf1be4519": "EVC_ControllerViolation - account already has a different controller enabled (Euler allows only 1 per sub-account)",
+  "0x6a03e7fb": "E_ControllerViolation - account would have too many controllers (Euler allows only 1)",
+  "0x8ca0c0c2": "E_InvalidAddress - invalid address provided",
+  "0xf3d7f4eb": "E_NotAuthorized - caller not authorized (operator not set)",
+  "0xf61c8d97": "E_ControllerDisabled - controller vault not enabled for this account",
+  "0x7fe32d04": "E_CollateralDisabled - collateral vault not enabled for this account",
+  "0x9f8c5c8e": "E_CheckDeferredLiquidity - account liquidity check failed (health factor too low)",
+  // EVault errors (borrow vaults)
+  "0x6c2e2d8f": "E_AccountLiquidity - insufficient collateral value to support borrow",
+  "0x2b7f0b02": "E_BadCollateral - collateral not accepted by this vault or has LTV=0",
+  "0xee33fd59": "E_BorrowCapExceeded - vault borrow cap has been reached",
+  "0x10074ad5": "E_SupplyCapExceeded - vault supply cap has been reached",
+  "0x4a0f0518": "E_InsufficientCash - vault doesn't have enough liquidity to borrow",
+  "0xb1e1fc57": "E_InsufficientBalance - insufficient share balance for withdrawal",
+  "0x7e0de5bb": "E_OperatorNotAuthorized - operator not authorized for this sub-account",
+  "0x1c0a3527": "E_InvalidReceiver - invalid receiver address for transfer",
+  "0x18e33c1a": "E_RepayTooMuch - repay amount exceeds outstanding debt",
+  "0xbd68e48e": "E_SelfTransfer - cannot transfer to self",
+  "0x5d4a42af": "E_VaultStatusCheckDeferred - vault status check is deferred",
+  // Oracle errors
+  "0x95aa9d3d": "E_PriceFeedNotSet - no price feed configured for this asset",
+  "0x47fbbf93": "E_PriceFeedStale - price feed data is stale or outdated",
+  "0x2098c0d3": "E_BadPrice - oracle returned invalid or zero price",
+
+  // ========================================================================
   // Flash Loan Errors
   // ========================================================================
   "0x0a3fad83": "FlashLoanNotEnabled - flash loans not enabled on this deployment",
