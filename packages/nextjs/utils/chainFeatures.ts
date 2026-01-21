@@ -105,8 +105,8 @@ const VENUS_AVAILABLE = new Set([
 ]);
 
 // Euler V2 (from 11_deploy_euler_gateway.ts CONFIG)
+// Note: Mainnet excluded - gateway not deployed yet (too expensive pre-feature-complete)
 const EULER_AVAILABLE = new Set([
-  1,     // Mainnet
   10,    // Optimism
   130,   // Unichain
   8453,  // Base
