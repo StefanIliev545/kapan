@@ -29,6 +29,7 @@ import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { formatSignedPercent } from "../utils";
 import { useModal } from "~~/hooks/useModal";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
+import { useTxCompletedListenerDelayed } from "~~/hooks/common/useTxCompletedListener";
 
 /**
  * Reusable collapsible section with animated expand/collapse.
@@ -69,46 +70,6 @@ const EMPTY_METRICS: PositionMetrics = {
   netApyPercent: null,
   positionsWithDebt: 0,
 };
-
-/**
- * Calculate position metrics from enriched position groups
- * Uses on-chain liquidity data for accurate USD values
- */
-function calculatePositionMetricsFromGroups(
-  groups: EulerPositionGroupWithBalances[]
-): PositionMetrics {
-  if (!groups || groups.length === 0) {
-    return EMPTY_METRICS;
-  }
-
-  // Sum up collateral and liability values from liquidity data
-  // Values are in 18 decimals (unit of account, usually USD)
-  let totalCollateralValue = 0;
-  let totalLiabilityValue = 0;
-  let positionsWithDebt = 0;
-
-  for (const group of groups) {
-    if (group.liquidity) {
-      // Convert from 18 decimals to human-readable
-      // Use liquidation collateral value
-      totalCollateralValue += Number(group.liquidity.collateralValueLiquidation) / 1e18;
-      totalLiabilityValue += Number(group.liquidity.liabilityValue) / 1e18;
-      positionsWithDebt++;
-    }
-  }
-
-  // Net balance = collateral - liability
-  const netBalance = totalCollateralValue - totalLiabilityValue;
-
-  // For yield calculations, we need APY data which we don't have aggregated
-  // Just show the net balance for now
-  return {
-    netBalance,
-    netYield30d: 0, // Would need APY-weighted calculation
-    netApyPercent: null, // Would need APY data
-    positionsWithDebt,
-  };
-}
 
 /**
  * Get the appropriate text color class for a numeric value.
@@ -732,11 +693,20 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
 
   // Fetch user positions
   const {
-    rows,
     enrichedPositionGroups,
     hasLoadedOnce,
     isLoadingPositions,
+    refetchPositions,
   } = useEulerLendingPositions(effectiveChainId, connectedAddress);
+
+  // Refetch positions after transactions complete (with delay for subgraph indexing)
+  useTxCompletedListenerDelayed(
+    useCallback(() => {
+      refetchPositions();
+    }, [refetchPositions]),
+    3000, // 3 second delay for subgraph to index
+    hasLoadedOnce
+  );
 
   // Extract unique token symbols for price fetching
   const tokenSymbols = useMemo(() => {
@@ -759,11 +729,51 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     enabled: tokenSymbols.length > 0,
   });
 
-  // Compute metrics from enriched position groups (uses on-chain liquidity data)
-  const metrics = useMemo(
-    () => calculatePositionMetricsFromGroups(enrichedPositionGroups),
-    [enrichedPositionGroups]
-  );
+  // Compute metrics from enriched position groups using balances and prices
+  // This handles both positions with debt (have liquidity data) and supply-only positions
+  const metrics = useMemo((): PositionMetrics => {
+    if (!enrichedPositionGroups.length) return EMPTY_METRICS;
+
+    let totalCollateralValueUsd = 0;
+    let totalDebtValueUsd = 0;
+    let positionsWithDebt = 0;
+
+    for (const group of enrichedPositionGroups) {
+      // Calculate collateral value from balances and prices
+      for (const col of group.collaterals) {
+        const symbol = col.vault.asset.symbol?.toLowerCase();
+        const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+        const decimals = col.vault.asset.decimals;
+
+        // balance is in underlying asset units, price is in 8 decimals (USD)
+        // USD value = balance * price / 10^decimals / 10^8
+        if (col.balance > 0n && priceRaw > 0n) {
+          const valueUsd = (Number(col.balance) / 10 ** decimals) * (Number(priceRaw) / 1e8);
+          totalCollateralValueUsd += valueUsd;
+        }
+      }
+
+      // Calculate debt value from balance and price
+      if (group.debt && group.debt.balance > 0n) {
+        positionsWithDebt++;
+        const symbol = group.debt.vault.asset.symbol?.toLowerCase();
+        const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+        const decimals = group.debt.vault.asset.decimals;
+
+        if (priceRaw > 0n) {
+          const valueUsd = (Number(group.debt.balance) / 10 ** decimals) * (Number(priceRaw) / 1e8);
+          totalDebtValueUsd += valueUsd;
+        }
+      }
+    }
+
+    return {
+      netBalance: totalCollateralValueUsd - totalDebtValueUsd,
+      netYield30d: 0, // Would need APY-weighted calculation
+      netApyPercent: null, // Would need APY data
+      positionsWithDebt,
+    };
+  }, [enrichedPositionGroups, pricesRaw]);
 
   // Compute all used sub-account indices (for debt swap to find next available)
   const usedSubAccountIndices = useMemo(() => {
@@ -774,27 +784,46 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     });
   }, [enrichedPositionGroups]);
 
-  // Report totals to global state (using liquidity data)
+  // Report totals to global state (using balance + price calculation from metrics)
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
   useEffect(() => {
     if (!hasLoadedOnce) return;
 
-    // Sum collateral and liability from all position groups
+    // Calculate totals from balances and prices (same logic as metrics)
     let totalSupplied = 0;
     let totalBorrowed = 0;
+
     for (const group of enrichedPositionGroups) {
-      if (group.liquidity) {
-        // Use liquidation collateral value (it's LTV-adjusted but close enough for display)
-        totalSupplied += Number(group.liquidity.collateralValueLiquidation) / 1e18;
-        totalBorrowed += Number(group.liquidity.liabilityValue) / 1e18;
+      // Sum collateral values
+      for (const col of group.collaterals) {
+        const symbol = col.vault.asset.symbol?.toLowerCase();
+        const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+        const decimals = col.vault.asset.decimals;
+
+        if (col.balance > 0n && priceRaw > 0n) {
+          totalSupplied += (Number(col.balance) / 10 ** decimals) * (Number(priceRaw) / 1e8);
+        }
+      }
+
+      // Sum debt values
+      if (group.debt && group.debt.balance > 0n) {
+        const symbol = group.debt.vault.asset.symbol?.toLowerCase();
+        const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+        const decimals = group.debt.vault.asset.decimals;
+
+        if (priceRaw > 0n) {
+          totalBorrowed += (Number(group.debt.balance) / 10 ** decimals) * (Number(priceRaw) / 1e8);
+        }
       }
     }
 
     setProtocolTotals("Euler", totalSupplied, totalBorrowed);
-  }, [hasLoadedOnce, enrichedPositionGroups, setProtocolTotals, effectiveChainId]);
+  }, [hasLoadedOnce, enrichedPositionGroups, pricesRaw, setProtocolTotals, effectiveChainId]);
 
-  const hasPositions = rows.length > 0;
+  // Use enrichedPositionGroups for hasPositions check - this comes from subgraph data
+  // and ensures auto-expand works even before balance fetching completes
+  const hasPositions = enrichedPositionGroups.length > 0;
 
   // Auto-expand when positions are found
   useEffect(() => {

@@ -29,6 +29,15 @@ const EULER_VAULT_ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
   {
+    // ERC-4626: Returns max assets withdrawable by account (= convertToAssets(balanceOf(account)))
+    // This gives us the underlying asset balance directly, not shares
+    name: "maxWithdraw",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
     name: "convertToAssets",
     type: "function",
     stateMutability: "view",
@@ -77,7 +86,7 @@ export type { EulerVaultInfo, EulerCollateralPosition, EulerPositionGroup };
 
 // Enriched types with balance data
 export interface EulerCollateralWithBalance extends EulerCollateralPosition {
-  balance: bigint; // Supply balance (shares)
+  balance: bigint; // Supply balance in underlying assets (from maxWithdraw)
 }
 
 export interface EulerDebtWithBalance {
@@ -306,6 +315,7 @@ export function useEulerLendingPositions(
     queryKey: qk.euler.positions(chainId, userAddress as string),
     queryFn: () => fetchEulerPositions(chainId, userAddress as string),
     staleTime: 30_000, // 30 seconds
+    refetchInterval: 60_000, // Auto-refresh every 60 seconds
     refetchOnWindowFocus: false,
     enabled: chainId > 0 && !!userAddress,
   });
@@ -329,8 +339,9 @@ export function useEulerLendingPositions(
   }, [positionsData?.positionGroups]);
 
   // Build multicall contracts for balance queries using sub-account addresses
-  // IMPORTANT: Euler V2 uses sub-accounts, so we must query balanceOf/debtOf
+  // IMPORTANT: Euler V2 uses sub-accounts, so we must query balances
   // using the sub-account address, NOT the main user address!
+  // NOTE: We query balanceOf (shares) first, then convertToAssets in a second batch
   const balanceContracts = useMemo(() => {
     if (!positionGroups.length) return [];
 
@@ -347,7 +358,7 @@ export function useEulerLendingPositions(
     for (const group of positionGroups) {
       const subAccount = group.subAccount as `0x${string}`;
 
-      // Query balanceOf for each collateral vault (using sub-account address)
+      // Query balanceOf for each collateral vault (returns shares)
       for (const col of group.collaterals) {
         contracts.push({
           address: col.vault.address as `0x${string}`,
@@ -359,7 +370,7 @@ export function useEulerLendingPositions(
         });
       }
 
-      // Query debtOf for debt vault (using sub-account address)
+      // Query debtOf for debt vault (already returns underlying asset amount)
       if (group.debt) {
         contracts.push({
           address: group.debt.vault.address as `0x${string}`,
@@ -375,11 +386,56 @@ export function useEulerLendingPositions(
     return contracts;
   }, [positionGroups, chainId]);
 
-  // Fetch on-chain balances
+  // Fetch on-chain balances (shares for collateral, debt amount for debt)
   const { data: balanceResults } = useReadContracts({
     contracts: balanceContracts,
     query: {
       enabled: balanceContracts.length > 0,
+      staleTime: 30_000,
+    },
+  });
+
+  // Build convertToAssets contracts to convert shares to underlying assets
+  // This runs after we have the shares from balanceResults
+  const convertContracts = useMemo(() => {
+    if (!balanceResults || !balanceContracts.length) return [];
+
+    const contracts: Array<{
+      address: `0x${string}`;
+      abi: typeof EULER_VAULT_ABI;
+      functionName: "convertToAssets";
+      args: [bigint];
+      chainId: number;
+      _meta: { subAccount: string; vaultAddress: string };
+    }> = [];
+
+    for (let i = 0; i < balanceResults.length; i++) {
+      const result = balanceResults[i];
+      const contract = balanceContracts[i];
+      if (!contract?._meta || contract._meta.type !== "collateral") continue;
+
+      // Get shares from result
+      const shares = result?.status === "success" ? (result.result as bigint) : 0n;
+      if (shares === 0n) continue;
+
+      contracts.push({
+        address: contract.address,
+        abi: EULER_VAULT_ABI,
+        functionName: "convertToAssets",
+        args: [shares],
+        chainId,
+        _meta: { subAccount: contract._meta.subAccount, vaultAddress: contract._meta.vaultAddress },
+      });
+    }
+
+    return contracts;
+  }, [balanceResults, balanceContracts, chainId]);
+
+  // Fetch converted asset amounts
+  const { data: convertResults } = useReadContracts({
+    contracts: convertContracts,
+    query: {
+      enabled: convertContracts.length > 0,
       staleTime: 30_000,
     },
   });
@@ -528,12 +584,28 @@ export function useEulerLendingPositions(
     return map;
   }, [liquidityResults, positionGroups]);
 
-  // Parse balance results into a map: "subAccount:vaultAddress" -> { shares, debt }
+  // Parse balance results into a map: "subAccount:vaultAddress" -> { assets, debt }
   // We key by both sub-account and vault since the same vault can have different
   // balances on different sub-accounts
+  // NOTE: For collateral, we use convertResults (underlying assets) not balanceResults (shares)
   const balanceMap = useMemo(() => {
-    const map = new Map<string, { shares: bigint; debt: bigint }>();
+    const map = new Map<string, { assets: bigint; debt: bigint }>();
     if (!balanceResults || balanceResults.length === 0 || !balanceContracts.length) return map;
+
+    // Build a map of converted assets from convertResults
+    const convertedAssetsMap = new Map<string, bigint>();
+    if (convertResults && convertContracts.length > 0) {
+      for (let i = 0; i < convertResults.length; i++) {
+        const result = convertResults[i];
+        const contract = convertContracts[i];
+        if (!contract?._meta) continue;
+
+        const key = `${contract._meta.subAccount.toLowerCase()}:${contract._meta.vaultAddress.toLowerCase()}`;
+        if (result?.status === "success") {
+          convertedAssetsMap.set(key, result.result as bigint);
+        }
+      }
+    }
 
     // Validate array alignment - this should never happen, but guard against race conditions
     if (balanceResults.length !== balanceContracts.length) {
@@ -562,13 +634,16 @@ export function useEulerLendingPositions(
       const key = `${subAccount.toLowerCase()}:${vaultAddress.toLowerCase()}`;
 
       // Get or create entry
-      const existing = map.get(key) ?? { shares: 0n, debt: 0n };
+      const existing = map.get(key) ?? { assets: 0n, debt: 0n };
 
       if (result?.status === "success") {
         const value = result.result as bigint;
         if (type === "collateral") {
-          existing.shares = value;
+          // Use converted assets if available, otherwise fall back to shares
+          // (shares will be slightly off but better than nothing)
+          existing.assets = convertedAssetsMap.get(key) ?? value;
         } else {
+          // Debt is already in underlying asset units
           existing.debt = value;
         }
       } else if (result?.status === "failure") {
@@ -584,12 +659,12 @@ export function useEulerLendingPositions(
 
     console.log("[useEulerLendingPositions] Balance map:", Array.from(map.entries()).map(([k, v]) => ({
       key: k,
-      shares: v.shares.toString(),
+      assets: v.assets.toString(),
       debt: v.debt.toString(),
     })));
 
     return map;
-  }, [balanceResults, balanceContracts]);
+  }, [balanceResults, balanceContracts, convertResults, convertContracts]);
 
   // Enrich position groups with on-chain balance and liquidity data
   const enrichedPositionGroups = useMemo<EulerPositionGroupWithBalances[]>(() => {
@@ -599,12 +674,13 @@ export function useEulerLendingPositions(
       const subAccountLower = group.subAccount.toLowerCase();
 
       // Enrich collaterals with balance data (using subAccount:vault key)
+      // NOTE: balance is now in underlying assets (from maxWithdraw), not shares
       const enrichedCollaterals: EulerCollateralWithBalance[] = group.collaterals.map((col) => {
         const key = `${subAccountLower}:${col.vault.address.toLowerCase()}`;
         const balanceData = balanceMap.get(key);
         return {
           ...col,
-          balance: balanceData?.shares ?? 0n,
+          balance: balanceData?.assets ?? 0n,
         };
       });
 
