@@ -13,21 +13,31 @@ import { NextRequest, NextResponse } from "next/server";
 // RPC endpoints for on-chain LTV checks
 const RPC_ENDPOINTS: Record<number, string> = {
   1: "https://eth.llamarpc.com",
-  42161: "https://arb1.arbitrum.io/rpc",
-  8453: "https://mainnet.base.org",
   10: "https://mainnet.optimism.io",
+  130: "https://mainnet.unichain.org",
+  8453: "https://mainnet.base.org",
+  9745: "https://rpc.plasma.io/l2",
+  42161: "https://arb1.arbitrum.io/rpc",
+  59144: "https://rpc.linea.build",
+  31337: "http://127.0.0.1:8545", // Hardhat local node
 };
 
 // Euler subgraph endpoints by chain
 const EULER_SUBGRAPH_URLS: Record<number, string> = {
   // Ethereum Mainnet
   1: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-mainnet/latest/gn",
-  // Arbitrum
-  42161: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-arbitrum/latest/gn",
-  // Base
-  8453: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-base/latest/gn",
   // Optimism
   10: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-optimism/latest/gn",
+  // Unichain
+  130: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-unichain/latest/gn",
+  // Base
+  8453: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-base/latest/gn",
+  // Plasma
+  9745: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-plasma/latest/gn",
+  // Arbitrum
+  42161: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-arbitrum/latest/gn",
+  // Linea
+  59144: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-linea/latest/gn",
 };
 
 // Lightweight query to get all vault id->symbol->asset mappings for collateral resolution
@@ -100,6 +110,10 @@ export interface EulerVaultResponse {
   };
   totalSupply: string;
   totalBorrows: string;
+  /** Borrow cap in human-readable units (null = no cap) */
+  borrowCap: string | null;
+  /** Available borrow capacity = borrowCap - totalBorrows (null = unlimited) */
+  availableBorrowCapacity: string | null;
   supplyApy: number;
   borrowApy: number;
   utilization: number;
@@ -210,15 +224,22 @@ export async function GET(
   const { chainId: chainIdStr } = await params;
   const chainId = parseInt(chainIdStr, 10);
 
-  const subgraphUrl = EULER_SUBGRAPH_URLS[chainId];
+  const searchParams = request.nextUrl.searchParams;
+
+  // For hardhat (31337), use forkChainId param to determine which chain's subgraph to query
+  // RPC calls go to localhost, but subgraph data comes from the forked chain
+  const forkChainId = chainId === 31337
+    ? parseInt(searchParams.get("forkChainId") || "42161", 10) // Default to Arbitrum
+    : chainId;
+
+  const subgraphUrl = EULER_SUBGRAPH_URLS[forkChainId];
   if (!subgraphUrl) {
     return NextResponse.json(
-      { error: `Chain ${chainId} not supported for Euler V2` },
+      { error: `Chain ${forkChainId} not supported for Euler V2` },
       { status: 400 }
     );
   }
 
-  const searchParams = request.nextUrl.searchParams;
   const first = Math.min(parseInt(searchParams.get("first") || "100"), 500);
   const skip = parseInt(searchParams.get("skip") || "0");
   const search = searchParams.get("search")?.toLowerCase();
@@ -342,6 +363,14 @@ export async function GET(
             })
         : [];
 
+      // Parse borrow cap (0 = no cap)
+      // Note: borrowCap from subgraph is already in token units (not raw/wei)
+      const borrowCapRaw = parseFloat(v.borrowCap || "0");
+      const borrowCap = borrowCapRaw > 0 ? borrowCapRaw : null;
+      const availableBorrowCapacity = borrowCap !== null
+        ? Math.max(0, borrowCap - totalBorrows)
+        : null;
+
       return {
         id: v.id,
         address: v.id,
@@ -354,6 +383,8 @@ export async function GET(
         },
         totalSupply: totalSupply.toString(),
         totalBorrows: totalBorrows.toString(),
+        borrowCap: borrowCap?.toString() ?? null,
+        availableBorrowCapacity: availableBorrowCapacity?.toString() ?? null,
         // APY values are in RAY format (1e27) - convert to decimal (0.05 = 5%)
         supplyApy: parseFloat(v.state?.supplyApy || "0") / 1e27,
         borrowApy: parseFloat(v.state?.borrowApy || "0") / 1e27,

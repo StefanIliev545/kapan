@@ -134,13 +134,15 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         try {
           localStorage.setItem(STORAGE_KEY, urlNetwork);
         } catch { }
-        // non-blocking wallet network switch
-        const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
-        if (chainId && chainId !== chain?.id) {
-          try {
-            void switchChain?.({ chainId });
-          } catch (e) {
-            console.warn("Auto network switch failed on popstate", e);
+        // non-blocking wallet network switch (skip for hardhat)
+        if (urlNetwork !== "hardhat") {
+          const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
+          if (chainId && chainId !== chain?.id) {
+            try {
+              void switchChain?.({ chainId });
+            } catch (e) {
+              console.warn("Auto network switch failed on popstate", e);
+            }
           }
         }
       }
@@ -160,7 +162,8 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
 
     if (isValid(urlNetwork) && urlNetwork) {
       initial = urlNetwork;
-    } else {
+    } else if (defaultNetwork !== "hardhat") {
+      // Only use cache if not in hardhat dev mode - hardhat mode should always start on hardhat
       try {
         const cached = localStorage.getItem(STORAGE_KEY);
         if (isValid(cached) && cached) initial = cached;
@@ -172,12 +175,15 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       onNetworkChange(initial);
 
       // Switch wallet network if it's an EVM network (non-blocking)
-      const chainId = NETWORK_ID_TO_CHAIN_ID[initial];
-      if (chainId && chainId !== chain?.id) {
-        try {
-          void switchChain?.({ chainId });
-        } catch (e) {
-          console.warn("Auto network switch failed on init", e);
+      // Skip for hardhat - wallet switch will fail and we don't want that to cause issues
+      if (initial !== "hardhat") {
+        const chainId = NETWORK_ID_TO_CHAIN_ID[initial];
+        if (chainId && chainId !== chain?.id) {
+          try {
+            void switchChain?.({ chainId });
+          } catch (e) {
+            console.warn("Auto network switch failed on init", e);
+          }
         }
       }
     }
@@ -199,12 +205,15 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       try {
         localStorage.setItem(STORAGE_KEY, urlNetwork);
       } catch { }
-      const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
-      if (chainId && chainId !== chain?.id) {
-        try {
-          void switchChain?.({ chainId });
-        } catch (e) {
-          console.warn("Auto network switch failed on URL change", e);
+      // Skip wallet switch for hardhat
+      if (urlNetwork !== "hardhat") {
+        const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
+        if (chainId && chainId !== chain?.id) {
+          try {
+            void switchChain?.({ chainId });
+          } catch (e) {
+            console.warn("Auto network switch failed on URL change", e);
+          }
         }
       }
     }
@@ -222,7 +231,11 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   }, [networks, defaultNetwork]);
 
   // 4) Sync wallet network changes (from navbar) back to the filter
+  // Disabled entirely in hardhat dev mode to prevent unwanted network switches
+  const isHardhatDevMode = process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true";
   useEffect(() => {
+    // Skip syncing entirely in hardhat dev mode
+    if (isHardhatDevMode) return;
     if (!chain?.id) return;
 
     // If we initiated the chain switch, skip syncing back
@@ -250,10 +263,12 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         shallowUpdateUrl(networkId, "replace");
       }
     }
-  }, [chain?.id, isValid, onNetworkChange, shallowUpdateUrl]);
+  }, [chain?.id, isValid, onNetworkChange, shallowUpdateUrl, isHardhatDevMode]);
 
   const handleNetworkChange = useCallback((networkId: string, { trackEvent = true }: { trackEvent?: boolean } = {}) => {
-    if (!isValid(networkId) || networkId === selectedRef.current) return;
+    // In hardhat dev mode, always allow hardhat even if not in networks array
+    const isValidOrHardhat = isValid(networkId) || (isHardhatDevMode && networkId === "hardhat");
+    if (!isValidOrHardhat || networkId === selectedRef.current) return;
 
     if (trackEvent) {
       track("network_filter_select", {
@@ -272,14 +287,17 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     } catch { }
 
     // Switch wallet network if it's an EVM network (non-blocking)
-    const chainId = NETWORK_ID_TO_CHAIN_ID[networkId];
-    if (chainId && chainId !== chain?.id) {
-      try {
-        weInitiatedChainSwitchRef.current = true; // Prevent sync loop
-        void switchChain?.({ chainId });
-      } catch (e) {
-        weInitiatedChainSwitchRef.current = false;
-        console.warn("Auto network switch failed", e);
+    // Skip for hardhat - user should manually add hardhat network to wallet if needed
+    if (networkId !== "hardhat") {
+      const chainId = NETWORK_ID_TO_CHAIN_ID[networkId];
+      if (chainId && chainId !== chain?.id) {
+        try {
+          weInitiatedChainSwitchRef.current = true; // Prevent sync loop
+          void switchChain?.({ chainId });
+        } catch (e) {
+          weInitiatedChainSwitchRef.current = false;
+          console.warn("Auto network switch failed", e);
+        }
       }
     }
 
@@ -299,7 +317,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
         router.replace(`${pathname}?${next.toString()}`, { scroll: false });
       }
     }
-  }, [isValid, pathname, onNetworkChange, chain?.id, switchChain, searchParams, shallowUpdateUrl, router]);
+  }, [isValid, pathname, onNetworkChange, chain?.id, switchChain, searchParams, shallowUpdateUrl, router, isHardhatDevMode]);
 
   // Track button refs for measuring positions
   const containerRef = useRef<HTMLDivElement>(null);

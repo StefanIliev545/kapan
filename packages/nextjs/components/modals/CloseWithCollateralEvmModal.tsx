@@ -25,7 +25,9 @@ import {
     encodeFlashLoan,
     encodeLendingInstruction,
     encodePushToken,
+    encodePullToken,
     encodeToOutput,
+    encodeAdd,
     LendingOp,
     encodeEulerContext,
 } from "~~/utils/v2/instructionHelpers";
@@ -114,7 +116,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 }) => {
     const {
         buildCloseWithCollateralFlow,
-    } = useKapanRouterV2();
+    } = useKapanRouterV2({ chainId });
 
     // Protocol detection
     const isEuler = protocolName.toLowerCase().includes("euler");
@@ -219,10 +221,10 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
     const [customBuyAmount, setCustomBuyAmount] = useState<string>("");
     const [useCustomBuyAmount, setUseCustomBuyAmount] = useState(false);
 
-    // Wallet hooks for limit order
+    // Wallet hooks for limit order - use prop chainId to target correct network
     const { address: userAddress } = useAccount();
-    const { data: walletClient } = useWalletClient();
-    const publicClient = usePublicClient();
+    const { data: walletClient } = useWalletClient({ chainId });
+    const publicClient = usePublicClient({ chainId });
 
     // CoW limit order hook
     const {
@@ -464,6 +466,93 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         if (!selectedTo || !userAddress || !orderManagerAddress || !cowFlashLoanInfo) {
             return [{ preInstructions: [], postInstructions: [] }];
         }
+
+        // ========================================================================
+        // EULER: Close with collateral on same sub-account
+        // ========================================================================
+        if (isEuler && eulerContextEncoded && eulerBorrowVault) {
+            const numChunks = limitOrderConfig?.numChunks ?? 1;
+            const chunkBuyAmount = limitOrderBuyAmount / BigInt(numChunks);
+
+            // Get the collateral vault for the selected collateral
+            const selectedCollateralVault = (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault
+                || eulerCollateralVaults?.[0];
+            if (!selectedCollateralVault) {
+                console.error("[Euler Limit Order] No collateral vault found");
+                return [{ preInstructions: [], postInstructions: [] }];
+            }
+
+            return Array(numChunks).fill(null).map(() => {
+                /**
+                 * Euler Close with Collateral (Limit Order) - KIND_BUY:
+                 *
+                 * UTXO Layout (hook prepends implicit UTXOs for buy orders):
+                 * [0] = actual sell amount used (collateral, from fundOrder ToOutput)
+                 * [1] = leftover from flash loan (collateral refund)
+                 * --- Post-hook instructions start here ---
+                 * [2] PullToken(debt from OM) -> pulled debt
+                 * [3] Approve(2, euler) -> dummy
+                 * [4] Repay(input=2) -> refund
+                 * [5] WithdrawCollateral(input=0) -> to repay flash loan
+                 * [6] Add(5, 1) -> withdrawn + leftover for flash loan repay
+                 */
+                const postInstructions: ProtocolInstruction[] = [];
+                let utxoIndex = 2; // Start after implicit [0] sell amount and [1] leftover
+
+                // 1. PullToken: pull bought debt from OrderManager -> [2]
+                postInstructions.push(
+                    createRouterInstruction(encodePullToken(chunkBuyAmount, debtToken as Address, orderManagerAddress as Address))
+                );
+                const pulledDebtUtxo = utxoIndex++;
+
+                // 2. Approve debt for Euler gateway -> [3]
+                postInstructions.push(
+                    createRouterInstruction(encodeApprove(pulledDebtUtxo, "euler"))
+                );
+                utxoIndex++; // approve output
+
+                // 3. Repay debt (input=pulledDebtUtxo) -> [4] (refund)
+                postInstructions.push(
+                    createProtocolInstruction(
+                        "euler",
+                        encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, eulerContextEncoded, pulledDebtUtxo)
+                    )
+                );
+                const repayRefundUtxo = utxoIndex++;
+
+                // 4. Withdraw collateral to repay flash loan (amount from [0]) -> [5]
+                postInstructions.push(
+                    createProtocolInstruction(
+                        "euler",
+                        encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedTo.address, userAddress, 0n, eulerContextEncoded, 0)
+                    )
+                );
+                const withdrawUtxo = utxoIndex++;
+
+                // 5. Add: withdrawn ([5]) + leftover ([1]) for flash loan repay -> [6]
+                postInstructions.push(
+                    createRouterInstruction(encodeAdd(withdrawUtxo, 1))
+                );
+                const flashLoanRepayUtxo = utxoIndex++;
+
+                // 6. For max repayments: Push any refund from Repay back to user
+                if (isMax) {
+                    postInstructions.push(
+                        createRouterInstruction(encodePushToken(repayRefundUtxo, userAddress))
+                    );
+                }
+
+                return {
+                    preInstructions: [],
+                    postInstructions,
+                    flashLoanRepaymentUtxoIndex: flashLoanRepayUtxo,
+                };
+            });
+        }
+
+        // ========================================================================
+        // Standard flow (Aave, Compound, Venus) - shared pool model
+        // ========================================================================
         return buildCowChunkInstructions({
             selectedTo,
             userAddress,
@@ -478,7 +567,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             limitOrderConfig,
             isMax, // When true, adds PushToken to return any repay refund to user
         });
-    }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtToken, debtName, debtDecimals, cowFlashLoanInfo, limitOrderConfig, isMax]);
+    }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtToken, debtName, debtDecimals, cowFlashLoanInfo, limitOrderConfig, isMax, isEuler, eulerContextEncoded, eulerBorrowVault, eulerCollateralVaults]);
 
     const buildFlow = (): ProtocolInstruction[] => {
         if (!swapQuote || !selectedTo || !hasAdapter || requiredCollateral === 0n) return [];

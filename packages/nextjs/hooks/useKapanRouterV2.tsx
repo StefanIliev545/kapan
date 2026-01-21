@@ -251,16 +251,23 @@ const filterValidDeauthCalls = (deauthCalls: AuthorizationCall[]): Authorization
   });
 };
 
+interface UseKapanRouterV2Options {
+  /** Override chainId (for hardhat/local dev). If not provided, uses wallet's chainId */
+  chainId?: number;
+}
+
 /**
  * Hook for building and executing instructions on KapanRouter v2
  */
-export const useKapanRouterV2 = () => {
+export const useKapanRouterV2 = (options?: UseKapanRouterV2Options) => {
   const { address: userAddress } = useAccount();
   const { data: routerContract } = useDeployedContractInfo({ contractName: "KapanRouter" });
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
+  const walletChainId = useChainId();
+  // Use provided chainId or fall back to wallet's chainId
+  const chainId = options?.chainId ?? walletChainId;
+  const publicClient = usePublicClient({ chainId });
+  const { data: walletClient } = useWalletClient({ chainId });
   const queryClient = useQueryClient();
-  const chainId = useChainId();
 
   const CONFIRMATIONS_BY_CHAIN: Record<number, number> = {
     8453: 1,   // Base mainnet
@@ -1800,6 +1807,28 @@ export const useKapanRouterV2 = () => {
       totalCalls: calls.length,
       callOrder: calls.map((c, i) => ({ index: i, to: c.to, dataPrefix: c.data?.slice(0, 10) })),
     });
+
+    // Single comprehensive debug log for batched execution
+    const selectorNames: Record<string, string> = {
+      "0xb3fdb079": "setAccountOperator",
+      "0xd1e8f606": "enableCollateral",
+      "0x2edb71be": "enableController",
+    };
+    console.log("[executeFlowBatchedIfPossible] === COMPLETE DEBUG INFO ===", JSON.stringify({
+      user: userAddress,
+      router: routerContract.address,
+      authCalls: filteredAuthCalls.map((c, i) => ({
+        idx: i, to: c.target, selector: c.data?.slice(0, 10),
+        method: selectorNames[c.data?.slice(0, 10) || ""] || "unknown",
+        data: c.data,
+      })),
+      mainCall: { to: routerContract.address, data: routerCalldata },
+      deauthCalls: filteredDeauthCalls.map((c, i) => ({
+        idx: i, to: c.target, selector: c.data?.slice(0, 10), data: c.data,
+      })),
+      allCalls: calls.map((c, i) => ({ idx: i, to: c.to, data: c.data })),
+      totalCalls: calls.length,
+    }, null, 2));
 
     if (preferBatching) {
       const { id } = await sendCallsAsync({

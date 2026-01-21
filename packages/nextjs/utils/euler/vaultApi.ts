@@ -13,6 +13,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { qk } from "~~/lib/queryKeys";
 import type { EulerVaultResponse } from "~~/app/api/euler/[chainId]/vaults/route";
+import { getEffectiveChainId } from "~~/utils/forkChain";
 
 // Re-export the type for convenience
 export type { EulerVaultResponse };
@@ -33,6 +34,12 @@ export async function fetchEulerVaults(
     params.set("first", String(options?.first ?? 500));
     if (options?.search?.trim()) {
       params.set("search", options.search.trim());
+    }
+
+    // For hardhat, pass the forked chain ID so the API uses the correct subgraph
+    if (chainId === 31337) {
+      const forkChainId = getEffectiveChainId(chainId);
+      params.set("forkChainId", String(forkChainId));
     }
 
     const response = await fetch(`/api/euler/${chainId}/vaults?${params.toString()}`);

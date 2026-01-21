@@ -18,6 +18,7 @@ import {
   Tooltip,
 } from "@radix-ui/themes";
 import { Search, X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { TablePagination } from "~~/components/common/TablePagination";
 import {
   useReactTable,
   getCoreRowModel,
@@ -850,8 +851,21 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   );
 
   const rows = table.getRowModel().rows;
-  const canLoadMore = table.getCanNextPage();
-  const handleShowMore = React.useCallback(() => table.nextPage(), [table]);
+  const pageIndex = table.getState().pagination.pageIndex;
+  const pageCount = table.getPageCount();
+  const canPreviousPage = table.getCanPreviousPage();
+  const canNextPage = table.getCanNextPage();
+  const totalItems = table.getFilteredRowModel().rows.length;
+
+  const handlePageChange = React.useCallback(
+    (newPageIndex: number) => table.setPageIndex(newPageIndex),
+    [table]
+  );
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    table.setPageIndex(0);
+  }, [table, globalFilter, selectedCollaterals, selectedDebtAssets]);
 
   const handleCloseDepositModal = React.useCallback(() => {
     depositModal.close();
@@ -1124,13 +1138,15 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
         </>
       )}
 
-      {canLoadMore && (
-        <Flex align="center" justify="center" py="2">
-          <Button variant="soft" onClick={handleShowMore}>
-            Show more
-          </Button>
-        </Flex>
-      )}
+      <TablePagination
+        pageIndex={pageIndex}
+        pageCount={pageCount}
+        onPageChange={handlePageChange}
+        canPreviousPage={canPreviousPage}
+        canNextPage={canNextPage}
+        totalItems={totalItems}
+        pageSize={pageSize}
+      />
 
       {selectedMarket && depositModalToken && (
         <DepositModal

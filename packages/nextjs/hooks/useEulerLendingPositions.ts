@@ -10,6 +10,7 @@ import type {
   EulerPositionGroup,
 } from "~~/app/api/euler/[chainId]/positions/route";
 import { fetchEulerVaults as fetchEulerVaultsApi } from "~~/utils/euler/vaultApi";
+import { getEffectiveChainId } from "~~/utils/forkChain";
 
 // Euler vault ABI for balance queries
 const EULER_VAULT_ABI = [
@@ -218,8 +219,15 @@ async function fetchEulerPositions(
   userAddress: string
 ): Promise<PositionsApiResponse> {
   try {
+    // For hardhat, pass the forked chain ID so the API uses the correct subgraph
+    const params = new URLSearchParams({ user: userAddress });
+    if (chainId === 31337) {
+      const forkChainId = getEffectiveChainId(chainId);
+      params.set("forkChainId", String(forkChainId));
+    }
+
     const response = await fetch(
-      `/api/euler/${chainId}/positions?user=${userAddress}`
+      `/api/euler/${chainId}/positions?${params.toString()}`
     );
     if (!response.ok) {
       console.error(`[useEulerLendingPositions] Positions API error: ${response.status}`);

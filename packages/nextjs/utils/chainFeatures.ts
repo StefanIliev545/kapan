@@ -107,9 +107,13 @@ const VENUS_AVAILABLE = new Set([
 // Euler V2 (from 11_deploy_euler_gateway.ts CONFIG)
 const EULER_AVAILABLE = new Set([
   1,     // Mainnet
-  42161, // Arbitrum
-  8453,  // Base
   10,    // Optimism
+  130,   // Unichain
+  8453,  // Base
+  9745,  // Plasma
+  42161, // Arbitrum
+  59144, // Linea
+  31337, // Hardhat (for local dev with fork)
 ]);
 
 // Flash loan fees in basis points (1 bps = 0.01%)

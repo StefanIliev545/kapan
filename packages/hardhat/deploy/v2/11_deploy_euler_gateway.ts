@@ -13,9 +13,12 @@ import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from
  *
  * Euler V2 EVC deployments (different per chain):
  * - Ethereum (1):     0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383
- * - Arbitrum (42161): 0x6302ef0F34100CDDFb5489fbcB6eE1AA95CD1066
- * - Base (8453):      0x5301c7dD20bD945D2013b48ed0DEE3A284ca8989
  * - Optimism (10):    0xbfB28650Cd13CE879E7D56569Ed4715c299823E4
+ * - Unichain (130):   0x2A1176964F5D7caE5406B627Bf6166664FE83c60
+ * - Base (8453):      0x5301c7dD20bD945D2013b48ed0DEE3A284ca8989
+ * - Plasma (9745):    0x7bdbd0A7114aA42CA957F292145F6a931a345583
+ * - Arbitrum (42161): 0x6302ef0F34100CDDFb5489fbcB6eE1AA95CD1066
+ * - Linea (59144):    0xd8CeCEe9A04eA3d941a959F68fb4486f23271d09
  *
  * Note: Vaults are discovered via Euler's subgraph - no on-chain market registration needed.
  */
@@ -29,17 +32,29 @@ const CONFIG: Record<number, ChainConfig> = {
   1: {
     EVC: "0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383",
   },
-  // Arbitrum
-  42161: {
-    EVC: "0x6302ef0F34100CDDFb5489fbcB6eE1AA95CD1066",
+  // Optimism
+  10: {
+    EVC: "0xbfB28650Cd13CE879E7D56569Ed4715c299823E4",
+  },
+  // Unichain
+  130: {
+    EVC: "0x2A1176964F5D7caE5406B627Bf6166664FE83c60",
   },
   // Base
   8453: {
     EVC: "0x5301c7dD20bD945D2013b48ed0DEE3A284ca8989",
   },
-  // Optimism
-  10: {
-    EVC: "0xbfB28650Cd13CE879E7D56569Ed4715c299823E4",
+  // Plasma
+  9745: {
+    EVC: "0x7bdbd0A7114aA42CA957F292145F6a931a345583",
+  },
+  // Arbitrum
+  42161: {
+    EVC: "0x6302ef0F34100CDDFb5489fbcB6eE1AA95CD1066",
+  },
+  // Linea
+  59144: {
+    EVC: "0xd8CeCEe9A04eA3d941a959F68fb4486f23271d09",
   },
 };
 

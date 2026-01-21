@@ -359,13 +359,16 @@ describe("v2 Euler Gateway (fork)", function () {
       const evc = await ethers.getContractAt("IEVC", evcAddress);
       const borrowVault = ARB_EULER_VAULTS.USDC.vault;
       const collateralVault = ARB_EULER_VAULTS.wstETH.vault;
-      const eulerContext = encodeEulerContext(borrowVault, collateralVault);
+
+      // Use user's natural sub-account index so sub-account = user.address
+      const subAccountIndex = getUserMainAccountIndex(user.address);
+      const eulerContext = encodeEulerContext(borrowVault, collateralVault, subAccountIndex);
 
       // User enables collateral, controller, and sets gateway as operator
       await evc.connect(user).enableCollateral(user.address, collateralVault);
       await evc.connect(user).enableController(user.address, borrowVault);
       await evc.connect(user).setAccountOperator(user.address, gatewayAddress, true);
-      console.log(`✓ EVC authorization complete (collateral, controller, operator)`);
+      console.log(`✓ EVC authorization complete (collateral, controller, operator, index ${subAccountIndex})`);
 
       // ============ STEP 1: Deposit Collateral ============
       console.log("\n--- Step 1: Deposit Collateral ---");
@@ -541,11 +544,14 @@ describe("v2 Euler Gateway (fork)", function () {
       const evc = await ethers.getContractAt("IEVC", evcAddress);
       const collateralVault = ARB_EULER_VAULTS.wstETH.vault;
       const borrowVault = ARB_EULER_VAULTS.USDC.vault; // Still needed for context
-      const eulerContext = encodeEulerContext(borrowVault, collateralVault);
+
+      // Use user's natural sub-account index so sub-account = user.address
+      const subAccountIndex = getUserMainAccountIndex(user.address);
+      const eulerContext = encodeEulerContext(borrowVault, collateralVault, subAccountIndex);
 
       await evc.connect(user).enableCollateral(user.address, collateralVault);
       await evc.connect(user).setAccountOperator(user.address, gatewayAddress, true);
-      console.log(`✓ EVC authorization (collateral + operator)`);
+      console.log(`✓ EVC authorization (collateral + operator, index ${subAccountIndex})`);
 
       // STEP 1: Deposit collateral
       console.log("\n--- Step 1: Deposit Collateral ---");
@@ -652,12 +658,15 @@ describe("v2 Euler Gateway (fork)", function () {
       const evc = await ethers.getContractAt("IEVC", evcAddress);
       const borrowVault = ARB_EULER_VAULTS.USDC.vault;
       const collateralVault = ARB_EULER_VAULTS.wstETH.vault;
-      const eulerContext = encodeEulerContext(borrowVault, collateralVault);
+
+      // Use user's natural sub-account index so sub-account = user.address
+      const subAccountIndex = getUserMainAccountIndex(user.address);
+      const eulerContext = encodeEulerContext(borrowVault, collateralVault, subAccountIndex);
 
       await evc.connect(user).enableCollateral(user.address, collateralVault);
       await evc.connect(user).enableController(user.address, borrowVault);
       await evc.connect(user).setAccountOperator(user.address, gatewayAddress, true);
-      console.log(`✓ EVC authorization complete`);
+      console.log(`✓ EVC authorization complete (index ${subAccountIndex})`);
 
       // STEP 1: Deposit collateral
       console.log("\n--- Step 1: Deposit Collateral ---");
@@ -819,7 +828,10 @@ describe("v2 Euler Gateway (fork)", function () {
       const evc = await ethers.getContractAt("IEVC", evcAddress);
       const borrowVault = ARB_EULER_VAULTS.USDC.vault;
       const collateralVault = ARB_EULER_VAULTS.wstETH.vault;
-      const eulerContext = encodeEulerContext(borrowVault, collateralVault);
+
+      // Use user's natural sub-account index
+      const subAccountIndex = getUserMainAccountIndex(user.address);
+      const eulerContext = encodeEulerContext(borrowVault, collateralVault, subAccountIndex);
 
       await evc.connect(user).enableCollateral(user.address, collateralVault);
       await evc.connect(user).enableController(user.address, borrowVault);
@@ -937,7 +949,10 @@ describe("v2 Euler Gateway (fork)", function () {
       const evc = await ethers.getContractAt("IEVC", evcAddress);
       const collateralVault = ARB_EULER_VAULTS.wstETH.vault;
       const borrowVault = ARB_EULER_VAULTS.USDC.vault;
-      const eulerContext = encodeEulerContext(borrowVault, collateralVault);
+
+      // Use user's natural sub-account index
+      const subAccountIndex = getUserMainAccountIndex(user.address);
+      const eulerContext = encodeEulerContext(borrowVault, collateralVault, subAccountIndex);
 
       await evc.connect(user).enableCollateral(user.address, collateralVault);
       await evc.connect(user).setAccountOperator(user.address, await gateway.getAddress(), true);
@@ -1014,7 +1029,10 @@ describe("v2 Euler Gateway (fork)", function () {
       const evc = await ethers.getContractAt("IEVC", evcAddress);
       const borrowVault = ARB_EULER_VAULTS.USDC.vault;
       const collateralVault = ARB_EULER_VAULTS.wstETH.vault;
-      const eulerContext = encodeEulerContext(borrowVault, collateralVault);
+
+      // Use user's natural sub-account index
+      const subAccountIndex = getUserMainAccountIndex(user.address);
+      const eulerContext = encodeEulerContext(borrowVault, collateralVault, subAccountIndex);
 
       await evc.connect(user).enableCollateral(user.address, collateralVault);
       await evc.connect(user).enableController(user.address, borrowVault);
@@ -1058,7 +1076,9 @@ describe("v2 Euler Gateway (fork)", function () {
       await router.addGateway("euler", gatewayAddress);
       await syncGateway("euler", gatewayAddress);
 
-      const eulerContext = encodeEulerContext(ARB_EULER_VAULTS.USDC.vault, ARB_EULER_VAULTS.wstETH.vault);
+      // Use deployer's natural sub-account index
+      const subAccountIndex = getUserMainAccountIndex(deployer.address);
+      const eulerContext = encodeEulerContext(ARB_EULER_VAULTS.USDC.vault, ARB_EULER_VAULTS.wstETH.vault, subAccountIndex);
 
       // Create borrow instruction (requires operator)
       const borrowInstr = createProtocolInstruction(
@@ -1195,14 +1215,17 @@ describe("v2 Euler Gateway (fork)", function () {
 
       const borrowVault = ARB_EULER_VAULTS.USDC.vault;
       const collateralVault = ARB_EULER_VAULTS.wstETH.vault;
-      const eulerContext = encodeEulerContext(borrowVault, collateralVault);
+
+      // Use user's natural sub-account index
+      const subAccountIndex = getUserMainAccountIndex(user.address);
+      const eulerContext = encodeEulerContext(borrowVault, collateralVault, subAccountIndex);
 
       // Setup EVC authorization BEFORE refinance
       const evc = await ethers.getContractAt("IEVC", evcAddress);
       await evc.connect(user).enableCollateral(user.address, collateralVault);
       await evc.connect(user).enableController(user.address, borrowVault);
       await evc.connect(user).setAccountOperator(user.address, eulerGatewayAddress, true);
-      console.log(`✓ EVC authorization complete`);
+      console.log(`✓ EVC authorization complete (index ${subAccountIndex})`);
 
       /**
        * Refinance UTXO Flow:
@@ -1498,27 +1521,41 @@ describe("v2 Euler Gateway (fork)", function () {
  * @param borrowVault - The vault to borrow from (controller)
  * @param collateralVault - The vault where collateral is deposited
  * @param subAccountIndex - Sub-account index (0-255), 0 = main account (default)
+ *
+ * Note: Context format is (address borrowVault, address[] collateralVaults, uint8 subAccountIndex)
  */
 export function encodeEulerContext(borrowVault: string, collateralVault: string, subAccountIndex: number = 0): string {
   return ethers.AbiCoder.defaultAbiCoder().encode(
-    ["address", "address", "uint8"],
-    [borrowVault, collateralVault, subAccountIndex]
+    ["address", "address[]", "uint8"],
+    [borrowVault, [collateralVault], subAccountIndex]
   );
 }
 
 /**
  * Derive sub-account address from user address and index
  * Sub-account = (user & 0xFF...FF00) | subAccountIndex
+ *
+ * Note: Index 0 produces 0x...00, NOT the user's address.
+ * The user's "main" account is at index = last byte of their address.
+ * For example, user 0x...a3 has main account at index 163 (0xa3).
  */
 export function getSubAccount(user: string, subAccountIndex: number): string {
-  if (subAccountIndex === 0) return user;
   const userBigInt = BigInt(user);
   const mask = ~BigInt(0xFF);
   return ethers.getAddress("0x" + ((userBigInt & mask) | BigInt(subAccountIndex)).toString(16).padStart(40, "0"));
 }
 
 /**
+ * Get the natural sub-account index for a user (their "main" account)
+ * This is the last byte of the user's address.
+ */
+export function getUserMainAccountIndex(user: string): number {
+  return Number(BigInt(user) & BigInt(0xFF));
+}
+
+/**
  * Create an Euler lending instruction
+ * @param subAccountIndex - Optional sub-account index (default: user's natural index)
  */
 export function createEulerInstruction(
   op: LendingOp,
@@ -1527,9 +1564,12 @@ export function createEulerInstruction(
   amount: bigint,
   borrowVault: string,
   collateralVault: string,
-  inputIndex: number = 999
+  inputIndex: number = 999,
+  subAccountIndex?: number
 ) {
-  const context = encodeEulerContext(borrowVault, collateralVault);
+  // If not provided, use user's natural sub-account index so sub-account = user
+  const index = subAccountIndex ?? getUserMainAccountIndex(user);
+  const context = encodeEulerContext(borrowVault, collateralVault, index);
   return createProtocolInstruction(
     "euler",
     encodeLendingInstruction(op, token, user, amount, context, inputIndex)

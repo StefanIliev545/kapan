@@ -5,7 +5,10 @@ import { useEulerVaultsQuery } from "~~/utils/euler/vaultApi";
  * Hook to find compatible Euler borrow vaults for debt swap.
  * Given a user's current collateral vaults, finds other borrow vaults that:
  * 1. Have a different underlying debt token
- * 2. Accept at least one of the user's current collateral vaults
+ * 2. Accept ALL of the user's current collateral vaults (strict filtering)
+ *
+ * Strict filtering is required because debt swap migrates all collaterals
+ * to the new sub-account - partial migration is not supported.
  */
 
 export interface EulerDebtSwapTarget {
@@ -61,14 +64,11 @@ export function useEulerDebtSwapVaults({
     }
 
     const currentDebtAddr = currentDebtTokenAddress.toLowerCase();
-    const userCollateralVaultsSet = new Set(
-      userCollateralVaultAddresses.map(addr => addr.toLowerCase())
-    );
 
     const byAddress: Record<string, EulerDebtSwapTarget> = {};
     const compatibleVaults: EulerDebtSwapTarget[] = [];
 
-    // Find borrow vaults that accept at least one of the user's collateral vaults
+    // Find borrow vaults that accept ALL of the user's collateral vaults
     for (const vault of allVaults) {
       const debtTokenAddr = vault.asset?.address?.toLowerCase();
 
@@ -78,13 +78,21 @@ export function useEulerDebtSwapVaults({
       // Skip the current debt token (we're looking for alternatives)
       if (debtTokenAddr === currentDebtAddr) continue;
 
-      // Check which of the user's collateral vaults are accepted by this borrow vault
-      const acceptedCollaterals = (vault.collaterals || [])
-        .filter(col => userCollateralVaultsSet.has(col.vaultAddress.toLowerCase()))
-        .map(col => col.vaultAddress);
+      // Build set of collateral vaults this borrow vault accepts
+      const vaultAcceptedCollaterals = new Set(
+        (vault.collaterals || []).map(col => col.vaultAddress.toLowerCase())
+      );
 
-      // Skip if this vault doesn't accept any of the user's collaterals
-      if (acceptedCollaterals.length === 0) continue;
+      // Check if ALL user's collateral vaults are accepted by this borrow vault
+      const allCollateralsAccepted = userCollateralVaultAddresses.every(
+        userCol => vaultAcceptedCollaterals.has(userCol.toLowerCase())
+      );
+
+      // Skip if this vault doesn't accept ALL of the user's collaterals
+      if (!allCollateralsAccepted) continue;
+
+      // All user collaterals are accepted
+      const acceptedCollaterals = userCollateralVaultAddresses;
 
       const target: EulerDebtSwapTarget = {
         vaultAddress: vault.address,
@@ -107,9 +115,8 @@ export function useEulerDebtSwapVaults({
     // Sort by borrow APY (lowest first)
     compatibleVaults.sort((a, b) => a.borrowApy - b.borrowApy);
 
-    console.log("[useEulerDebtSwapVaults] Found compatible vaults:",
-      Object.keys(byAddress).length,
-      "for collaterals:", userCollateralVaultAddresses
+    console.log("[useEulerDebtSwapVaults] Found", Object.keys(byAddress).length,
+      "compatible vaults that accept ALL", userCollateralVaultAddresses.length, "collaterals"
     );
 
     return {

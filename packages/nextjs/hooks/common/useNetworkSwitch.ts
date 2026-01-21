@@ -21,6 +21,8 @@ export function useNetworkSwitch(isActive: boolean, targetChainId?: number): voi
 
   useEffect(() => {
     if (!isActive || !targetChainId) return;
+    // Skip for hardhat (31337) - user manages wallet connection manually in dev mode
+    if (targetChainId === 31337) return;
     if (chain?.id !== targetChainId) {
       try {
         switchChain?.({ chainId: targetChainId });

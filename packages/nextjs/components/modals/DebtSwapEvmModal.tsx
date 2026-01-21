@@ -115,6 +115,24 @@ interface DebtSwapEvmModalProps {
     eulerCollateralVaults?: string[];
     /** Euler: Sub-account index (0 = main account) */
     eulerSubAccountIndex?: number;
+    /** Euler: All sub-account indices that are currently in use (have positions) */
+    eulerUsedSubAccountIndices?: number[];
+    /** Euler: Full collateral info for sub-account migration (vault + token + balance) */
+    eulerCollaterals?: EulerCollateralInfo[];
+}
+
+/** Euler collateral info for debt swap with sub-account migration */
+export interface EulerCollateralInfo {
+    /** Vault address (where shares are held) */
+    vaultAddress: string;
+    /** Underlying token address */
+    tokenAddress: string;
+    /** Underlying token symbol */
+    tokenSymbol: string;
+    /** Token decimals */
+    decimals: number;
+    /** User's collateral balance (shares) */
+    balance: bigint;
 }
 
 export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
@@ -140,13 +158,15 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     eulerBorrowVault,
     eulerCollateralVaults,
     eulerSubAccountIndex,
+    eulerUsedSubAccountIndices,
+    eulerCollaterals,
 }) => {
     // Prefixed with _ to indicate intentionally unused (reserved for future display)
     void _collateralTokenSymbol;
     void _collateralDecimals;
     const {
         buildDebtSwapFlow,
-    } = useKapanRouterV2();
+    } = useKapanRouterV2({ chainId });
 
     // ========================================================================
     // Protocol Detection & Market Discovery
@@ -252,30 +272,46 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const [selectedFrom, setSelectedFrom] = useState<SwapAsset | null>(fromAsset);
     const [selectedTo, setSelectedTo] = useState<SwapAsset | null>(null);
 
-    // Euler: Encode OLD borrow vault context (current position)
-    // Uses the first collateral vault for context (all collaterals share the same sub-account)
+    // Euler: Sub-account migration strategy
+    // To avoid controller conflicts, we migrate to a NEW sub-account:
+    // - Old sub-account: repay debt + withdraw collaterals
+    // - New sub-account: deposit collaterals + borrow new debt
+    const oldSubAccountIndex = eulerSubAccountIndex ?? 0;
+    // Find next available sub-account index (not in use by other positions)
+    const newSubAccountIndex = useMemo(() => {
+        const usedSet = new Set(eulerUsedSubAccountIndices ?? [oldSubAccountIndex]);
+        // Start from oldIndex + 1 and find next available
+        for (let i = 1; i < 256; i++) {
+            const candidate = (oldSubAccountIndex + i) % 256;
+            if (!usedSet.has(candidate)) {
+                return candidate;
+            }
+        }
+        // Fallback (shouldn't happen - would need 256 positions)
+        return (oldSubAccountIndex + 1) % 256;
+    }, [oldSubAccountIndex, eulerUsedSubAccountIndices]);
+
+    // Euler: Encode OLD borrow vault context (for repay on old sub-account)
     const oldEulerContextEncoded = useMemo(() => {
         if (!isEuler || !eulerBorrowVault || !eulerCollateralVaults?.length) return undefined;
         return encodeEulerContext({
             borrowVault: eulerBorrowVault as Address,
-            collateralVault: eulerCollateralVaults[0] as Address,
-            subAccountIndex: eulerSubAccountIndex,
+            collateralVault: eulerCollateralVaults as Address[],
+            subAccountIndex: oldSubAccountIndex,
         });
-    }, [isEuler, eulerBorrowVault, eulerCollateralVaults, eulerSubAccountIndex]);
+    }, [isEuler, eulerBorrowVault, eulerCollateralVaults, oldSubAccountIndex]);
 
-    // Euler: Encode NEW borrow vault context (selected target)
-    // Uses the same collateral vault - collaterals stay in place, only borrow vault changes
+    // Euler: Encode NEW borrow vault context (for borrow on new sub-account)
     const newEulerContextEncoded = useMemo(() => {
         if (!isEuler || !selectedTo || !eulerCollateralVaults?.length) return undefined;
-        // Get the new borrow vault from the selected asset
         const newBorrowVault = (selectedTo as SwapAsset & { eulerBorrowVault?: string }).eulerBorrowVault;
         if (!newBorrowVault) return undefined;
         return encodeEulerContext({
             borrowVault: newBorrowVault as Address,
-            collateralVault: eulerCollateralVaults[0] as Address,
-            subAccountIndex: eulerSubAccountIndex,
+            collateralVault: eulerCollateralVaults as Address[],
+            subAccountIndex: newSubAccountIndex,
         });
-    }, [isEuler, selectedTo, eulerCollateralVaults, eulerSubAccountIndex]);
+    }, [isEuler, selectedTo, eulerCollateralVaults, newSubAccountIndex]);
 
     const [slippage, setSlippage] = useState<number>(0.1); // Start with minimum, will auto-adjust
     const [amountIn, setAmountIn] = useState(""); // Amount of current debt to repay
@@ -292,9 +328,9 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const [customBuyAmount, setCustomBuyAmount] = useState<string>("");
     const [useCustomBuyAmount, setUseCustomBuyAmount] = useState(false);
 
-    // Wallet hooks for limit order
-    const { data: walletClient } = useWalletClient();
-    const publicClient = usePublicClient();
+    // Wallet hooks for limit order - use prop chainId to target correct network
+    const { data: walletClient } = useWalletClient({ chainId });
+    const publicClient = usePublicClient({ chainId });
 
     // CoW limit order hook
     const {
@@ -426,6 +462,15 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         return result.value ?? 0n;
     }, [debouncedAmountIn, debtFromDecimals]);
 
+    // For isMax, apply dust buffer to account for interest accrual between quote and execution
+    // This ensures the swap produces enough old debt tokens to repay the full (potentially accrued) debt
+    const bufferedRepayAmount = useMemo(() => {
+        if (isMax) {
+            return calculateDustBuffer(repayAmountRaw);
+        }
+        return repayAmountRaw;
+    }, [isMax, repayAmountRaw]);
+
     // For limit orders with max: apply dust buffer to buy slightly more than current debt
     // This accounts for interest accrual between order creation and execution
     const limitOrderBuyAmount = useMemo(() => {
@@ -465,16 +510,17 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
     const isUnitQuoteLoading = swapRouter === "1inch" ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
 
     // Calculate required newDebt input based on unit quote
+    // Use bufferedRepayAmount to ensure we get enough tokens for full repayment (including interest accrual)
     const { requiredNewDebt, requiredNewDebtFormatted, exchangeRate } = useMemo(() => {
         return calculateRequiredNewDebt({
             selectedTo,
-            repayAmountRaw,
+            repayAmountRaw: bufferedRepayAmount,
             oneInchUnitQuote,
             pendleUnitQuote,
             debtFromDecimals,
             slippage,
         });
-    }, [oneInchUnitQuote, pendleUnitQuote, selectedTo, repayAmountRaw, debtFromDecimals, slippage]);
+    }, [oneInchUnitQuote, pendleUnitQuote, selectedTo, bufferedRepayAmount, debtFromDecimals, slippage]);
 
     // Flash Loan selection - check liquidity for the NEW debt token we're flash loaning
     const { selectedProvider, setSelectedProvider } = useFlashLoanSelection({
@@ -665,6 +711,177 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         }
 
         // ========================================================================
+        // EULER: Sub-account migration with multiple collaterals
+        // ========================================================================
+        if (isEuler && oldEulerContextEncoded && newEulerContextEncoded && eulerCollaterals?.length && eulerBorrowVault) {
+            const numChunks = limitOrderConfig?.numChunks ?? 1;
+            const chunkBuyAmount = limitOrderBuyAmount / BigInt(numChunks);
+            // Get the new borrow vault from selected target
+            const newBorrowVault = (selectedTo as SwapAsset & { eulerBorrowVault?: string }).eulerBorrowVault;
+            if (!newBorrowVault) {
+                console.error("[Euler Limit Order] No new borrow vault found");
+                return [{ preInstructions: [], postInstructions: [] }];
+            }
+
+            return Array(numChunks).fill(null).map(() => {
+                /**
+                 * Euler Sub-Account Migration Debt Swap (Limit Order) - KIND_BUY:
+                 *
+                 * UTXO Layout (hook prepends implicit UTXOs for buy orders):
+                 * [0] = actual sell amount used (newDebt, from fundOrder ToOutput)
+                 * [1] = leftover from flash loan (newDebt refund)
+                 * --- Post-hook instructions start here ---
+                 * [2] PullToken(oldDebt from OM) -> pulled oldDebt
+                 * [3] Approve(2, euler) -> dummy
+                 * [4] Repay(input=2, OLD_SUBACCOUNT) -> refund
+                 * For each collateral i:
+                 *   [5+2i] GetSupplyBalance(OLD_SUBACCOUNT) -> balance
+                 *   [6+2i] WithdrawCollateral(input=5+2i, OLD_SUBACCOUNT) -> collateral tokens
+                 * For each collateral i (after all withdrawals):
+                 *   Approve(withdrawal_utxo, euler) -> dummy
+                 *   DepositCollateral(input, NEW_SUBACCOUNT) -> NO OUTPUT
+                 * Borrow(input=0, NEW_SUBACCOUNT) -> newDebt for flash loan repay
+                 * Add(borrow_utxo, 1) -> borrowed + leftover for flash loan repay
+                 */
+                const postInstructions: ProtocolInstruction[] = [];
+                let utxoIndex = 2; // Start after implicit [0] sell amount and [1] leftover
+
+                // 1. PullToken: pull oldDebt from OrderManager -> [2]
+                postInstructions.push(
+                    createRouterInstruction(encodePullToken(chunkBuyAmount, debtFromToken as Address, orderManagerAddress as Address))
+                );
+                const pulledOldDebtUtxo = utxoIndex++;
+
+                // 2. Approve oldDebt for Euler gateway -> [3]
+                postInstructions.push(
+                    createRouterInstruction(encodeApprove(pulledOldDebtUtxo, "euler"))
+                );
+                utxoIndex++; // approve output
+
+                // 3. Repay oldDebt on OLD sub-account (input=pulledOldDebtUtxo) -> [4] (refund)
+                postInstructions.push(
+                    createProtocolInstruction(
+                        "euler",
+                        encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, 0n, oldEulerContextEncoded, pulledOldDebtUtxo)
+                    )
+                );
+                const repayRefundUtxo = utxoIndex++;
+
+                // 4. For each collateral: GetSupplyBalance → Withdraw from OLD sub-account
+                const collateralWithdrawUtxos: number[] = [];
+                for (const collateral of eulerCollaterals) {
+                    // Context for withdraw from OLD sub-account
+                    const withdrawContext = encodeEulerContext({
+                        borrowVault: eulerBorrowVault as Address,
+                        collateralVault: collateral.vaultAddress as Address,
+                        subAccountIndex: oldSubAccountIndex,
+                    });
+
+                    // GetSupplyBalance to get exact amount
+                    postInstructions.push(
+                        createProtocolInstruction(
+                            "euler",
+                            encodeLendingInstruction(
+                                LendingOp.GetSupplyBalance,
+                                collateral.tokenAddress,
+                                userAddress,
+                                0n,
+                                withdrawContext,
+                                999 // No input reference
+                            )
+                        )
+                    );
+                    const supplyBalanceUtxo = utxoIndex++;
+
+                    // Withdraw full balance using GetSupplyBalance output
+                    postInstructions.push(
+                        createProtocolInstruction(
+                            "euler",
+                            encodeLendingInstruction(
+                                LendingOp.WithdrawCollateral,
+                                collateral.tokenAddress,
+                                userAddress,
+                                0n, // Use input amount from GetSupplyBalance
+                                withdrawContext,
+                                supplyBalanceUtxo // Reference GetSupplyBalance output
+                            )
+                        )
+                    );
+                    collateralWithdrawUtxos.push(utxoIndex++);
+                }
+
+                // 5. For each collateral: Approve + Deposit to NEW sub-account
+                for (let i = 0; i < eulerCollaterals.length; i++) {
+                    const collateral = eulerCollaterals[i];
+                    const withdrawUtxo = collateralWithdrawUtxos[i];
+
+                    // Context for deposit to NEW sub-account
+                    const depositContext = encodeEulerContext({
+                        borrowVault: newBorrowVault as Address,
+                        collateralVault: collateral.vaultAddress as Address,
+                        subAccountIndex: newSubAccountIndex,
+                    });
+
+                    // Approve Euler for collateral tokens
+                    postInstructions.push(
+                        createRouterInstruction(encodeApprove(withdrawUtxo, "euler"))
+                    );
+                    utxoIndex++; // approve output
+
+                    // Deposit to NEW sub-account
+                    postInstructions.push(
+                        createProtocolInstruction(
+                            "euler",
+                            encodeLendingInstruction(
+                                LendingOp.DepositCollateral,
+                                collateral.tokenAddress,
+                                userAddress,
+                                0n, // Use input amount
+                                depositContext,
+                                withdrawUtxo // Reference withdrawal output
+                            )
+                        )
+                    );
+                    // DepositCollateral has no output, so don't increment utxoIndex
+                }
+
+                // 6. Borrow newDebt from NEW sub-account (amount from [0])
+                // Include all collateral vaults for Euler health factor calculation
+                const borrowContext = encodeEulerContext({
+                    borrowVault: newBorrowVault as Address,
+                    collateralVault: eulerCollaterals.map(c => c.vaultAddress as Address),
+                    subAccountIndex: newSubAccountIndex,
+                });
+                postInstructions.push(
+                    createProtocolInstruction(
+                        "euler",
+                        encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress, 0n, borrowContext, 0)
+                    )
+                );
+                const borrowUtxo = utxoIndex++;
+
+                // 7. Add: borrowed ([borrowUtxo]) + leftover ([1]) for flash loan repay
+                postInstructions.push(
+                    createRouterInstruction(encodeAdd(borrowUtxo, 1))
+                );
+                const flashLoanRepayUtxo = utxoIndex++;
+
+                // 8. For max repayments: Push any refund from Repay back to user
+                if (isMax) {
+                    postInstructions.push(
+                        createRouterInstruction(encodePushToken(repayRefundUtxo, userAddress))
+                    );
+                }
+
+                return {
+                    preInstructions: [],
+                    postInstructions,
+                    flashLoanRepaymentUtxoIndex: flashLoanRepayUtxo,
+                };
+            });
+        }
+
+        // ========================================================================
         // Standard flow (Aave, Compound, Venus) - shared pool model
         // ========================================================================
         return buildCowChunkInstructions({
@@ -681,7 +898,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
             limitOrderConfig,
             isMax,  // Enable dust clearing (refund to user) when max is selected
         });
-    }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderConfig, isMax, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance]);
+    }, [selectedTo, userAddress, limitOrderBuyAmount, orderManagerAddress, protocolName, context, debtFromToken, debtFromName, debtFromDecimals, cowFlashLoanInfo, limitOrderConfig, isMax, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex]);
 
     // amountOut = required new debt (what user will borrow)
     const amountOut = useMemo(() => {
@@ -804,87 +1021,222 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         }
 
         // ========================================================================
-        // EULER: Simpler than Morpho - no collateral movement needed
-        // Collaterals stay in place, only the controller (borrow vault) changes
+        // EULER: Sub-account migration to avoid controller conflicts
+        // Since each sub-account can only have ONE controller (borrow vault),
+        // we migrate collaterals to a NEW sub-account with the new controller.
         // ========================================================================
-        if (isEuler && oldEulerContextEncoded && newEulerContextEncoded) {
-            const minAmountOutBigInt = repayAmountRaw;
+        if (isEuler && oldEulerContextEncoded && newEulerContextEncoded && eulerCollaterals?.length) {
+            // Use buffered amount for swap output to ensure full debt repayment (accounts for interest accrual)
+            const minAmountOutBigInt = bufferedRepayAmount;
             const swapContext = encodeAbiParameters(
                 [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
                 [debtFromToken as Address, minAmountOutBigInt, swapQuote.tx.data as `0x${string}`]
             );
 
+            // Get the new borrow vault from selected target
+            const newBorrowVault = (selectedTo as SwapAsset & { eulerBorrowVault?: string }).eulerBorrowVault;
+            if (!newBorrowVault) {
+                console.error("[Euler Debt Swap] No new borrow vault found");
+                return [];
+            }
+
             /**
-             * Euler Debt Swap (Market Order):
+             * Euler Debt Swap with Sub-Account Migration:
              *
-             * Unlike Morpho, Euler collaterals don't need to move - they stay enabled
-             * in the sub-account. Only the controller (borrow vault) changes.
+             * When isMax=true, we use GetBorrowBalance to get exact debt on-chain.
+             * This ensures full repayment even with interest accrual since quote time.
+             * The gateway adds 0.1% buffer to GetBorrowBalance to cover accrual during tx.
              *
-             * UTXO Layout:
-             * [0] ToOutput(maxNewDebt) -> amount ref
-             * [1] FlashLoan(0) -> new debt tokens
-             * [2] Approve(1, swap) -> dummy
-             * [3],[4] SwapExactOut(1) -> oldDebt, newDebt refund
-             * [5] Approve(3, euler) -> dummy
-             * [6] Repay(3, OLD_VAULT) -> repay refund (removes old controller)
-             * [7] Borrow(0, NEW_VAULT) -> to repay flash loan (sets new controller)
+             * Flow:
+             * 1. (isMax only) GetBorrowBalance on OLD sub-account -> exact debt
+             * 2. Flash loan new debt token
+             * 3. Swap new debt -> old debt (minOut = exact debt or quote amount)
+             * 4. Repay old debt on OLD sub-account (must be FULL repay for withdraw to work)
+             * 5. Withdraw collaterals from OLD sub-account
+             * 6. Deposit collaterals to NEW sub-account
+             * 7. Borrow new debt on NEW sub-account
              */
             const instructions: ProtocolInstruction[] = [];
+            let utxoIndex = 0;
 
-            // 0. ToOutput(maxNewDebt) -> [0]
+            // Note: We don't use GetBorrowBalance for Euler debt swaps because:
+            // 1. The gateway's Repay already caps at actual debt and refunds excess
+            // 2. The swap quote includes slippage buffer
+            // 3. Interest accrual between quote and execution is minimal
+
+            // ToOutput(maxNewDebt) -> [0]
             instructions.push(
                 createRouterInstruction(encodeToOutput(requiredNewDebt, selectedTo.address))
             );
+            const borrowAmountUtxo = utxoIndex++;
 
-            // 1. FlashLoan(0) -> [1]
+            // FlashLoan -> [1 or 2]
             instructions.push(
-                createRouterInstruction(encodeFlashLoan(providerEnum, 0))
+                createRouterInstruction(encodeFlashLoan(providerEnum, borrowAmountUtxo))
             );
+            const flashLoanUtxo = utxoIndex++;
 
-            // 2. Approve swap protocol for new debt ([1]) -> [2]
+            // Approve swap protocol for new debt
             instructions.push(
-                createRouterInstruction(encodeApprove(1, swapProtocol))
+                createRouterInstruction(encodeApprove(flashLoanUtxo, swapProtocol))
             );
+            utxoIndex++; // approve output
 
-            // 3. SwapExactOut new debt -> old debt (input=1) -> [3] oldDebt, [4] newDebt refund
+            // SwapExactOut new debt -> old debt
             instructions.push(
                 createProtocolInstruction(
                     swapProtocol,
-                    encodeLendingInstruction(LendingOp.SwapExactOut, selectedTo.address, userAddress!, 0n, swapContext, 1)
+                    encodeLendingInstruction(LendingOp.SwapExactOut, selectedTo.address, userAddress!, 0n, swapContext, flashLoanUtxo)
                 )
             );
+            const oldDebtUtxo = utxoIndex++;
+            const swapRefundUtxo = utxoIndex++;
 
-            // 4. Approve Euler for old debt ([3]) -> [5]
+            // Approve Euler for old debt
             instructions.push(
-                createRouterInstruction(encodeApprove(3, "euler"))
+                createRouterInstruction(encodeApprove(oldDebtUtxo, "euler"))
             );
+            utxoIndex++; // approve output
 
-            // 5. Repay old debt on OLD vault (input=3) -> [6]
-            // This removes the old borrow vault as controller
+            // Repay old debt on OLD sub-account
+            // Always use swap output as input - gateway caps at actual debt and refunds excess
+            // GetBorrowBalance (if used) just ensures we request enough from the swap
             instructions.push(
                 createProtocolInstruction(
                     "euler",
-                    encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress!, 0n, oldEulerContextEncoded, 3)
+                    encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress!, 0n, oldEulerContextEncoded, oldDebtUtxo)
                 )
             );
+            const repayRefundUtxo = utxoIndex++;
 
-            // 6. Borrow new debt from NEW vault (amount from [0]) -> [7]
-            // This sets the new borrow vault as controller
-            // The new vault must accept our existing collaterals (checked by useEulerDebtSwapVaults)
+            // 6. For each collateral: GetSupplyBalance → Withdraw from OLD sub-account, Deposit to NEW sub-account
+            const collateralUtxos: number[] = [];
+            for (const collateral of eulerCollaterals) {
+                // Context for withdraw from OLD sub-account
+                const withdrawContext = encodeEulerContext({
+                    borrowVault: eulerBorrowVault as Address,
+                    collateralVault: collateral.vaultAddress as Address,
+                    subAccountIndex: oldSubAccountIndex,
+                });
+
+                // Get exact supply balance on-chain (converts shares to assets)
+                instructions.push(
+                    createProtocolInstruction(
+                        "euler",
+                        encodeLendingInstruction(
+                            LendingOp.GetSupplyBalance,
+                            collateral.tokenAddress,
+                            userAddress!,
+                            0n,
+                            withdrawContext,
+                            999 // No input reference
+                        )
+                    )
+                );
+                const supplyBalanceUtxo = utxoIndex++;
+
+                // Withdraw full collateral balance from OLD sub-account using exact amount from GetSupplyBalance
+                instructions.push(
+                    createProtocolInstruction(
+                        "euler",
+                        encodeLendingInstruction(
+                            LendingOp.WithdrawCollateral,
+                            collateral.tokenAddress,
+                            userAddress!,
+                            0n, // Use input amount from GetSupplyBalance
+                            withdrawContext,
+                            supplyBalanceUtxo // Reference GetSupplyBalance output
+                        )
+                    )
+                );
+                collateralUtxos.push(utxoIndex++);
+            }
+
+            // 7. For each collateral: Approve + Deposit to NEW sub-account
+            for (let i = 0; i < eulerCollaterals.length; i++) {
+                const collateral = eulerCollaterals[i];
+                const collateralUtxo = collateralUtxos[i];
+
+                // Context for deposit to NEW sub-account
+                const depositContext = encodeEulerContext({
+                    borrowVault: newBorrowVault as Address,
+                    collateralVault: collateral.vaultAddress as Address,
+                    subAccountIndex: newSubAccountIndex,
+                });
+
+                // Approve Euler for collateral tokens
+                instructions.push(
+                    createRouterInstruction(encodeApprove(collateralUtxo, "euler"))
+                );
+                utxoIndex++; // approve output
+
+                // Deposit to NEW sub-account (uses amount from withdraw output)
+                instructions.push(
+                    createProtocolInstruction(
+                        "euler",
+                        encodeLendingInstruction(
+                            LendingOp.DepositCollateral,
+                            collateral.tokenAddress,
+                            userAddress!,
+                            0n, // Use input amount
+                            depositContext,
+                            collateralUtxo // Reference withdraw output
+                        )
+                    )
+                );
+                // DepositCollateral has no output, so don't increment utxoIndex
+            }
+
+            // 8. Borrow new debt on NEW sub-account (amount from [0])
+            // Include all collateral vaults - required for Euler to calculate health factor
+            const borrowContext = encodeEulerContext({
+                borrowVault: newBorrowVault as Address,
+                collateralVault: eulerCollaterals.map(c => c.vaultAddress as Address),
+                subAccountIndex: newSubAccountIndex,
+            });
             instructions.push(
                 createProtocolInstruction(
                     "euler",
-                    encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress!, 0n, newEulerContextEncoded, 0)
+                    encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress!, 0n, borrowContext, borrowAmountUtxo)
                 )
             );
+            utxoIndex++; // borrow output
 
-            // 7. Push refunds to user
+            // 9. Push refunds to user
             instructions.push(
-                createRouterInstruction(encodePushToken(6, userAddress!)) // repay refund
+                createRouterInstruction(encodePushToken(repayRefundUtxo, userAddress!))
             );
             instructions.push(
-                createRouterInstruction(encodePushToken(4, userAddress!)) // swap refund
+                createRouterInstruction(encodePushToken(swapRefundUtxo, userAddress!))
             );
+
+            // Single comprehensive debug log for Euler debt swap
+            console.log("[Euler Debt Swap] === COMPLETE DEBUG INFO ===", JSON.stringify({
+                // Sub-account info
+                user: userAddress,
+                oldSubAccount: { index: oldSubAccountIndex, borrowVault: eulerBorrowVault, context: oldEulerContextEncoded },
+                newSubAccount: { index: newSubAccountIndex, borrowVault: newBorrowVault, context: borrowContext },
+                usedSubAccountIndices: eulerUsedSubAccountIndices,
+
+                // Flash loan & swap
+                flashLoan: { provider: providerEnum, requiredNewDebt: requiredNewDebt.toString(), newDebtToken: selectedTo.address },
+                swap: { protocol: swapProtocol, minOutput: bufferedRepayAmount.toString(), oldDebtToken: debtFromToken, swapContext },
+
+                // Collaterals
+                collaterals: eulerCollaterals.map(c => ({
+                    vault: c.vaultAddress, token: c.tokenAddress, symbol: c.tokenSymbol, balance: c.balance?.toString()
+                })),
+
+                // UTXO tracking
+                utxos: { borrowAmountUtxo, flashLoanUtxo, oldDebtUtxo, swapRefundUtxo, repayRefundUtxo, collateralUtxos },
+
+                // Instructions
+                instructionCount: instructions.length,
+                instructions: instructions.map((inst, i) => ({ idx: i, protocol: inst.protocolName, data: inst.data })),
+
+                // Flags
+                isMax,
+            }, null, 2));
 
             return instructions;
         }

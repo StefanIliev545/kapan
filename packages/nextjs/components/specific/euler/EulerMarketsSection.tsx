@@ -17,6 +17,7 @@ import {
   Tooltip,
 } from "@radix-ui/themes";
 import { Search, X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { TablePagination } from "~~/components/common/TablePagination";
 import {
   useReactTable,
   getCoreRowModel,
@@ -102,8 +103,8 @@ function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
   }, []);
 
   return (
-    <div
-      className="bg-base-300 relative flex-shrink-0 overflow-hidden rounded-full"
+    <span
+      className="bg-base-300 relative inline-flex flex-shrink-0 overflow-hidden rounded-full"
       style={containerStyle}
     >
       <Image
@@ -120,7 +121,7 @@ function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
       >
         {symbol.slice(0, 2).toUpperCase()}
       </span>
-    </div>
+    </span>
   );
 }
 
@@ -852,7 +853,21 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
   }, [selectedVault]);
 
   const rows = table.getRowModel().rows;
-  const canLoadMore = table.getCanNextPage();
+  const pageIndex = table.getState().pagination.pageIndex;
+  const pageCount = table.getPageCount();
+  const canPreviousPage = table.getCanPreviousPage();
+  const canNextPage = table.getCanNextPage();
+  const totalItems = table.getFilteredRowModel().rows.length;
+
+  const handlePageChange = React.useCallback(
+    (newPageIndex: number) => table.setPageIndex(newPageIndex),
+    [table]
+  );
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    table.setPageIndex(0);
+  }, [table, globalFilter, selectedAssets, selectedCollaterals]);
 
   if (isLoading) {
     return (
@@ -1050,13 +1065,15 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
         </>
       )}
 
-      {canLoadMore && (
-        <Flex align="center" justify="center" py="2">
-          <Button variant="soft" onClick={() => table.nextPage()}>
-            Show more
-          </Button>
-        </Flex>
-      )}
+      <TablePagination
+        pageIndex={pageIndex}
+        pageCount={pageCount}
+        onPageChange={handlePageChange}
+        canPreviousPage={canPreviousPage}
+        canNextPage={canNextPage}
+        totalItems={totalItems}
+        pageSize={pageSize}
+      />
 
       {selectedVault && depositModalToken && (
         <DepositModal

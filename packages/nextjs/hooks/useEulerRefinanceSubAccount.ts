@@ -6,6 +6,7 @@ import {
   findEulerRefinanceSubAccount,
   type EulerRefinanceSubAccount,
 } from "~~/utils/euler/subAccountUtils";
+import { getEffectiveChainId } from "~~/utils/forkChain";
 
 /**
  * Hook to find the appropriate Euler sub-account for a refinance operation.
@@ -44,8 +45,15 @@ async function fetchEulerPositions(
   userAddress: string
 ): Promise<{ positionGroups: EulerPositionGroup[] }> {
   try {
+    // For hardhat, pass the forked chain ID so the API uses the correct subgraph
+    const params = new URLSearchParams({ user: userAddress.toLowerCase() });
+    if (chainId === 31337) {
+      const forkChainId = getEffectiveChainId(chainId);
+      params.set("forkChainId", String(forkChainId));
+    }
+
     const response = await fetch(
-      `/api/euler/${chainId}/positions?user=${userAddress.toLowerCase()}`
+      `/api/euler/${chainId}/positions?${params.toString()}`
     );
     if (!response.ok) {
       console.error(`[useEulerRefinanceSubAccount] Positions API error: ${response.status}`);

@@ -16,12 +16,18 @@ import { NextRequest, NextResponse } from "next/server";
 const EULER_SUBGRAPH_URLS: Record<number, string> = {
   // Ethereum Mainnet
   1: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-mainnet/latest/gn",
-  // Arbitrum
-  42161: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-arbitrum/latest/gn",
-  // Base
-  8453: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-base/latest/gn",
   // Optimism
   10: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-optimism/latest/gn",
+  // Unichain
+  130: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-unichain/latest/gn",
+  // Base
+  8453: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-base/latest/gn",
+  // Plasma
+  9745: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-plasma/latest/gn",
+  // Arbitrum
+  42161: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-arbitrum/latest/gn",
+  // Linea
+  59144: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-linea/latest/gn",
 };
 
 // Query for user positions via trackingActiveAccount
@@ -326,15 +332,21 @@ export async function GET(
   const { chainId: chainIdStr } = await params;
   const chainId = parseInt(chainIdStr, 10);
 
-  const subgraphUrl = EULER_SUBGRAPH_URLS[chainId];
+  const searchParams = request.nextUrl.searchParams;
+
+  // For hardhat (31337), use forkChainId param to determine which chain's subgraph to query
+  const forkChainId = chainId === 31337
+    ? parseInt(searchParams.get("forkChainId") || "42161", 10) // Default to Arbitrum
+    : chainId;
+
+  const subgraphUrl = EULER_SUBGRAPH_URLS[forkChainId];
   if (!subgraphUrl) {
     return NextResponse.json(
-      { error: `Chain ${chainId} not supported for Euler V2` },
+      { error: `Chain ${forkChainId} not supported for Euler V2` },
       { status: 400 }
     );
   }
 
-  const searchParams = request.nextUrl.searchParams;
   const userAddress = searchParams.get("user")?.toLowerCase();
 
   if (!userAddress) {

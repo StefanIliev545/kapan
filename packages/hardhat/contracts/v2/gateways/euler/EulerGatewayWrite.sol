@@ -141,12 +141,11 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         uint256 shares = IEulerVault(vault).balanceOf(user);
         uint256 userBalance = IEulerVault(vault).convertToAssets(shares);
 
-        // Clamp to user's actual balance (can't withdraw more than they have)
-        if (amount > userBalance) {
-            amount = userBalance;
-        }
+        if (shares == 0) return 0;
 
-        if (amount == 0) return 0;
+        // Determine if this is a full withdrawal
+        // Use redeem(shares) for full withdrawal to avoid dust from rounding
+        bool isFullWithdrawal = amount >= userBalance;
 
         address token = IEulerVault(vault).asset();
         uint256 preBal = IERC20(token).balanceOf(address(this));
@@ -157,12 +156,24 @@ contract EulerGatewayWrite is IGateway, ProtocolGateway, Ownable, ReentrancyGuar
         // at the end of the batch, allowing withdrawals that would fail
         // if checked immediately (e.g., partial withdrawals with active debt)
         IEVC.BatchItem[] memory items = new IEVC.BatchItem[](1);
-        items[0] = IEVC.BatchItem({
-            targetContract: vault,
-            onBehalfOfAccount: user,
-            value: 0,
-            data: abi.encodeCall(IEulerVault.withdraw, (amount, address(this), user))
-        });
+
+        if (isFullWithdrawal) {
+            // Full withdrawal: use redeem(shares) to withdraw ALL shares without dust
+            items[0] = IEVC.BatchItem({
+                targetContract: vault,
+                onBehalfOfAccount: user,
+                value: 0,
+                data: abi.encodeCall(IEulerVault.redeem, (shares, address(this), user))
+            });
+        } else {
+            // Partial withdrawal: use withdraw(amount) for exact asset amount
+            items[0] = IEVC.BatchItem({
+                targetContract: vault,
+                onBehalfOfAccount: user,
+                value: 0,
+                data: abi.encodeCall(IEulerVault.withdraw, (amount, address(this), user))
+            });
+        }
 
         evc.batch(items);
 

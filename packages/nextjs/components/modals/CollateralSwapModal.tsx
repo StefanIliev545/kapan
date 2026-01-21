@@ -406,7 +406,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     eulerCollateralVault,
     eulerSubAccountIndex,
 }) => {
-    const { buildCollateralSwapFlow } = useKapanRouterV2();
+    const { buildCollateralSwapFlow } = useKapanRouterV2({ chainId });
     const isMorpho = normalizeProtocolName(protocolName) === "morpho-blue";
     const isEuler = normalizeProtocolName(protocolName) === "euler";
 
@@ -534,10 +534,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     const [useCustomBuyAmount, setUseCustomBuyAmount] = useState(false);
     const cowAvailable = isCowProtocolSupported(chainId);
 
-    // Get user address for CoW order creation
+    // Get user address for CoW order creation - use prop chainId to target correct network
     const { address: userAddress } = useAccount();
-    const { data: walletClient } = useWalletClient();
-    const publicClient = usePublicClient();
+    const { data: walletClient } = useWalletClient({ chainId });
+    const publicClient = usePublicClient({ chainId });
     const { sendCallsAsync } = useSendCalls();
     
     // CoW order hooks

@@ -167,6 +167,15 @@ const INITIAL_SWAP_STATE: CollateralSwapState = {
   allCollaterals: [],
 };
 
+/** Collateral info for Euler debt swap sub-account migration */
+interface EulerCollateralForSwap {
+  vaultAddress: string;
+  tokenAddress: string;
+  tokenSymbol: string;
+  decimals: number;
+  balance: bigint;
+}
+
 /** Debt swap state for tracking which debt is being swapped */
 interface DebtSwapState {
   isOpen: boolean;
@@ -179,6 +188,8 @@ interface DebtSwapState {
   context: `0x${string}`;
   /** All collateral vault addresses in the position */
   collateralVaults: string[];
+  /** Full collateral info for sub-account migration */
+  collaterals: EulerCollateralForSwap[];
   subAccountIndex: number;
 }
 
@@ -192,6 +203,7 @@ const INITIAL_DEBT_SWAP_STATE: DebtSwapState = {
   tokenPrice: 0n,
   context: "0x",
   collateralVaults: [],
+  collaterals: [],
   subAccountIndex: 0,
 };
 
@@ -232,9 +244,11 @@ interface EulerPositionGroupRowProps {
   chainId: number;
   /** Map of lowercase symbol -> price in raw format (8 decimals) */
   pricesRaw: Record<string, bigint>;
+  /** All sub-account indices that are currently in use (have positions) */
+  usedSubAccountIndices: number[];
 }
 
-const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId, pricesRaw }) => {
+const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId, pricesRaw, usedSubAccountIndices }) => {
   const { debt, collaterals, isMainAccount, subAccount } = group;
   const swapModal = useModal();
   const debtSwapModal = useModal();
@@ -340,6 +354,14 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
       collateralVault: primaryCollateralVault,
       subAccountIndex,
     }) as `0x${string}`;
+    // Build full collateral info for sub-account migration
+    const collateralsForSwap: EulerCollateralForSwap[] = collaterals.map(c => ({
+      vaultAddress: c.vault.address,
+      tokenAddress: c.vault.asset.address,
+      tokenSymbol: c.vault.asset.symbol,
+      decimals: c.vault.asset.decimals,
+      balance: c.balance,
+    }));
     setDebtSwapState({
       isOpen: true,
       borrowVault: debt.vault.address,
@@ -350,6 +372,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
       tokenPrice: pricesRaw[symbol.toLowerCase()] ?? 0n,
       context,
       collateralVaults: collaterals.map(c => c.vault.address),
+      collaterals: collateralsForSwap,
       subAccountIndex,
     });
     debtSwapModal.open();
@@ -596,6 +619,8 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
         eulerBorrowVault={debtSwapState.borrowVault}
         eulerCollateralVaults={debtSwapState.collateralVaults}
         eulerSubAccountIndex={debtSwapState.subAccountIndex}
+        eulerUsedSubAccountIndices={usedSubAccountIndices}
+        eulerCollaterals={debtSwapState.collaterals}
       />
 
       {/* Close with Collateral Modal */}
@@ -739,6 +764,15 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     () => calculatePositionMetricsFromGroups(enrichedPositionGroups),
     [enrichedPositionGroups]
   );
+
+  // Compute all used sub-account indices (for debt swap to find next available)
+  const usedSubAccountIndices = useMemo(() => {
+    return enrichedPositionGroups.map(group => {
+      if (!group.subAccount) return 0;
+      // Extract last byte of address as index
+      return parseInt(group.subAccount.slice(-2), 16);
+    });
+  }, [enrichedPositionGroups]);
 
   // Report totals to global state (using liquidity data)
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
@@ -943,7 +977,7 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
             ) : (
               <div className="space-y-3">
                 {enrichedPositionGroups.map((group, idx) => (
-                  <EulerPositionGroupRow key={group.subAccount || idx} group={group} chainId={effectiveChainId} pricesRaw={pricesRaw} />
+                  <EulerPositionGroupRow key={group.subAccount || idx} group={group} chainId={chainId} pricesRaw={pricesRaw} usedSubAccountIndices={usedSubAccountIndices} />
                 ))}
               </div>
             )}

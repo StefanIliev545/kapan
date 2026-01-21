@@ -10,6 +10,8 @@ import { IGateway } from "./interfaces/IGateway.sol";
 import { ProtocolTypes } from "./interfaces/ProtocolTypes.sol";
 import { FlashLoanConsumerBase } from "./flashloans/FlashLoanConsumerBase.sol";
 
+import "hardhat/console.sol";
+
 interface IAuthorizationHelper {
     function authorizeInstructions(ProtocolTypes.ProtocolInstruction[] calldata, address) external view returns (address[] memory, bytes[] memory);
     function deauthorizeInstructions(ProtocolTypes.ProtocolInstruction[] calldata, address) external view returns (address[] memory, bytes[] memory);
@@ -205,14 +207,17 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     }
 
     function _executeAllInMemory(ProtocolTypes.ProtocolInstruction[] calldata instructions) internal {
+        console.log("[Router] _executeAllInMemory numInstructions=%d", instructions.length);
         ProtocolTypes.Output[] memory outputs = new ProtocolTypes.Output[](0);
         for (uint256 i = 0; i < instructions.length; i++) {
+            console.log("[Router] Executing instruction %d/%d protocol=%s", i, instructions.length, instructions[i].protocolName);
             ProtocolTypes.ProtocolInstruction calldata instruction = instructions[i];
             if (keccak256(abi.encode(instruction.protocolName)) == ROUTER_KEY) {
                 outputs = _processRouterInstructionInMemory(instruction, outputs);
             } else {
                 outputs = _processGatewayInstructionInMemory(instruction, outputs);
             }
+            console.log("[Router] Instruction %d completed, outputs.length=%d", i, outputs.length);
         }
     }
 
@@ -391,7 +396,9 @@ contract KapanRouter is Ownable, ReentrancyGuard, FlashLoanConsumerBase {
     ) internal returns (ProtocolTypes.Output[] memory) {
         IGateway gw = gateways[instruction.protocolName];
         if (address(gw) == address(0)) revert GatewayNotFound();
+        console.log("[Router] Calling gateway=%s for protocol=%s", address(gw), instruction.protocolName);
         ProtocolTypes.Output[] memory produced = gw.processLendingInstruction(outputs, instruction.data);
+        console.log("[Router] Gateway returned %d outputs", produced.length);
         if (produced.length > 0) {
             outputs = _concatOutputsMemory(outputs, produced);
         }
