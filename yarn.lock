@@ -416,6 +416,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@babel/types@npm:^7.26.0":
+  version: 7.28.6
+  resolution: "@babel/types@npm:7.28.6"
+  dependencies:
+    "@babel/helper-string-parser": ^7.27.1
+    "@babel/helper-validator-identifier": ^7.28.5
+  checksum: f76556cda59be337cc10dc68b2a9a947c10de018998bab41076e7b7e4489b28dd53299f98f22eec0774264c989515e6fdc56de91c73e3aa396367bb953200a6a
+  languageName: node
+  linkType: hard
+
 "@base-org/account@npm:2.4.0":
   version: 2.4.0
   resolution: "@base-org/account@npm:2.4.0"
@@ -6625,6 +6635,7 @@ __metadata:
     "@storybook/test": ^8.5.0
     "@tanstack/react-query": ^5.72.2
     "@tanstack/react-query-devtools": ^5.72.2
+    "@tanstack/react-table": ^8.21.3
     "@testing-library/dom": ^10.4.0
     "@testing-library/jest-dom": ^6.6.3
     "@testing-library/react": ^16.2.0
@@ -6642,6 +6653,7 @@ __metadata:
     abi-wan-kanabi: ^2.2.4
     abitype: 1.0.6
     autoprefixer: ~10.4.20
+    babel-plugin-react-compiler: latest
     blo: ~1.2.0
     burner-connector: 0.0.9
     clsx: ^2.1.1
@@ -7960,6 +7972,25 @@ __metadata:
   peerDependencies:
     react: ^18 || ^19
   checksum: 09e54e468fdc315859e63a16fb4124d6b92364b5e4b6d0867b4de6939df70feef210b0ec810543b0a93046bb16d4e67473574105e3b420e93a467bdf5aa0e954
+  languageName: node
+  linkType: hard
+
+"@tanstack/react-table@npm:^8.21.3":
+  version: 8.21.3
+  resolution: "@tanstack/react-table@npm:8.21.3"
+  dependencies:
+    "@tanstack/table-core": 8.21.3
+  peerDependencies:
+    react: ">=16.8"
+    react-dom: ">=16.8"
+  checksum: 1452e7bd1dd0febbfc37e656c61c2c426dc243136333a8688bfadfccfec233e87c9bbe83011d742b0e86ae52c9b3d436bdc5618be4ac675ab921f52317317780
+  languageName: node
+  linkType: hard
+
+"@tanstack/table-core@npm:8.21.3":
+  version: 8.21.3
+  resolution: "@tanstack/table-core@npm:8.21.3"
+  checksum: ce260ab981f334ba999240cf68ae942a524a28980f6853275da90d1864a8b56fa59b952bfd2266570f36ae11f66476d1c96dacc640ba5fd9d6d4e2a78cf05187
   languageName: node
   linkType: hard
 
@@ -11701,6 +11732,15 @@ __metadata:
   version: 4.1.0
   resolution: "axobject-query@npm:4.1.0"
   checksum: 7d1e87bf0aa7ae7a76cd39ab627b7c48fda3dc40181303d9adce4ba1d5b5ce73b5e5403ee6626ec8e91090448c887294d6144e24b6741a976f5be9347e3ae1df
+  languageName: node
+  linkType: hard
+
+"babel-plugin-react-compiler@npm:latest":
+  version: 1.0.0
+  resolution: "babel-plugin-react-compiler@npm:1.0.0"
+  dependencies:
+    "@babel/types": ^7.26.0
+  checksum: 4c5c6c209a27477b7af8ce2361f3e5ddbc1ef59ebac5fc9d85cf91c3921752c19ac814bb7f98e7f55084db3cb585fc966aa05191018fa70e4444f2f4a980fff2
   languageName: node
   linkType: hard
 

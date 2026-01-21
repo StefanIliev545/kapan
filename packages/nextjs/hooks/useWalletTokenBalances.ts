@@ -4,6 +4,7 @@ import { Abi, Address } from "viem";
 import { useAccount as useEvmAccount, usePublicClient } from "wagmi";
 import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useAccount as useStarkAccount } from "./useAccount";
+import { addrKey } from "~~/utils/address";
 
 type NetworkType = "evm" | "starknet" | "stark";
 
@@ -14,7 +15,8 @@ type TokenBalanceInput = {
 
 type TokenBalanceResult = Record<string, { balance: bigint; decimals?: number }>;
 
-export const normalizeAddress = (address: string) => address.toLowerCase();
+/** @deprecated Use addrKey from ~~/utils/address instead */
+export const normalizeAddress = addrKey;
 
 const getCallResult = (response: unknown): string[] | undefined => {
   // starknet.js v6+ returns array directly, older versions return { result: [...] }

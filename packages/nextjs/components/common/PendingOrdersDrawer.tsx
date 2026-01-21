@@ -26,6 +26,7 @@ import { getProtocolLogo } from "~~/utils/protocol";
 import { timeAgo } from "~~/utils/deadline";
 import { truncateAddress } from "~~/utils/address";
 import { useIntervalWhen } from "~~/hooks/common";
+import { qk } from "~~/lib/queryKeys";
 
 function formatAmount(amount: bigint, decimals: number): string {
   const formatted = formatUnits(amount, decimals);
@@ -87,15 +88,17 @@ export function PendingOrdersDrawer() {
       queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
       queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
       queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['morpho-positions'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['morpho-markets-support'], type: 'active' }),
+      // Morpho-specific queries - use hierarchical keys for chain-specific invalidation
+      queryClient.refetchQueries({ queryKey: qk.morpho.all(chainId), type: 'active' }),
+      // Euler-specific queries
+      queryClient.refetchQueries({ queryKey: qk.euler.all(chainId), type: 'active' }),
     ]).catch(e => console.warn("[PendingOrdersDrawer] Refetch error:", e));
 
     // Also dispatch txCompleted event for any other listeners
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("txCompleted"));
     }
-  }, [queryClient]);
+  }, [queryClient, chainId]);
 
   const fetchOrders = useCallback(async () => {
     if (!userAddress || !isAvailable || !currentKey) return;

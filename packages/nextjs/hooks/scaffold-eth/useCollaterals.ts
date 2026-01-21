@@ -1,9 +1,13 @@
 import { useScaffoldReadContract } from "./useScaffoldReadContract";
 import { formatUnits } from "viem";
 import { ContractName } from "~~/utils/scaffold-eth/contract";
-import { getGatewayContractName } from "./gatewayContracts";
+import { getGatewayContractName, normalizeProtocolName, UNSUPPORTED_GATEWAY_PROTOCOLS } from "./gatewayContracts";
 
 export const useCollaterals = (tokenAddress: string, protocolName: string, userAddress: string, enabled: boolean, chainId?: number) => {
+  // Check if protocol is supported for generic collateral fetching
+  const normalizedProtocol = normalizeProtocolName(protocolName);
+  const isUnsupportedProtocol = UNSUPPORTED_GATEWAY_PROTOCOLS.has(normalizedProtocol);
+
   // Get gateway contract name using shared utility
   const gatewayContractName = getGatewayContractName(protocolName);
 
@@ -13,7 +17,8 @@ export const useCollaterals = (tokenAddress: string, protocolName: string, userA
     args: [tokenAddress, userAddress],
     chainId: chainId as any,
     query: {
-      enabled,
+      // Don't query for protocols that don't support the generic interface
+      enabled: enabled && !isUnsupportedProtocol,
     },
   });
 

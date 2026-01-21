@@ -26,6 +26,10 @@ export type PreSelectedCollateral = {
   amount?: bigint;
   maxAmount?: bigint;
   inputValue?: string;
+  /** Euler-specific: The collateral vault address for this collateral (used for source context) */
+  eulerCollateralVault?: string;
+  /** Euler-specific: The sub-account index for this position (0 = main account, 1+ = sub-accounts) */
+  eulerSubAccountIndex?: number;
 };
 
 /* ------------------------------ Protocol Types ------------------------------ */

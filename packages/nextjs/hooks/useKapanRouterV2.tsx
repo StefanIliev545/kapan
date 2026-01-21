@@ -23,6 +23,7 @@ import {
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { getBlockExplorerTxLink } from "~~/utils/scaffold-eth";
+import { qk } from "~~/lib/queryKeys";
 import {
   ProtocolInstruction,
   createRouterInstruction,
@@ -250,16 +251,23 @@ const filterValidDeauthCalls = (deauthCalls: AuthorizationCall[]): Authorization
   });
 };
 
+interface UseKapanRouterV2Options {
+  /** Override chainId (for hardhat/local dev). If not provided, uses wallet's chainId */
+  chainId?: number;
+}
+
 /**
  * Hook for building and executing instructions on KapanRouter v2
  */
-export const useKapanRouterV2 = () => {
+export const useKapanRouterV2 = (options?: UseKapanRouterV2Options) => {
   const { address: userAddress } = useAccount();
   const { data: routerContract } = useDeployedContractInfo({ contractName: "KapanRouter" });
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
+  const walletChainId = useChainId();
+  // Use provided chainId or fall back to wallet's chainId
+  const chainId = options?.chainId ?? walletChainId;
+  const publicClient = usePublicClient({ chainId });
+  const { data: walletClient } = useWalletClient({ chainId });
   const queryClient = useQueryClient();
-  const chainId = useChainId();
 
   const CONFIRMATIONS_BY_CHAIN: Record<number, number> = {
     8453: 1,   // Base mainnet
@@ -364,9 +372,10 @@ export const useKapanRouterV2 = () => {
         queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
         queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
         queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
-        // Morpho-specific queries
-        queryClient.refetchQueries({ queryKey: ['morpho-positions'], type: 'active' }),
-        queryClient.refetchQueries({ queryKey: ['morpho-markets-support'], type: 'active' }),
+        // Morpho-specific queries - use hierarchical keys for chain-specific invalidation
+        queryClient.refetchQueries({ queryKey: qk.morpho.all(chainId), type: 'active' }),
+        // Euler-specific queries
+        queryClient.refetchQueries({ queryKey: qk.euler.all(chainId), type: 'active' }),
       ]).catch(e => logger.warn("Post-tx refetch err:", e));
 
       if (typeof window !== "undefined") {
@@ -405,10 +414,10 @@ export const useKapanRouterV2 = () => {
     const amountBigInt = parseUnits(amount, decimals);
     const isCompound = normalizedProtocol === "compound";
     const isMorpho = normalizedProtocol === "morpho-blue";
-    // Morpho uses DepositCollateral for collateral deposits (which is what we do when there's a position with debt)
-    // Compound also uses DepositCollateral
+    const isEuler = normalizedProtocol === "euler";
+    // Morpho, Compound, and Euler use DepositCollateral for collateral deposits
     // Other protocols use Deposit
-    const lendingOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    const lendingOp = (isCompound || isMorpho || isEuler) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
     return [
       createRouterInstruction(encodePullToken(amountBigInt, tokenAddress, userAddress)),
@@ -1249,7 +1258,8 @@ export const useKapanRouterV2 = () => {
    * These are errors that would still occur even after approvals are executed
    */
   const isDefinitelyNotApprovalRelated = useCallback((errorText: string): boolean => {
-    const nonApprovalPatterns = /health.?factor|liquidation|borrow.?cap|supply.?cap|frozen|paused|insufficient.?collateral|siloed|isolation.?mode|debt.?ceiling/i;
+    // Include patterns from Aave, Compound, Euler, etc.
+    const nonApprovalPatterns = /health.?factor|liquidation|borrow.?cap|supply.?cap|frozen|paused|insufficient.?collateral|siloed|isolation.?mode|debt.?ceiling|e_accountliquidity|e_badcollateral|e_borrowcapexceeded|e_supplycapexceeded|e_insufficientcash|e_pricefeednoset|e_badprice|e_pricefeedstale|oracle|liquidity/i;
     return nonApprovalPatterns.test(errorText);
   }, []);
 
@@ -1263,7 +1273,19 @@ export const useKapanRouterV2 = () => {
   }, []);
 
   /**
-   * Simulate authorization calls and throw on failure
+   * Check if an auth error is expected/benign (e.g., "already enabled" states in Euler)
+   * These errors will succeed in the actual batch because they're no-ops when state already exists
+   */
+  const isExpectedAuthError = useCallback((errorText: string): boolean => {
+    // Euler EVC: controller/collateral already enabled, or trying to re-enable
+    const expectedPatterns = /controllerviolation|already.*enabled|collateraldisabled|controllerdisabled|notauthorized/i;
+    return expectedPatterns.test(errorText);
+  }, []);
+
+  /**
+   * Simulate authorization calls - log errors but don't throw for expected state errors
+   * When using batched transactions, many auth calls are "enable if not enabled" which
+   * may fail in isolated simulation but succeed in the actual batch
    */
   const simulateAuthCalls = useCallback(async (
     authCalls: AuthorizationCall[],
@@ -1276,10 +1298,22 @@ export const useKapanRouterV2 = () => {
       const authResult = await simulateTransaction(client, target as `0x${string}`, data, user as `0x${string}`);
       if (!authResult.success && authResult.error) {
         const formatted = formatErrorForDisplay(authResult.error);
-        throw new Error(formatSimulationError(formatted));
+        const errorText = `${formatted.description || ""} ${formatted.title || ""}`.toLowerCase();
+
+        // Log the error but only throw if it's NOT an expected state-related error
+        logger.info("[simulateAuthCalls] Auth call failed:", {
+          target,
+          error: formatted,
+          isExpected: isExpectedAuthError(errorText),
+        });
+
+        if (!isExpectedAuthError(errorText)) {
+          throw new Error(formatSimulationError(formatted));
+        }
+        // Otherwise continue - the actual batched tx will handle it
       }
     }
-  }, [formatSimulationError]);
+  }, [formatSimulationError, isExpectedAuthError]);
 
   /**
    * Handle router simulation result, considering whether auth calls will be bundled
@@ -1292,6 +1326,14 @@ export const useKapanRouterV2 = () => {
 
     const formatted = formatErrorForDisplay(simResult.error);
     const errorText = `${formatted.description || ""} ${formatted.title || ""}`.toLowerCase();
+
+    logger.info("[handleRouterSimulationResult] Error detected:", {
+      title: formatted.title,
+      description: formatted.description,
+      suggestion: formatted.suggestion,
+      authCallsExist,
+      isDefinitelyNotApprovalRelated: isDefinitelyNotApprovalRelated(errorText),
+    });
 
     // When auth calls exist, only fail on errors that are definitely not approval-related
     if (authCallsExist && !isDefinitelyNotApprovalRelated(errorText)) {
@@ -1310,11 +1352,13 @@ export const useKapanRouterV2 = () => {
 
       // Skip simulation for simple lending flows to avoid false negatives on basic actions
       if (isBasicLendingFlow(instructions)) {
+        logger.info("[simulateInstructions] Skipping - basic lending flow");
         return;
       }
 
       // Get authorization calls first - we need to know if batching will include approvals
       const authCalls = await getAuthorizations(instructions);
+      logger.info("[simulateInstructions] Auth calls count:", authCalls.length);
 
       // Skip simulation when auth calls exist and caller requests it (for batched flows)
       if (options?.skipWhenAuthCallsExist && authCalls.length > 0) {
@@ -1323,13 +1367,17 @@ export const useKapanRouterV2 = () => {
       }
 
       // Simulate authorization calls to surface readable errors
+      logger.info("[simulateInstructions] Simulating auth calls...");
       await simulateAuthCalls(authCalls, publicClient, userAddress as Address);
+      logger.info("[simulateInstructions] Auth calls simulation passed");
 
       // Simulate the router call
       const protocolInstructions = instructions.map(inst => ({
         protocolName: inst.protocolName,
         data: inst.data as `0x${string}`,
       }));
+
+      logger.info("[simulateInstructions] Simulating router call with", protocolInstructions.length, "instructions");
 
       const calldata = encodeFunctionData({
         abi: routerContract.abi,
@@ -1343,6 +1391,13 @@ export const useKapanRouterV2 = () => {
         calldata,
         userAddress as `0x${string}`
       );
+
+      logger.info("[simulateInstructions] Router simulation result:", {
+        success: simResult.success,
+        hasError: !!simResult.error,
+        error: simResult.error,
+        rawError: (simResult as any).rawError,
+      });
 
       handleRouterSimulationResult(simResult, authCalls.length > 0);
     },
@@ -1753,6 +1808,28 @@ export const useKapanRouterV2 = () => {
       callOrder: calls.map((c, i) => ({ index: i, to: c.to, dataPrefix: c.data?.slice(0, 10) })),
     });
 
+    // Single comprehensive debug log for batched execution
+    const selectorNames: Record<string, string> = {
+      "0xb3fdb079": "setAccountOperator",
+      "0xd1e8f606": "enableCollateral",
+      "0x2edb71be": "enableController",
+    };
+    console.log("[executeFlowBatchedIfPossible] === COMPLETE DEBUG INFO ===", JSON.stringify({
+      user: userAddress,
+      router: routerContract.address,
+      authCalls: filteredAuthCalls.map((c, i) => ({
+        idx: i, to: c.target, selector: c.data?.slice(0, 10),
+        method: selectorNames[c.data?.slice(0, 10) || ""] || "unknown",
+        data: c.data,
+      })),
+      mainCall: { to: routerContract.address, data: routerCalldata },
+      deauthCalls: filteredDeauthCalls.map((c, i) => ({
+        idx: i, to: c.target, selector: c.data?.slice(0, 10), data: c.data,
+      })),
+      allCalls: calls.map((c, i) => ({ idx: i, to: c.to, data: c.data })),
+      totalCalls: calls.length,
+    }, null, 2));
+
     if (preferBatching) {
       const { id } = await sendCallsAsync({
         calls,
@@ -1869,9 +1946,9 @@ export const useKapanRouterV2 = () => {
         addRouter(encodeApprove(utxoIndexForWithdraw, to) as `0x${string}`, true);
         
         // Deposit collateral to destination protocol
-        // For Morpho Blue, use DepositCollateral (supplies collateral for borrowing)
+        // For Morpho Blue and Euler V2, use DepositCollateral (supplies collateral for borrowing)
         // For other protocols, use Deposit (which handles collateral deposits)
-        const depositOp = to === "morpho-blue" ? LendingOp.DepositCollateral : LendingOp.Deposit;
+        const depositOp = (to === "morpho-blue" || to === "euler") ? LendingOp.DepositCollateral : LendingOp.Deposit;
         addProto(to, encodeLendingInstruction(depositOp, collateralToken, userAddress, 0n, toCtx, utxoIndexForWithdraw) as `0x${string}`, false);
       },
 

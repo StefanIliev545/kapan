@@ -93,6 +93,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     { name: "oneinch", deploymentName: "OneInchGateway" },
     { name: "pendle", deploymentName: "PendleGateway" },
     { name: "spark", deploymentName: "SparkGatewayWrite" },
+    { name: "euler", deploymentName: "EulerGatewayWrite" },
   ];
 
   let syncedCount = 0;
@@ -171,6 +172,7 @@ func.dependencies = [
   "PendleGateway",
   "SparkGatewayWrite",
   "MorphoBlueGateway",
+  "EulerGateway",
   "UiHelper",
   "KapanOrderManager",  // Fixed: was CowOrderManager
   "KapanOrderHandler",  // Fixed: was CowOrderHandler

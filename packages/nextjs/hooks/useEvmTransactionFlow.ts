@@ -39,17 +39,21 @@ export const useEvmTransactionFlow = ({
   const batchingPreference = useBatchingPreference();
   const { executeFlowBatchedIfPossible, isAnyConfirmed, simulateInstructions } = useKapanRouterV2();
 
+  // Skip chain switching for hardhat (31337) - user manages wallet connection manually in dev mode
+  const isHardhat = chainId === 31337;
+
   const ensureCorrectChain = useCallback(async () => {
+    if (isHardhat) return; // Skip for hardhat - wallet stays on whatever chain for dev
     if (!chainId || !switchChain || chain?.id === chainId) return;
     await switchChain({ chainId });
-  }, [chainId, chain?.id, switchChain]);
+  }, [chainId, chain?.id, switchChain, isHardhat]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isHardhat) return; // Skip for hardhat
     ensureCorrectChain().catch(error => {
       console.warn("Auto network switch failed", error);
     });
-  }, [ensureCorrectChain, isOpen]);
+  }, [ensureCorrectChain, isOpen, isHardhat]);
 
   const handleConfirm = useCallback(
     async (amount: string, isMax?: boolean) => {

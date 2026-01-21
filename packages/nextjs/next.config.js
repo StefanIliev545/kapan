@@ -12,6 +12,8 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 /** @type {import('next').NextConfig} */
 const commonConfig = {
   reactStrictMode: true,
+  // reactCompiler disabled: incompatible with styled-jsx (causes hydration mismatch)
+  // See: https://github.com/vercel/next.js/issues/65995
   typescript: {
     ignoreBuildErrors: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
   },

@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import type { MorphoMarket, MorphoMarketContext } from "./useMorphoLendingPositions";
-
-const addrKey = (a?: string) => (a ?? "").toLowerCase();
+import { addrKey } from "~~/utils/address";
 
 export const useMovePositionState = (isOpen: boolean) => {
   const [debtAmount, setDebtAmount] = useState<string>("");

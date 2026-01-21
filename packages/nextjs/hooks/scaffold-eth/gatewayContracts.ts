@@ -12,6 +12,8 @@ export type GatewayContractName =
 
 /**
  * Maps protocol names (lowercase, no version suffix) to gateway contract names.
+ * Note: Euler is NOT included here because it doesn't have a getPossibleCollaterals function.
+ * Euler collaterals must be fetched via the EulerLendingPositions hook instead.
  */
 export const PROTOCOL_TO_GATEWAY_MAP: Record<string, GatewayContractName> = {
   aave: "AaveGatewayView",
@@ -20,6 +22,12 @@ export const PROTOCOL_TO_GATEWAY_MAP: Record<string, GatewayContractName> = {
   zerolend: "ZeroLendGatewayView",
   spark: "SparkGatewayView",
 };
+
+/**
+ * Protocols that don't support the generic getPossibleCollaterals interface.
+ * These protocols need custom collateral fetching logic.
+ */
+export const UNSUPPORTED_GATEWAY_PROTOCOLS = new Set(["euler", "morpho", "morphoblue"]);
 
 /**
  * Normalizes a protocol name by removing version suffix and spaces.

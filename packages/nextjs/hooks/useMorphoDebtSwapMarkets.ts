@@ -1,7 +1,5 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { MorphoMarket } from "./useMorphoLendingPositions";
-import { sortMarketsByLiquidityDesc } from "./useMorphoLendingPositions";
+import { useMorphoMarketsQuery, type MorphoMarket } from "~~/utils/morpho/marketApi";
 
 // ============ Types ============
 
@@ -24,31 +22,6 @@ export interface UseMorphoDebtSwapMarketsResult {
   error: Error | null;
 }
 
-// ============ API Fetcher ============
-
-async function fetchMorphoMarkets(chainId: number): Promise<MorphoMarket[]> {
-  try {
-    const params = new URLSearchParams({
-      first: "2000",
-      curation: "curated",
-      minLiquidityUsd: "10000",
-      hideSaturated: "true",
-    });
-
-    const response = await fetch(`/api/morpho/${chainId}/markets?${params.toString()}`);
-    if (!response.ok) {
-      console.error(`[useMorphoDebtSwapMarkets] Markets API error: ${response.status}`);
-      return [];
-    }
-    const data = await response.json();
-    const items: MorphoMarket[] = data?.markets?.items || [];
-    return sortMarketsByLiquidityDesc(items);
-  } catch (error) {
-    console.error("[useMorphoDebtSwapMarkets] Failed to fetch markets:", error);
-    return [];
-  }
-}
-
 // ============ Hook ============
 
 /**
@@ -66,17 +39,13 @@ export function useMorphoDebtSwapMarkets({
   currentDebtAddress,
   enabled = true,
 }: UseMorphoDebtSwapMarketsParams): UseMorphoDebtSwapMarketsResult {
-  // Fetch all markets for this chain (with caching)
+  // Fetch all markets for this chain (with caching via shared hook)
   const {
     data: allMarkets,
     isLoading,
     error,
-  } = useQuery({
-    queryKey: ["morpho-markets-debt-swap", chainId],
-    queryFn: () => fetchMorphoMarkets(chainId),
+  } = useMorphoMarketsQuery(chainId, {
     enabled: enabled && !!chainId && !!collateralTokenAddress,
-    staleTime: 5 * 60 * 1000, // 5 min cache
-    gcTime: 10 * 60 * 1000, // 10 min garbage collection
   });
 
   // Filter markets: same collateral token, different debt token

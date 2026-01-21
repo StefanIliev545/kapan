@@ -33,7 +33,7 @@ export type MergeCollateralsOptions = {
 };
 
 /* ------------------------------ Helpers ------------------------------ */
-const addrKey = (a?: string) => (a ?? "").toLowerCase();
+import { addrKey } from "~~/utils/address";
 
 /**
  * Creates a collateral entry from a pre-selected collateral

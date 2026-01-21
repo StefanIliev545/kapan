@@ -19,6 +19,7 @@ export * from "./SegmentedActionBar";
 export * from "./Spinner";
 export * from "./StableArea";
 export * from "./SupportBanner";
+export * from "./TablePagination";
 export * from "./TransactionStatus";
 
 // Header components

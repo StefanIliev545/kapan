@@ -42,12 +42,12 @@ export type StarknetMoveResult = {
   error: string | null;
 };
 
+import { addrKey } from "~~/utils/address";
+
 const toOutputPointer = (instructionIndex: number) => ({
   instruction_index: BigInt(instructionIndex),
   output_index: 0n,
 });
-
-const addrKey = (a?: string) => (a ?? "").toLowerCase();
 
 const MAX_UINT256 = (1n << 256n) - 1n;
 

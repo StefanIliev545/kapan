@@ -26,6 +26,10 @@ import { RefinanceModalStark } from "./RefinanceModalStark";
       amount?: bigint;
       maxAmount?: bigint;
       inputValue?: string;
+      /** Euler-specific: The collateral vault address for this collateral */
+      eulerCollateralVault?: string;
+      /** Euler-specific: The sub-account index for this position */
+      eulerSubAccountIndex?: number;
     }>;
     disableCollateralSelection?: boolean;
     /** Pre-encoded context for the source protocol (e.g., Morpho MarketParams) */

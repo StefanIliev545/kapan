@@ -30,7 +30,7 @@ type LegacyResult = {
   error: string | null;
 };
 
-const addrKey = (a?: string) => (a ?? "").toLowerCase();
+import { addrKey } from "~~/utils/address";
 const toOutputPointer = (i: number) => ({ instruction_index: BigInt(i), output_index: 0n });
 
 export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResult => {

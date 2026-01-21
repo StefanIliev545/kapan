@@ -26,25 +26,18 @@ import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { saveOrderNote, createDebtSwapNote } from "~~/utils/orderNotes";
 import { getCowQuoteSellAmount, type CowQuoteResponse } from "~~/hooks/useCowQuote";
-import type { ChunkInstructions, BuildOrderResult } from "~~/hooks/useCowLimitOrder";
+import type { ChunkInstructions } from "~~/hooks/useCowLimitOrder";
 
-/** Alias for backwards compatibility */
-export type LimitOrderBuildResult = BuildOrderResult;
 import type { SwapAsset } from "./SwapModalShell";
 import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
 import type { WalletClient, PublicClient } from "viem";
+// Shared types for CoW swap operations
+import { type FlashLoanInfo, type LimitOrderBuildResult } from "./common/swapTypes";
+export type { FlashLoanInfo, LimitOrderBuildResult };
 
 // ============ Types ============
 
 export type DebtSwapAnalyticsProps = Record<string, string | number | boolean | null | undefined>;
-
-export interface FlashLoanInfo {
-    lender: string;
-    provider: string;
-    fee: bigint;
-    amount: bigint;
-    token: string;
-}
 
 export interface CowChunkParams {
     selectedTo: SwapAsset;
@@ -178,21 +171,24 @@ export function buildCowFlashLoanInfo(
 /**
  * Calculate dust buffer for max debt repayment.
  *
- * When repaying max debt via limit order, we need to buy slightly more oldDebt than
- * the current balance to account for interest that accrues between order creation
- * and execution. Any excess is refunded to the user via a PushToken instruction.
+ * When repaying max debt, we need to buy slightly more oldDebt than the current
+ * balance to account for interest that accrues between quote and execution.
+ * Any excess is refunded to the user via a PushToken instruction.
  *
- * We use ~1 hour of interest at typical DeFi rates (10% APY as conservative estimate):
- * - 10% APY = 0.0001142% per hour (10 / 365 / 24 = 0.00114%)
- * - Rounded up to 0.0002% (2 basis points) for safety margin
+ * Buffer: 0.5% (50 basis points)
+ * - Covers ~3.5 days at 50% APY or ~10 days at 17.5% APY
+ * - Critical for Euler where any leftover debt blocks collateral withdrawal
  *
  * @param amount - The debt amount to buffer
  * @returns The buffered amount (amount + dust buffer)
  */
 export function calculateDustBuffer(amount: bigint): bigint {
-    // Add 0.0002% (2 basis points) = multiply by 10002/10000
-    // This covers ~1 hour of interest at 17.5% APY with safety margin
-    const DUST_BUFFER_NUMERATOR = 10002n;
+    // Add 0.5% (50 basis points) = multiply by 10050/10000
+    // This covers interest accrual between quote and execution:
+    // - ~3.5 days at 50% APY (extreme)
+    // - ~10 days at 17.5% APY (typical)
+    // Larger buffer needed for Euler debt swaps where leftover debt blocks withdrawal
+    const DUST_BUFFER_NUMERATOR = 10050n;
     const DUST_BUFFER_DENOMINATOR = 10000n;
 
     return (amount * DUST_BUFFER_NUMERATOR) / DUST_BUFFER_DENOMINATOR;
@@ -226,7 +222,7 @@ export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstruct
     } = params;
 
     // Early return for invalid state
-    if (!selectedTo || !userAddress || repayAmountRaw === 0n || !orderManagerAddress || !cowFlashLoanInfo) {
+    if (!selectedTo || !userAddress || repayAmountRaw === 0n || !orderManagerAddress || !cowFlashLoanInfo || !debtFromToken) {
         return [{ preInstructions: [], postInstructions: [] }];
     }
 

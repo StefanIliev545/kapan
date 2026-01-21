@@ -53,8 +53,8 @@ const FORK_BLOCK_NUMBERS: Record<string, number | undefined> = {
   ethereum: undefined, // Use latest - contracts deployed recently
   eth: undefined,
   mainnet: undefined,
-  arbitrum: 414729450, // ~Dec 2025
-  arb: 414729450,
+  arbitrum: 423810000, // ~Jan 2026
+  arb: 423810000,
   base: undefined,     // Use latest - testing recent orders
   optimism: 129000000, // ~Dec 2024
   op: 129000000,

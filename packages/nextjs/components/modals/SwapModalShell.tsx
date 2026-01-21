@@ -325,6 +325,8 @@ export interface SwapAsset {
     icon: string;
     usdValue?: number;
     price?: bigint;
+    /** Euler-specific: the collateral vault address for this asset */
+    eulerCollateralVault?: string;
 }
 
 // Swap router options
