@@ -508,6 +508,8 @@ export async function executeBatchedLimitOrder(params: {
     track("debt_swap_limit_order_complete", { ...analyticsProps, status: "batched", batchId: newBatchId });
 }
 
+type TransactionReceipt = Awaited<ReturnType<PublicClient["waitForTransactionReceipt"]>>;
+
 export async function executeSequentialLimitOrder(params: {
     allCalls: Array<{ to: string; data: string }>;
     walletClient: WalletClient;
@@ -517,6 +519,7 @@ export async function executeSequentialLimitOrder(params: {
     analyticsProps: DebtSwapAnalyticsProps;
     onClose: () => void;
     notificationId: string | number;
+    onSuccess?: (receipts: TransactionReceipt[]) => void;
 }): Promise<void> {
     const {
         allCalls,
@@ -526,8 +529,10 @@ export async function executeSequentialLimitOrder(params: {
         orderManagerAddress,
         analyticsProps,
         onClose,
+        onSuccess,
     } = params;
     let { notificationId } = params;
+    const receipts: TransactionReceipt[] = [];
 
     console.log("[Limit Order] Using sequential TX mode");
 
@@ -550,7 +555,8 @@ export async function executeSequentialLimitOrder(params: {
             account,
         });
 
-        await publicClient.waitForTransactionReceipt({ hash });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        receipts.push(receipt);
     }
 
     notification.remove(notificationId);
@@ -564,6 +570,7 @@ export async function executeSequentialLimitOrder(params: {
     );
 
     track("debt_swap_limit_order_complete", { ...analyticsProps, status: "success" });
+    onSuccess?.(receipts);
     onClose();
 }
 

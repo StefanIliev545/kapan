@@ -58,6 +58,8 @@ import {
     calculateRequiredCollateral,
     calculateLimitOrderCollateral,
 } from "./closeWithCollateralEvmHelpers";
+import { useSaveOrder } from "~~/hooks/useOrderHistory";
+import { extractOrderHash } from "~~/utils/orderHashExtractor";
 
 // Aave flash loan fee: 5 bps (0.05%)
 // We add a small buffer (10 bps total) to ensure swap covers repayment
@@ -232,6 +234,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         isReady: limitOrderReady,
         orderManagerAddress
     } = useCowLimitOrder();
+    const saveOrder = useSaveOrder();
 
     // Initialize limitOrderConfig with default provider when switching to limit mode
     useEffect(() => {
@@ -816,6 +819,29 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                 analyticsProps,
                 onClose,
                 notificationId,
+                onSuccess: (receipts) => {
+                    // Extract orderHash from transaction receipts
+                    const orderHash = extractOrderHash(receipts, orderManagerAddress) ?? undefined;
+
+                    // Save order to database after successful execution
+                    if (limitOrderResult.salt && selectedTo) {
+                        saveOrder.mutate({
+                            orderUid: limitOrderResult.salt,
+                            orderHash,
+                            salt: limitOrderResult.salt,
+                            userAddress,
+                            chainId,
+                            orderType: "close_position",
+                            protocol: protocolName,
+                            sellToken: selectedTo.address,
+                            buyToken: debtToken,
+                            sellTokenSymbol: selectedTo.symbol,
+                            buyTokenSymbol: debtName,
+                            sellAmount: limitOrderCollateral.toString(),
+                            buyAmount: repayAmountRaw.toString(),
+                        });
+                    }
+                },
             });
         } catch (e) {
             handleLimitOrderError(e, notificationId, analyticsProps);
@@ -823,7 +849,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         } finally {
             setIsLimitSubmitting(false);
         }
-    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, limitOrderBuyAmount, debtDecimals, limitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose]);
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, limitOrderBuyAmount, debtDecimals, limitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose, saveOrder]);
 
     // Can submit based on execution type
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter;

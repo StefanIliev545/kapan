@@ -21,7 +21,9 @@ import {
   getOperationColorClass,
   ORDER_CREATED_EVENT,
   type OrderNote,
+  type OperationType,
 } from "~~/utils/orderNotes";
+import { useOrderHistory, type Order } from "~~/hooks/useOrderHistory";
 import { getProtocolLogo } from "~~/utils/protocol";
 import { timeAgo } from "~~/utils/deadline";
 import { truncateAddress } from "~~/utils/address";
@@ -64,6 +66,9 @@ export function PendingOrdersDrawer() {
   const chainId = useChainId();
   const queryClient = useQueryClient();
   const { getUserOrdersWithDetails, cancelOrder, isCancelling, isAvailable } = useCowOrder();
+
+  // Fetch orders from database to get order types
+  const { data: dbOrders } = useOrderHistory({ chainId, enabled: !!userAddress });
 
   const [isOpen, setIsOpen] = useState(false);
   const [orders, setOrders] = useState<OrderWithHash[]>([]);
@@ -293,16 +298,17 @@ export function PendingOrdersDrawer() {
   }, [tokenInfoMap]);
 
   // Look up order notes for operation type and protocol info
+  // Check localStorage first, then fall back to database orders
   const orderNotesMap = useMemo(() => {
     const notesMap = new Map<string, OrderNote>();
-    
+
     for (const order of orders) {
       const { orderHash, context } = order;
-      
-      // Try direct lookup by orderHash
+
+      // Try direct lookup by orderHash from localStorage
       let note = getOrderNote(orderHash);
-      
-      // If not found, try to match by tokens and timestamp
+
+      // If not found, try to match by tokens and timestamp from localStorage
       if (!note) {
         const sellSymbol = getTokenSymbol(context.params.sellToken);
         const buySymbol = getTokenSymbol(context.params.buyToken);
@@ -312,20 +318,50 @@ export function PendingOrdersDrawer() {
           chainId,
           Number(context.createdAt)
         );
-        
+
         // If found a pending note, link it to the orderHash
         if (note && note.salt) {
           linkNoteToOrderHash(note.salt, orderHash);
         }
       }
-      
+
+      // If still not found, try to match from database orders by tokens and timestamp
+      if (!note && dbOrders && dbOrders.length > 0) {
+        const sellTokenLower = context.params.sellToken.toLowerCase();
+        const buyTokenLower = context.params.buyToken.toLowerCase();
+        const createdAtMs = Number(context.createdAt) * 1000;
+
+        // Find matching database order (within 5 minute tolerance)
+        const dbOrder = dbOrders.find((db: Order) => {
+          const tokenMatch = db.sellToken.toLowerCase() === sellTokenLower &&
+                            db.buyToken.toLowerCase() === buyTokenLower;
+          const timeMatch = Math.abs(new Date(db.createdAt).getTime() - createdAtMs) < 5 * 60 * 1000;
+          return tokenMatch && timeMatch;
+        });
+
+        if (dbOrder) {
+          // Create a note from database order
+          note = {
+            orderHash,
+            salt: dbOrder.salt || undefined,
+            operationType: dbOrder.orderType as OperationType,
+            description: `${dbOrder.orderType}: ${dbOrder.sellTokenSymbol} → ${dbOrder.buyTokenSymbol}`,
+            protocol: dbOrder.protocol || undefined,
+            sellToken: dbOrder.sellTokenSymbol || undefined,
+            buyToken: dbOrder.buyTokenSymbol || undefined,
+            chainId: dbOrder.chainId,
+            createdAt: new Date(dbOrder.createdAt).getTime(),
+          };
+        }
+      }
+
       if (note) {
         notesMap.set(orderHash, note);
       }
     }
-    
+
     return notesMap;
-  }, [orders, chainId, getTokenSymbol]);
+  }, [orders, chainId, getTokenSymbol, dbOrders]);
 
   // Don't render anything if CoW not available or not connected
   if (!isAvailable || !userAddress) return null;

@@ -18,6 +18,7 @@ import { BlockieAvatar, isENS } from "~~/components/scaffold-eth";
 import { useOutsideClick, useCopyToClipboard } from "~~/hooks/scaffold-eth";
 import { getTargetNetworks } from "~~/utils/scaffold-eth";
 import { truncateAddress } from "~~/utils/address";
+import { ReferralDropdownSection } from "~~/components/referral/ReferralDropdownSection";
 
 const allowedNetworks = getTargetNetworks();
 
@@ -146,6 +147,9 @@ export const AddressInfoDropdown = ({
                 </button>
               )}
             </div>
+
+            {/* Referral Section */}
+            <ReferralDropdownSection onClose={closeDropdown} />
 
             {/* Disconnect */}
             <div className="border-base-200 border-t py-2">

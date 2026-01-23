@@ -61,18 +61,19 @@ const PENDLE_CHAIN_MAP: Record<number, string> = {
 };
 
 /**
- * Fetch all active Pendle markets for a chain
+ * Fetch a single page of Pendle markets
  */
-async function fetchPendleMarkets(chainId: number): Promise<PendleMarket[]> {
+async function fetchPendleMarketsPage(
+  chainId: number,
+  skip: number,
+  limit: number
+): Promise<PendleMarket[]> {
   const pendleChainId = PENDLE_CHAIN_MAP[chainId];
-  if (!pendleChainId) {
-    console.warn(`[usePendlePTYields] Chain ${chainId} not supported by Pendle`);
-    return [];
-  }
+  if (!pendleChainId) return [];
 
-  const endpoint = `/${pendleChainId}/markets?order_by=name%3A1&skip=0&limit=100`;
-  
-  // Try direct API first (faster, no proxy compile time)
+  const endpoint = `/${pendleChainId}/markets?order_by=name%3A1&skip=${skip}&limit=${limit}`;
+
+  // Try direct API first
   try {
     const directResponse = await fetch(`${PENDLE_API_DIRECT}${endpoint}`, {
       headers: { Accept: "application/json" },
@@ -82,24 +83,57 @@ async function fetchPendleMarkets(chainId: number): Promise<PendleMarket[]> {
       return data.results || data || [];
     }
   } catch {
-    // CORS blocked or network error, fall back to proxy
+    // Fall through to proxy
   }
 
-  // Fall back to local proxy
+  // Fall back to proxy
   try {
     const response = await fetch(`${PENDLE_API_PROXY}${endpoint}`);
-    
-    if (!response.ok) {
-      console.error(`[usePendlePTYields] Pendle API error: ${response.status}`);
-      return [];
+    if (response.ok) {
+      const data = await response.json();
+      return data.results || data || [];
     }
+  } catch {
+    // Ignore
+  }
 
-    const data = await response.json();
-    return data.results || data || [];
-  } catch (error) {
-    console.error("[usePendlePTYields] Failed to fetch Pendle markets:", error);
+  return [];
+}
+
+/**
+ * Fetch all active Pendle markets for a chain (with pagination)
+ */
+async function fetchPendleMarkets(chainId: number): Promise<PendleMarket[]> {
+  const pendleChainId = PENDLE_CHAIN_MAP[chainId];
+  if (!pendleChainId) {
+    console.warn(`[usePendlePTYields] Chain ${chainId} not supported by Pendle`);
     return [];
   }
+
+  const allMarkets: PendleMarket[] = [];
+  const pageSize = 100;
+  let skip = 0;
+  let hasMore = true;
+
+  // Fetch pages until we get less than pageSize results
+  while (hasMore) {
+    const page = await fetchPendleMarketsPage(chainId, skip, pageSize);
+    allMarkets.push(...page);
+
+    if (page.length < pageSize) {
+      hasMore = false;
+    } else {
+      skip += pageSize;
+      // Safety limit to prevent infinite loops
+      if (skip > 1000) hasMore = false;
+    }
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[Pendle API] Chain ${chainId}: ${allMarkets.length} markets total`);
+  }
+
+  return allMarkets;
 }
 
 /**
@@ -224,6 +258,17 @@ export function getPTShortName(symbol: string): string {
 }
 
 /**
+ * Normalize a PT symbol for lookup by stripping the chain suffix
+ * e.g., "PT-sUSDai-20NOV2025-(UNI)" -> "pt-susdai-20nov2025"
+ * This allows bridged PT tokens to match their home network yield data
+ */
+export function normalizePTSymbolForLookup(symbol: string): string {
+  const lower = symbol.toLowerCase();
+  // Strip chain suffix like "-(uni)", "-(arb)", "-(eth)"
+  return lower.replace(/-?\([a-z]+\)$/i, "");
+}
+
+/**
  * Get the maturity info string for a PT token
  * Returns formatted date or null if not a PT token
  */
@@ -243,10 +288,16 @@ export function extractPTBaseToken(symbol: string): string {
   return parsed.baseToken.toLowerCase();
 }
 
+// All chains where Pendle is deployed - we fetch from all to support bridged tokens
+const ALL_PENDLE_CHAINS = Object.keys(PENDLE_CHAIN_MAP).map(Number);
+
 /**
  * Hook to fetch PT token yields from Pendle
- * 
- * @param chainId - The chain ID to fetch markets for
+ *
+ * Fetches from ALL Pendle-supported chains to support bridged PT tokens
+ * that might have originated on any chain (indicated by suffixes like "(ETH)", "(ARB)").
+ *
+ * @param chainId - The chain ID (used for cache key, but we fetch from all chains)
  * @param tokens - Optional list of token addresses/symbols to filter by
  * @param enabled - Whether to enable the query
  */
@@ -255,24 +306,31 @@ export function usePendlePTYields(
   tokens?: { address: Address; symbol: string }[],
   enabled = true
 ) {
-  const isSupported = !!chainId && !!PENDLE_CHAIN_MAP[chainId];
-  
-  
   const query = useQuery({
-    queryKey: ["pendle-pt-yields", chainId],
+    queryKey: ["pendle-pt-yields-all-chains"],
     queryFn: async () => {
-      if (!chainId) return [];
-      
-      const markets = await fetchPendleMarkets(chainId);
+      // Fetch from all Pendle-supported chains in parallel
+      const allMarketsPromises = ALL_PENDLE_CHAINS.map(chain => fetchPendleMarkets(chain));
+      const allMarketsResults = await Promise.all(allMarketsPromises);
+
+      if (process.env.NODE_ENV === "development") {
+        ALL_PENDLE_CHAINS.forEach((chain, i) => {
+          console.log(`[Pendle] Chain ${chain}: ${allMarketsResults[i].length} markets`);
+        });
+      }
+
+      const allMarkets = allMarketsResults.flat();
+
       const now = new Date();
-      
-      // Convert markets to PTYield format
-      const yields: PTYield[] = markets
+
+      // Convert markets to PTYield format, deduplicating by symbol
+      const seenSymbols = new Set<string>();
+      const yields: PTYield[] = allMarkets
         .filter(m => m.pt && m.impliedApy !== undefined)
         .map(m => {
           const expiry = new Date(m.expiry);
           const daysToExpiry = Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-          
+
           return {
             address: m.pt.address.toLowerCase() as Address,
             symbol: m.pt.symbol,
@@ -285,14 +343,24 @@ export function usePendlePTYields(
             liquidity: m.liquidity?.usd || 0,
           };
         })
-        .filter(y => y.daysToExpiry > 0); // Only include non-expired markets
-      
+        .filter(y => {
+          if (y.daysToExpiry <= 0) return false; // Filter expired
+          // Deduplicate by symbol (keep first/highest liquidity)
+          const key = y.symbol.toLowerCase();
+          if (seenSymbols.has(key)) return false;
+          seenSymbols.add(key);
+          return true;
+        });
+
       return yields;
     },
-    enabled: enabled && isSupported,
+    enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
+
+  // For backwards compatibility
+  const isSupported = true;
 
   // Create memoized maps for easy lookup by address and symbol
   const yieldsByAddress = useMemo(() => {
@@ -334,10 +402,85 @@ export function usePendlePTYields(
   }, [tokens, yieldsByAddress, yieldsBySymbol, query.data]);
 
 
+  // Smart lookup function that handles bridged PT tokens with chain suffixes
+  const findYield = useMemo(() => {
+    return (address?: string, symbol?: string): PTYield | undefined => {
+      // Try exact address match first
+      if (address) {
+        const byAddress = yieldsByAddress.get(address.toLowerCase());
+        if (byAddress) return byAddress;
+      }
+
+      if (symbol) {
+        // Debug: log lookup attempt
+        if (isPTToken(symbol) && process.env.NODE_ENV === "development") {
+          console.log(`[PT Yield Lookup] Searching for: ${symbol}`);
+          console.log(`[PT Yield Lookup] Available symbols:`, query.data?.map(y => y.symbol).slice(0, 20));
+        }
+
+        // Try exact symbol match
+        const bySymbol = yieldsBySymbol.get(symbol.toLowerCase());
+        if (bySymbol) return bySymbol;
+
+        // Try normalized symbol (strips chain suffix like "(UNI)", "(ETH)")
+        const normalizedSymbol = normalizePTSymbolForLookup(symbol);
+        if (normalizedSymbol !== symbol.toLowerCase()) {
+          const byNormalized = yieldsBySymbol.get(normalizedSymbol);
+          if (byNormalized) return byNormalized;
+        }
+
+        // Parse the input symbol to get components for flexible matching
+        if (isPTToken(symbol)) {
+          const parsed = parsePTToken(symbol);
+          if (parsed.isPT) {
+            const baseToken = parsed.baseToken.toLowerCase();
+            const maturityDate = parsed.maturityDate;
+
+            // Try to find a match by comparing parsed components
+            const match = query.data?.find(y => {
+              const yParsed = parsePTToken(y.symbol);
+              if (!yParsed.isPT) return false;
+
+              const yBaseToken = yParsed.baseToken.toLowerCase();
+
+              // Match if base tokens are similar (one contains the other)
+              const baseTokenMatch =
+                baseToken.includes(yBaseToken) ||
+                yBaseToken.includes(baseToken) ||
+                baseToken === yBaseToken;
+
+              if (!baseTokenMatch) return false;
+
+              // If we have maturity dates, they should be close (within 2 days to handle timezone issues)
+              if (maturityDate && yParsed.maturityDate) {
+                const daysDiff = Math.abs(maturityDate.getTime() - yParsed.maturityDate.getTime()) / (1000 * 60 * 60 * 24);
+                return daysDiff <= 2;
+              }
+
+              // If no maturity date to compare, just match on base token
+              return true;
+            });
+            if (match) return match;
+
+            // Fallback: fuzzy match on underlying symbol
+            const fuzzyMatch = query.data?.find(y =>
+              y.underlyingSymbol.toLowerCase().includes(baseToken) ||
+              y.symbol.toLowerCase().includes(baseToken)
+            );
+            if (fuzzyMatch) return fuzzyMatch;
+          }
+        }
+      }
+
+      return undefined;
+    };
+  }, [yieldsByAddress, yieldsBySymbol, query.data]);
+
   return {
     yields: query.data || [],
     yieldsByAddress,
     yieldsBySymbol,
+    findYield,
     matchedYields,
     isLoading: query.isLoading,
     isSupported,

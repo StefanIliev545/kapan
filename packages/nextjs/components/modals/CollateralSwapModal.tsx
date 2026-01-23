@@ -54,6 +54,9 @@ import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { useSendCalls } from "wagmi/experimental";
 import { saveOrderNote, createCollateralSwapNote } from "~~/utils/orderNotes";
+import { useSaveOrder } from "~~/hooks/useOrderHistory";
+import { extractOrderHash } from "~~/utils/orderHashExtractor";
+import type { TransactionReceipt } from "~~/utils/transactionSimulation";
 
 // ============================================================================
 // Types & Interfaces
@@ -170,8 +173,9 @@ async function executeSequentialOrder(
     notificationId: string,
     onClose: () => void,
     txBeginProps: Record<string, string | number | boolean | null>
-): Promise<void> {
+): Promise<{ receipts: TransactionReceipt[] }> {
     const { limitOrderResult, userAddress, chainId, walletClient, publicClient } = params;
+    const receipts: TransactionReceipt[] = [];
 
     if (!walletClient || !publicClient) {
         throw new Error("Wallet not connected");
@@ -192,7 +196,8 @@ async function executeSequentialOrder(
             chain: null,
         });
 
-        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+        receipts.push(receipt);
         notification.remove(stepNotificationId);
     }
 
@@ -207,6 +212,8 @@ async function executeSequentialOrder(
 
     track("collateral_swap_limit_order_complete", { ...txBeginProps, status: "success", mode: "sequential" });
     onClose();
+
+    return { receipts };
 }
 
 /**
@@ -383,6 +390,8 @@ interface CollateralSwapModalProps {
     morphoContext?: MorphoMarketContextForEncoding;
     /** Morpho-specific: Debt token address for finding compatible markets */
     debtTokenAddress?: string;
+    /** Morpho-specific: Current debt balance (raw bigint) for proportional debt migration */
+    currentDebtBalance?: bigint;
     /** Euler-specific: Borrow vault address (extracted from context) */
     eulerBorrowVault?: string;
     /** Euler-specific: Current collateral vault address */
@@ -402,6 +411,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     position,
     morphoContext,
     debtTokenAddress,
+    currentDebtBalance,
     eulerBorrowVault,
     eulerCollateralVault,
     eulerSubAccountIndex,
@@ -542,6 +552,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     
     // CoW order hooks
     const { buildOrderCalls: buildLimitOrderCalls, isReady: limitOrderReady, orderManagerAddress } = useCowLimitOrder();
+    const saveOrder = useSaveOrder();
 
     // Number of chunks for limit orders
     const [numChunks, setNumChunks] = useState(1);
@@ -863,6 +874,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         // Must borrow from new market to repay old market before withdrawing
         // ========================================================================
         if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && debtTokenAddress) {
+            // For partial swaps, calculate proportional debt per chunk
+            // For max swaps, use GetBorrowBalance to migrate all debt
+            const useFixedDebtAmount = currentDebtBalance !== undefined && currentDebtBalance > 0n && !isMax;
+            const chunkDebtAmount = useFixedDebtAmount && selectedFrom?.rawBalance
+                ? (currentDebtBalance * chunkSellAmount) / selectedFrom.rawBalance
+                : 0n;
+
             console.log("[buildCowInstructions] Morpho collateral swap (PAIR-ISOLATED):", {
                 sellToken: selectedFrom.symbol,
                 buyToken: selectedTo.symbol,
@@ -870,12 +888,13 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 oldMarket: morphoContext?.marketId,
                 newMarket: newMorphoContext?.marketId,
                 chunkWithdrawAmount: formatUnits(chunkWithdrawAmount, selectedFrom.decimals),
-                flow: "swap[0] -> approve[1] -> deposit(NEW) -> getBorrowBal[2] -> borrow(NEW)[3] -> approve[4] -> repay(OLD)[5] -> withdraw(OLD)[6]",
+                useFixedDebtAmount,
+                chunkDebtAmount: useFixedDebtAmount ? chunkDebtAmount.toString() : "GetBorrowBalance",
+                flow: useFixedDebtAmount
+                    ? "swap[0] -> approve[1] -> deposit(NEW) -> toOutput(debt)[2] -> borrow(NEW)[3] -> approve[4] -> repay(OLD)[5] -> withdraw(OLD)[6]"
+                    : "swap[0] -> approve[1] -> deposit(NEW) -> getBorrowBal[2] -> borrow(NEW)[3] -> approve[4] -> repay(OLD)[5] -> withdraw(OLD)[6]",
             });
 
-            // For Morpho pair-isolated, we need to get the debt amount to migrate
-            // This should match the user's current borrow position
-            // For now, we'll use GetBorrowBalance to get the exact amount
             return Array(numChunks).fill(null).map(() => {
                 /**
                  * Morpho Pair-Isolated Collateral Swap (Limit Order):
@@ -884,10 +903,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                  * [0] = swap output (new collateral, from OrderManager ToOutput prepend)
                  * [1] Approve(0, morpho) -> dummy
                  *     DepositCollateral(input=0, NEW_MARKET) -> NO OUTPUT
-                 * [2] GetBorrowBalance(OLD_MARKET) -> debt amount to migrate
+                 * [2] GetBorrowBalance OR ToOutput(debtAmount) -> debt amount to migrate
                  * [3] Borrow(input=2, NEW_MARKET) -> borrowed debt tokens
                  * [4] Approve(3, morpho) -> dummy (gateway needs approval to pull tokens)
-                 * [5] Repay(input=2, OLD_MARKET) -> refund (uses GetBorrowBalance for amount)
+                 * [5] Repay(input=2, OLD_MARKET) -> refund
                  * [6] WithdrawCollateral(OLD_MARKET) -> withdrawn collateral
                  * [N] PushToken(6, borrower) -> repay flash loan (appended by hook)
                  */
@@ -900,34 +919,52 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                         normalizedProtocol,
                         encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, newMorphoContextEncoded, 0)
                     ),
+                ];
 
-                    // 3. GetBorrowBalance on OLD market -> [2]
-                    createProtocolInstruction(
-                        normalizedProtocol,
-                        encodeLendingInstruction(LendingOp.GetBorrowBalance, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 999)
-                    ),
+                // 3. Get debt amount to migrate -> [2]
+                if (useFixedDebtAmount) {
+                    // Partial swap: use fixed proportional debt amount per chunk
+                    postInstructions.push(
+                        createRouterInstruction(encodeToOutput(chunkDebtAmount, debtTokenAddress))
+                    );
+                } else {
+                    // Max swap: use GetBorrowBalance to migrate all debt
+                    postInstructions.push(
+                        createProtocolInstruction(
+                            normalizedProtocol,
+                            encodeLendingInstruction(LendingOp.GetBorrowBalance, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 999)
+                        )
+                    );
+                }
 
-                    // 4. Borrow from NEW market (amount from [2]) -> [3]
+                // 4. Borrow from NEW market (amount from [2]) -> [3]
+                postInstructions.push(
                     createProtocolInstruction(
                         normalizedProtocol,
                         encodeLendingInstruction(LendingOp.Borrow, debtTokenAddress, userAddress, 0n, newMorphoContextEncoded, 2)
-                    ),
+                    )
+                );
 
-                    // 5. Approve gateway to spend borrowed tokens ([3]) -> [4]
-                    createRouterInstruction(encodeApprove(3, normalizedProtocol)),
+                // 5. Approve gateway to spend borrowed tokens ([3]) -> [4]
+                postInstructions.push(
+                    createRouterInstruction(encodeApprove(3, normalizedProtocol))
+                );
 
-                    // 6. Repay on OLD market (amount from [2], uses tokens from Borrow) -> [5]
+                // 6. Repay on OLD market (amount from [2], uses tokens from Borrow) -> [5]
+                postInstructions.push(
                     createProtocolInstruction(
                         normalizedProtocol,
                         encodeLendingInstruction(LendingOp.Repay, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 2)
-                    ),
+                    )
+                );
 
-                    // 7. Withdraw old collateral from OLD market -> [6]
+                // 7. Withdraw old collateral from OLD market -> [6]
+                postInstructions.push(
                     createProtocolInstruction(
                         normalizedProtocol,
                         encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, chunkWithdrawAmount, oldMorphoContextEncoded, 999)
-                    ),
-                ];
+                    )
+                );
 
                 return {
                     preInstructions: [],
@@ -1086,7 +1123,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 // ensuring the second WithdrawCollateral gets proper authorization for dust.
             };
         });
-    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, numChunks, isMax, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, debtTokenAddress, morphoContext, newMorphoContext, isEuler, oldEulerContextEncoded, newEulerContextEncoded]);
+    }, [selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName, context, cowFlashLoanInfo, numChunks, isMax, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, debtTokenAddress, morphoContext, newMorphoContext, isEuler, oldEulerContextEncoded, newEulerContextEncoded, currentDebtBalance]);
 
     const buildFlow = () => {
         if (!selectedFrom || !selectedTo || !userAddress) return [];
@@ -1102,7 +1139,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         } else {
             if (!pendleQuote || !pendleAdapter) return [];
             swapData = pendleQuote.transaction.data;
-            minOut = pendleQuote.data.minPtOut || pendleQuote.data.minTokenOut || "1";
+            // Pendle API handles slippage internally in the transaction data
+            // We pass slippage to the API, and it returns tx data with slippage baked in
+            // Use "1" as minOut since the Pendle router contract enforces its own minimum
+            minOut = "1";
         }
 
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
@@ -1119,6 +1159,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 [selectedTo.address as Address, minAmountOutBigInt, swapData as `0x${string}`]
             );
 
+            // For partial swaps, use fixed proportional debt amount
+            // For max swaps, use GetBorrowBalance to migrate all debt
+            const useFixedDebtAmount = proportionalDebtAmount !== undefined && !isMax;
+
             /**
              * Morpho Pair-Isolated Collateral Swap (Market Order):
              *
@@ -1129,7 +1173,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
              * 3. Swap(oldColl -> newColl, input=1) -> [3] newColl, [4] refund
              * 4. Approve(3, morpho) -> [5] (dummy)
              * 5. DepositCollateral(newColl, input=3, NEW_MARKET) -> NO OUTPUT
-             * 6. GetBorrowBalance(debt, OLD_MARKET) -> [6]
+             * 6. GetBorrowBalance OR ToOutput(debtAmount) -> [6]
              * 7. Borrow(debt, input=6, NEW_MARKET) -> [7] (borrowed tokens go to router)
              * 8. Approve(7, morpho) -> [8] (approve gateway to spend borrowed tokens)
              * 9. Repay(debt, input=6, OLD_MARKET) -> [9] (refund)
@@ -1174,13 +1218,21 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 )
             );
 
-            // 6. GetBorrowBalance from OLD market -> [6]
-            instructions.push(
-                createProtocolInstruction(
-                    "morpho-blue",
-                    encodeLendingInstruction(LendingOp.GetBorrowBalance, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 999)
-                )
-            );
+            // 6. Get debt amount to migrate -> [6]
+            if (useFixedDebtAmount) {
+                // Partial swap: use fixed proportional debt amount
+                instructions.push(
+                    createRouterInstruction(encodeToOutput(proportionalDebtAmount, debtTokenAddress))
+                );
+            } else {
+                // Max swap: use GetBorrowBalance to migrate all debt
+                instructions.push(
+                    createProtocolInstruction(
+                        "morpho-blue",
+                        encodeLendingInstruction(LendingOp.GetBorrowBalance, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 999)
+                    )
+                );
+            }
 
             // 7. Borrow from NEW market (amount from [6]) -> [7]
             instructions.push(
@@ -1373,7 +1425,29 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
             // Always use sequential execution for limit orders
             // MetaMask has issues with approvals in batched calls that may go unused
             if (walletClient && publicClient) {
-                await executeSequentialOrder(executionParams, notificationId as string, onClose, txBeginProps);
+                const { receipts } = await executeSequentialOrder(executionParams, notificationId as string, onClose, txBeginProps);
+
+                // Extract orderHash from transaction receipts
+                const orderHash = extractOrderHash(receipts, orderManagerAddress) ?? undefined;
+
+                // Save order to database after successful execution
+                if (limitOrderResult.salt && selectedFrom && selectedTo) {
+                    saveOrder.mutate({
+                        orderUid: limitOrderResult.salt,
+                        orderHash,
+                        salt: limitOrderResult.salt,
+                        userAddress,
+                        chainId,
+                        orderType: "collateral_swap",
+                        protocol: protocolName,
+                        sellToken: selectedFrom.address,
+                        buyToken: selectedTo.address,
+                        sellTokenSymbol: selectedFrom.symbol,
+                        buyTokenSymbol: selectedTo.symbol,
+                        sellAmount: amountInBigInt.toString(),
+                        buyAmount: minBuyAmount.raw.toString(),
+                    });
+                }
             } else {
                 throw new Error("Wallet not connected");
             }
@@ -1455,11 +1529,34 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     const hasQuote = swapRouter === "1inch" ? !!oneInchQuote : !!pendleQuote;
     const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
-    
+
+    // Calculate proportional debt for partial Morpho collateral swaps
+    // If swapping X% of collateral, migrate X% of debt
+    const proportionalDebtAmount = useMemo(() => {
+        if (!isMorpho || !currentDebtBalance || !selectedFrom?.rawBalance || selectedFrom.rawBalance === 0n) {
+            return undefined;
+        }
+        if (isMax) {
+            // For max swaps, migrate all debt (use GetBorrowBalance in instructions)
+            return undefined;
+        }
+        const amountInBigInt = parseUnits(amountIn || "0", selectedFrom.decimals);
+        if (amountInBigInt === 0n) return undefined;
+
+        // proportionalDebt = totalDebt * (amountIn / totalCollateral)
+        // Use high precision to avoid rounding errors
+        const proportional = (currentDebtBalance * amountInBigInt) / selectedFrom.rawBalance;
+        return proportional;
+    }, [isMorpho, currentDebtBalance, selectedFrom?.rawBalance, selectedFrom?.decimals, amountIn, isMax]);
+
+    // Morpho partial swaps are now supported when we have debt balance info
+    // Only block if we don't have the required debt info for a partial swap
+    const morphoMissingDebtInfo = isMorpho && !isMax && parseFloat(amountIn) > 0 && !currentDebtBalance;
+
     // For market orders: need quote and adapter
     // For limit orders: need CoW contract available (quote optional)
-    const canSubmitMarket = hasQuote && hasAdapter && parseFloat(amountIn) > 0;
-    const canSubmitLimit = !!selectedFrom && !!selectedTo && parseFloat(amountIn) > 0 && limitOrderReady && !!cowFlashLoanInfo;
+    const canSubmitMarket = hasQuote && hasAdapter && parseFloat(amountIn) > 0 && !morphoMissingDebtInfo;
+    const canSubmitLimit = !!selectedFrom && !!selectedTo && parseFloat(amountIn) > 0 && limitOrderReady && !!cowFlashLoanInfo && !morphoMissingDebtInfo;
     const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
 
     // Info content for "How it works" tab
@@ -1532,6 +1629,12 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     // Warnings
     const warnings = useMemo(() => (
         <>
+            {morphoMissingDebtInfo && (
+                <WarningDisplay
+                    message="Unable to calculate proportional debt for partial swap. Use the MAX button to swap all collateral."
+                    size="sm"
+                />
+            )}
             {swapRouter === "1inch" && oneInchQuote && oneInchAdapter && oneInchQuote.tx.from.toLowerCase() !== oneInchAdapter.address.toLowerCase() && (
                 <WarningDisplay
                     message="Warning: Quote 'from' address mismatch!"
@@ -1552,7 +1655,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 />
             )}
         </>
-    ), [swapRouter, oneInchQuote, oneInchAdapter, pendleAdapter, isOpen]);
+    ), [morphoMissingDebtInfo, swapRouter, oneInchQuote, oneInchAdapter, pendleAdapter, isOpen]);
 
     // Right panel with Market/Limit toggle and settings
     const rightPanel = useMemo(() => (
@@ -1582,7 +1685,11 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                                 value={slippage}
                                 onChange={(e) => setSlippage(parseFloat(e.target.value))}
                             >
-                                {[0.05, 0.1, 0.3, 0.5, 1, 2, 3, 5].map(s => (
+                                {/* Higher slippage options for Pendle (PT tokens often have higher price impact) */}
+                                {(swapRouter === "pendle"
+                                    ? [0.1, 0.5, 1, 2, 3, 5, 7, 10, 15, 20]
+                                    : [0.05, 0.1, 0.3, 0.5, 1, 2, 3, 5]
+                                ).map(s => (
                                     <option key={s} value={s}>{s}%</option>
                                 ))}
                             </select>

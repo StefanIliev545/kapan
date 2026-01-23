@@ -12,6 +12,8 @@ import { useToggle } from "~~/hooks/useModal";
 import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
+import { isPTToken } from "~~/hooks/usePendlePTYields";
+import { TokenSymbolDisplay } from "./TokenSymbolDisplay";
 
 // Static handler for stopPropagation - extracted to module level to avoid recreation
 const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
@@ -399,7 +401,7 @@ export const BasePosition: FC<BasePositionProps> = ({
               <Image src={icon} alt={`${name} icon`} fill className="rounded object-contain" />
             </div>
             <span className="max-w-[100px] truncate text-sm font-bold leading-none tracking-tight" title={name}>
-              {renderName ? renderName(name) : name}
+              {renderName ? renderName(name) : isPTToken(name) ? <TokenSymbolDisplay symbol={name} size="xs" /> : name}
             </span>
             {infoButtonNode && (
               <div className="hidden flex-shrink-0 sm:block" onClick={stopPropagation}>
@@ -457,6 +459,8 @@ export const BasePosition: FC<BasePositionProps> = ({
               <div className="flex min-w-0 flex-col">
                 {renderName ? (
                   <>{renderName(name)}</>
+                ) : isPTToken(name) ? (
+                  <TokenSymbolDisplay symbol={name} size="sm" variant="stacked" />
                 ) : (
                   <>
                     <span className="truncate text-base font-bold leading-tight tracking-tight" title={name}>{name}</span>

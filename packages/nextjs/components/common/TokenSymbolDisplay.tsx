@@ -63,6 +63,9 @@ export function TokenSymbolDisplay({
   // PT token - show short name with maturity
   const ptParsed = parsed as ParsedPTToken;
 
+  // Check if matured (maturity date is in the past)
+  const isMatured = ptParsed.maturityDate ? ptParsed.maturityDate < new Date() : false;
+
   const content = variant === "stacked" ? (
     <PTStackedDisplay parsed={ptParsed} sizeClasses={sizeClasses} className={className} />
   ) : (
@@ -76,7 +79,7 @@ export function TokenSymbolDisplay({
           <span className="block font-medium">{ptParsed.originalSymbol}</span>
           {ptParsed.formattedMaturity && (
             <span className="text-base-content/70 block text-xs">
-              Matures: {ptParsed.formattedMaturity}
+              {isMatured ? `Matured on: ${ptParsed.formattedMaturity}` : `Matures: ${ptParsed.formattedMaturity}`}
             </span>
           )}
         </span>
@@ -89,7 +92,7 @@ export function TokenSymbolDisplay({
   return content;
 }
 
-// Inline display: "PT-sUSDai · Nov 20"
+// Inline display: "PT-sUSDai · Nov 20" or "PT-sUSDai · Matured"
 function PTInlineDisplay({
   parsed,
   sizeClasses,
@@ -99,24 +102,27 @@ function PTInlineDisplay({
   sizeClasses: typeof SIZE_CLASSES.sm;
   className: string;
 }) {
+  // Check if matured (maturity date is in the past)
+  const isMatured = parsed.maturityDate ? parsed.maturityDate < new Date() : false;
+
   // Format maturity as compact "Nov 20" (without year for brevity)
   const compactMaturity = parsed.maturityDate
     ? parsed.maturityDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : null;
 
   return (
-    <span className={`inline-flex cursor-help items-center gap-1 ${className}`}>
+    <span className={`inline-flex items-center gap-1 ${className}`}>
       <span className={`font-medium ${sizeClasses.main}`}>{parsed.shortName}</span>
       {compactMaturity && (
-        <span className={`text-base-content/50 ${sizeClasses.maturity}`}>
-          · {compactMaturity}
+        <span className={`${isMatured ? "text-warning" : "text-base-content/50"} ${sizeClasses.maturity}`}>
+          · {isMatured ? "Matured" : compactMaturity}
         </span>
       )}
     </span>
   );
 }
 
-// Stacked display: short name on top, maturity below
+// Stacked display: short name on top, maturity below (or "Matured" if past)
 function PTStackedDisplay({
   parsed,
   sizeClasses,
@@ -126,12 +132,15 @@ function PTStackedDisplay({
   sizeClasses: typeof SIZE_CLASSES.sm;
   className: string;
 }) {
+  // Check if matured (maturity date is in the past)
+  const isMatured = parsed.maturityDate ? parsed.maturityDate < new Date() : false;
+
   return (
-    <span className={`inline-flex cursor-help flex-col ${className}`}>
+    <span className={`inline-flex flex-col ${className}`}>
       <span className={`font-medium ${sizeClasses.main}`}>{parsed.shortName}</span>
       {parsed.formattedMaturity && (
-        <span className={`text-base-content/50 leading-tight ${sizeClasses.maturity}`}>
-          {parsed.formattedMaturity}
+        <span className={`${isMatured ? "text-warning" : "text-base-content/50"} leading-tight ${sizeClasses.maturity}`}>
+          {isMatured ? "Matured" : parsed.formattedMaturity}
         </span>
       )}
     </span>
@@ -160,18 +169,21 @@ export function PTBadge({
 
   const ptParsed = parsed as ParsedPTToken;
 
+  // Check if matured (maturity date is in the past)
+  const isMatured = ptParsed.maturityDate ? ptParsed.maturityDate < new Date() : false;
+
   return (
     <Tooltip content={
       <span className="block space-y-1">
         <span className="block font-medium">{ptParsed.originalSymbol}</span>
         {ptParsed.formattedMaturity && (
           <span className="text-base-content/70 block text-xs">
-            Matures: {ptParsed.formattedMaturity}
+            {isMatured ? `Matured on: ${ptParsed.formattedMaturity}` : `Matures: ${ptParsed.formattedMaturity}`}
           </span>
         )}
       </span>
     }>
-      <span className={`inline-flex cursor-help items-center gap-1.5 ${className}`}>
+      <span className={`inline-flex items-center gap-1.5 ${className}`}>
         <span className={`bg-info/20 text-info rounded ${sizeClasses.badge} font-semibold`}>
           PT
         </span>
@@ -201,16 +213,22 @@ export function MaturityBadge({
   }
 
   const ptParsed = parsed as ParsedPTToken;
+
+  // Check if matured (maturity date is in the past)
+  const isMatured = ptParsed.maturityDate ? ptParsed.maturityDate < new Date() : false;
+
   const compactDate = ptParsed.maturityDate
     ? ptParsed.maturityDate.toLocaleDateString("en-US", { month: "short", year: "2-digit" })
     : ptParsed.rawMaturityDate;
 
   const sizeClass = size === "xs" ? "text-[9px] px-1 py-0.5" : "text-[10px] px-1.5 py-0.5";
 
+  const tooltipText = isMatured ? `Matured on: ${ptParsed.formattedMaturity}` : `Matures: ${ptParsed.formattedMaturity}`;
+
   return (
-    <Tooltip content={`Matures: ${ptParsed.formattedMaturity}`}>
-      <span className={`bg-base-content/10 text-base-content/60 cursor-help rounded ${sizeClass} font-medium ${className}`}>
-        {compactDate}
+    <Tooltip content={tooltipText}>
+      <span className={`${isMatured ? "bg-warning/20 text-warning" : "bg-base-content/10 text-base-content/60"} rounded ${sizeClass} font-medium ${className}`}>
+        {isMatured ? "Matured" : compactDate}
       </span>
     </Tooltip>
   );

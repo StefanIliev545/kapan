@@ -67,6 +67,8 @@ import {
     calculateLimitOrderNewDebt,
     calculateDustBuffer,
 } from "./debtSwapEvmHelpers";
+import { useSaveOrder } from "~~/hooks/useOrderHistory";
+import { extractOrderHash } from "~~/utils/orderHashExtractor";
 
 interface DebtSwapEvmModalProps {
     isOpen: boolean;
@@ -338,7 +340,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         isReady: limitOrderReady,
         orderManagerAddress
     } = useCowLimitOrder();
-
+    const saveOrder = useSaveOrder();
 
     // Initialize limitOrderConfig with default provider when switching to limit mode
     useEffect(() => {
@@ -1393,6 +1395,29 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 analyticsProps,
                 onClose,
                 notificationId,
+                onSuccess: (receipts) => {
+                    // Extract orderHash from transaction receipts
+                    const orderHash = extractOrderHash(receipts, orderManagerAddress) ?? undefined;
+
+                    // Save order to database after successful execution
+                    if (limitOrderResult.salt && selectedTo && userAddress) {
+                        saveOrder.mutate({
+                            orderUid: limitOrderResult.salt,
+                            orderHash,
+                            salt: limitOrderResult.salt,
+                            userAddress,
+                            chainId,
+                            orderType: "debt_swap",
+                            protocol: protocolName,
+                            sellToken: selectedTo.address,
+                            buyToken: debtFromToken,
+                            sellTokenSymbol: selectedTo.symbol,
+                            buyTokenSymbol: debtFromName,
+                            sellAmount: effectiveLimitOrderNewDebt.toString(),
+                            buyAmount: repayAmountRaw.toString(),
+                        });
+                    }
+                },
             });
         } catch (e) {
             handleLimitOrderError(e, notificationId, analyticsProps);
@@ -1400,7 +1425,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         } finally {
             setIsLimitSubmitting(false);
         }
-    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, effectiveLimitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose, limitOrderBuyAmount]);
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtFromToken, debtFromName, repayAmountRaw, debtFromDecimals, effectiveLimitOrderNewDebt, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose, limitOrderBuyAmount, saveOrder]);
 
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && requiredNewDebt > 0n && hasAdapter;
     const canSubmitLimit = executionType === "limit" && limitOrderReady && !!cowFlashLoanInfo &&
