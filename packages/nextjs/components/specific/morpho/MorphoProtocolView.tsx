@@ -69,13 +69,12 @@ const EMPTY_METRICS: PositionMetrics = {
 function getPTTokenYield(
   collateralSymbol: string,
   collateralAddress: string,
-  yieldsByAddress: Map<string, PTYield>,
-  yieldsBySymbol: Map<string, PTYield>
+  findYield: (address?: string, symbol?: string) => PTYield | undefined
 ): number {
   if (!isPTToken(collateralSymbol)) {
     return 0;
   }
-  const ptYield = yieldsByAddress.get(collateralAddress) || yieldsBySymbol.get(collateralSymbol.toLowerCase());
+  const ptYield = findYield(collateralAddress, collateralSymbol);
   return ptYield?.fixedApy ?? 0;
 }
 
@@ -85,12 +84,11 @@ function getPTTokenYield(
  */
 function buildSuppliedPositions(
   rows: MorphoPositionRow[],
-  yieldsByAddress: Map<string, PTYield>,
-  yieldsBySymbol: Map<string, PTYield>
+  findYield: (address?: string, symbol?: string) => PTYield | undefined
 ): Array<{ balance: number; currentRate: number }> {
   return rows.map((row) => {
     const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
-    const currentRate = getPTTokenYield(row.collateralSymbol, collateralAddr, yieldsByAddress, yieldsBySymbol);
+    const currentRate = getPTTokenYield(row.collateralSymbol, collateralAddr, findYield);
     return {
       balance: row.collateralBalanceUsd,
       currentRate,
@@ -118,14 +116,13 @@ function buildBorrowedPositions(
  */
 function calculatePositionMetrics(
   rows: MorphoPositionRow[],
-  yieldsByAddress: Map<string, PTYield>,
-  yieldsBySymbol: Map<string, PTYield>
+  findYield: (address?: string, symbol?: string) => PTYield | undefined
 ): PositionMetrics {
   if (!rows || rows.length === 0) {
     return EMPTY_METRICS;
   }
 
-  const suppliedPositions = buildSuppliedPositions(rows, yieldsByAddress, yieldsBySymbol);
+  const suppliedPositions = buildSuppliedPositions(rows, findYield);
   const borrowedPositions = buildBorrowedPositions(rows);
   const yieldMetrics = calculateNetYieldMetrics(suppliedPositions, borrowedPositions);
 
@@ -225,7 +222,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   const { marketPairs } = useMorphoMarkets(effectiveChainId, undefined);
 
   // Fetch PT yields from Pendle for fixed APY display
-  const { yieldsByAddress, yieldsBySymbol } = usePendlePTYields(effectiveChainId);
+  const { findYield } = usePendlePTYields(effectiveChainId);
 
   // Extract markets where user has positions for fast refresh
   const marketsWithPositions = useMemo(() => {
@@ -258,8 +255,8 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 
   // Compute totals and metrics using extracted helper
   const metrics = useMemo(
-    () => calculatePositionMetrics(rows, yieldsByAddress, yieldsBySymbol),
-    [rows, yieldsByAddress, yieldsBySymbol]
+    () => calculatePositionMetrics(rows, findYield),
+    [rows, findYield]
   );
 
   // Report totals to global state for dashboard metrics
@@ -474,8 +471,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
           hasLoadedOnce={hasLoadedOnce || !isLoadingPositions}
           isUpdating={isUpdating}
           chainId={chainId}
-          yieldsByAddress={yieldsByAddress}
-          yieldsBySymbol={yieldsBySymbol}
+          findYield={findYield}
         />
       </CollapsibleSection>
     </div>

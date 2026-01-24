@@ -42,6 +42,7 @@ import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { AccountProvider } from "~~/contexts/AccountContext";
 import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
 import { LandingSectionProvider } from "~~/contexts/LandingSectionContext";
+import { ReferralProvider } from "~~/contexts/ReferralContext";
 import { ControllerConnector } from "@cartridge/connector";
 import { constants } from "starknet";
 
@@ -147,9 +148,11 @@ export const ScaffoldEthAppWithProviders = ({
                   avatar={BlockieAvatar}
                   theme={darkTheme()}
                 >
-                  <StarknetWalletAnalytics />
-                  <WalletAnalytics />
-                  <ScaffoldEthApp initialHost={initialHost}>{children}</ScaffoldEthApp>
+                  <ReferralProvider>
+                    <StarknetWalletAnalytics />
+                    <WalletAnalytics />
+                    <ScaffoldEthApp initialHost={initialHost}>{children}</ScaffoldEthApp>
+                  </ReferralProvider>
                 </RainbowKitProvider>
               </StarkBlockNumberProvider>
             </BlockNumberProvider>

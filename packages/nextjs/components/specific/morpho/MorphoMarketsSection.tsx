@@ -602,7 +602,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   const { address: walletAddress, chainId: walletChainId } = useAccount();
 
   // Fetch Pendle PT yields for PT tokens
-  const { yieldsByAddress, yieldsBySymbol } = usePendlePTYields(chainId);
+  const { findYield } = usePendlePTYields(chainId);
 
   // Memoize filter sets for performance
   const collateralFilterSet = React.useMemo(() => new Set(selectedCollaterals), [selectedCollaterals]);
@@ -648,7 +648,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
         let impliedApy: number | null = null;
 
         if (isPTToken(collateralSymbol)) {
-          const ptYield = yieldsByAddress.get(collateralAddress) || yieldsBySymbol.get(collateralSymbol.toLowerCase());
+          const ptYield = findYield(collateralAddress, collateralSymbol);
           if (ptYield) {
             impliedApy = ptYield.fixedApy;
           }
@@ -669,7 +669,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           impliedApy,
         };
       });
-  }, [markets, collateralFilterSet, debtFilterSet, yieldsByAddress, yieldsBySymbol]);
+  }, [markets, collateralFilterSet, debtFilterSet, findYield]);
 
   // Extract unique collateral and debt assets from markets
   const { collateralAssets, debtAssets } = React.useMemo(() => {
@@ -955,11 +955,11 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
     const collateralAddr = loopMarket.collateralAsset.address.toLowerCase();
     let apy = 0;
     if (isPTToken(loopMarket.collateralAsset.symbol)) {
-      const ptYield = yieldsByAddress.get(collateralAddr) || yieldsBySymbol.get(loopMarket.collateralAsset.symbol.toLowerCase());
+      const ptYield = findYield(collateralAddr, loopMarket.collateralAsset.symbol);
       if (ptYield) apy = ptYield.fixedApy;
     }
     return { [collateralAddr]: apy };
-  }, [loopMarket, yieldsByAddress, yieldsBySymbol]);
+  }, [loopMarket, findYield]);
 
   const loopModalBorrowApyMap = React.useMemo(() => {
     if (!loopMarket) return {};

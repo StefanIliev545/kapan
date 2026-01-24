@@ -460,6 +460,8 @@ export async function executeBatchedLimitOrder(params: {
     track("close_with_collateral_limit_order_complete", { ...analyticsProps, status: "submitted", mode: "batched" });
 }
 
+type ReceiptType = Awaited<ReturnType<PublicClient["waitForTransactionReceipt"]>>;
+
 export async function executeSequentialLimitOrder(params: {
     allCalls: Array<{ to: string; data: string }>;
     walletClient: WalletClient;
@@ -472,6 +474,7 @@ export async function executeSequentialLimitOrder(params: {
     analyticsProps: ClosePositionAnalyticsProps;
     onClose: () => void;
     notificationId: string | number;
+    onSuccess?: (receipts: ReceiptType[]) => void;
 }): Promise<void> {
     const {
         allCalls,
@@ -484,6 +487,7 @@ export async function executeSequentialLimitOrder(params: {
         appDataHash,
         analyticsProps,
         onClose,
+        onSuccess,
     } = params;
     let { notificationId } = params;
 
@@ -536,6 +540,7 @@ export async function executeSequentialLimitOrder(params: {
     );
 
     track("close_with_collateral_limit_order_complete", { ...analyticsProps, status: "success", mode: "sequential" });
+    onSuccess?.(result.receipts);
     onClose();
 }
 

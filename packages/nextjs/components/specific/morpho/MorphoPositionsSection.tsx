@@ -31,10 +31,8 @@ interface MorphoPositionsSectionProps {
   chainId: number;
   onBorrowRequest?: (params: { market: MorphoMarket; collateralAddress: string }) => void;
   onDepositRequest?: () => void;
-  /** PT yield lookup by address (lowercase) */
-  yieldsByAddress?: Map<string, PTYield>;
-  /** PT yield lookup by symbol (lowercase) */
-  yieldsBySymbol?: Map<string, PTYield>;
+  /** Smart PT yield lookup function that handles bridged tokens */
+  findYield?: (address?: string, symbol?: string) => PTYield | undefined;
 }
 
 // Static image error handler at module level
@@ -58,6 +56,7 @@ interface SwapModalState {
   isOpen: boolean;
   morphoContext: MorphoMarketContextForEncoding | null;
   debtTokenAddress: string;
+  debtBalance: bigint; // Current debt balance for proportional calculations
   collateralAddress: string;
   collateralSymbol: string;
   collateralDecimals: number;
@@ -88,8 +87,7 @@ interface MorphoPositionRowProps {
   chainId: number;
   isExpanded: boolean;
   onToggleExpanded: () => void;
-  yieldsByAddress?: Map<string, PTYield>;
-  yieldsBySymbol?: Map<string, PTYield>;
+  findYield?: (address?: string, symbol?: string) => PTYield | undefined;
   onSwapRequest?: (state: SwapModalState) => void;
   onDebtSwapRequest?: (state: DebtSwapModalState) => void;
 }
@@ -99,8 +97,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
   chainId,
   isExpanded,
   onToggleExpanded,
-  yieldsByAddress,
-  yieldsBySymbol,
+  findYield,
   onSwapRequest,
   onDebtSwapRequest,
 }) => {
@@ -111,9 +108,9 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
   const collateralRate = useMemo(() => {
     if (!isPTToken(row.collateralSymbol)) return 0;
     const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
-    const ptYield = yieldsByAddress?.get(collateralAddr) || yieldsBySymbol?.get(row.collateralSymbol.toLowerCase());
+    const ptYield = findYield?.(collateralAddr, row.collateralSymbol);
     return ptYield?.fixedApy ?? 0;
-  }, [row.collateralSymbol, row.market.collateralAsset?.address, yieldsByAddress, yieldsBySymbol]);
+  }, [row.collateralSymbol, row.market.collateralAsset?.address, findYield]);
 
   // Memoized supply position object
   const supplyPosition = useMemo(() => ({
@@ -239,6 +236,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
       isOpen: true,
       morphoContext: row.context,
       debtTokenAddress: row.market.loanAsset.address,
+      debtBalance: row.borrowBalance,
       collateralAddress: row.market.collateralAsset?.address || "",
       collateralSymbol: row.collateralSymbol,
       collateralDecimals: row.collateralDecimals,
@@ -388,8 +386,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   userAddress,
   hasLoadedOnce,
   chainId,
-  yieldsByAddress,
-  yieldsBySymbol,
+  findYield,
 }) => {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
@@ -460,8 +457,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
         chainId={chainId}
         isExpanded={!!expandedRows[row.key]}
         onToggleExpanded={getToggleHandler(row.key)}
-        yieldsByAddress={yieldsByAddress}
-        yieldsBySymbol={yieldsBySymbol}
+        findYield={findYield}
         onSwapRequest={handleSwapRequest}
         onDebtSwapRequest={handleDebtSwapRequest}
       />
@@ -545,6 +541,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
           position={swapPosition}
           morphoContext={swapModalState.morphoContext ?? undefined}
           debtTokenAddress={swapModalState.debtTokenAddress}
+          currentDebtBalance={swapModalState.debtBalance}
         />
       )}
 

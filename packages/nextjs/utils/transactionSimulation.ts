@@ -105,15 +105,18 @@ export async function simulateTransactionBatch(
  * Execute transactions sequentially with optional pre-simulation
  * Used for limit order flows where batching isn't supported
  */
+export type TransactionReceipt = Awaited<ReturnType<PublicClient["waitForTransactionReceipt"]>>;
+
 export async function executeSequentialTransactions(
   publicClient: PublicClient,
   walletClient: WalletClient,
   calls: TransactionCall[],
   userAddress: Address,
   options: SequentialExecutionOptions = {}
-): Promise<{ success: boolean; hashes: Hex[]; failedStep?: number; error?: string }> {
+): Promise<{ success: boolean; hashes: Hex[]; receipts: TransactionReceipt[]; failedStep?: number; error?: string }> {
   const { onProgress, onError, simulateFirst = true } = options;
   const hashes: Hex[] = [];
+  const receipts: TransactionReceipt[] = [];
 
   for (let i = 0; i < calls.length; i++) {
     const call = calls[i];
@@ -135,6 +138,7 @@ export async function executeSequentialTransactions(
         return {
           success: false,
           hashes,
+          receipts,
           failedStep: i + 1,
           error: errorMessage,
         };
@@ -160,8 +164,9 @@ export async function executeSequentialTransactions(
 
       hashes.push(hash);
 
-      // Wait for confirmation
-      await publicClient.waitForTransactionReceipt({ hash });
+      // Wait for confirmation and store receipt
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      receipts.push(receipt);
       onProgress?.(i + 1, calls.length, "confirmed");
     } catch (execError: unknown) {
       const errorMessage = extractRevertReason(execError);
@@ -169,13 +174,14 @@ export async function executeSequentialTransactions(
       return {
         success: false,
         hashes,
+        receipts,
         failedStep: i + 1,
         error: `Transaction execution failed at step ${i + 1}: ${errorMessage}`,
       };
     }
   }
 
-  return { success: true, hashes };
+  return { success: true, hashes, receipts };
 }
 
 /**

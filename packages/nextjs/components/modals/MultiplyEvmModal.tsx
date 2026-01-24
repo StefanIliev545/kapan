@@ -33,6 +33,8 @@ import { TransactionToast } from "~~/components/TransactionToast";
 import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { saveOrderNote, createLeverageUpNote } from "~~/utils/orderNotes";
 import { executeSequentialTransactions, type TransactionCall } from "~~/utils/transactionSimulation";
+import { extractOrderHash } from "~~/utils/orderHashExtractor";
+import { useSaveOrder } from "~~/hooks/useOrderHistory";
 
 // Import helper functions to reduce cognitive complexity
 import {
@@ -131,6 +133,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // CoW order hooks
   const { isCreating: isCowCreating, isAvailable: cowContractAvailable } = useCowOrder();
   const { buildOrderCalls: buildLimitOrderCalls, buildRouterCall, orderManagerAddress } = useCowLimitOrder();
+  const saveOrder = useSaveOrder();
 
   // Check swap router availability for this chain
   const oneInchAvailable = is1inchSupported(chainId);
@@ -946,6 +949,29 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     console.log("[Limit Order] All steps completed");
     console.log("[Limit Order] Salt:", cowCalls.salt);
     console.log("[Limit Order] AppData Hash:", cowCalls.appDataHash);
+
+    // Extract orderHash from transaction receipts
+    const orderHash = extractOrderHash(result.receipts, orderManagerAddress) ?? undefined;
+    console.log("[Limit Order] OrderHash:", orderHash);
+
+    // Save order to database after successful execution
+    if (cowCalls.salt && debt && collateral && userAddress) {
+      saveOrder.mutate({
+        orderUid: cowCalls.salt,
+        orderHash,
+        salt: cowCalls.salt,
+        userAddress,
+        chainId,
+        orderType: "leverage_up",
+        protocol: protocolName,
+        sellToken: debt.address,
+        buyToken: collateral.address,
+        sellTokenSymbol: debt.symbol,
+        buyTokenSymbol: collateral.symbol,
+        sellAmount: flashLoanAmountRaw.toString(),
+        buyAmount: minCollateralOut.raw.toString(),
+      });
+    }
 
     track("multiply_limit_order_complete", { status: "submitted", mode: "sequential" });
     onClose();
