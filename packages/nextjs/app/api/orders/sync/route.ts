@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
 import { eq, and, inArray } from "drizzle-orm";
-import { createPublicClient, http, parseAbiItem, type Address } from "viem";
+import { createPublicClient, http, parseAbiItem, type Address, type Chain } from "viem";
 import { arbitrum, base, mainnet, optimism, linea } from "viem/chains";
 import { db, orders, orderFills } from "~~/lib/db";
 import deployedContracts from "~~/contracts/deployedContracts";
 
-const CHAINS: Record<number, typeof arbitrum> = {
+const CHAINS: Record<number, Chain> = {
   1: mainnet,
   42161: arbitrum,
   8453: base,
