@@ -62,6 +62,11 @@ const EulerProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Euler" /> }
 );
 
+const WalletSection = dynamic(
+  () => import("~~/components/specific/wallet/WalletSection").then(m => m.WalletSection),
+  { ssr: false }
+);
+
 // Network options (memo for referential stability)
 const networkOptions: NetworkOption[] = [
   { id: "ethereum", name: "Ethereum", logo: "/logos/ethereum.svg" },
@@ -211,6 +216,7 @@ const App: NextPage = () => {
           {/* ETHEREUM MAINNET */}
           {selectedNetwork === "ethereum" && (
             <div className="space-y-3">
+              <WalletSection chainId={mainnet.id} />
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={mainnet.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -232,6 +238,7 @@ const App: NextPage = () => {
           {/* ARBITRUM */}
           {selectedNetwork === "arbitrum" && (
             <div className="space-y-3">
+              <WalletSection chainId={arbitrum.id} />
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -253,6 +260,7 @@ const App: NextPage = () => {
           {/* BASE */}
           {selectedNetwork === "base" && (
             <div className="space-y-3">
+              <WalletSection chainId={base.id} />
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <MorphoProtocolView chainId={base.id} />
               </StableArea>
@@ -280,6 +288,7 @@ const App: NextPage = () => {
               <div className="alert alert-warning text-sm">
                 Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
               </div>
+              <WalletSection chainId={hardhat.id} />
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={hardhat.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -310,6 +319,7 @@ const App: NextPage = () => {
           {/* OPTIMISM */}
           {selectedNetwork === "optimism" && (
             <div className="space-y-3">
+              <WalletSection chainId={optimism.id} />
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={optimism.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -328,6 +338,7 @@ const App: NextPage = () => {
           {/* LINEA */}
           {selectedNetwork === "linea" && (
             <div className="space-y-3">
+              <WalletSection chainId={linea.id} />
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={linea.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -346,6 +357,7 @@ const App: NextPage = () => {
           {/* PLASMA */}
           {selectedNetwork === "plasma" && (
             <div className="space-y-3">
+              <WalletSection chainId={plasma.id} />
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={plasma.id} enabledFeatures={ENABLED_FEATURES_SWAP_ONLY} />
               </StableArea>
@@ -358,6 +370,7 @@ const App: NextPage = () => {
           {/* UNICHAIN */}
           {selectedNetwork === "unichain" && (
             <div className="space-y-3">
+              <WalletSection chainId={unichain.id} />
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <MorphoProtocolView chainId={unichain.id} />
               </StableArea>

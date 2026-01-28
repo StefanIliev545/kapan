@@ -13,12 +13,23 @@ import formatPercentage from "~~/utils/formatPercentage";
 import { encodeMorphoContext, type MorphoMarketContextForEncoding } from "~~/utils/v2/instructionHelpers";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
 import { ExternalLink } from "lucide-react";
-import { isPTToken, PTYield } from "~~/hooks/usePendlePTYields";
+import { Cog6ToothIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import {
+  formatLtvPercent,
+  useConditionalOrders,
+  PROTOCOL_IDS,
+  decodeMorphoContext,
+  ConditionalOrderStatus,
+  type ConditionalOrder,
+} from "~~/hooks/useConditionalOrders";
+import { hasExternalYield, type ExternalYield } from "~~/hooks/useExternalYields";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { formatSignedPercent } from "../utils";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
 import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
+import { ADLAutomationModal } from "~~/components/modals/ADLAutomationModal";
+import { useADLContracts } from "~~/hooks/useADLOrder";
 import type { Address } from "viem";
 
 interface MorphoPositionsSectionProps {
@@ -32,7 +43,7 @@ interface MorphoPositionsSectionProps {
   onBorrowRequest?: (params: { market: MorphoMarket; collateralAddress: string }) => void;
   onDepositRequest?: () => void;
   /** Smart PT yield lookup function that handles bridged tokens */
-  findYield?: (address?: string, symbol?: string) => PTYield | undefined;
+  findYield?: (address?: string, symbol?: string) => ExternalYield | undefined;
 }
 
 // Static image error handler at module level
@@ -81,15 +92,40 @@ interface DebtSwapModalState {
   collateralDecimals: number;
 }
 
+// ADL modal state for a position
+interface ADLModalState {
+  isOpen: boolean;
+  morphoContext: MorphoMarketContextForEncoding | null;
+  currentLtvBps: number;
+  liquidationLtvBps: number;
+  collateralTokenAddress: string;
+  collateralTokenSymbol: string;
+  collateralDecimals: number;
+  collateralBalance: bigint;
+  collateralBalanceUsd: number;
+  collateralPrice: bigint;
+  debtTokenAddress: string;
+  debtTokenSymbol: string;
+  debtTokenDecimals: number;
+  debtBalanceUsd: number;
+}
+
 // Memoized position row component to avoid recreating inline objects on each render
 interface MorphoPositionRowProps {
   row: MorphoPositionRow;
   chainId: number;
   isExpanded: boolean;
   onToggleExpanded: () => void;
-  findYield?: (address?: string, symbol?: string) => PTYield | undefined;
+  findYield?: (address?: string, symbol?: string) => ExternalYield | undefined;
   onSwapRequest?: (state: SwapModalState) => void;
   onDebtSwapRequest?: (state: DebtSwapModalState) => void;
+  onADLRequest?: (state: ADLModalState) => void;
+  isADLSupported?: boolean;
+  hasActiveADL?: boolean;
+  adlTriggerLtvBps?: bigint;
+  adlTargetLtvBps?: bigint;
+  /** True if current LTV is at or above trigger threshold */
+  isAboveTrigger?: boolean;
 }
 
 const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
@@ -100,13 +136,19 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
   findYield,
   onSwapRequest,
   onDebtSwapRequest,
+  onADLRequest,
+  isADLSupported,
+  hasActiveADL,
+  adlTriggerLtvBps,
+  adlTargetLtvBps,
+  isAboveTrigger,
 }) => {
   // Pre-encode the Morpho market context for modals
   const protocolContext = useMemo(() => encodeMorphoContext(row.context), [row.context]);
 
   // Calculate collateral rate (PT tokens have fixed yield)
   const collateralRate = useMemo(() => {
-    if (!isPTToken(row.collateralSymbol)) return 0;
+    if (!hasExternalYield(row.collateralSymbol)) return 0;
     const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
     const ptYield = findYield?.(collateralAddr, row.collateralSymbol);
     return ptYield?.fixedApy ?? 0;
@@ -246,12 +288,43 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
     });
   }, [onSwapRequest, row]);
 
+  // Handle ADL button click - opens ADL automation modal
+  const handleADLClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onADLRequest || !row.hasDebt || !row.hasCollateral) return;
+    const priceIn1e8 = BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8));
+    onADLRequest({
+      isOpen: true,
+      morphoContext: row.context,
+      currentLtvBps: Math.round((row.currentLtv || 0) * 100),
+      liquidationLtvBps: Math.round(row.lltv * 100),
+      collateralTokenAddress: row.market.collateralAsset?.address || "",
+      collateralTokenSymbol: row.collateralSymbol,
+      collateralDecimals: row.collateralDecimals,
+      collateralBalance: row.collateralBalance,
+      collateralBalanceUsd: row.collateralBalanceUsd,
+      collateralPrice: priceIn1e8,
+      debtTokenAddress: row.market.loanAsset.address,
+      debtTokenSymbol: row.loanSymbol,
+      debtTokenDecimals: row.borrowDecimals,
+      debtBalanceUsd: row.borrowBalanceUsd,
+    });
+  }, [onADLRequest, row]);
+
   const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
+
+  // ADL shadow styling: subtle glow effect
+  // Green = below trigger (safe/protected), Red = at or above trigger (warning)
+  const adlShadowClass = hasActiveADL
+    ? isAboveTrigger
+      ? "shadow-[0_0_6px_rgba(239,68,68,0.25),0_0_12px_rgba(239,68,68,0.15)]" // Red glow
+      : "shadow-[0_0_6px_rgba(74,222,128,0.3),0_0_12px_rgba(74,222,128,0.18)]" // Green glow
+    : "";
 
   return (
     <div
       key={row.key}
-      className="border-base-300 hover:border-base-content/15 relative rounded-md border transition-all duration-200"
+      className={`border-base-300 hover:border-base-content/15 relative rounded-md border transition-all duration-200 ${adlShadowClass}`}
     >
       {/* Market pair header */}
       <div
@@ -301,8 +374,42 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
             </a>
           )}
         </div>
-        {/* Stats row - wraps on mobile */}
+        {/* Right side: ADL indicator + Stats */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+          {/* ADL Settings/Status - show before stats */}
+          {isADLSupported && row.hasDebt && row.hasCollateral && (
+            <button
+              onClick={handleADLClick}
+              className={`group relative flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors ${
+                hasActiveADL
+                  ? "bg-success/10 text-success hover:bg-success/20"
+                  : "text-base-content/50 hover:bg-base-200 hover:text-base-content"
+              }`}
+            >
+              {hasActiveADL ? (
+                <>
+                  <ShieldCheckIcon className="size-3.5" />
+                  <span className="text-[10px] font-medium">
+                    {formatLtvPercent(adlTriggerLtvBps!)} → {formatLtvPercent(adlTargetLtvBps!)}
+                  </span>
+                  {/* Hover tooltip */}
+                  <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    <span className="text-warning">Trigger:</span> {formatLtvPercent(adlTriggerLtvBps!)} (starts deleveraging)
+                    <br />
+                    <span className="text-success">Target:</span> {formatLtvPercent(adlTargetLtvBps!)} (deleverage to)
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Cog6ToothIcon className="size-3.5" />
+                  {/* Hover tooltip for inactive */}
+                  <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    Set up Auto-Deleverage Protection
+                  </span>
+                </>
+              )}
+            </button>
+          )}
           {/* Net Value */}
           <span className="text-base-content/60">
             Net:{" "}
@@ -396,6 +503,62 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   // Debt Swap modal state
   const [debtSwapModalState, setDebtSwapModalState] = useState<DebtSwapModalState | null>(null);
 
+  // ADL modal state
+  const [adlModalState, setAdlModalState] = useState<ADLModalState | null>(null);
+
+  // Check if ADL is supported on this chain
+  const { isSupported: isADLSupported } = useADLContracts(chainId);
+
+  // Fetch all conditional orders to find ADL for each position
+  const { orders: conditionalOrders } = useConditionalOrders({
+    activeOnly: true,
+    fetchTriggerStatus: true,
+  });
+
+  // Build a map of market ID -> ADL order for quick lookup
+  const adlByMarketId = useMemo(() => {
+    const map = new Map<string, ConditionalOrder>();
+
+    for (const order of conditionalOrders) {
+      if (order.context.status !== ConditionalOrderStatus.Active) continue;
+      if (!order.triggerParams) continue;
+
+      // Only match Morpho orders
+      if (order.triggerParams.protocolId !== PROTOCOL_IDS.MORPHO_BLUE) continue;
+
+      // Decode the protocol context to get market params
+      const morphoContext = decodeMorphoContext(order.triggerParams.protocolContext);
+      if (!morphoContext) continue;
+
+      // Use the marketId as key
+      map.set(morphoContext.marketId.toLowerCase(), order);
+    }
+
+    return map;
+  }, [conditionalOrders]);
+
+  // Helper to get ADL info for a row
+  const getADLInfoForRow = useCallback((row: MorphoPositionRow) => {
+    // Get the market's unique key (this is the market ID)
+    const marketId = row.market.uniqueKey?.toLowerCase();
+    if (!marketId) return { hasActiveADL: false };
+
+    const adlOrder = adlByMarketId.get(marketId);
+    if (!adlOrder || !adlOrder.triggerParams) return { hasActiveADL: false };
+
+    const currentLtvBps = Math.round((row.currentLtv || 0) * 100);
+    const triggerLtvBps = Number(adlOrder.triggerParams.triggerLtvBps);
+    const isAboveTrigger = currentLtvBps >= triggerLtvBps;
+
+    return {
+      hasActiveADL: true,
+      adlTriggerLtvBps: adlOrder.triggerParams.triggerLtvBps,
+      adlTargetLtvBps: adlOrder.triggerParams.targetLtvBps,
+      isAboveTrigger,
+      isTriggerMet: adlOrder.isTriggerMet,
+    };
+  }, [adlByMarketId]);
+
   const toggleRowExpanded = useCallback((key: string) => {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
@@ -425,6 +588,16 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
     setDebtSwapModalState(null);
   }, []);
 
+  // Handle ADL modal open request
+  const handleADLRequest = useCallback((state: ADLModalState) => {
+    setAdlModalState(state);
+  }, []);
+
+  // Handle ADL modal close
+  const handleCloseADLModal = useCallback(() => {
+    setAdlModalState(null);
+  }, []);
+
   const renderPositions = () => {
     if (!userAddress) {
       return (
@@ -450,18 +623,27 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
       );
     }
 
-    return rows.map((row) => (
-      <MorphoPositionRowComponent
-        key={row.key}
-        row={row}
-        chainId={chainId}
-        isExpanded={!!expandedRows[row.key]}
-        onToggleExpanded={getToggleHandler(row.key)}
-        findYield={findYield}
-        onSwapRequest={handleSwapRequest}
-        onDebtSwapRequest={handleDebtSwapRequest}
-      />
-    ));
+    return rows.map((row) => {
+      const adlInfo = getADLInfoForRow(row);
+      return (
+        <MorphoPositionRowComponent
+          key={row.key}
+          row={row}
+          chainId={chainId}
+          isExpanded={!!expandedRows[row.key]}
+          onToggleExpanded={getToggleHandler(row.key)}
+          findYield={findYield}
+          onSwapRequest={handleSwapRequest}
+          onDebtSwapRequest={handleDebtSwapRequest}
+          onADLRequest={handleADLRequest}
+          isADLSupported={isADLSupported}
+          hasActiveADL={adlInfo.hasActiveADL}
+          adlTriggerLtvBps={adlInfo.adlTriggerLtvBps}
+          adlTargetLtvBps={adlInfo.adlTargetLtvBps}
+          isAboveTrigger={adlInfo.isAboveTrigger}
+        />
+      );
+    });
   };
 
   // Build available assets for swap modal from current position
@@ -564,6 +746,36 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
           collateralTokenSymbol={debtSwapModalState.collateralTokenSymbol}
           collateralBalance={debtSwapModalState.collateralBalance}
           collateralDecimals={debtSwapModalState.collateralDecimals}
+        />
+      )}
+
+      {/* ADL Automation Modal */}
+      {adlModalState && (
+        <ADLAutomationModal
+          isOpen={adlModalState.isOpen}
+          onClose={handleCloseADLModal}
+          protocolName="morpho-blue"
+          chainId={chainId}
+          currentLtvBps={adlModalState.currentLtvBps}
+          liquidationLtvBps={adlModalState.liquidationLtvBps}
+          collateralTokens={[{
+            symbol: adlModalState.collateralTokenSymbol,
+            address: adlModalState.collateralTokenAddress,
+            decimals: adlModalState.collateralDecimals,
+            rawBalance: adlModalState.collateralBalance,
+            balance: Number(formatUnits(adlModalState.collateralBalance, adlModalState.collateralDecimals)),
+            icon: tokenNameToLogo(adlModalState.collateralTokenSymbol.toLowerCase()),
+            price: adlModalState.collateralPrice,
+            usdValue: adlModalState.collateralBalanceUsd,
+          }]}
+          debtToken={{
+            address: adlModalState.debtTokenAddress,
+            symbol: adlModalState.debtTokenSymbol,
+            decimals: adlModalState.debtTokenDecimals,
+          }}
+          morphoContext={adlModalState.morphoContext ?? undefined}
+          totalCollateralUsd={BigInt(Math.round(adlModalState.collateralBalanceUsd * 1e8))}
+          totalDebtUsd={BigInt(Math.round(adlModalState.debtBalanceUsd * 1e8))}
         />
       )}
     </>

@@ -39,8 +39,8 @@ import { useMorphoCollateralSwapMarkets, marketToContext } from "~~/hooks/useMor
 import { useEulerCollateralSwapVaults } from "~~/hooks/useEulerCollateralSwapVaults";
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
-import { CompletionType, getCowExplorerAddressUrl, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
+import { is1inchSupported, isKyberSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getKyberAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
+import { CompletionType, getCowExplorerAddressUrl, getPreferredFlashLoanLender, calculateFlashLoanFee, storeOrderQuoteRate } from "~~/utils/cow";
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
@@ -320,7 +320,7 @@ function calculateAmountOut(
         return formatUnits(bestQuote.amount, decimals);
     }
 
-    if (swapRouter === "1inch" && oneInchQuote) {
+    if ((swapRouter === "1inch" || swapRouter === "kyber") && oneInchQuote) {
         return formatUnits(BigInt(oneInchQuote.dstAmount), decimals);
     }
 
@@ -344,7 +344,7 @@ function calculateQuotesPriceImpact(
         return Math.abs(pendleQuote.data.priceImpact * 100);
     }
 
-    if (swapRouter === "1inch" && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
+    if ((swapRouter === "1inch" || swapRouter === "kyber") && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
         const srcUSD = parseFloat(oneInchQuote.srcUSD);
         const dstUSD = parseFloat(oneInchQuote.dstUSD);
         if (srcUSD > 0) {
@@ -469,22 +469,29 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     // Check swap router availability and get adapter info directly from deployed contracts
     const oneInchAvailable = is1inchSupported(chainId);
+    const kyberAvailable = isKyberSupported(chainId);
     const pendleAvailable = isPendleSupported(chainId);
     const oneInchAdapter = getOneInchAdapterInfo(chainId);
+    const kyberAdapter = getKyberAdapterInfo(chainId);
     const pendleAdapter = getPendleAdapterInfo(chainId);
     const defaultRouter = getDefaultSwapRouter(chainId);
 
-    // Swap router selection (1inch or Pendle) - default based on chain availability
-    const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "1inch");
-    
+    // Swap router selection - default based on chain availability (Kyber preferred)
+    const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "kyber");
+
+    // Select the correct adapter based on swap router
+    const activeAdapter = swapRouter === "kyber" ? kyberAdapter : swapRouter === "pendle" ? pendleAdapter : oneInchAdapter;
+
     // Update swap router if chain changes and current router is not available
     useEffect(() => {
-        if (swapRouter === "1inch" && !oneInchAvailable) {
-            setSwapRouter(pendleAvailable ? "pendle" : "1inch");
+        if (swapRouter === "kyber" && !kyberAvailable) {
+            setSwapRouter(oneInchAvailable ? "1inch" : pendleAvailable ? "pendle" : "kyber");
+        } else if (swapRouter === "1inch" && !oneInchAvailable) {
+            setSwapRouter(kyberAvailable ? "kyber" : pendleAvailable ? "pendle" : "1inch");
         } else if (swapRouter === "pendle" && !pendleAvailable) {
-            setSwapRouter(oneInchAvailable ? "1inch" : "pendle");
+            setSwapRouter(kyberAvailable ? "kyber" : oneInchAvailable ? "1inch" : "pendle");
         }
-    }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
+    }, [chainId, oneInchAvailable, kyberAvailable, pendleAvailable, swapRouter]);
 
     const wasOpenRef = useRef(false);
 
@@ -539,6 +546,8 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     // CoW limit order specific state
     const [limitSlippage, setLimitSlippage] = useState<number>(0.1);
     const [hasAutoSetLimitSlippage, setHasAutoSetLimitSlippage] = useState(false);
+    // Market order auto-slippage
+    const [hasAutoSetMarketSlippage, setHasAutoSetMarketSlippage] = useState(false);
     // Custom buy amount for limit orders (user-editable)
     const [customBuyAmount, setCustomBuyAmount] = useState<string>("");
     const [useCustomBuyAmount, setUseCustomBuyAmount] = useState(false);
@@ -686,15 +695,16 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         [amountIn, selectedFrom, isMax, selectedProvider?.providerEnum]
     );
 
-    // 1inch Quote - uses reduced amount when Aave + isMax
+    // Swap Quote (Kyber preferred, falls back to 1inch) - uses reduced amount when Aave + isMax
     const { data: oneInchQuote, isLoading: is1inchLoading, error: oneInchError } = use1inchQuote({
         chainId,
         src: selectedFrom?.address as Address,
         dst: selectedTo?.address as Address,
         amount: quoteAmount,
-        from: oneInchAdapter?.address || "",
+        from: activeAdapter?.address || "",
         slippage: slippage,
-        enabled: oneInchAvailable && swapRouter === "1inch" && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!oneInchAdapter,
+        enabled: (kyberAvailable || oneInchAvailable) && (swapRouter === "kyber" || swapRouter === "1inch") && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!activeAdapter,
+        preferredRouter: swapRouter === "kyber" ? "kyber" : "1inch",
     });
 
     // Pendle Quote
@@ -722,11 +732,11 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
     // Include isInputSettling to show loading state while user is typing (prevents stale quotes)
     const isQuoteLoading = (executionType === "limit"
         ? isCowQuoteLoading
-        : (swapRouter === "1inch" ? is1inchLoading : isPendleLoading))
+        : (swapRouter === "pendle" ? isPendleLoading : is1inchLoading))
         || (isMorpho && isMorphoMarketsLoading)
         || (isEuler && isEulerVaultsLoading)
         || isInputSettling;
-    const quoteError = swapRouter === "1inch" ? oneInchError : pendleError;
+    const quoteError = swapRouter === "pendle" ? pendleError : oneInchError;
     
     // Get best quote from available sources (for limit orders, use CoW quote)
     const bestQuote = useMemo(
@@ -757,20 +767,32 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         [swapRouter, pendleQuote, oneInchQuote]
     );
 
+    // Auto-estimate market order slippage based on price impact
+    useEffect(() => {
+        if (executionType !== "market" || hasAutoSetMarketSlippage) return;
+        if (quotesPriceImpact === null) return;
+
+        const suggested = calculateSuggestedSlippage(quotesPriceImpact);
+        setSlippage(suggested);
+        setHasAutoSetMarketSlippage(true);
+    }, [executionType, quotesPriceImpact, hasAutoSetMarketSlippage]);
+
     // Auto-estimate limit order slippage based on price impact (only on first quote)
     useEffect(() => {
         if (executionType !== "limit" || hasAutoSetLimitSlippage) return;
         if (quotesPriceImpact === null) return;
-        
+
         const suggested = calculateSuggestedSlippage(quotesPriceImpact);
         setLimitSlippage(suggested);
         setHasAutoSetLimitSlippage(true);
     }, [executionType, quotesPriceImpact, hasAutoSetLimitSlippage]);
 
-    // Reset limit slippage auto-set flag when switching execution type or tokens
+    // Reset slippage auto-set flags when switching tokens
     useEffect(() => {
         setHasAutoSetLimitSlippage(false);
         setLimitSlippage(0.1);
+        setHasAutoSetMarketSlippage(false);
+        setSlippage(0.1);
     }, [selectedFrom?.address, selectedTo?.address]);
 
     // Calculate USD values from token prices for price impact fallback
@@ -803,9 +825,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     // Calculate min output for limit orders with slippage
     const minBuyAmount = useMemo(() => {
-        if (!selectedTo || !bestQuote) return { raw: 0n, formatted: "0" };
+        if (!selectedTo) return { raw: 0n, formatted: "0" };
 
-        // For limit orders, use custom buy amount if user has set one
+        // For limit orders, use custom buy amount if user has set one (works even without quote)
         if (executionType === "limit" && useCustomBuyAmount && customBuyAmount) {
             const customParsed = parseFloat(customBuyAmount);
             if (!isNaN(customParsed) && customParsed > 0) {
@@ -813,6 +835,9 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                 return { raw: rawCustom, formatted: customBuyAmount };
             }
         }
+
+        // Need bestQuote for non-custom amounts
+        if (!bestQuote) return { raw: 0n, formatted: "0" };
 
         const slippageToUse = executionType === "limit" ? limitSlippage : slippage;
         const bufferBps = BigInt(Math.round(slippageToUse * 100));
@@ -1132,10 +1157,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         let swapData: string;
         let minOut: string;
 
-        if (swapRouter === "1inch") {
-            if (!oneInchQuote || !oneInchAdapter) return [];
+        if (swapRouter === "1inch" || swapRouter === "kyber") {
+            if (!oneInchQuote || !activeAdapter) return [];
             swapData = oneInchQuote.tx.data;
-            minOut = "1"; // 1inch handles slippage internally
+            minOut = "1"; // Aggregator handles slippage internally
         } else {
             if (!pendleQuote || !pendleAdapter) return [];
             swapData = pendleQuote.transaction.data;
@@ -1146,7 +1171,7 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
         }
 
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
-        const swapProtocol = swapRouter === "1inch" ? "oneinch" : "pendle";
+        const swapProtocol = swapRouter === "1inch" ? "oneinch" : swapRouter === "kyber" ? "kyber" : "pendle";
 
         // ========================================================================
         // MORPHO (Pair-Isolated): Custom instruction flow
@@ -1447,6 +1472,12 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                         sellAmount: amountInBigInt.toString(),
                         buyAmount: minBuyAmount.raw.toString(),
                     });
+
+                    // Store quote rate for price impact calculation
+                    if (orderHash && amountInBigInt > 0n && minBuyAmount.raw > 0n) {
+                        const quoteRate = Number(amountInBigInt) / Number(minBuyAmount.raw);
+                        storeOrderQuoteRate(chainId, orderHash, quoteRate);
+                    }
                 }
             } else {
                 throw new Error("Wallet not connected");
@@ -1527,8 +1558,8 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
 
     const { enabled: preferBatching, setEnabled: setPreferBatching } = batchingPreference;
 
-    const hasQuote = swapRouter === "1inch" ? !!oneInchQuote : !!pendleQuote;
-    const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
+    const hasQuote = swapRouter === "pendle" ? !!pendleQuote : !!oneInchQuote;
+    const hasAdapter = swapRouter === "pendle" ? !!pendleAdapter : !!activeAdapter;
 
     // Calculate proportional debt for partial Morpho collateral swaps
     // If swapping X% of collateral, migrate X% of debt
@@ -1594,10 +1625,10 @@ export const CollateralSwapModal: FC<CollateralSwapModalProps> = ({
                     <div className="pb-4">
                         <h4 className="text-sm font-medium">Swap</h4>
                         <p className="text-base-content/70 text-xs">
-                            We swap your current collateral for the new asset using {swapRouter === "pendle" ? "Pendle" : "1inch"}.
+                            We swap your current collateral for the new asset using {swapRouter === "pendle" ? "Pendle" : swapRouter === "kyber" ? "Kyber" : "1inch"}.
                         </p>
                         <div className="bg-base-200 mt-1 inline-block rounded p-1 text-xs">
-                            Router: {swapRouter === "pendle" ? "Pendle" : "1inch"}
+                            Router: {swapRouter === "pendle" ? "Pendle" : swapRouter === "kyber" ? "Kyber" : "1inch"}
                         </div>
                     </div>
                 </div>

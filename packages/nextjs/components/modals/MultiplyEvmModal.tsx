@@ -2,7 +2,7 @@ import { FC, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { track } from "@vercel/analytics";
 import Image from "next/image";
 import { Address, formatUnits, parseUnits, type Hex } from "viem";
-import { CheckIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, ClockIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
@@ -23,10 +23,10 @@ import {
   createRouterInstruction,
   encodePushToken,
 } from "~~/utils/v2/instructionHelpers";
-import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate } from "~~/utils/cow";
-import { calculateSuggestedSlippage } from "~~/utils/slippage";
+import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, storeOrderQuoteRate } from "~~/utils/cow";
+import { calculateSuggestedSlippage, SLIPPAGE_OPTIONS } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
+import { is1inchSupported, isKyberSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getKyberAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
@@ -109,6 +109,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // CoW limit order specific state
   const [limitSlippage, setLimitSlippage] = useState<number>(0.1);
   const [hasAutoSetLimitSlippage, setHasAutoSetLimitSlippage] = useState(false);
+  // Market order auto-slippage
+  const [hasAutoSetMarketSlippage, setHasAutoSetMarketSlippage] = useState(false);
   // customMinPrice: user-specified exchange rate (collateral per 1 unit of debt) for limit orders
   const [customMinPrice, setCustomMinPrice] = useState<string>("");
   const cowAvailable = isCowProtocolSupported(chainId);
@@ -137,11 +139,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // Check swap router availability for this chain
   const oneInchAvailable = is1inchSupported(chainId);
+  const kyberAvailable = isKyberSupported(chainId);
   const pendleAvailable = isPendleSupported(chainId);
   const defaultRouter = getDefaultSwapRouter(chainId);
 
-  // Swap router selection
-  const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "1inch");
+  // Swap router selection - default based on chain availability (Kyber preferred)
+  const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "kyber");
 
   // Zap mode: deposit debt token instead of collateral
   const [zapMode, setZapMode] = useState(false);
@@ -149,12 +152,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // ==================== Effects for Router/Token Changes ====================
 
   useEffect(() => {
-    if (swapRouter === "1inch" && !oneInchAvailable) {
-      setSwapRouter(pendleAvailable ? "pendle" : "1inch");
+    if (swapRouter === "kyber" && !kyberAvailable) {
+      setSwapRouter(oneInchAvailable ? "1inch" : pendleAvailable ? "pendle" : "kyber");
+    } else if (swapRouter === "1inch" && !oneInchAvailable) {
+      setSwapRouter(kyberAvailable ? "kyber" : pendleAvailable ? "pendle" : "1inch");
     } else if (swapRouter === "pendle" && !pendleAvailable) {
-      setSwapRouter(oneInchAvailable ? "1inch" : "pendle");
+      setSwapRouter(kyberAvailable ? "kyber" : oneInchAvailable ? "1inch" : "pendle");
     }
-  }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
+  }, [chainId, oneInchAvailable, kyberAvailable, pendleAvailable, swapRouter]);
 
   useEffect(() => {
     const collateralIsPT = collateral && isPendleToken(collateral.symbol);
@@ -266,7 +271,11 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // ==================== Adapter Info ====================
 
   const oneInchAdapter = getOneInchAdapterInfo(chainId);
+  const kyberAdapter = getKyberAdapterInfo(chainId);
   const pendleAdapter = getPendleAdapterInfo(chainId);
+
+  // Select the correct adapter based on swap router
+  const activeAdapter = swapRouter === "kyber" ? kyberAdapter : swapRouter === "pendle" ? pendleAdapter : oneInchAdapter;
 
   // ==================== Amount Calculations ====================
 
@@ -323,11 +332,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const swapQuoteAmount = zapMode ? totalSwapAmount : flashLoanAmountRaw;
 
+  const kyberOrOneInchEnabled = (kyberAvailable && swapRouter === "kyber" || oneInchAvailable && swapRouter === "1inch") && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!activeAdapter;
+
   const { data: oneInchQuote, isLoading: is1inchLoading } = use1inchQuote({
     chainId, src: (debt?.address as Address) || "0x0000000000000000000000000000000000000000",
     dst: (collateral?.address as Address) || "0x0000000000000000000000000000000000000000",
-    amount: swapQuoteAmount.toString(), from: (oneInchAdapter?.address as Address) || "0x0000000000000000000000000000000000000000",
-    slippage, enabled: oneInchAvailable && swapRouter === "1inch" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!oneInchAdapter,
+    amount: swapQuoteAmount.toString(), from: (activeAdapter?.address as Address) || "0x0000000000000000000000000000000000000000",
+    slippage, enabled: kyberOrOneInchEnabled,
+    preferredRouter: swapRouter === "kyber" ? "kyber" : "1inch",
   });
 
   const pendleConvertResult = usePendleConvert({
@@ -346,14 +358,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const quotesRef = useRef<{
     oneInchQuote: typeof oneInchQuote;
     pendleQuote: typeof pendleQuote;
-    oneInchAdapter: typeof oneInchAdapter;
+    activeAdapter: typeof activeAdapter;
     pendleAdapter: typeof pendleAdapter;
-  }>({ oneInchQuote: undefined, pendleQuote: undefined, oneInchAdapter, pendleAdapter });
+  }>({ oneInchQuote: undefined, pendleQuote: undefined, activeAdapter, pendleAdapter });
 
   // Keep ref in sync with latest values
   useEffect(() => {
-    quotesRef.current = { oneInchQuote, pendleQuote, oneInchAdapter, pendleAdapter };
-  }, [oneInchQuote, pendleQuote, oneInchAdapter, pendleAdapter]);
+    quotesRef.current = { oneInchQuote, pendleQuote, activeAdapter, pendleAdapter };
+  }, [oneInchQuote, pendleQuote, activeAdapter, pendleAdapter]);
 
   const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
     sellToken: debt?.address || "",
@@ -365,7 +377,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const isSwapQuoteLoading = executionType === "limit"
     ? isCowQuoteLoading
-    : (swapRouter === "1inch" ? is1inchLoading : isPendleLoading);
+    : (swapRouter === "pendle" ? isPendleLoading : is1inchLoading);
 
   // ==================== Quote Processing Using Helpers ====================
 
@@ -402,8 +414,19 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     [swapRouter, quoteData.pendleQuote, quoteData.oneInchQuote]
   );
 
-  // ==================== Auto-estimate Limit Slippage ====================
+  // ==================== Auto-estimate Slippage ====================
 
+  // Auto-estimate slippage for market orders based on quote price impact
+  useEffect(() => {
+    if (executionType !== "market" || hasAutoSetMarketSlippage) return;
+    if (quotesPriceImpact === null) return;
+
+    const suggested = calculateSuggestedSlippage(quotesPriceImpact);
+    setSlippage(suggested);
+    setHasAutoSetMarketSlippage(true);
+  }, [executionType, quotesPriceImpact, hasAutoSetMarketSlippage]);
+
+  // Auto-estimate slippage for limit orders
   useEffect(() => {
     if (executionType !== "limit" || hasAutoSetLimitSlippage) return;
     if (quotesPriceImpact === null) return;
@@ -413,9 +436,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     setHasAutoSetLimitSlippage(true);
   }, [executionType, quotesPriceImpact, hasAutoSetLimitSlippage]);
 
+  // Reset auto-slippage flags when tokens change
   useEffect(() => {
     setHasAutoSetLimitSlippage(false);
     setLimitSlippage(0.1);
+    setHasAutoSetMarketSlippage(false);
+    setSlippage(1); // Reset to default
   }, [collateral?.address, debt?.address]);
 
   // ==================== Min Collateral Calculation ====================
@@ -496,18 +522,28 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     }
 
     // Use ref to get latest quote values (avoids stale closure issues)
-    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, oneInchAdapter: currentOneInchAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
+    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, activeAdapter: currentActiveAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
 
     let swapData: string;
     let minOut: string;
 
-    if (swapRouter === "1inch") {
-      if (!currentOneInchQuote || !currentOneInchAdapter) {
-        console.warn("[buildFlow] 1inch not ready:", { oneInchQuote: !!currentOneInchQuote, oneInchAdapter: !!currentOneInchAdapter });
+    if (swapRouter === "1inch" || swapRouter === "kyber") {
+      if (!currentOneInchQuote || !currentActiveAdapter) {
+        console.warn("[buildFlow] Swap not ready:", { oneInchQuote: !!currentOneInchQuote, activeAdapter: !!currentActiveAdapter, swapRouter });
         return [];
       }
       swapData = currentOneInchQuote.tx.data;
       minOut = minCollateralOut.formatted;
+      console.log("[buildFlow] Kyber/1inch swap params:", {
+        swapRouter,
+        adapterAddress: currentActiveAdapter.address,
+        swapDataLength: swapData?.length || 0,
+        swapDataPrefix: swapData?.slice(0, 20) || "empty",
+        minOut,
+        dstAmount: currentOneInchQuote.dstAmount,
+        txTo: currentOneInchQuote.tx?.to,
+        txFrom: currentOneInchQuote.tx?.from,
+      });
     } else {
       if (!currentPendleQuote || !currentPendleAdapter) {
         console.warn("[buildFlow] Pendle not ready:", { pendleQuote: !!currentPendleQuote, pendleAdapter: !!currentPendleAdapter });
@@ -525,7 +561,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       collateralDecimals: collateral.decimals, debtDecimals: debt.decimals,
       flashLoanProvider: selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2, market,
       morphoContext: morphoContext ? encodeMorphoContext(morphoContext) : undefined,
-      swapRouter: (swapRouter === "1inch" ? "oneinch" : "pendle") as "oneinch" | "pendle",
+      swapRouter: (swapRouter === "1inch" ? "oneinch" : swapRouter === "kyber" ? "kyber" : "pendle") as "oneinch" | "kyber" | "pendle",
       zapMode,
       depositAmount: zapMode ? marginAmount : undefined,
     };
@@ -971,6 +1007,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         sellAmount: flashLoanAmountRaw.toString(),
         buyAmount: minCollateralOut.raw.toString(),
       });
+
+      // Store quote rate for price impact calculation
+      if (orderHash && flashLoanAmountRaw > 0n && minCollateralOut.raw > 0n) {
+        const quoteRate = Number(flashLoanAmountRaw) / Number(minCollateralOut.raw);
+        storeOrderQuoteRate(chainId, orderHash, quoteRate);
+      }
     }
 
     track("multiply_limit_order_complete", { status: "submitted", mode: "sequential" });
@@ -981,11 +1023,11 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const handleMarketOrderSubmit = async () => {
     // Use ref to get latest quote values for logging (same ref used in buildFlow)
-    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, oneInchAdapter: currentOneInchAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
+    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, activeAdapter: currentActiveAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
     console.log("[handleMarketOrderSubmit] State at submit (from ref):", {
       swapRouter,
       hasOneInchQuote: !!currentOneInchQuote,
-      hasOneInchAdapter: !!currentOneInchAdapter,
+      hasActiveAdapter: !!currentActiveAdapter,
       hasPendleQuote: !!currentPendleQuote,
       hasPendleAdapter: !!currentPendleAdapter,
       flashLoanAmountRaw: flashLoanAmountRaw.toString(),
@@ -1006,8 +1048,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // ==================== Derived State for UI ====================
 
-  const hasQuote = swapRouter === "1inch" ? !!oneInchQuote : !!pendleQuote;
-  const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
+  const hasQuote = swapRouter === "pendle" ? !!pendleQuote : !!oneInchQuote;
+  const hasAdapter = swapRouter === "kyber" ? !!kyberAdapter : swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
 
   const canSubmitMarket = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && hasQuote && hasAdapter && !isSwapQuoteLoading;
   const canSubmitLimit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && cowContractAvailable && !isCowCreating;
@@ -1242,7 +1284,7 @@ const DepositSection: FC<DepositSectionProps> = ({
     <div className="border-base-300/30 mt-2 flex items-center justify-between border-t pt-2">
       <span className="text-base-content/50 text-xs">approx ${marginUsd.toFixed(2)}</span>
       <div className="flex items-center gap-1.5 text-xs">
-        <span className="text-base-content/40">arrow-right</span>
+        <ArrowRightIcon className="text-base-content/40 size-3" />
         <span className="text-success font-medium">{metrics.totalCollateralTokens.toFixed(4)} {collateral?.symbol}</span>
         <span className="text-base-content/50">(${metrics.totalCollateralUsd.toFixed(2)})</span>
       </div>
@@ -1462,7 +1504,7 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
             <div className="flex items-center justify-between">
               <span className="text-base-content/60">Slippage</span>
               <select value={slippage} onChange={handleSlippageChange} className="select select-xs bg-base-300/50 h-6 min-h-0 border-0 pr-6 text-xs">
-                {[0.1, 0.3, 0.5, 1, 2, 3].map(s => <option key={s} value={s}>{s}%</option>)}
+                {SLIPPAGE_OPTIONS.map(s => <option key={s} value={s}>{s}%</option>)}
               </select>
             </div>
             <div className="flex items-center justify-between">
@@ -1675,7 +1717,7 @@ const DetailsSection: FC<DetailsSectionProps> = ({
           {executionType === "market" && isSwapQuoteLoading ? (
             <span className="loading loading-dots loading-xs" />
           ) : flashLoanAmountRaw > 0n ? (
-            `${shortAmount.toFixed(2)} arrow-right ${Number(minCollateralOut.formatted).toFixed(2)}`
+            <span className="flex items-center gap-1">{shortAmount.toFixed(2)} <ArrowRightIcon className="size-3 inline" /> {Number(minCollateralOut.formatted).toFixed(2)}</span>
           ) : "-"}
         </span>
       </div>

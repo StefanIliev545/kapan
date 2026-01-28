@@ -4,7 +4,7 @@ import { FC, useState, useMemo, useEffect, ReactNode, useCallback } from "react"
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
-import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
+import { ChevronDownIcon, ChevronUpIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
 import {
   useEulerLendingPositions,
   useEulerVaults,
@@ -20,7 +20,9 @@ import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
 import { CloseWithCollateralEvmModal } from "~~/components/modals/CloseWithCollateralEvmModal";
 import { AddEulerCollateralModal } from "~~/components/modals/AddEulerCollateralModal";
 import { EulerBorrowModal } from "~~/components/modals/EulerBorrowModal";
+import { ADLAutomationModal } from "~~/components/modals/ADLAutomationModal";
 import type { SwapAsset } from "~~/components/modals/SwapModalShell";
+import { useADLContracts } from "~~/hooks/useADLOrder";
 import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
 import { useTokenPrices } from "~~/hooks/useTokenPrice";
 import { getEffectiveChainId } from "~~/utils/forkChain";
@@ -207,15 +209,18 @@ interface EulerPositionGroupRowProps {
   pricesRaw: Record<string, bigint>;
   /** All sub-account indices that are currently in use (have positions) */
   usedSubAccountIndices: number[];
+  /** Whether ADL is supported on this chain */
+  isADLSupported: boolean;
 }
 
-const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId, pricesRaw, usedSubAccountIndices }) => {
+const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId, pricesRaw, usedSubAccountIndices, isADLSupported }) => {
   const { debt, collaterals, isMainAccount, subAccount } = group;
   const swapModal = useModal();
   const debtSwapModal = useModal();
   const closeModal = useModal();
   const addCollateralModal = useModal();
   const borrowModal = useModal();
+  const adlModal = useModal();
   const [swapState, setSwapState] = useState<CollateralSwapState>(INITIAL_SWAP_STATE);
   const [debtSwapState, setDebtSwapState] = useState<DebtSwapState>(INITIAL_DEBT_SWAP_STATE);
   const [closeState, setCloseState] = useState<CloseModalState>(INITIAL_CLOSE_STATE);
@@ -427,6 +432,19 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
             <span className={`text-[10px] font-medium uppercase ${healthStatus.colorClass}`}>
               {healthStatus.label}
             </span>
+            {/* ADL Settings Cog - only show if ADL is supported and user has debt and collateral */}
+            {isADLSupported && debt && collaterals.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  adlModal.open();
+                }}
+                className="text-base-content/50 hover:text-base-content hover:bg-base-200 rounded-lg p-1 transition-colors"
+                title="Auto-Deleverage Protection"
+              >
+                <Cog6ToothIcon className="size-3.5" />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -641,6 +659,35 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
           }))}
         />
       )}
+
+      {/* ADL Automation Modal */}
+      {debt && collaterals.length > 0 && healthStatus && (
+        <ADLAutomationModal
+          isOpen={adlModal.isOpen}
+          onClose={adlModal.close}
+          protocolName="Euler"
+          chainId={chainId}
+          currentLtvBps={Math.round(healthStatus.currentLtv * 100)}
+          liquidationLtvBps={Math.round(healthStatus.effectiveLltv * 100)}
+          collateralTokens={collaterals.map((col): SwapAsset => ({
+            symbol: col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol,
+            address: col.vault.asset.address,
+            decimals: col.vault.asset.decimals,
+            rawBalance: col.balance,
+            balance: Number(col.balance) / (10 ** col.vault.asset.decimals),
+            icon: getIcon(col.vault.asset.symbol),
+            price: pricesRaw[col.vault.asset.symbol?.toLowerCase()] ?? 0n,
+          }))}
+          debtToken={{
+            address: debt.vault.asset.address,
+            symbol: debt.vault.asset.symbol === "???" ? "unknown" : debt.vault.asset.symbol,
+            decimals: debt.vault.asset.decimals,
+          }}
+          eulerBorrowVault={debt.vault.address}
+          eulerCollateralVaults={collaterals.map(c => c.vault.address)}
+          eulerSubAccountIndex={subAccountIndex}
+        />
+      )}
     </div>
   );
 };
@@ -698,6 +745,9 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     isLoadingPositions,
     refetchPositions,
   } = useEulerLendingPositions(effectiveChainId, connectedAddress);
+
+  // Check if ADL is supported on this chain
+  const { isSupported: isADLSupported } = useADLContracts(effectiveChainId);
 
   // Refetch positions after transactions complete (with delay for subgraph indexing)
   useTxCompletedListenerDelayed(
@@ -1006,7 +1056,7 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
             ) : (
               <div className="space-y-3">
                 {enrichedPositionGroups.map((group, idx) => (
-                  <EulerPositionGroupRow key={group.subAccount || idx} group={group} chainId={chainId} pricesRaw={pricesRaw} usedSubAccountIndices={usedSubAccountIndices} />
+                  <EulerPositionGroupRow key={group.subAccount || idx} group={group} chainId={chainId} pricesRaw={pricesRaw} usedSubAccountIndices={usedSubAccountIndices} isADLSupported={isADLSupported} />
                 ))}
               </div>
             )}

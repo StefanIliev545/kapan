@@ -29,6 +29,14 @@ import { timeAgo } from "~~/utils/deadline";
 import { truncateAddress } from "~~/utils/address";
 import { useIntervalWhen } from "~~/hooks/common";
 import { qk } from "~~/lib/queryKeys";
+import {
+  useConditionalOrders,
+  ConditionalOrderStatus,
+  formatLtvPercent,
+  type ConditionalOrder,
+} from "~~/hooks/useConditionalOrders";
+import { useConditionalOrderEvents } from "~~/hooks/useConditionalOrderEvents";
+import { ShieldCheckIcon } from "@heroicons/react/24/outline";
 
 function formatAmount(amount: bigint, decimals: number): string {
   const formatted = formatUnits(amount, decimals);
@@ -69,6 +77,19 @@ export function PendingOrdersDrawer() {
 
   // Fetch orders from database to get order types
   const { data: dbOrders } = useOrderHistory({ chainId, enabled: !!userAddress });
+
+  // Fetch conditional orders (ADL)
+  const {
+    orders: conditionalOrders,
+    activeCount: activeConditionalCount,
+    isAvailable: isConditionalAvailable,
+    refetch: refetchConditionalOrders,
+    cancelOrder: cancelConditionalOrder,
+    isCancelling: isCancellingConditional,
+  } = useConditionalOrders({ fetchTriggerStatus: true });
+
+  // Watch for conditional order events (created, completed, cancelled) to trigger real-time refreshes
+  useConditionalOrderEvents();
 
   const [isOpen, setIsOpen] = useState(false);
   const [orders, setOrders] = useState<OrderWithHash[]>([]);
@@ -190,13 +211,13 @@ export function PendingOrdersDrawer() {
       setHasPendingNew(true);
       // Small delay to allow the order to be indexed, then fetch
       setTimeout(() => {
-        fetchOrders().then(() => setHasPendingNew(false));
+        Promise.all([fetchOrders(), refetchConditionalOrders()]).then(() => setHasPendingNew(false));
       }, 2000);
     };
 
     window.addEventListener(ORDER_CREATED_EVENT, handleOrderCreated);
     return () => window.removeEventListener(ORDER_CREATED_EVENT, handleOrderCreated);
-  }, [fetchOrders]);
+  }, [fetchOrders, refetchConditionalOrders]);
 
   const handleCancel = useCallback(async (orderHash: string) => {
     setCancellingHash(orderHash);
@@ -278,12 +299,18 @@ export function PendingOrdersDrawer() {
 
   const tokenAddresses = useMemo(() => {
     const addresses = new Set<Address>();
+    // Regular CoW orders
     orders.forEach(o => {
       addresses.add(o.context.params.sellToken as Address);
       addresses.add(o.context.params.buyToken as Address);
     });
+    // Conditional/ADL orders
+    conditionalOrders.forEach(o => {
+      addresses.add(o.context.params.sellToken as Address);
+      addresses.add(o.context.params.buyToken as Address);
+    });
     return Array.from(addresses);
-  }, [orders]);
+  }, [orders, conditionalOrders]);
 
   const tokenInfoMap = useTokenInfo(tokenAddresses, chainId);
 
@@ -363,12 +390,18 @@ export function PendingOrdersDrawer() {
     return notesMap;
   }, [orders, chainId, getTokenSymbol, dbOrders]);
 
-  // Don't render anything if CoW not available or not connected
-  if (!isAvailable || !userAddress) return null;
+  // Don't render anything if neither CoW nor conditional orders available, or not connected
+  if ((!isAvailable && !isConditionalAvailable) || !userAddress) return null;
+
+  // Filter active conditional orders
+  const activeConditionalOrders = conditionalOrders.filter(o => o.context.status === ConditionalOrderStatus.Active);
 
   // Show button if we have orders OR if a new order was just created (pending fetch)
   // This allows the button to appear immediately when ORDER_CREATED_EVENT fires
-  const showButton = orders.length > 0 || hasPendingNew;
+  const showButton = orders.length > 0 || conditionalOrders.length > 0 || hasPendingNew;
+
+  // Total active count (regular + conditional)
+  const totalActiveCount = activeCount + activeConditionalCount;
 
   return (
     <>
@@ -382,8 +415,8 @@ export function PendingOrdersDrawer() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
           <span className="font-medium">Orders</span>
-          {activeCount > 0 && (
-            <span className="bg-primary-content text-primary rounded px-1.5 py-0.5 text-xs font-bold">{activeCount}</span>
+          {totalActiveCount > 0 && (
+            <span className="bg-primary-content text-primary rounded px-1.5 py-0.5 text-xs font-bold">{totalActiveCount}</span>
           )}
         </button>
       )}
@@ -395,8 +428,8 @@ export function PendingOrdersDrawer() {
           <div className="border-base-200 flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="font-semibold">Orders</span>
-              <button 
-                onClick={fetchOrders} 
+              <button
+                onClick={() => { fetchOrders(); refetchConditionalOrders(); }}
                 disabled={isLoading}
                 className="hover:bg-base-200 rounded p-1 transition-colors"
               >
@@ -418,7 +451,7 @@ export function PendingOrdersDrawer() {
               <div className="flex items-center justify-center py-16">
                 <span className="loading loading-spinner loading-md"></span>
               </div>
-            ) : recentOrders.length === 0 ? (
+            ) : recentOrders.length === 0 && conditionalOrders.length === 0 ? (
               <div className="text-base-content/50 py-16 text-center">
                 <p className="text-sm">{orders.length > 0 ? 'No recent orders' : 'No orders yet'}</p>
                 {hasOlderOrders && (
@@ -429,8 +462,30 @@ export function PendingOrdersDrawer() {
               </div>
             ) : (
               <div className="divide-base-200 divide-y">
+                {/* Conditional/ADL Orders Section */}
+                {activeConditionalOrders.length > 0 && (
+                  <>
+                    <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
+                        <ShieldCheckIcon className="mr-1 inline size-3" />
+                        Auto-Deleverage Protection
+                      </span>
+                    </div>
+                    {activeConditionalOrders.map((order) => renderConditionalOrderItem(order))}
+                  </>
+                )}
+
                 {/* Active orders first */}
-                {activeOrders.map((order) => renderOrderItem(order))}
+                {activeOrders.length > 0 && (
+                  <>
+                    {activeConditionalOrders.length > 0 && (
+                      <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
+                        <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">Limit Orders</span>
+                      </div>
+                    )}
+                    {activeOrders.map((order) => renderOrderItem(order))}
+                  </>
+                )}
 
                 {/* Past orders section */}
                 {pastOrders.length > 0 && (
@@ -646,5 +701,98 @@ export function PendingOrdersDrawer() {
                       </div>
                     </div>
                   );
+  }
+
+  // Helper function to render a conditional/ADL order item
+  function renderConditionalOrderItem(order: ConditionalOrder) {
+    const { orderHash, context, triggerParams, isTriggerMet } = order;
+    const { status, iterationCount, createdAt } = context;
+    const isActive = status === ConditionalOrderStatus.Active;
+
+    const sellSymbol = getTokenSymbol(context.params.sellToken);
+    const buySymbol = getTokenSymbol(context.params.buyToken);
+
+    const maxIterations = Number(context.params.maxIterations);
+    const completedIterations = Number(iterationCount);
+    const progressPercent = maxIterations > 0 ? (completedIterations / maxIterations) * 100 : 0;
+
+    return (
+      <div key={orderHash} className={`hover:bg-base-50 px-4 py-3 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
+        {/* Row 0: ADL badge + Status */}
+        <div className="mb-1.5 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="bg-success/20 text-success rounded px-1.5 py-0.5 text-[10px] font-medium">
+              ADL
+            </span>
+            {isTriggerMet && (
+              <span className="bg-warning/20 text-warning rounded px-1.5 py-0.5 text-[10px] font-medium">
+                Trigger Met
+              </span>
+            )}
+          </div>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+            isActive ? 'bg-success/20 text-success' : 'bg-base-300 text-base-content/50'
+          }`}>
+            {isActive ? 'Active' : status === ConditionalOrderStatus.Completed ? 'Done' : 'Cancelled'}
+          </span>
+        </div>
+
+        {/* Row 1: Token pair + time */}
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center -space-x-1">
+              <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={24} height={24} className="ring-base-100 rounded-full ring-2" />
+              <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={24} height={24} className="ring-base-100 rounded-full ring-2" />
+            </div>
+            <span className="text-sm font-medium">{sellSymbol} → {buySymbol}</span>
+          </div>
+          <span className="text-base-content/40 text-xs">{timeAgo(createdAt, true)}</span>
+        </div>
+
+        {/* Row 2: LTV Thresholds */}
+        {triggerParams && (
+          <div className="bg-base-200/50 mb-2 rounded-lg p-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">Trigger LTV</span>
+              <span className="text-warning font-medium">{formatLtvPercent(triggerParams.triggerLtvBps)}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">Target LTV</span>
+              <span className="text-success font-medium">{formatLtvPercent(triggerParams.targetLtvBps)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Row 3: Progress (if has iterations) */}
+        {maxIterations > 0 && (
+          <div className="mb-2">
+            <div className="bg-base-200 h-1 w-full">
+              <div
+                className={`h-full transition-all ${isActive ? 'bg-success' : 'bg-base-300'}`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="text-base-content/40 text-xs">{completedIterations}/{maxIterations} iterations</span>
+              <span className="text-base-content/50 text-xs font-medium">{progressPercent.toFixed(0)}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* Row 4: Actions */}
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-base-content/40">{truncateAddress(orderHash)}</span>
+          {isActive && (
+            <button
+              onClick={() => cancelConditionalOrder(orderHash)}
+              disabled={isCancellingConditional}
+              className="text-error hover:underline disabled:opacity-50"
+            >
+              {isCancellingConditional ? 'Cancelling...' : 'Cancel'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 }

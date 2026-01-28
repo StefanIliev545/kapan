@@ -39,8 +39,8 @@ import { useEulerDebtSwapVaults } from "~~/hooks/useEulerDebtSwapVaults";
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { encodeAbiParameters } from "viem";
-import { getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
+import { getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee, storeOrderQuoteRate } from "~~/utils/cow";
+import { is1inchSupported, isKyberSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getKyberAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
@@ -62,7 +62,6 @@ import {
     saveLimitOrderNote,
     executeSequentialLimitOrder,
     handleLimitOrderError,
-    shouldSwitchSwapRouter,
     calculateRequiredNewDebt,
     calculateLimitOrderNewDebt,
     calculateDustBuffer,
@@ -215,21 +214,29 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // Check swap router availability and get adapter info directly from deployed contracts
     const oneInchAvailable = is1inchSupported(chainId);
+    const kyberAvailable = isKyberSupported(chainId);
     const pendleAvailable = isPendleSupported(chainId);
     const oneInchAdapter = getOneInchAdapterInfo(chainId);
+    const kyberAdapter = getKyberAdapterInfo(chainId);
     const pendleAdapter = getPendleAdapterInfo(chainId);
     const defaultRouter = getDefaultSwapRouter(chainId);
 
-    // Swap router selection - default based on chain availability
-    const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "1inch");
+    // Swap router selection - default based on chain availability (Kyber preferred)
+    const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "kyber");
+
+    // Select the correct adapter based on swap router
+    const activeAdapter = swapRouter === "kyber" ? kyberAdapter : swapRouter === "pendle" ? pendleAdapter : oneInchAdapter;
 
     // Update swap router if chain changes and current router is not available
     useEffect(() => {
-        const newRouter = shouldSwitchSwapRouter(swapRouter, oneInchAvailable, pendleAvailable);
-        if (newRouter) {
-            setSwapRouter(newRouter as SwapRouter);
+        if (swapRouter === "kyber" && !kyberAvailable) {
+            setSwapRouter(oneInchAvailable ? "1inch" : pendleAvailable ? "pendle" : "kyber");
+        } else if (swapRouter === "1inch" && !oneInchAvailable) {
+            setSwapRouter(kyberAvailable ? "kyber" : pendleAvailable ? "pendle" : "1inch");
+        } else if (swapRouter === "pendle" && !pendleAvailable) {
+            setSwapRouter(kyberAvailable ? "kyber" : oneInchAvailable ? "1inch" : "pendle");
         }
-    }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
+    }, [chainId, oneInchAvailable, kyberAvailable, pendleAvailable, swapRouter]);
 
     const wasOpenRef = useRef(false);
 
@@ -495,7 +502,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         src: selectedTo?.address as Address,
         dst: debtFromToken,
         amount: unitQuoteAmount,
-        enabled: oneInchAvailable && swapRouter === "1inch" && !!selectedTo && isOpen && executionType === "market",
+        enabled: (kyberAvailable && swapRouter === "kyber" || oneInchAvailable && swapRouter === "1inch") && !!selectedTo && isOpen && executionType === "market",
     });
 
     // Pendle unit quote (only fetch when Pendle router is selected)
@@ -509,7 +516,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         enabled: pendleAvailable && swapRouter === "pendle" && !!selectedTo && !!pendleAdapter && isOpen && unitQuoteAmount !== "0" && executionType === "market",
     });
 
-    const isUnitQuoteLoading = swapRouter === "1inch" ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
+    const isUnitQuoteLoading = swapRouter === "pendle" ? isPendleUnitQuoteLoading : isOneInchUnitQuoteLoading;
 
     // Calculate required newDebt input based on unit quote
     // Use bufferedRepayAmount to ensure we get enough tokens for full repayment (including interest accrual)
@@ -535,18 +542,20 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
 
     // Step 2: Get actual swap quote with the required amount
     const minSwapAmount = selectedTo ? parseUnits("0.001", selectedTo.decimals) : 0n;
+    const kyberSwapEnabled = kyberAvailable && swapRouter === "kyber" && requiredNewDebt > minSwapAmount && !!selectedTo && !!kyberAdapter && isOpen && executionType === "market";
     const oneInchSwapEnabled = oneInchAvailable && swapRouter === "1inch" && requiredNewDebt > minSwapAmount && !!selectedTo && !!oneInchAdapter && isOpen && executionType === "market";
     const pendleSwapEnabled = pendleAvailable && swapRouter === "pendle" && requiredNewDebt > minSwapAmount && !!selectedTo && !!pendleAdapter && isOpen && executionType === "market";
 
-    // 1inch quote
+    // 1inch/Kyber quote (use1inchQuote hook handles both with fallback)
     const { data: oneInchSwapQuote, isLoading: is1inchSwapQuoteLoading, error: oneInchQuoteError } = use1inchQuote({
         chainId,
         src: selectedTo?.address as Address,
         dst: debtFromToken,
         amount: requiredNewDebt.toString(),
-        from: oneInchAdapter?.address || ("" as Address),
+        from: activeAdapter?.address || ("" as Address),
         slippage,
-        enabled: oneInchSwapEnabled,
+        enabled: kyberSwapEnabled || oneInchSwapEnabled,
+        preferredRouter: swapRouter === "kyber" ? "kyber" : "1inch",
     });
 
     // Pendle quote
@@ -575,14 +584,14 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         return oneInchSwapQuote;
     }, [swapRouter, pendleQuoteData, oneInchSwapQuote]);
 
-    const isSwapQuoteLoading = swapRouter === "1inch" ? is1inchSwapQuoteLoading : isPendleQuoteLoading;
-    const quoteError = swapRouter === "1inch" ? oneInchQuoteError : pendleQuoteError;
+    const isSwapQuoteLoading = swapRouter === "pendle" ? isPendleQuoteLoading : is1inchSwapQuoteLoading;
+    const quoteError = swapRouter === "pendle" ? pendleQuoteError : oneInchQuoteError;
     // Include isInputSettling to show loading state while user is typing
     // This prevents displaying stale quotes that don't match current input
     const isQuoteLoading = isUnitQuoteLoading || isSwapQuoteLoading || isInputSettling;
 
     // Check adapter availability
-    const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
+    const hasAdapter = swapRouter === "kyber" ? !!kyberAdapter : swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
 
     // What the swap will actually produce (from the real quote)
     const expectedOutput = swapQuote
@@ -917,7 +926,7 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
         if (!swapQuote || !selectedTo || !hasAdapter || requiredNewDebt === 0n) return [];
 
         const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
-        const swapProtocol = swapRouter === "1inch" ? "oneinch" : "pendle";
+        const swapProtocol = swapRouter === "1inch" ? "oneinch" : swapRouter === "kyber" ? "kyber" : "pendle";
 
         // ========================================================================
         // MORPHO (Pair-Isolated): Must move collateral between markets
@@ -1416,6 +1425,12 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                             sellAmount: effectiveLimitOrderNewDebt.toString(),
                             buyAmount: repayAmountRaw.toString(),
                         });
+
+                        // Store quote rate for price impact calculation
+                        if (orderHash && effectiveLimitOrderNewDebt > 0n && repayAmountRaw > 0n) {
+                            const quoteRate = Number(effectiveLimitOrderNewDebt) / Number(repayAmountRaw);
+                            storeOrderQuoteRate(chainId, orderHash, quoteRate);
+                        }
                     }
                 },
             });
@@ -1673,12 +1688,12 @@ export const DebtSwapEvmModal: FC<DebtSwapEvmModalProps> = ({
                 expectedOutput={expectedOutput}
                 debtFromName={debtFromName}
                 swapRouter={swapRouter}
-                oneInchAdapter={oneInchAdapter}
+                activeAdapter={activeAdapter}
                 hasAdapter={hasAdapter}
                 isOpen={isOpen}
             />
         ),
-        [executionType, swapQuote, outputCoversRepay, expectedOutput, debtFromName, swapRouter, oneInchAdapter, hasAdapter, isOpen],
+        [executionType, swapQuote, outputCoversRepay, expectedOutput, debtFromName, swapRouter, activeAdapter, hasAdapter, isOpen],
     );
 
     // Pre-compute execution type dependent props to reduce cognitive complexity in JSX
@@ -1828,7 +1843,7 @@ const MarketOrderInfoContent: FC<MarketOrderInfoContentProps> = ({ swapRouter, s
 
             <InfoStep step={2} title="Swap" isLast={false}>
                 <p className="text-base-content/70 text-xs">
-                    We swap the new debt token for your current debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.
+                    We swap the new debt token for your current debt token using {swapRouter === "kyber" ? "Kyber" : swapRouter === "1inch" ? "1inch" : "Pendle"}.
                 </p>
             </InfoStep>
 
@@ -1903,7 +1918,7 @@ interface DebtSwapWarningsProps {
     expectedOutput: string;
     debtFromName: string;
     swapRouter: SwapRouter;
-    oneInchAdapter: { address: string } | null | undefined;
+    activeAdapter: { address: string } | null | undefined;
     hasAdapter: boolean;
     isOpen: boolean;
 }
@@ -1915,12 +1930,12 @@ const DebtSwapWarnings: FC<DebtSwapWarningsProps> = ({
     expectedOutput,
     debtFromName,
     swapRouter,
-    oneInchAdapter,
+    activeAdapter,
     hasAdapter,
     isOpen,
 }) => {
     const showOutputWarning = executionType === "market" && swapQuote && !outputCoversRepay;
-    const showFromMismatchWarning = executionType === "market" && swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from?.toLowerCase() !== oneInchAdapter.address.toLowerCase();
+    const showFromMismatchWarning = executionType === "market" && (swapRouter === "1inch" || swapRouter === "kyber") && swapQuote && activeAdapter && "from" in swapQuote.tx && swapQuote.tx.from?.toLowerCase() !== activeAdapter.address.toLowerCase();
     const showNoAdapterWarning = executionType === "market" && !hasAdapter && isOpen;
 
     return (
@@ -1940,7 +1955,7 @@ const DebtSwapWarnings: FC<DebtSwapWarningsProps> = ({
             )}
             {showNoAdapterWarning && (
                 <WarningDisplay
-                    message={`${swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.`}
+                    message={`${swapRouter === "kyber" ? "Kyber" : swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network. Swaps unavailable.`}
                     size="sm"
                 />
             )}

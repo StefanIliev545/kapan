@@ -32,7 +32,7 @@ import {
     encodeEulerContext,
 } from "~~/utils/v2/instructionHelpers";
 import { getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee } from "~~/utils/cow";
-import { is1inchSupported, isPendleSupported, getOneInchAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
+import { is1inchSupported, isKyberSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getKyberAdapterInfo, getPendleAdapterInfo, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { SwapModalShell, SwapAsset, SwapRouter } from "./SwapModalShell";
 import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
@@ -54,12 +54,12 @@ import {
     saveLimitOrderNote,
     executeSequentialLimitOrder,
     handleLimitOrderError,
-    shouldSwitchSwapRouter,
     calculateRequiredCollateral,
     calculateLimitOrderCollateral,
 } from "./closeWithCollateralEvmHelpers";
 import { useSaveOrder } from "~~/hooks/useOrderHistory";
 import { extractOrderHash } from "~~/utils/orderHashExtractor";
+import { storeOrderQuoteRate } from "~~/utils/cow";
 
 // Aave flash loan fee: 5 bps (0.05%)
 // We add a small buffer (10 bps total) to ensure swap covers repayment
@@ -125,20 +125,29 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     // Check swap router availability and get adapter info directly from deployed contracts
     const oneInchAvailable = is1inchSupported(chainId);
+    const kyberAvailable = isKyberSupported(chainId);
     const pendleAvailable = isPendleSupported(chainId);
     const oneInchAdapter = getOneInchAdapterInfo(chainId);
+    const kyberAdapter = getKyberAdapterInfo(chainId);
     const pendleAdapter = getPendleAdapterInfo(chainId);
+    const defaultRouter = getDefaultSwapRouter(chainId);
 
-    // Swap router selection - default based on chain and token availability
-    const [swapRouter, setSwapRouter] = useState<SwapRouter>("1inch");
+    // Swap router selection - default based on chain availability (Kyber preferred)
+    const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "kyber");
 
-    // Update swap router based on chain and token availability
+    // Select the correct adapter based on swap router
+    const activeAdapter = swapRouter === "kyber" ? kyberAdapter : swapRouter === "pendle" ? pendleAdapter : oneInchAdapter;
+
+    // Update swap router if chain changes and current router is not available
     useEffect(() => {
-        const newRouter = shouldSwitchSwapRouter(swapRouter, oneInchAvailable, pendleAvailable);
-        if (newRouter) {
-            setSwapRouter(newRouter as SwapRouter);
+        if (swapRouter === "kyber" && !kyberAvailable) {
+            setSwapRouter(oneInchAvailable ? "1inch" : pendleAvailable ? "pendle" : "kyber");
+        } else if (swapRouter === "1inch" && !oneInchAvailable) {
+            setSwapRouter(kyberAvailable ? "kyber" : pendleAvailable ? "pendle" : "1inch");
+        } else if (swapRouter === "pendle" && !pendleAvailable) {
+            setSwapRouter(kyberAvailable ? "kyber" : oneInchAvailable ? "1inch" : "pendle");
         }
-    }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
+    }, [chainId, oneInchAvailable, kyberAvailable, pendleAvailable, swapRouter]);
 
     const wasOpenRef = useRef(false);
 
@@ -326,13 +335,13 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         return parseUnits("1", selectedTo.decimals).toString();
     }, [selectedTo]);
 
-    // 1inch unit quote (only fetch when 1inch router is selected)
+    // 1inch/Kyber unit quote (only fetch when 1inch or kyber router is selected)
     const { data: oneInchUnitQuote, isLoading: isOneInchUnitQuoteLoading } = use1inchQuoteOnly({
         chainId,
         src: selectedTo?.address as Address,
         dst: debtToken,
         amount: unitQuoteAmount,
-        enabled: oneInchAvailable && swapRouter === "1inch" && !!selectedTo && isOpen,
+        enabled: (kyberAvailable && swapRouter === "kyber" || oneInchAvailable && swapRouter === "1inch") && !!selectedTo && isOpen,
     });
 
     // Pendle unit quote (only fetch when Pendle router is selected)
@@ -346,7 +355,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         enabled: pendleAvailable && swapRouter === "pendle" && !!selectedTo && !!pendleAdapter && isOpen && unitQuoteAmount !== "0",
     });
 
-    const isUnitQuoteLoading = swapRouter === "1inch" ? isOneInchUnitQuoteLoading : isPendleUnitQuoteLoading;
+    const isUnitQuoteLoading = swapRouter === "pendle" ? isPendleUnitQuoteLoading : isOneInchUnitQuoteLoading;
 
     // Calculate required collateral based on debt to repay
     const { requiredCollateral, requiredCollateralFormatted, exchangeRate } = useMemo(() => {
@@ -365,18 +374,20 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
 
     // Step 2: Get actual swap quote with the required collateral amount
     const minSwapAmount = selectedTo ? parseUnits("0.0001", selectedTo.decimals) : 0n;
+    const kyberSwapEnabled = kyberAvailable && swapRouter === "kyber" && requiredCollateral > minSwapAmount && !!selectedTo && !!kyberAdapter && isOpen;
     const oneInchSwapEnabled = oneInchAvailable && swapRouter === "1inch" && requiredCollateral > minSwapAmount && !!selectedTo && !!oneInchAdapter && isOpen;
     const pendleSwapEnabled = pendleAvailable && swapRouter === "pendle" && requiredCollateral > minSwapAmount && !!selectedTo && !!pendleAdapter && isOpen;
 
-    // 1inch quote
+    // 1inch/Kyber quote (use1inchQuote hook handles both with fallback)
     const { data: oneInchSwapQuote, isLoading: is1inchSwapQuoteLoading, error: oneInchQuoteError } = use1inchQuote({
         chainId,
         src: selectedTo?.address as Address,
         dst: debtToken,
         amount: requiredCollateral.toString(),
-        from: oneInchAdapter?.address || ("" as Address),
+        from: activeAdapter?.address || ("" as Address),
         slippage,
-        enabled: oneInchSwapEnabled,
+        enabled: kyberSwapEnabled || oneInchSwapEnabled,
+        preferredRouter: swapRouter === "kyber" ? "kyber" : "1inch",
     });
 
     // Pendle quote
@@ -405,14 +416,14 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         return oneInchSwapQuote;
     }, [swapRouter, pendleQuoteData, oneInchSwapQuote]);
 
-    const isSwapQuoteLoading = swapRouter === "1inch" ? is1inchSwapQuoteLoading : isPendleQuoteLoading;
-    const quoteError = swapRouter === "1inch" ? oneInchQuoteError : pendleQuoteError;
+    const isSwapQuoteLoading = swapRouter === "pendle" ? isPendleQuoteLoading : is1inchSwapQuoteLoading;
+    const quoteError = swapRouter === "pendle" ? pendleQuoteError : oneInchQuoteError;
     // Include isInputSettling to show loading state while user is typing
     // This prevents displaying stale quotes that don't match current input
     const isQuoteLoading = isUnitQuoteLoading || isSwapQuoteLoading || isInputSettling;
 
     // Check adapter availability
-    const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
+    const hasAdapter = swapRouter === "kyber" ? !!kyberAdapter : swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
 
     // ============ Limit Order: CoW Quote ============
     // Use limitOrderBuyAmount which includes buffer for isMax orders
@@ -441,6 +452,18 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         return 0n;
     }, [cowQuote, selectedTo, slippage, requiredCollateral]);
 
+    // ============ Limit Order: Effective Collateral (custom or quote) ============
+    // When user modifies the price, use their custom amount instead of the quote
+    const effectiveLimitOrderCollateral = useMemo(() => {
+        if (useCustomBuyAmount && customBuyAmount && selectedTo) {
+            const parsed = parseFloat(customBuyAmount);
+            if (!isNaN(parsed) && parsed > 0) {
+                return BigInt(Math.floor(parsed * (10 ** selectedTo.decimals)));
+            }
+        }
+        return limitOrderCollateral;
+    }, [useCustomBuyAmount, customBuyAmount, selectedTo, limitOrderCollateral]);
+
     // amountOut = required collateral (what user will sell)
     const amountOut = useMemo(() => {
         // For limit orders, use custom amount if user has set one
@@ -448,21 +471,21 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             return customBuyAmount;
         }
         // For limit orders, use CoW quote-based collateral; for market, use 1inch/Pendle
-        if (executionType === "limit" && limitOrderCollateral > 0n && selectedTo) {
-            return formatUnits(limitOrderCollateral, selectedTo.decimals);
+        if (executionType === "limit" && effectiveLimitOrderCollateral > 0n && selectedTo) {
+            return formatUnits(effectiveLimitOrderCollateral, selectedTo.decimals);
         }
         return requiredCollateralFormatted;
-    }, [executionType, useCustomBuyAmount, customBuyAmount, limitOrderCollateral, selectedTo, requiredCollateralFormatted]);
+    }, [executionType, useCustomBuyAmount, customBuyAmount, effectiveLimitOrderCollateral, selectedTo, requiredCollateralFormatted]);
 
     // Check if user has enough collateral for limit order
-    const hasEnoughCollateralForLimit = selectedTo && limitOrderCollateral > 0n
-        ? checkCollateralSufficiency(limitOrderCollateral, selectedTo.rawBalance)
+    const hasEnoughCollateralForLimit = selectedTo && effectiveLimitOrderCollateral > 0n
+        ? checkCollateralSufficiency(effectiveLimitOrderCollateral, selectedTo.rawBalance)
         : hasEnoughCollateral;
 
     // ============ Limit Order: Flash Loan Info ============
     const cowFlashLoanInfo = useMemo(() => {
-        return buildCowFlashLoanInfo(chainId, limitOrderConfig, executionType, selectedTo, limitOrderCollateral);
-    }, [chainId, limitOrderConfig, executionType, limitOrderCollateral, selectedTo]);
+        return buildCowFlashLoanInfo(chainId, limitOrderConfig, executionType, selectedTo, effectiveLimitOrderCollateral);
+    }, [chainId, limitOrderConfig, executionType, effectiveLimitOrderCollateral, selectedTo]);
 
     // ============ Limit Order: Build Chunk Instructions ============
     const buildCowInstructions = useMemo(() => {
@@ -587,7 +610,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         // EULER: Custom flow with proper context encoding
         // ========================================================================
         if (isEuler && eulerContextEncoded && userAddress) {
-            const swapProtocol = swapRouter === "1inch" ? "oneinch" : "pendle";
+            const swapProtocol = swapRouter === "1inch" ? "oneinch" : swapRouter === "kyber" ? "kyber" : "pendle";
             const swapContext = encodeAbiParameters(
                 [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
                 [debtToken as Address, swapMinAmountOut, swapQuote.tx.data as Hex]
@@ -676,7 +699,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             providerEnum,            // flash loan provider
             context,
             isMax,                   // if true, uses GetBorrowBalance for exact debt amount on-chain
-            swapRouter === "1inch" ? "oneinch" : "pendle",
+            swapRouter === "1inch" ? "oneinch" : swapRouter === "kyber" ? "kyber" : "pendle",
         );
     };
 
@@ -745,7 +768,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             selectedTo,
             repayAmountRaw,
             debtDecimals,
-            limitOrderCollateral,
+            limitOrderCollateral: effectiveLimitOrderCollateral,
             requiredCollateral,
             flashLoanProviderName: limitOrderConfig.selectedProvider.name,
         });
@@ -759,7 +782,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             logLimitOrderBuildStart({
                 selectedTo,
                 debtName,
-                limitOrderCollateral,
+                limitOrderCollateral: effectiveLimitOrderCollateral,
                 repayAmountRaw,
                 debtDecimals,
                 cowFlashLoanInfo,
@@ -771,7 +794,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             const callParams = buildLimitOrderCallParams({
                 selectedTo,
                 debtToken,
-                limitOrderCollateral,
+                limitOrderCollateral: effectiveLimitOrderCollateral,
                 repayAmountRaw: limitOrderBuyAmount,
                 cowFlashLoanInfo,
                 buildCowInstructions,
@@ -823,6 +846,12 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                     // Extract orderHash from transaction receipts
                     const orderHash = extractOrderHash(receipts, orderManagerAddress) ?? undefined;
 
+                    // Store quote rate for price impact calculation
+                    if (orderHash && effectiveLimitOrderCollateral > 0n && repayAmountRaw > 0n) {
+                        const quoteRate = Number(effectiveLimitOrderCollateral) / Number(repayAmountRaw);
+                        storeOrderQuoteRate(chainId, orderHash, quoteRate);
+                    }
+
                     // Save order to database after successful execution
                     if (limitOrderResult.salt && selectedTo) {
                         saveOrder.mutate({
@@ -837,7 +866,7 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
                             buyToken: debtToken,
                             sellTokenSymbol: selectedTo.symbol,
                             buyTokenSymbol: debtName,
-                            sellAmount: limitOrderCollateral.toString(),
+                            sellAmount: effectiveLimitOrderCollateral.toString(),
                             buyAmount: repayAmountRaw.toString(),
                         });
                     }
@@ -849,12 +878,12 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
         } finally {
             setIsLimitSubmitting(false);
         }
-    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, limitOrderBuyAmount, debtDecimals, limitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose, saveOrder]);
+    }, [selectedTo, userAddress, orderManagerAddress, walletClient, publicClient, limitOrderConfig, cowFlashLoanInfo, protocolName, chainId, debtToken, debtName, repayAmountRaw, limitOrderBuyAmount, debtDecimals, effectiveLimitOrderCollateral, requiredCollateral, cowQuote, buildCowInstructions, buildLimitOrderCalls, onClose, saveOrder]);
 
     // Can submit based on execution type
     const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter;
     const canSubmitLimit = executionType === "limit" && limitOrderReady && !!cowFlashLoanInfo &&
-        parseFloat(amountIn) > 0 && hasEnoughCollateralForLimit && !!orderManagerAddress && limitOrderCollateral > 0n;
+        parseFloat(amountIn) > 0 && hasEnoughCollateralForLimit && !!orderManagerAddress && effectiveLimitOrderCollateral > 0n;
     const canSubmit = executionType === "market" ? canSubmitMarket : canSubmitLimit;
 
     // What the swap will actually produce
@@ -1082,11 +1111,11 @@ export const CloseWithCollateralEvmModal: FC<CloseWithCollateralEvmModalProps> =
             requiredCollateralFormatted={requiredCollateralFormatted}
             swapRouter={swapRouter}
             swapQuote={swapQuote}
-            oneInchAdapter={oneInchAdapter}
+            activeAdapter={activeAdapter}
             hasAdapter={hasAdapter}
             isOpen={isOpen}
         />
-    ), [hasEnoughCollateral, requiredCollateral, selectedTo, requiredCollateralFormatted, swapRouter, swapQuote, oneInchAdapter, hasAdapter, isOpen]);
+    ), [hasEnoughCollateral, requiredCollateral, selectedTo, requiredCollateralFormatted, swapRouter, swapQuote, activeAdapter, hasAdapter, isOpen]);
 
     // Hide dropdown when there's only one collateral option (e.g., Morpho isolated pairs)
     const singleCollateral = toAssets.length === 1;
@@ -1246,7 +1275,7 @@ const CloseWithCollateralInfoContent: FC<CloseWithCollateralInfoContentProps> = 
 
             <InfoStep step={2} title="Swap" isLast={false}>
                 <p className="text-base-content/70 text-xs">
-                    Collateral is swapped for the debt token using {swapRouter === "1inch" ? "1inch" : "Pendle"}.
+                    Collateral is swapped for the debt token using {swapRouter === "kyber" ? "Kyber" : swapRouter === "1inch" ? "1inch" : "Pendle"}.
                 </p>
             </InfoStep>
 
@@ -1290,7 +1319,7 @@ interface CloseWithCollateralWarningsProps {
     requiredCollateralFormatted: string;
     swapRouter: SwapRouter;
     swapQuote: { dstAmount: string; tx: { data: string; from?: string }; srcUSD?: string | null; dstUSD?: string | null } | null | undefined;
-    oneInchAdapter: { address: string } | null | undefined;
+    activeAdapter: { address: string } | null | undefined;
     hasAdapter: boolean;
     isOpen: boolean;
 }
@@ -1302,12 +1331,12 @@ const CloseWithCollateralWarnings: FC<CloseWithCollateralWarningsProps> = ({
     requiredCollateralFormatted,
     swapRouter,
     swapQuote,
-    oneInchAdapter,
+    activeAdapter,
     hasAdapter,
     isOpen,
 }) => {
     const showInsufficientCollateralWarning = !hasEnoughCollateral && requiredCollateral > 0n && selectedTo;
-    const showFromMismatchWarning = swapRouter === "1inch" && swapQuote && oneInchAdapter && "from" in swapQuote.tx && swapQuote.tx.from?.toLowerCase() !== oneInchAdapter.address.toLowerCase();
+    const showFromMismatchWarning = (swapRouter === "1inch" || swapRouter === "kyber") && swapQuote && activeAdapter && "from" in swapQuote.tx && swapQuote.tx.from?.toLowerCase() !== activeAdapter.address.toLowerCase();
     const showNoAdapterWarning = !hasAdapter && isOpen;
 
     const hasAnyWarning = showInsufficientCollateralWarning || showFromMismatchWarning || showNoAdapterWarning;
@@ -1323,7 +1352,7 @@ const CloseWithCollateralWarnings: FC<CloseWithCollateralWarningsProps> = ({
                             <>Need ~{requiredCollateralFormatted} {selectedTo.symbol}, have {Number(formatUnits(selectedTo.rawBalance, selectedTo.decimals)).toFixed(4)}</>
                         )}
                         {showFromMismatchWarning && "Quote address mismatch"}
-                        {showNoAdapterWarning && `${swapRouter === "1inch" ? "1inch" : "Pendle"} adapter unavailable`}
+                        {showNoAdapterWarning && `${swapRouter === "kyber" ? "Kyber" : swapRouter === "1inch" ? "1inch" : "Pendle"} adapter unavailable`}
                     </span>
                 </div>
             )}

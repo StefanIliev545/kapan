@@ -128,6 +128,8 @@ interface TokenSectionProps {
     onTokenChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
     onValueChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onSetMax?: () => void;
+    /** Custom token picker to replace the default select dropdown */
+    customTokenPicker?: ReactNode;
 }
 
 const TokenSection: FC<TokenSectionProps> = ({
@@ -142,6 +144,7 @@ const TokenSection: FC<TokenSectionProps> = ({
     onTokenChange,
     onValueChange,
     onSetMax,
+    customTokenPicker,
 }) => (
     <div className="bg-base-200/50 border-base-300/50 rounded-lg border px-3 py-2">
         <div className="text-base-content/50 mb-1 flex items-center justify-between text-[10px]">
@@ -160,23 +163,29 @@ const TokenSection: FC<TokenSectionProps> = ({
         <div className="flex items-center justify-between">
             {/* Token selector */}
             <div className="flex items-center gap-1.5">
-                {asset && (
-                    <div className="relative size-5 flex-shrink-0">
-                        <Image src={asset.icon} alt={asset.symbol} fill className="rounded-full object-contain" />
-                    </div>
-                )}
-                {isReadOnly ? (
-                    <span className="text-sm font-medium">{asset?.symbol || "-"}</span>
+                {customTokenPicker ? (
+                    customTokenPicker
                 ) : (
-                    <select
-                        className="select select-ghost select-xs h-auto min-h-0 bg-transparent pl-0 text-sm font-medium focus:outline-none"
-                        value={asset?.symbol || ""}
-                        onChange={onTokenChange}
-                    >
-                        {assets.map(t => (
-                            <option key={t.address} value={t.symbol}>{t.symbol}</option>
-                        ))}
-                    </select>
+                    <>
+                        {asset && (
+                            <div className="relative size-5 flex-shrink-0">
+                                <Image src={asset.icon} alt={asset.symbol} fill className="rounded-full object-contain" />
+                            </div>
+                        )}
+                        {isReadOnly ? (
+                            <span className="text-sm font-medium">{asset?.symbol || "-"}</span>
+                        ) : (
+                            <select
+                                className="select select-ghost select-xs h-auto min-h-0 bg-transparent pl-0 text-sm font-medium focus:outline-none"
+                                value={asset?.symbol || ""}
+                                onChange={onTokenChange}
+                            >
+                                {assets.map(t => (
+                                    <option key={t.address} value={t.symbol}>{t.symbol}</option>
+                                ))}
+                            </select>
+                        )}
+                    </>
                 )}
             </div>
 
@@ -330,9 +339,10 @@ export interface SwapAsset {
 }
 
 // Swap router options
-export type SwapRouter = "1inch" | "pendle";
+export type SwapRouter = "1inch" | "kyber" | "pendle";
 
 export const SWAP_ROUTER_OPTIONS: { value: SwapRouter; label: string }[] = [
+    { value: "kyber", label: "Kyber" },
     { value: "1inch", label: "1inch" },
     { value: "pendle", label: "Pendle" },
 ];
@@ -411,6 +421,9 @@ export interface SwapModalShellProps {
 
     // Limit price adjustment buttons (shown below TO section when provided)
     limitPriceButtons?: ReactNode;
+
+    // Custom token picker for "To" section (replaces default select dropdown)
+    customToTokenPicker?: ReactNode;
 }
 
 export const SwapModalShell: FC<SwapModalShellProps> = ({
@@ -451,6 +464,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
     afterMetrics,
     onAmountOutChange,
     limitPriceButtons,
+    customToTokenPicker,
 }) => {
     const [activeTab, setActiveTab] = useState<"swap" | "info">("swap");
 
@@ -615,6 +629,7 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                     usdValue={usdValueOut}
                     onTokenChange={handleToTokenChange}
                     onValueChange={onAmountOutChange ? (e) => onAmountOutChange(e.target.value) : undefined}
+                    customTokenPicker={customToTokenPicker}
                 />
 
                 {/* Limit price adjustment buttons (for limit orders) */}

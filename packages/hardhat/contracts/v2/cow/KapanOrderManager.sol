@@ -19,12 +19,6 @@ interface IKapanRouter {
     function isAuthorizedFor(address user) external view returns (bool);
 }
 
-// Forward declaration for KapanCowAdapter interface
-interface IKapanCowAdapter {
-    function onPreHook(bytes32 orderHash) external;
-    function onPostHook(bytes32 orderHash) external;
-}
-
 /// @title KapanOrderManager
 /// @notice Manages CoW Protocol orders for Kapan, acting as ERC-1271 signer
 /// @dev Singleton contract that holds order context and executes hooks
@@ -44,6 +38,8 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     error PreHookAlreadyExecuted();
     error PreHookNotExecuted();
     error CannotCancelMidExecution();
+    error SaltAlreadyUsed();
+    error MaxOrdersExceeded();
 
     // ============ Enums ============
     enum CompletionType {
@@ -132,24 +128,21 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     }
 
     // ============ State Variables ============
-    
-    /// @notice The KapanRouter for executing lending operations
-    IKapanRouter public router;
-    
-    /// @notice The ComposableCoW contract for order registration
-    IComposableCoW public composableCoW;
-    
-    /// @notice The GPv2Settlement contract
-    IGPv2Settlement public settlement;
-    
-    /// @notice The HooksTrampoline contract (caller for hooks)
-    address public hooksTrampoline;
-    
+
+    /// @notice The KapanRouter for executing lending operations (immutable)
+    IKapanRouter public immutable router;
+
+    /// @notice The ComposableCoW contract for order registration (immutable)
+    IComposableCoW public immutable composableCoW;
+
+    /// @notice The GPv2Settlement contract (immutable)
+    IGPv2Settlement public immutable settlement;
+
+    /// @notice The HooksTrampoline contract (caller for hooks) (immutable)
+    address public immutable hooksTrampoline;
+
     /// @notice The KapanOrderHandler for generating orders
     address public orderHandler;
-
-    /// @notice The KapanCowAdapter for flash loan order security
-    IKapanCowAdapter public cowAdapter;
 
     /// @notice Order contexts by order hash
     mapping(bytes32 => OrderContext) public orders;
@@ -175,6 +168,11 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     mapping(bytes32 => uint256) public preHookSellBalance;
     mapping(bytes32 => uint256) public preHookBuyBalance;
 
+    // ============ Security: Order Limits ============
+
+    /// @notice Maximum orders per user to prevent storage DOS
+    uint256 public constant MAX_ORDERS_PER_USER = 100;
+
     // ============ Events ============
     
     event OrderCreated(
@@ -193,11 +191,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     event PostHookExecuted(bytes32 indexed orderHash, uint256 chunkIndex, uint256 receivedAmount);
     
     // Admin events
-    event RouterUpdated(address indexed oldRouter, address indexed newRouter);
-    event ComposableCoWUpdated(address indexed oldComposableCoW, address indexed newComposableCoW);
-    event HooksTrampolineUpdated(address indexed oldTrampoline, address indexed newTrampoline);
     event OrderHandlerUpdated(address indexed oldHandler, address indexed newHandler);
-    event CowAdapterUpdated(address indexed oldAdapter, address indexed newAdapter);
 
     // ============ Constructor ============
     
@@ -220,39 +214,13 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     }
 
     // ============ Admin Functions ============
-    
-    function setRouter(address _router) external onlyOwner {
-        if (_router == address(0)) revert ZeroAddress();
-        address oldRouter = address(router);
-        router = IKapanRouter(_router);
-        emit RouterUpdated(oldRouter, _router);
-    }
-    
-    function setComposableCoW(address _composableCoW) external onlyOwner {
-        if (_composableCoW == address(0)) revert ZeroAddress();
-        address oldComposableCoW = address(composableCoW);
-        composableCoW = IComposableCoW(_composableCoW);
-        emit ComposableCoWUpdated(oldComposableCoW, _composableCoW);
-    }
-    
-    function setHooksTrampoline(address _hooksTrampoline) external onlyOwner {
-        if (_hooksTrampoline == address(0)) revert ZeroAddress();
-        address oldTrampoline = hooksTrampoline;
-        hooksTrampoline = _hooksTrampoline;
-        emit HooksTrampolineUpdated(oldTrampoline, _hooksTrampoline);
-    }
-    
+
+    /// @notice Update the order handler address
     function setOrderHandler(address _handler) external onlyOwner {
         if (_handler == address(0)) revert ZeroAddress();
         address oldHandler = orderHandler;
         orderHandler = _handler;
         emit OrderHandlerUpdated(oldHandler, _handler);
-    }
-
-    function setCowAdapter(address _cowAdapter) external onlyOwner {
-        address oldAdapter = address(cowAdapter);
-        cowAdapter = IKapanCowAdapter(_cowAdapter);
-        emit CowAdapterUpdated(oldAdapter, _cowAdapter);
     }
 
     /// @notice Approve vault relayer to spend a token
@@ -279,11 +247,17 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         if (params.user != msg.sender) revert Unauthorized();
         if (orderHandler == address(0)) revert InvalidHandler();
 
+        // Security: Prevent salt reuse
+        if (userSaltToOrderHash[msg.sender][salt] != bytes32(0)) revert SaltAlreadyUsed();
+
+        // Security: Limit orders per user to prevent storage DOS
+        if (userOrders[msg.sender].length >= MAX_ORDERS_PER_USER) revert MaxOrdersExceeded();
+
         // Validate all instructions target the calling user (prevents attacking other users' positions)
         // Pass address(this) as second arg to allow PullToken from OrderManager (for KIND_BUY post-hooks)
         _validateInstructionUsers(params.preInstructionsPerIteration, msg.sender, address(this));
         _validateInstructionUsers(params.postInstructionsPerIteration, msg.sender, address(this));
-        
+
         // Compute order hash
         orderHash = keccak256(abi.encode(params, salt, block.timestamp));
         
@@ -343,16 +317,20 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     /// @param orderHash The order to cancel
     function cancelOrder(bytes32 orderHash) external nonReentrant {
         OrderContext storage ctx = orders[orderHash];
-        
+
         if (ctx.status == OrderStatus.None) revert OrderNotFound();
         if (ctx.params.user != msg.sender) revert Unauthorized();
         if (ctx.status != OrderStatus.Active) revert InvalidOrderState();
-        
+
         // Cannot cancel if pre-hook has executed but post-hook hasn't (mid-execution)
         if (preHookExecutedForIteration[orderHash] != 0) revert CannotCancelMidExecution();
-        
+
+        // Invalidate any in-flight order on CoW Protocol BEFORE changing status
+        // This ensures the order shows as cancelled in CoW Explorer
+        _invalidateInFlightOrder(ctx);
+
         ctx.status = OrderStatus.Cancelled;
-        
+
         // Remove from ComposableCoW
         // Note: We need to compute the same hash ComposableCoW uses
         bytes32 cowOrderHash = composableCoW.hash(
@@ -363,7 +341,7 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
             })
         );
         composableCoW.remove(cowOrderHash);
-        
+
         // Only refund the tracked seed balance for THIS order
         // This prevents stealing tokens belonging to other orders
         uint256 seedToRefund = orderSeedBalance[orderHash];
@@ -371,13 +349,69 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
             orderSeedBalance[orderHash] = 0;
             IERC20(ctx.params.sellToken).safeTransfer(ctx.params.user, seedToRefund);
         }
-        
+
         // Note: We don't refund buyTokens here because:
         // - If not mid-execution, no buyTokens should be present for this order
         // - If iterations completed (iterationCount > 0), buyTokens were processed through router
         // - Any stuck buyTokens can be recovered via owner's recoverTokens()
-        
+
         emit OrderCancelled(orderHash, msg.sender);
+    }
+
+    /// @notice Invalidate the current in-flight order on CoW Protocol
+    /// @dev Computes the GPv2Order that would be generated and calls settlement.invalidateOrder()
+    function _invalidateInFlightOrder(OrderContext storage ctx) internal {
+        // Calculate remaining amount for current chunk
+        uint256 remaining = ctx.params.preTotalAmount - ctx.executedAmount;
+        if (remaining == 0) return; // No in-flight order
+
+        uint256 sellAmount = remaining < ctx.params.chunkSize
+            ? remaining
+            : ctx.params.chunkSize;
+
+        // Calculate validTo using same logic as KapanOrderHandler
+        uint256 validTo = _calculateValidTo(ctx.createdAt, ctx.iterationCount);
+
+        // Build the GPv2Order that would be in-flight
+        GPv2Order.Data memory order = GPv2Order.Data({
+            sellToken: IERC20(ctx.params.sellToken),
+            buyToken: IERC20(ctx.params.buyToken),
+            receiver: address(this),
+            sellAmount: sellAmount,
+            buyAmount: ctx.params.minBuyPerChunk,
+            validTo: uint32(validTo),
+            appData: ctx.params.appDataHash,
+            feeAmount: 0,
+            kind: ctx.params.isKindBuy ? GPv2Order.KIND_BUY : GPv2Order.KIND_SELL,
+            partiallyFillable: false,
+            sellTokenBalance: GPv2Order.BALANCE_ERC20,
+            buyTokenBalance: GPv2Order.BALANCE_ERC20
+        });
+
+        // Compute orderDigest
+        bytes32 orderDigest = GPv2Order.hash(order, settlement.domainSeparator());
+
+        // Build orderUid: abi.encodePacked(orderDigest, owner, validTo)
+        bytes memory orderUid = abi.encodePacked(orderDigest, address(this), uint32(validTo));
+
+        // Invalidate on CoW Protocol - this makes it show as cancelled in Explorer
+        settlement.invalidateOrder(orderUid);
+    }
+
+    /// @notice Calculate deterministic validTo timestamp for a chunk (mirrors KapanOrderHandler)
+    uint256 private constant CHUNK_WINDOW = 30 minutes;
+
+    function _calculateValidTo(uint256 createdAt, uint256 iterationCount) internal view returns (uint256) {
+        uint256 chunkWindowStart = createdAt + (iterationCount * CHUNK_WINDOW);
+        uint256 chunkWindowEnd = chunkWindowStart + CHUNK_WINDOW - 1;
+
+        if (block.timestamp <= chunkWindowEnd) {
+            return chunkWindowEnd;
+        }
+
+        uint256 elapsedSinceCreate = block.timestamp - createdAt;
+        uint256 currentWindowIndex = elapsedSinceCreate / CHUNK_WINDOW;
+        return createdAt + ((currentWindowIndex + 1) * CHUNK_WINDOW) - 1;
     }
 
     // ============ Hook Execution ============
@@ -427,13 +461,6 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
 
         OrderContext storage ctx = orders[orderHash];
         if (ctx.status != OrderStatus.Active) revert InvalidOrderState();
-
-        // SECURITY: For flash loan orders, validate with CowAdapter
-        // This prevents hook hijacking - attacker can't trigger victim's hooks
-        // because fundOrder must have been called with this orderHash first
-        if (ctx.params.isFlashLoanOrder && address(cowAdapter) != address(0)) {
-            cowAdapter.onPreHook(orderHash);
-        }
 
         // Guard: Pre-hook can only run once per iteration
         // Value of 0 means no pre-hook pending, non-zero means pre-hook already executed
@@ -604,12 +631,6 @@ contract KapanOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         }
 
         emit PostHookExecuted(orderHash, ctx.iterationCount, actualBuyAmount);
-
-        // SECURITY: For flash loan orders, finalize with CowAdapter
-        // This clears the adapter state, ensuring proper cleanup
-        if (ctx.params.isFlashLoanOrder && address(cowAdapter) != address(0)) {
-            cowAdapter.onPostHook(orderHash);
-        }
     }
 
     // ============ ERC-1271 Signature Verification ============

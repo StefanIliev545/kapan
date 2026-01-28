@@ -116,8 +116,8 @@ export const queryOptions = {
  */
 export const queryKeys = {
   // DEX Quotes
-  oneInchQuote: (chainId: number, src: string, dst: string, amount: string, from?: string, slippage?: number) =>
-    ["1inch-quote", chainId, src?.toLowerCase() ?? "", dst?.toLowerCase() ?? "", amount, from?.toLowerCase(), slippage] as const,
+  oneInchQuote: (chainId: number, src: string, dst: string, amount: string, from?: string, slippage?: number, preferredRouter?: string) =>
+    ["1inch-quote", chainId, src?.toLowerCase() ?? "", dst?.toLowerCase() ?? "", amount, from?.toLowerCase(), slippage, preferredRouter] as const,
 
   oneInchQuoteOnly: (chainId: number, src: string, dst: string, amount: string) =>
     ["1inch-quote-only", chainId, src?.toLowerCase() ?? "", dst?.toLowerCase() ?? "", amount] as const,

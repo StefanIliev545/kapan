@@ -311,6 +311,8 @@ export type RefinanceModalContentProps = {
   setPreferBatching?: React.Dispatch<React.SetStateAction<boolean>>;
   revokePermissions?: boolean;
   setRevokePermissions?: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Whether user has active ADL orders (disables revoke permissions) */
+  hasActiveADLOrders?: boolean;
 
   // Error display
   errorMessage?: string;
@@ -395,6 +397,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
   setPreferBatching,
   revokePermissions,
   setRevokePermissions,
+  hasActiveADLOrders,
   errorMessage,
   apiProbes,
   // Morpho-specific props
@@ -855,15 +858,29 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = ({
                   Batch transactions
                 </button>
                 {setRevokePermissions && (
-                  <button
-                    type="button"
-                    onClick={handleToggleRevoke}
-                    className={`inline-flex cursor-pointer items-center gap-1 text-xs hover:opacity-80 ${revokePermissions ? "text-success" : "text-base-content/60"
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleRevoke}
+                      disabled={hasActiveADLOrders}
+                      className={`inline-flex cursor-pointer items-center gap-1 text-xs hover:opacity-80 ${
+                        hasActiveADLOrders
+                          ? "cursor-not-allowed text-base-content/40"
+                          : revokePermissions
+                            ? "text-success"
+                            : "text-base-content/60"
                       }`}
-                  >
-                    <CheckIcon className={`size-4 ${revokePermissions ? "" : "opacity-40"}`} />
-                    Revoke permissions
-                  </button>
+                      title={hasActiveADLOrders ? "Cannot revoke permissions while ADL protection is active" : undefined}
+                    >
+                      <CheckIcon className={`size-4 ${revokePermissions && !hasActiveADLOrders ? "" : "opacity-40"}`} />
+                      Revoke permissions
+                    </button>
+                    {hasActiveADLOrders && (
+                      <span className="text-warning text-[10px]" title="ADL protection requires router permissions">
+                        (ADL active)
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             )}

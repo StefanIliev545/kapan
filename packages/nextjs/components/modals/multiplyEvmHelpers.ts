@@ -138,7 +138,7 @@ export function calculateMarketRate(
  * Calculate price impact from available quote data.
  */
 export function calculateQuotesPriceImpact(
-  swapRouter: "1inch" | "pendle",
+  swapRouter: "1inch" | "kyber" | "pendle",
   pendleQuote: QuoteData["pendleQuote"],
   oneInchQuote: QuoteData["oneInchQuote"]
 ): number | null {
@@ -146,8 +146,8 @@ export function calculateQuotesPriceImpact(
   if (swapRouter === "pendle" && pendleQuote?.data?.priceImpact !== undefined) {
     return Math.abs(pendleQuote.data.priceImpact * 100);
   }
-  // 1inch: calculate from USD values
-  if (swapRouter === "1inch" && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
+  // 1inch/Kyber: calculate from USD values
+  if ((swapRouter === "1inch" || swapRouter === "kyber") && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
     const srcUSD = parseFloat(oneInchQuote.srcUSD);
     const dstUSD = parseFloat(oneInchQuote.dstUSD);
     if (srcUSD > 0) {
@@ -238,7 +238,7 @@ export function calculateFeeBreakdown(
   shortAmount: number,
   debtPrice: number,
   selectedProviderName: string | undefined,
-  swapRouter: "1inch" | "pendle",
+  swapRouter: "1inch" | "kyber" | "pendle",
   pendlePriceImpact: number | undefined,
   totalCollateralUsd: number
 ): FeeBreakdown {
@@ -288,7 +288,7 @@ export function calculateMinCollateralOut(
   executionType: "market" | "limit",
   customMinPrice: string,
   bestQuote: { amount: bigint } | null,
-  swapRouter: "1inch" | "pendle",
+  swapRouter: "1inch" | "kyber" | "pendle",
   oneInchQuote: QuoteData["oneInchQuote"],
   pendleQuote: QuoteData["pendleQuote"],
   limitSlippage: number,
@@ -311,7 +311,7 @@ export function calculateMinCollateralOut(
   if (executionType === "limit") {
     // For limit orders, use best quote from any source
     quoted = bestQuote?.amount ?? 0n;
-  } else if (swapRouter === "1inch" && oneInchQuote) {
+  } else if ((swapRouter === "1inch" || swapRouter === "kyber") && oneInchQuote) {
     quoted = BigInt(oneInchQuote.dstAmount || "0");
   } else if (swapRouter === "pendle" && pendleQuote) {
     const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";

@@ -157,3 +157,18 @@ export const fetch1inchSwap = async (
   const url = `${ONE_INCH_API_BASE}/${chainId}/swap?${searchParams.toString()}`;
   return fetch1inchApi<OneInchSwapResponse>(url, "swap");
 };
+
+// Response type for tokens endpoint
+export type OneInchTokensResponse = {
+  tokens: Record<string, OneInchToken>;
+  error?: string;
+  description?: string;
+};
+
+// Fetch all available tokens for a chain
+export const fetch1inchTokens = async (
+  chainId: number,
+): Promise<OneInchTokensResponse> => {
+  const url = `${ONE_INCH_API_BASE}/${chainId}/tokens`;
+  return fetch1inchApi<OneInchTokensResponse>(url, "tokens");
+};

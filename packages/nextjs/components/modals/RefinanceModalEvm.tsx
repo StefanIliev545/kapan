@@ -29,6 +29,7 @@ import {
   type CollateralFromHook,
   type RefinanceModalEvmProps,
 } from "./common";
+import { useHasActiveConditionalOrders } from "~~/hooks/useConditionalOrders";
 
 /* ------------------------------ Helpers ------------------------------ */
 import { addrKey } from "~~/utils/address";
@@ -454,12 +455,20 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   const [revokePermissions, setRevokePermissions] = useState(false);
 
-  // Auto-enable revoke permissions when batching is enabled
+  // Check for active conditional orders (ADL) - don't revoke permissions if active
+  const { hasActiveOrders: hasActiveADLOrders } = useHasActiveConditionalOrders();
+
+  // Auto-enable revoke permissions when batching is enabled (unless ADL is active)
   useEffect(() => {
-    if (preferBatching) {
+    if (preferBatching && !hasActiveADLOrders) {
       setRevokePermissions(true);
+    } else if (hasActiveADLOrders) {
+      setRevokePermissions(false); // Force disable if ADL is active
     }
-  }, [preferBatching]);
+  }, [preferBatching, hasActiveADLOrders]);
+
+  // Compute effective revoke permissions (disabled if ADL orders exist)
+  const effectiveRevokePermissions = revokePermissions && !hasActiveADLOrders;
 
   const debtInputRef = useRef<HTMLInputElement>(null);
 
@@ -868,10 +877,10 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         throw simError;
       }
 
-      const res = await executeFlowBatchedIfPossible(flow, preferBatching, { revokePermissions });
+      const res = await executeFlowBatchedIfPossible(flow, preferBatching, { revokePermissions: effectiveRevokePermissions });
       batchingUsed = res?.kind === "batch";
       if (!res) {
-        const fallbackResult = await executeFlowBatchedIfPossible(flow, false, { revokePermissions });
+        const fallbackResult = await executeFlowBatchedIfPossible(flow, false, { revokePermissions: effectiveRevokePermissions });
         batchingUsed = batchingUsed || fallbackResult?.kind === "batch";
       }
 
@@ -1006,6 +1015,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       setPreferBatching={setPreferBatching}
       revokePermissions={revokePermissions}
       setRevokePermissions={setRevokePermissions}
+      hasActiveADLOrders={hasActiveADLOrders}
       apiProbes={apiProbes}
       // Morpho-specific props
       isMorphoSelected={isMorphoSelected}

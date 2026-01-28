@@ -1238,4 +1238,99 @@ describe("CoW Protocol Integration (Fork)", function () {
       console.log("  and the entire transaction would revert.");
     });
   });
+
+  describe("Order Cancellation", function () {
+    let kapanOrderHash: string;
+    let userAddr: string;
+
+    beforeEach(async function () {
+      userAddr = await user.getAddress();
+
+      // Create a simple order
+      const params = buildOrderParams({
+        user: userAddr,
+        preTotalAmount: ethers.parseUnits("1000", 6),
+        sellToken: USDC,
+        buyToken: WETH,
+        chunkSize: ethers.parseUnits("500", 6),
+        minBuyPerChunk: ethers.parseEther("0.15"),
+        targetValue: 2,
+      });
+
+      const salt = ethers.keccak256(ethers.toUtf8Bytes("cancel-test-" + Date.now()));
+      const tx = await orderManager.connect(user).createOrder(params, salt, 0);
+      kapanOrderHash = extractOrderHash(await tx.wait(), orderManager);
+    });
+
+    it("should cancel order and invalidate on CoW Settlement", async function () {
+      // Verify order is active
+      const orderBefore = await orderManager.getOrder(kapanOrderHash);
+      expect(orderBefore.status).to.equal(1); // Active
+
+      // Cancel the order - this should call settlement.invalidateOrder()
+      const tx = await orderManager.connect(user).cancelOrder(kapanOrderHash);
+      await tx.wait();
+
+      // Verify order is cancelled
+      const orderAfter = await orderManager.getOrder(kapanOrderHash);
+      expect(orderAfter.status).to.equal(3); // Cancelled
+
+      console.log("✅ Order cancelled successfully");
+      console.log("   - Order status changed to Cancelled");
+      console.log("   - settlement.invalidateOrder() was called");
+    });
+
+    it("should revert getTradeableOrder with PollNever after cancellation", async function () {
+      // Cancel the order
+      await orderManager.connect(user).cancelOrder(kapanOrderHash);
+
+      // Try to get tradeable order - should revert with PollNever
+      const staticInput = coder.encode(["bytes32"], [kapanOrderHash]);
+
+      let errorMsg = "";
+      try {
+        await orderHandler.getTradeableOrder(
+          await orderManager.getAddress(),
+          await owner.getAddress(),
+          ethers.ZeroHash,
+          staticInput,
+          "0x"
+        );
+      } catch (error: unknown) {
+        errorMsg = (error as Error).message;
+      }
+      if (!errorMsg.includes("PollNever")) {
+        throw new Error("Expected PollNever revert but got: " + errorMsg);
+      }
+    });
+
+    it("should not allow cancelling already cancelled order", async function () {
+      // Cancel once
+      await orderManager.connect(user).cancelOrder(kapanOrderHash);
+
+      // Try to cancel again - should revert
+      let errorMsg = "";
+      try {
+        await orderManager.connect(user).cancelOrder(kapanOrderHash);
+      } catch (error: unknown) {
+        errorMsg = (error as Error).message;
+      }
+      if (!errorMsg.includes("InvalidOrderState")) {
+        throw new Error("Expected InvalidOrderState revert but got: " + errorMsg);
+      }
+    });
+
+    it("should not allow non-owner to cancel order", async function () {
+      // Try to cancel as owner (not the order user)
+      let errorMsg = "";
+      try {
+        await orderManager.connect(owner).cancelOrder(kapanOrderHash);
+      } catch (error: unknown) {
+        errorMsg = (error as Error).message;
+      }
+      if (!errorMsg.includes("Unauthorized")) {
+        throw new Error("Expected Unauthorized revert but got: " + errorMsg);
+      }
+    });
+  });
 });

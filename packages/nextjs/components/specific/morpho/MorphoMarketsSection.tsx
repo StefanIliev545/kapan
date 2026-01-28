@@ -40,7 +40,7 @@ import { MultiplyEvmModal } from "~~/components/modals/MultiplyEvmModal";
 import { useAccount } from "wagmi";
 import { notification } from "~~/utils/scaffold-eth/notification";
 import { parseUnits } from "viem";
-import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
+import { useExternalYields, hasExternalYield } from "~~/hooks/useExternalYields";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { createTextChangeHandler } from "~~/utils/handlers";
 import {
@@ -232,7 +232,7 @@ function OptionButton({
         isSelected ? 'bg-primary/10' : 'hover:bg-base-200'
       }`}
     >
-      <div className={`flex size-4 flex-shrink-0 items-center justify-center rounded border-2${
+      <div className={`flex size-4 flex-shrink-0 items-center justify-center rounded border-2 ${
         isSelected
           ? 'bg-primary border-primary'
           : 'border-base-content/30'
@@ -406,15 +406,22 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
         {filteredOptions.length === 0 ? (
           <div className="text-base-content/50 py-8 text-center text-sm">No matches found</div>
         ) : (
-          filteredOptions.map(option => (
-            <OptionButton
-              key={option}
-              option={option}
-              isSelected={selectedSet.has(option)}
-              onSelect={handleSelect}
-              showIcon
-            />
-          ))
+          <>
+            {filteredOptions.slice(0, 50).map(option => (
+              <OptionButton
+                key={option}
+                option={option}
+                isSelected={selectedSet.has(option)}
+                onSelect={handleSelect}
+                showIcon
+              />
+            ))}
+            {filteredOptions.length > 50 && (
+              <div className="text-base-content/40 py-2 text-center text-xs">
+                {filteredOptions.length - 50} more — search to find
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -443,7 +450,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
         </div>
         <ChevronDown className={`size-4 flex-shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      {typeof document !== "undefined" && ReactDOM.createPortal(dropdownContent, document.body)}
+      {dropdownContent && typeof document !== "undefined" && ReactDOM.createPortal(dropdownContent, document.body)}
     </>
   );
 }
@@ -601,8 +608,8 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   const [loopMarket, setLoopMarket] = React.useState<MorphoMarket | null>(null);
   const { address: walletAddress, chainId: walletChainId } = useAccount();
 
-  // Fetch Pendle PT yields for PT tokens
-  const { findYield } = usePendlePTYields(chainId);
+  // Fetch external yields (Pendle PT tokens, Maple syrup tokens, etc.)
+  const { findYield } = useExternalYields(chainId);
 
   // Memoize filter sets for performance
   const collateralFilterSet = React.useMemo(() => new Set(selectedCollaterals), [selectedCollaterals]);
@@ -642,15 +649,15 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           ? liquidityAssetsUsd
           : (denom > 0 ? (liquidityAssetsRaw / denom) * loanPriceUsd : 0);
 
-        // Look up PT implied yield for collateral token
+        // Look up external yield for collateral token (PT tokens, syrupUSDC, etc.)
         const collateralSymbol = m.collateralAsset?.symbol ?? "";
         const collateralAddress = (m.collateralAsset?.address ?? "").toLowerCase();
         let impliedApy: number | null = null;
 
-        if (isPTToken(collateralSymbol)) {
-          const ptYield = findYield(collateralAddress, collateralSymbol);
-          if (ptYield) {
-            impliedApy = ptYield.fixedApy;
+        if (hasExternalYield(collateralSymbol)) {
+          const externalYield = findYield(collateralAddress, collateralSymbol);
+          if (externalYield) {
+            impliedApy = externalYield.fixedApy;
           }
         }
 
@@ -863,9 +870,12 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   );
 
   // Reset to first page when filters change
+  // Note: table is intentionally excluded from deps - it's a new object every render
+  // but table.setPageIndex is stable via closure
   React.useEffect(() => {
     table.setPageIndex(0);
-  }, [table, globalFilter, selectedCollaterals, selectedDebtAssets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalFilter, selectedCollaterals, selectedDebtAssets]);
 
   const handleCloseDepositModal = React.useCallback(() => {
     depositModal.close();
@@ -954,9 +964,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
     if (!loopMarket?.collateralAsset) return {};
     const collateralAddr = loopMarket.collateralAsset.address.toLowerCase();
     let apy = 0;
-    if (isPTToken(loopMarket.collateralAsset.symbol)) {
-      const ptYield = findYield(collateralAddr, loopMarket.collateralAsset.symbol);
-      if (ptYield) apy = ptYield.fixedApy;
+    if (hasExternalYield(loopMarket.collateralAsset.symbol)) {
+      const externalYield = findYield(collateralAddr, loopMarket.collateralAsset.symbol);
+      if (externalYield) apy = externalYield.fixedApy;
     }
     return { [collateralAddr]: apy };
   }, [loopMarket, findYield]);

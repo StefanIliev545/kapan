@@ -361,9 +361,16 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
         {filteredOptions.length === 0 ? (
           <div className="text-base-content/50 py-8 text-center text-sm">No matches found</div>
         ) : (
-          filteredOptions.map(opt => (
-            <OptionButton key={opt} option={opt} isSelected={selectedSet.has(opt)} onSelect={handleSelect} showIcon />
-          ))
+          <>
+            {filteredOptions.slice(0, 50).map(opt => (
+              <OptionButton key={opt} option={opt} isSelected={selectedSet.has(opt)} onSelect={handleSelect} showIcon />
+            ))}
+            {filteredOptions.length > 50 && (
+              <div className="text-base-content/40 py-2 text-center text-xs">
+                {filteredOptions.length - 50} more — search to find
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -392,7 +399,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
         </div>
         <ChevronDown className={`size-4 flex-shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      {typeof document !== "undefined" && ReactDOM.createPortal(dropdownContent, document.body)}
+      {dropdownContent && typeof document !== "undefined" && ReactDOM.createPortal(dropdownContent, document.body)}
     </>
   );
 }
@@ -865,9 +872,12 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
   );
 
   // Reset to first page when filters change
+  // Note: table is intentionally excluded from deps - it's a new object every render
+  // but table.setPageIndex is stable via closure
   React.useEffect(() => {
     table.setPageIndex(0);
-  }, [table, globalFilter, selectedAssets, selectedCollaterals]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalFilter, selectedAssets, selectedCollaterals]);
 
   if (isLoading) {
     return (

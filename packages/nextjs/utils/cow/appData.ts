@@ -173,6 +173,7 @@ const ERC20_ABI = [
 const KAPAN_ADAPTER_ABI = [
   "function fundOrder(bytes32 orderHash, address token, address recipient, uint256 amount) external",
   "function fundOrderBySalt(address user, bytes32 salt, address token, address recipient, uint256 amount) external",
+  "function fundOrderWithBalance(address user, bytes32 salt, address token, address recipient) external",
 ];
 
 const borrowerIface = new Interface(BORROWER_ABI);
@@ -294,6 +295,27 @@ export function encodeAdapterFundOrderBySalt(
 }
 
 /**
+ * Encode a call to KapanCowAdapter.fundOrderWithBalance()
+ * Transfers the ENTIRE balance of flash-loaned tokens to OrderManager.
+ *
+ * Use this for ADL/conditional orders where the flash loan amount is fixed
+ * but the actual swap amount is dynamic (determined by trigger at execution time).
+ *
+ * @param user - The order owner address
+ * @param salt - The order salt (known before order creation)
+ * @param token - Token to transfer (the flash-loaned token)
+ * @param recipient - Recipient address (OrderManager)
+ */
+export function encodeAdapterFundOrderWithBalance(
+  user: string,
+  salt: string,
+  token: string,
+  recipient: string
+): string {
+  return kapanAdapterIface.encodeFunctionData("fundOrderWithBalance", [user, salt, token, recipient]);
+}
+
+/**
  * Encode a pre-hook call for KapanOrderManager using (user, salt) lookup
  * This allows pre-computing appData before order creation
  * The pre-hook withdraws collateral and prepares tokens for the swap
@@ -375,6 +397,12 @@ export function buildKapanAppData(
       token: string;
       /** Amount to borrow */
       amount: bigint;
+      /**
+       * Use balance-based transfer (fundOrderWithBalance) instead of fixed amount.
+       * Required for ADL/conditional orders where flash loan is fixed but actual
+       * swap amount is dynamic (determined by trigger at execution time).
+       */
+      useBalanceTransfer?: boolean;
     };
   }
 ): AppDataDocument {
@@ -404,24 +432,34 @@ export function buildKapanAppData(
 
     if (kapanAdapter) {
       // Use KapanCowAdapter - our custom borrower that works with HooksTrampoline
-      // NOTE: Using fundOrderBySalt which looks up orderHash from (user, salt)
-      // This allows pre-computing hook calldata before order creation
-      const fundOrderCalldata = encodeAdapterFundOrderBySalt(
-        user,
-        salt,
-        options.flashLoan.token,
-        orderManagerAddress,
-        options.flashLoan.amount
-      );
+      // For ADL/conditional orders, use fundOrderWithBalance (transfers entire balance)
+      // For regular orders, use fundOrderBySalt (transfers fixed amount)
+      const fundOrderCalldata = options.flashLoan.useBalanceTransfer
+        ? encodeAdapterFundOrderWithBalance(
+            user,
+            salt,
+            options.flashLoan.token,
+            orderManagerAddress
+          )
+        : encodeAdapterFundOrderBySalt(
+            user,
+            salt,
+            options.flashLoan.token,
+            orderManagerAddress,
+            options.flashLoan.amount
+          );
 
       preHooks = [
         // First: Transfer flash-loaned tokens from Adapter to OrderManager
-        // fundOrderBySalt looks up orderHash from OrderManager.userSaltToOrderHash
+        // fundOrderWithBalance transfers entire balance (for dynamic ADL amounts)
+        // fundOrderBySalt transfers fixed amount (for regular orders)
         {
           target: kapanAdapter,
           callData: fundOrderCalldata,
           gasLimit: "150000", // Increased for storage read + transfer
-          dappId: "kapan://flashloans/adapter/fund",
+          dappId: options.flashLoan.useBalanceTransfer
+            ? "kapan://flashloans/adapter/fund-balance"
+            : "kapan://flashloans/adapter/fund",
         },
         // Second: Execute any pre-hook logic on OrderManager
         {
@@ -712,13 +750,19 @@ export async function buildAndRegisterAppData(
   
   // Use the hash computed by the API if available, otherwise fall back to local computation
   const appDataHash = result.computedHash || computeAppDataHash(appDataDoc);
-  
-  if (result.computedHash) {
-    console.log("[buildAndRegisterAppData] Using API-computed hash:", result.computedHash);
+
+  if (result.success) {
+    console.log("[buildAndRegisterAppData] ✅ AppData REGISTERED successfully!");
+    console.log("[buildAndRegisterAppData] Hash:", appDataHash);
+    if (result.computedHash) {
+      console.log("[buildAndRegisterAppData] (API-computed hash)");
+    }
   } else {
-    console.log("[buildAndRegisterAppData] Using locally-computed hash:", appDataHash);
+    console.error("[buildAndRegisterAppData] ❌ AppData registration FAILED!");
+    console.error("[buildAndRegisterAppData] Error:", result.error);
+    console.error("[buildAndRegisterAppData] Local hash:", appDataHash);
   }
-  
+
   return {
     appDataDoc,
     appDataHash,

@@ -16,7 +16,7 @@ import { MorphoMarketsSection } from "./MorphoMarketsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useGlobalState } from "~~/services/store/store";
-import { usePendlePTYields, isPTToken, PTYield } from "~~/hooks/usePendlePTYields";
+import { useExternalYields, hasExternalYield, type ExternalYield } from "~~/hooks/useExternalYields";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { HealthStatus } from "../common/HealthStatus";
 import { formatSignedPercent } from "../utils";
@@ -63,32 +63,32 @@ const EMPTY_METRICS: PositionMetrics = {
 };
 
 /**
- * Get the PT token yield for a given collateral asset.
- * Returns 0 if the collateral is not a PT token or has no yield data.
+ * Get the external yield for a given collateral asset (PT tokens, syrupUSDC, etc.).
+ * Returns 0 if the collateral has no external yield data.
  */
-function getPTTokenYield(
+function getExternalTokenYield(
   collateralSymbol: string,
   collateralAddress: string,
-  findYield: (address?: string, symbol?: string) => PTYield | undefined
+  findYield: (address?: string, symbol?: string) => ExternalYield | undefined
 ): number {
-  if (!isPTToken(collateralSymbol)) {
+  if (!hasExternalYield(collateralSymbol)) {
     return 0;
   }
-  const ptYield = findYield(collateralAddress, collateralSymbol);
-  return ptYield?.fixedApy ?? 0;
+  const externalYield = findYield(collateralAddress, collateralSymbol);
+  return externalYield?.fixedApy ?? 0;
 }
 
 /**
  * Build supplied positions array from rows.
- * Collateral in Morpho doesn't earn yield (0% APY) UNLESS it's a PT token.
+ * Collateral in Morpho doesn't earn yield (0% APY) UNLESS it has external yield (PT token, syrupUSDC, etc.).
  */
 function buildSuppliedPositions(
   rows: MorphoPositionRow[],
-  findYield: (address?: string, symbol?: string) => PTYield | undefined
+  findYield: (address?: string, symbol?: string) => ExternalYield | undefined
 ): Array<{ balance: number; currentRate: number }> {
   return rows.map((row) => {
     const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
-    const currentRate = getPTTokenYield(row.collateralSymbol, collateralAddr, findYield);
+    const currentRate = getExternalTokenYield(row.collateralSymbol, collateralAddr, findYield);
     return {
       balance: row.collateralBalanceUsd,
       currentRate,
@@ -116,7 +116,7 @@ function buildBorrowedPositions(
  */
 function calculatePositionMetrics(
   rows: MorphoPositionRow[],
-  findYield: (address?: string, symbol?: string) => PTYield | undefined
+  findYield: (address?: string, symbol?: string) => ExternalYield | undefined
 ): PositionMetrics {
   if (!rows || rows.length === 0) {
     return EMPTY_METRICS;
@@ -221,8 +221,8 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 
   const { marketPairs } = useMorphoMarkets(effectiveChainId, undefined);
 
-  // Fetch PT yields from Pendle for fixed APY display
-  const { findYield } = usePendlePTYields(effectiveChainId);
+  // Fetch external yields (Pendle PT tokens, Maple syrup tokens, etc.) for APY display
+  const { findYield } = useExternalYields(effectiveChainId);
 
   // Extract markets where user has positions for fast refresh
   const marketsWithPositions = useMemo(() => {
@@ -231,27 +231,31 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   }, [apiRows]);
 
   // Use refresh hook for fast updates after transactions
-  const { rows: refreshedRows, isFetching: isRefreshing, refetch: refetchPositions } = useMorphoPositionsRefresh(
+  const refreshEnabled = hasLoadedOnce && marketsWithPositions.length > 0;
+  const { rows: refreshedRows, isFetching: isRefreshing, isLoading: isRefreshLoading, refetch: refetchPositions } = useMorphoPositionsRefresh(
     marketsWithPositions,
     effectiveChainId,
-    hasLoadedOnce && marketsWithPositions.length > 0 // Only enable after initial load
+    refreshEnabled // Only enable after initial load
   );
 
   // Listen for transaction completion to trigger fast refresh (with delay to ensure tx is mined)
   useTxCompletedListenerDelayed(
     refetchPositions,
     2000,
-    hasLoadedOnce && marketsWithPositions.length > 0
+    refreshEnabled
   );
 
-  // Prioritize refreshed data when available, fallback to API data
+  // Prioritize on-chain data over API data
+  // The API (GraphQL) lags, so once on-chain query completes, trust it even if empty
   const rows = useMemo(() => {
-    // Use refreshed data if available and not stale, otherwise use API data
-    if (refreshedRows.length > 0 && !isRefreshing) {
+    // If refresh is enabled and has completed (not loading/fetching), trust on-chain result
+    // This ensures that if on-chain shows no position but API does, we show no position
+    if (refreshEnabled && !isRefreshLoading && !isRefreshing) {
       return refreshedRows;
     }
+    // Fall back to API data only before on-chain query completes
     return apiRows;
-  }, [refreshedRows, apiRows, isRefreshing]);
+  }, [refreshedRows, apiRows, isRefreshing, isRefreshLoading, refreshEnabled]);
 
   // Compute totals and metrics using extracted helper
   const metrics = useMemo(

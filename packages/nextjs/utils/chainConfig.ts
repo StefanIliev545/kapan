@@ -229,6 +229,21 @@ const PENDLE_SUPPORTED: Set<number> = new Set([
 ]);
 
 /**
+ * Chains where Kyberswap is available
+ */
+const KYBER_SUPPORTED: Set<number> = new Set([
+  CHAIN_IDS.MAINNET,
+  CHAIN_IDS.ARBITRUM,
+  CHAIN_IDS.OPTIMISM,
+  CHAIN_IDS.POLYGON,
+  CHAIN_IDS.BNB,
+  CHAIN_IDS.BASE,
+  CHAIN_IDS.LINEA,
+  CHAIN_IDS.AVALANCHE,
+  CHAIN_IDS.HARDHAT,
+]);
+
+/**
  * Chains where Aave V3 is available
  */
 const AAVE_V3_SUPPORTED: Set<number> = new Set([
@@ -311,6 +326,11 @@ export function isCowProtocolSupported(chainId: number | undefined): boolean {
 export function isPendleSupported(chainId: number | undefined): boolean {
   if (chainId === undefined) return false;
   return PENDLE_SUPPORTED.has(chainId);
+}
+
+export function isKyberSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return KYBER_SUPPORTED.has(chainId);
 }
 
 export function isAaveV3Supported(chainId: number | undefined): boolean {
@@ -397,8 +417,10 @@ export const FLASH_LOAN_FEES_BPS = {
 /**
  * Get the default swap router for a chain
  */
-export function getDefaultSwapRouter(chainId: number | undefined): "1inch" | "pendle" | undefined {
+export function getDefaultSwapRouter(chainId: number | undefined): "1inch" | "kyber" | "pendle" | undefined {
   if (chainId === undefined) return undefined;
+  // Prefer Kyber first (more reliable), then 1inch, then Pendle
+  if (isKyberSupported(chainId)) return "kyber";
   if (is1inchSupported(chainId)) return "1inch";
   if (isPendleSupported(chainId)) return "pendle";
   return undefined;
@@ -420,7 +442,7 @@ export function getBestSwapRouter(
   chainId: number | undefined,
   fromSymbol?: string,
   toSymbol?: string
-): "1inch" | "pendle" | undefined {
+): "1inch" | "kyber" | "pendle" | undefined {
   if (chainId === undefined) return undefined;
 
   // If either token is a PT token and Pendle is available, use Pendle
@@ -434,8 +456,9 @@ export function getBestSwapRouter(
 /**
  * Get all available swap routers for a chain
  */
-export function getAvailableSwapRouters(chainId: number | undefined): Array<"1inch" | "pendle"> {
-  const routers: Array<"1inch" | "pendle"> = [];
+export function getAvailableSwapRouters(chainId: number | undefined): Array<"1inch" | "kyber" | "pendle"> {
+  const routers: Array<"1inch" | "kyber" | "pendle"> = [];
+  if (isKyberSupported(chainId)) routers.push("kyber");
   if (is1inchSupported(chainId)) routers.push("1inch");
   if (isPendleSupported(chainId)) routers.push("pendle");
   return routers;

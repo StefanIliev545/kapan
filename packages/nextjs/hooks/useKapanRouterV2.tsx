@@ -576,7 +576,7 @@ export const useKapanRouterV2 = (options?: UseKapanRouterV2Options) => {
     isMax = false,
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
     isExactOut = false,
-    swapProtocol: "oneinch" | "pendle" = "oneinch"
+    swapProtocol: "oneinch" | "kyber" | "pendle" = "oneinch"
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
 
@@ -746,7 +746,7 @@ export const useKapanRouterV2 = (options?: UseKapanRouterV2Options) => {
     market?: Address;
     morphoContext?: string;  // Pre-encoded Morpho market context (from encodeMorphoContext)
     includeRefundPush?: boolean;
-    swapRouter?: "oneinch" | "pendle";
+    swapRouter?: "oneinch" | "kyber" | "pendle";
     // Zap mode: deposit debt token and swap everything (deposit + flash loan) to collateral
     zapMode?: boolean;
     depositAmount?: string; // Amount of debt token to deposit (used in zap mode)
@@ -929,7 +929,7 @@ export const useKapanRouterV2 = (options?: UseKapanRouterV2Options) => {
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
     context = "0x",
     isMax = false,
-    swapRouter: "oneinch" | "pendle" = "oneinch",
+    swapRouter: "oneinch" | "kyber" | "pendle" = "oneinch",
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -1031,7 +1031,7 @@ export const useKapanRouterV2 = (options?: UseKapanRouterV2Options) => {
     flashLoanProvider: FlashLoanProvider = FlashLoanProvider.BalancerV2,
     context = "0x",
     isMax = false,
-    swapRouter: "oneinch" | "pendle" = "oneinch",
+    swapRouter: "oneinch" | "kyber" | "pendle" = "oneinch",
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);

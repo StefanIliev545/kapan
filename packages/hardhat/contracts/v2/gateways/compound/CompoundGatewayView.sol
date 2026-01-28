@@ -234,6 +234,50 @@ contract CompoundGatewayView is Ownable {
         return (totalLiqAdjValue * 10_000) / totalCollValue;
     }
 
+    /// @notice Returns the current LTV (debt/collateral) in basis points
+    /// @dev This is the actual current LTV = totalDebt / totalCollateral * 10000
+    /// @param token The base token (market identifier)
+    /// @param user The user address
+    /// @return Current LTV in basis points (e.g., 6500 = 65%)
+    function getCurrentLtvBps(address token, address user) external view returns (uint256) {
+        ICompoundComet comet = getComet(token);
+
+        // Get raw borrow balance (in base token units)
+        uint256 borrowBalance = comet.borrowBalanceOf(user);
+        if (borrowBalance == 0) return 0;
+
+        // Get total collateral value (in base token units via oracle)
+        (uint256 totalCollateralValue,) = _collateralTotalsWithFactor(comet, user, false);
+        if (totalCollateralValue == 0) return 0;
+
+        // Convert borrow balance to same scale as collateral value
+        // borrowBalance is in base token units, collateralValue is in price-scaled units
+        // We need to scale borrowBalance by the base token's price
+        address baseToken = comet.baseToken();
+        address basePriceFeed = comet.baseTokenPriceFeed();
+        uint256 basePrice = comet.getPrice(basePriceFeed);
+        uint256 baseScale = 10 ** IERC20Metadata(baseToken).decimals();
+
+        uint256 borrowValue = (borrowBalance * basePrice) / baseScale;
+
+        return (borrowValue * 10_000) / totalCollateralValue;
+    }
+
+    /// @notice Returns the liquidation LTV threshold in basis points
+    /// @dev Position is liquidatable when currentLTV >= liquidationLtvBps
+    /// @param token The base token (market identifier)
+    /// @param user The user address
+    /// @return Weighted liquidation threshold in basis points
+    function getLiquidationLtvBps(address token, address user) external view returns (uint256) {
+        ICompoundComet comet = getComet(token);
+        (uint256 totalCollValue, uint256 totalLiqAdjValue) = _collateralTotalsWithFactor(comet, user, true);
+
+        if (totalCollValue == 0) return 0;
+
+        // Liquidation threshold = liquidateCollateralFactor weighted by collateral
+        return (totalLiqAdjValue * 10_000) / totalCollValue;
+    }
+
     function getPossibleCollaterals(address token, address user) external view returns (
         address[] memory collateralAddresses,
         uint256[] memory balances,

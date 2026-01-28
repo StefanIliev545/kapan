@@ -23,7 +23,7 @@ interface UseAutoSlippageParams {
     /** Pendle quote response with priceImpact */
     pendleQuote?: { data?: { priceImpact?: number } } | null;
     /** Which swap router is active */
-    swapRouter: "1inch" | "pendle";
+    swapRouter: "1inch" | "kyber" | "pendle";
     /** Dependency to reset auto-slippage (e.g., token address changes) */
     resetDep?: unknown;
     /** Whether auto-slippage is enabled (default: true) */
@@ -81,8 +81,8 @@ export const useAutoSlippage = ({
         if (swapRouter === "pendle" && pendleQuote?.data?.priceImpact !== undefined) {
             return Math.abs(pendleQuote.data.priceImpact * 100); // Convert to percentage
         }
-        // 1inch: calculate from USD values (API response or fallback from token prices)
-        if (swapRouter === "1inch" && oneInchQuote) {
+        // 1inch/Kyber: calculate from USD values (API response or fallback from token prices)
+        if ((swapRouter === "1inch" || swapRouter === "kyber") && oneInchQuote) {
             // Try API-provided USD values first, fall back to token-price-based values
             const srcUSD = oneInchQuote.srcUSD ? parseFloat(oneInchQuote.srcUSD) : srcUsdFallback ?? null;
             const dstUSD = oneInchQuote.dstUSD ? parseFloat(oneInchQuote.dstUSD) : dstUsdFallback ?? null;
@@ -92,7 +92,7 @@ export const useAutoSlippage = ({
     }, [swapRouter, pendleQuote, oneInchQuote, srcUsdFallback, dstUsdFallback]);
 
     // Check if we have quote data
-    const hasQuoteData = swapRouter === "1inch" ? !!oneInchQuote : !!pendleQuote;
+    const hasQuoteData = (swapRouter === "1inch" || swapRouter === "kyber") ? !!oneInchQuote : !!pendleQuote;
 
     // Auto-set slippage based on price impact
     // We use a ref pattern to track if we've auto-set, triggered by resetDep changes

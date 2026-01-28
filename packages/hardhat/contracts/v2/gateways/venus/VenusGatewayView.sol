@@ -505,6 +505,56 @@ contract VenusGatewayView is Ownable {
         return _weightedLiquidationThresholdBps(user);
     }
 
+    /// @notice Returns the current LTV (debt/collateral) in basis points
+    /// @dev This is the actual current LTV = totalDebt / totalCollateral * 10000
+    /// @param user The user address
+    /// @return Current LTV in basis points (e.g., 6500 = 65%)
+    function getCurrentLtvBps(address /* token */, address user) external view returns (uint256) {
+        if (user == address(0)) return 0;
+
+        VTokenInterface[] memory vTokens = comptroller.getAssetsIn(user);
+        if (vTokens.length == 0) return 0;
+
+        uint256 totalCollateralValue;
+        uint256 totalDebtValue;
+
+        for (uint i = 0; i < vTokens.length; i++) {
+            address vTokenAddr = address(vTokens[i]);
+            VTokenInterface vToken = VTokenInterface(vTokenAddr);
+
+            // Get oracle price (18 decimals, price per underlying token)
+            uint256 price;
+            try oracle.getUnderlyingPrice(vTokenAddr) returns (uint256 p) { price = p; } catch { continue; }
+
+            // Calculate collateral value
+            uint256 vTokenBalance = vToken.balanceOf(user);
+            if (vTokenBalance > 0) {
+                uint256 exchangeRate = vToken.exchangeRateStored();
+                uint256 underlyingAmount = (vTokenBalance * exchangeRate) / 1e18;
+                totalCollateralValue += (underlyingAmount * price) / 1e18;
+            }
+
+            // Calculate debt value
+            try vToken.borrowBalanceStored(user) returns (uint256 borrowBalance) {
+                if (borrowBalance > 0) {
+                    totalDebtValue += (borrowBalance * price) / 1e18;
+                }
+            } catch {}
+        }
+
+        if (totalCollateralValue == 0) return 0;
+        return (totalDebtValue * 10_000) / totalCollateralValue;
+    }
+
+    /// @notice Returns the liquidation LTV threshold in basis points
+    /// @dev Position is liquidatable when currentLTV >= liquidationLtvBps
+    /// @param user The user address
+    /// @return Weighted liquidation threshold in basis points
+    function getLiquidationLtvBps(address /* token */, address user) external view returns (uint256) {
+        if (user == address(0)) return 0;
+        return _weightedLiquidationThresholdBps(user);
+    }
+
     /// @notice Reserve configuration for LTV calculations (matches Aave/Compound pattern)
     struct ReserveConfigData {
         address token;
@@ -619,6 +669,35 @@ contract VenusGatewayView is Ownable {
                     : liquidationThresholdMantissa;
                 lltvBps[i] = (liqThreshold * 10_000) / 1e18;
             } catch {}
+        }
+    }
+
+    // ============ Price Queries (for ADL) ============
+
+    /// @notice Get the price of an underlying asset in USD (18 decimals)
+    /// @param underlyingToken The underlying asset address
+    /// @return price Price in 18 decimals
+    function getAssetPrice(address underlyingToken) external view returns (uint256 price) {
+        address vTokenAddress = getVTokenForUnderlying(underlyingToken);
+        if (vTokenAddress == address(0)) return 0;
+        try oracle.getUnderlyingPrice(vTokenAddress) returns (uint256 p) {
+            return p;
+        } catch {
+            return 0;
+        }
+    }
+
+    /// @notice Get the price of an underlying asset normalized to 8 decimals
+    /// @param underlyingToken The underlying asset address
+    /// @return price Price in 8 decimals (for consistency with other protocols)
+    function getAssetPrice8(address underlyingToken) external view returns (uint256 price) {
+        address vTokenAddress = getVTokenForUnderlying(underlyingToken);
+        if (vTokenAddress == address(0)) return 0;
+        try oracle.getUnderlyingPrice(vTokenAddress) returns (uint256 p) {
+            // Convert from 18 decimals to 8 decimals
+            return p / 1e10;
+        } catch {
+            return 0;
         }
     }
 }
