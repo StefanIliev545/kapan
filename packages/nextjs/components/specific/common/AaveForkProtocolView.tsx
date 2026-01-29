@@ -3,7 +3,7 @@ import { Cog6ToothIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { ProtocolView, ProtocolPosition } from "../../ProtocolView";
 import { AaveLike } from "../aave/AaveLike";
 import { EModeToggle } from "../aave/EModeToggle";
-import { ADLAutomationModal } from "../../modals/ADLAutomationModal";
+import { LTVAutomationModal } from "../../modals/LTVAutomationModal";
 import { SwapAsset } from "../../modals/SwapModalShell";
 import { useGatewayWithRiskParams, ViewGatewayContractName } from "~~/hooks/useGatewayContract";
 import { useAaveLikeEMode, AaveLikeViewContractName, AaveLikeWriteContractName } from "~~/hooks/useAaveEMode";
@@ -160,7 +160,7 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, e
 
             {/* ADL Automation Modal */}
             {selectedDebt && (
-              <ADLAutomationModal
+              <LTVAutomationModal
                 isOpen={adlModal.isOpen}
                 onClose={adlModal.close}
                 protocolName={protocolName}

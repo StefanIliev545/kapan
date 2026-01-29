@@ -20,7 +20,7 @@ import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
 import { CloseWithCollateralEvmModal } from "~~/components/modals/CloseWithCollateralEvmModal";
 import { AddEulerCollateralModal } from "~~/components/modals/AddEulerCollateralModal";
 import { EulerBorrowModal } from "~~/components/modals/EulerBorrowModal";
-import { ADLAutomationModal } from "~~/components/modals/ADLAutomationModal";
+import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
 import type { SwapAsset } from "~~/components/modals/SwapModalShell";
 import { useADLContracts } from "~~/hooks/useADLOrder";
 import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
@@ -411,10 +411,10 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
   return (
     <div className="bg-base-300/30 rounded-lg p-3">
       {/* Header: Sub-account label + Health indicator */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <div>
           {!isMainAccount && (
-            <span className="text-[10px] font-medium text-base-content/40 uppercase tracking-wider">
+            <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-wider">
               Sub-account
             </span>
           )}
@@ -449,11 +449,11 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         {/* Left side: Collaterals */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-base-content/50">
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-base-content/50 text-[10px] font-semibold uppercase tracking-wider">
               Collateral
             </div>
             {debt && (
@@ -467,7 +467,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
             )}
           </div>
           {collaterals.length === 0 ? (
-            <div className="text-sm text-base-content/40 italic">None</div>
+            <div className="text-base-content/40 text-sm italic">None</div>
           ) : (
             <div className="space-y-2">
               {collaterals.map((col, idx) => {
@@ -504,17 +504,17 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
         </div>
 
         {/* Divider */}
-        <div className="hidden sm:block w-px bg-base-content/10 self-stretch" />
-        <div className="sm:hidden h-px bg-base-content/10 w-full" />
+        <div className="bg-base-content/10 hidden w-px self-stretch sm:block" />
+        <div className="bg-base-content/10 h-px w-full sm:hidden" />
 
         {/* Right side: Debt */}
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-base-content/50 mb-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-base-content/50 mb-2 text-[10px] font-semibold uppercase tracking-wider">
             Debt
           </div>
           {!debt ? (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-base-content/40 italic">None</span>
+              <span className="text-base-content/40 text-sm italic">None</span>
               {collaterals.length > 0 && (
                 <button
                   type="button"
@@ -662,7 +662,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
 
       {/* ADL Automation Modal */}
       {debt && collaterals.length > 0 && healthStatus && (
-        <ADLAutomationModal
+        <LTVAutomationModal
           isOpen={adlModal.isOpen}
           onClose={adlModal.close}
           protocolName="Euler"

@@ -1,0 +1,395 @@
+{
+  "address": "0x8292810E039776F2CB2632939e829d0edB8822ED",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_manager",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "OrderNotValid",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "PollNever",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "PollTryNextBlock",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CHUNK_WINDOW",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes",
+          "name": "staticInput",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "name": "getTradeableOrder",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "contract IERC20",
+              "name": "sellToken",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IERC20",
+              "name": "buyToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "receiver",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "sellAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "buyAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint32",
+              "name": "validTo",
+              "type": "uint32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "appData",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "feeAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "kind",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bool",
+              "name": "partiallyFillable",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "sellTokenBalance",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "buyTokenBalance",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct GPv2Order.Data",
+          "name": "order",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "manager",
+      "outputs": [
+        {
+          "internalType": "contract IKapanConditionalOrderManager",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "interfaceId",
+          "type": "bytes4"
+        }
+      ],
+      "name": "supportsInterface",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes",
+          "name": "staticInput",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        },
+        {
+          "components": [
+            {
+              "internalType": "contract IERC20",
+              "name": "sellToken",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IERC20",
+              "name": "buyToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "receiver",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "sellAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "buyAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint32",
+              "name": "validTo",
+              "type": "uint32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "appData",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "feeAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "kind",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bool",
+              "name": "partiallyFillable",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "sellTokenBalance",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "buyTokenBalance",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct GPv2Order.Data",
+          "name": "order",
+          "type": "tuple"
+        }
+      ],
+      "name": "verify",
+      "outputs": [],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x31bd0ec4c700d12a6c6e6573e83c2fdbfc878fef4f64b4531be4ec72055560ca",
+  "receipt": {
+    "to": "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+    "from": "0x0BE61223F99E57b8b8B7033a77B54Adc7f7cF027",
+    "contractAddress": null,
+    "transactionIndex": 7,
+    "gasUsed": "872572",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0xc27a2d2f2ea7f6a8ab91c16487d856527728a93033a97cc9cbb5d304c5ccd2f3",
+    "transactionHash": "0x31bd0ec4c700d12a6c6e6573e83c2fdbfc878fef4f64b4531be4ec72055560ca",
+    "logs": [],
+    "blockNumber": 426469201,
+    "cumulativeGasUsed": "2061890",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0xD49D9C9F7A4C3dD06762D5d8FC14bcED8E6D552D"
+  ],
+  "numDeployments": 5,
+  "solcInputHash": "74ba877665fc6cb1dc8a91217367ceb4",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_manager\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"reason\",\"type\":\"string\"}],\"name\":\"OrderNotValid\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"reason\",\"type\":\"string\"}],\"name\":\"PollNever\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"reason\",\"type\":\"string\"}],\"name\":\"PollTryNextBlock\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"CHUNK_WINDOW\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"staticInput\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"getTradeableOrder\",\"outputs\":[{\"components\":[{\"internalType\":\"contract IERC20\",\"name\":\"sellToken\",\"type\":\"address\"},{\"internalType\":\"contract IERC20\",\"name\":\"buyToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"sellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"buyAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint32\",\"name\":\"validTo\",\"type\":\"uint32\"},{\"internalType\":\"bytes32\",\"name\":\"appData\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"kind\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"partiallyFillable\",\"type\":\"bool\"},{\"internalType\":\"bytes32\",\"name\":\"sellTokenBalance\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"buyTokenBalance\",\"type\":\"bytes32\"}],\"internalType\":\"struct GPv2Order.Data\",\"name\":\"order\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"manager\",\"outputs\":[{\"internalType\":\"contract IKapanConditionalOrderManager\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"staticInput\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"contract IERC20\",\"name\":\"sellToken\",\"type\":\"address\"},{\"internalType\":\"contract IERC20\",\"name\":\"buyToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"sellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"buyAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint32\",\"name\":\"validTo\",\"type\":\"uint32\"},{\"internalType\":\"bytes32\",\"name\":\"appData\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"feeAmount\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"kind\",\"type\":\"bytes32\"},{\"internalType\":\"bool\",\"name\":\"partiallyFillable\",\"type\":\"bool\"},{\"internalType\":\"bytes32\",\"name\":\"sellTokenBalance\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"buyTokenBalance\",\"type\":\"bytes32\"}],\"internalType\":\"struct GPv2Order.Data\",\"name\":\"order\",\"type\":\"tuple\"}],\"name\":\"verify\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Implements IConditionalOrderGenerator for ComposableCoW integration.      This is a STATELESS handler that reads order data from KapanConditionalOrderManager.      Separating handler from manager is required because:      - Handler must implement IERC165 for ComposableCoW to verify interface support      - Manager (owner) must NOT implement IERC165 to avoid Safe/fallback handler path\",\"errors\":{\"OrderNotValid(string)\":[{\"details\":\"Signal that the order parameters are invalid\"}],\"PollNever(string)\":[{\"details\":\"Signal to stop polling this order (completed or cancelled)\"}],\"PollTryNextBlock(string)\":[{\"details\":\"Signal to try polling again at the next block\"}]},\"kind\":\"dev\",\"methods\":{\"getTradeableOrder(address,address,bytes32,bytes,bytes)\":{\"details\":\"Called by ComposableCoW via getTradeableOrderWithSignature\",\"params\":{\"staticInput\":\"ABI-encoded orderHash\"},\"returns\":{\"order\":\"The GPv2Order.Data struct\"}},\"supportsInterface(bytes4)\":{\"details\":\"Required for ComposableCoW to verify handler compatibility\"},\"verify(address,address,bytes32,bytes32,bytes32,bytes,bytes,(address,address,address,uint256,uint256,uint32,bytes32,uint256,bytes32,bool,bytes32,bytes32))\":{\"details\":\"Called by ComposableCoW during signature verification\"}},\"title\":\"KapanConditionalOrderHandler\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"CHUNK_WINDOW()\":{\"notice\":\"Chunk window duration for deterministic validTo\"},\"getTradeableOrder(address,address,bytes32,bytes,bytes)\":{\"notice\":\"Generate a tradeable order if trigger condition is met\"},\"manager()\":{\"notice\":\"The KapanConditionalOrderManager that stores order contexts\"},\"supportsInterface(bytes4)\":{\"notice\":\"Check if contract supports an interface\"},\"verify(address,address,bytes32,bytes32,bytes32,bytes,bytes,(address,address,address,uint256,uint256,uint32,bytes32,uint256,bytes32,bool,bytes32,bytes32))\":{\"notice\":\"Verify that a proposed order matches the conditional order\"}},\"notice\":\"Generates CoW Protocol orders for Kapan conditional/trigger-based orders (ADL, stop-loss, etc.)\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/v2/cow/KapanConditionalOrderHandler.sol\":\"KapanConditionalOrderHandler\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":10},\"remappings\":[],\"viaIR\":true},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/IERC20.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Interface of the ERC20 standard as defined in the EIP.\\n */\\ninterface IERC20 {\\n    /**\\n     * @dev Emitted when `value` tokens are moved from one account (`from`) to\\n     * another (`to`).\\n     *\\n     * Note that `value` may be zero.\\n     */\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\n\\n    /**\\n     * @dev Emitted when the allowance of a `spender` for an `owner` is set by\\n     * a call to {approve}. `value` is the new allowance.\\n     */\\n    event Approval(address indexed owner, address indexed spender, uint256 value);\\n\\n    /**\\n     * @dev Returns the value of tokens in existence.\\n     */\\n    function totalSupply() external view returns (uint256);\\n\\n    /**\\n     * @dev Returns the value of tokens owned by `account`.\\n     */\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from the caller's account to `to`.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transfer(address to, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Returns the remaining number of tokens that `spender` will be\\n     * allowed to spend on behalf of `owner` through {transferFrom}. This is\\n     * zero by default.\\n     *\\n     * This value changes when {approve} or {transferFrom} are called.\\n     */\\n    function allowance(address owner, address spender) external view returns (uint256);\\n\\n    /**\\n     * @dev Sets a `value` amount of tokens as the allowance of `spender` over the\\n     * caller's tokens.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * IMPORTANT: Beware that changing an allowance with this method brings the risk\\n     * that someone may use both the old and the new allowance by unfortunate\\n     * transaction ordering. One possible solution to mitigate this race\\n     * condition is to first reduce the spender's allowance to 0 and set the\\n     * desired value afterwards:\\n     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729\\n     *\\n     * Emits an {Approval} event.\\n     */\\n    function approve(address spender, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from `from` to `to` using the\\n     * allowance mechanism. `value` is then deducted from the caller's\\n     * allowance.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transferFrom(address from, address to, uint256 value) external returns (bool);\\n}\\n\",\"keccak256\":\"0xc6a8ff0ea489379b61faa647490411b80102578440ab9d84e9a957cc12164e70\",\"license\":\"MIT\"},\"@openzeppelin/contracts/utils/introspection/IERC165.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (utils/introspection/IERC165.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Interface of the ERC165 standard, as defined in the\\n * https://eips.ethereum.org/EIPS/eip-165[EIP].\\n *\\n * Implementers can declare support of contract interfaces, which can then be\\n * queried by others ({ERC165Checker}).\\n *\\n * For an implementation, see {ERC165}.\\n */\\ninterface IERC165 {\\n    /**\\n     * @dev Returns true if this contract implements the interface defined by\\n     * `interfaceId`. See the corresponding\\n     * https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[EIP section]\\n     * to learn more about how these ids are created.\\n     *\\n     * This function call must use less than 30 000 gas.\\n     */\\n    function supportsInterface(bytes4 interfaceId) external view returns (bool);\\n}\\n\",\"keccak256\":\"0x4296879f55019b23e135000eb36896057e7101fb7fb859c5ef690cf14643757b\",\"license\":\"MIT\"},\"contracts/v2/cow/KapanConditionalOrderHandler.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport { IConditionalOrder, IConditionalOrderGenerator, PollTryNextBlock, PollNever, OrderNotValid } from \\\"../interfaces/cow/IConditionalOrder.sol\\\";\\nimport { GPv2Order } from \\\"../interfaces/cow/GPv2Order.sol\\\";\\nimport { IERC20 } from \\\"@openzeppelin/contracts/token/ERC20/IERC20.sol\\\";\\nimport { IERC165 } from \\\"@openzeppelin/contracts/utils/introspection/IERC165.sol\\\";\\nimport { IOrderTrigger } from \\\"../interfaces/IOrderTrigger.sol\\\";\\n\\n/// @notice Minimal interface to read from KapanConditionalOrderManager\\ninterface IKapanConditionalOrderManager {\\n    enum OrderStatus { None, Active, Completed, Cancelled }\\n\\n    struct KapanOrderParams {\\n        address user;\\n        address trigger;\\n        bytes triggerStaticData;\\n        bytes preInstructions;\\n        address sellToken;\\n        address buyToken;\\n        bytes postInstructions;\\n        bytes32 appDataHash;\\n        uint256 maxIterations;\\n        address sellTokenRefundAddress;\\n    }\\n\\n    struct OrderContext {\\n        KapanOrderParams params;\\n        OrderStatus status;\\n        uint256 iterationCount;\\n        uint256 createdAt;\\n    }\\n\\n    function getOrder(bytes32 orderHash) external view returns (OrderContext memory);\\n    function cachedSellAmount(bytes32 orderHash) external view returns (uint256);\\n    function cachedBuyAmount(bytes32 orderHash) external view returns (uint256);\\n}\\n\\n/// @title KapanConditionalOrderHandler\\n/// @notice Generates CoW Protocol orders for Kapan conditional/trigger-based orders (ADL, stop-loss, etc.)\\n/// @dev Implements IConditionalOrderGenerator for ComposableCoW integration.\\n///      This is a STATELESS handler that reads order data from KapanConditionalOrderManager.\\n///      Separating handler from manager is required because:\\n///      - Handler must implement IERC165 for ComposableCoW to verify interface support\\n///      - Manager (owner) must NOT implement IERC165 to avoid Safe/fallback handler path\\ncontract KapanConditionalOrderHandler is IConditionalOrderGenerator, IERC165 {\\n\\n    // ============ Constants ============\\n\\n    /// @notice Chunk window duration for deterministic validTo\\n    uint256 public constant CHUNK_WINDOW = 30 minutes;\\n\\n    // ============ State Variables ============\\n\\n    /// @notice The KapanConditionalOrderManager that stores order contexts\\n    IKapanConditionalOrderManager public immutable manager;\\n\\n    // ============ Constructor ============\\n\\n    constructor(address _manager) {\\n        require(_manager != address(0), \\\"Invalid manager\\\");\\n        manager = IKapanConditionalOrderManager(_manager);\\n    }\\n\\n    // ============ IConditionalOrderGenerator Implementation ============\\n\\n    /// @notice Generate a tradeable order if trigger condition is met\\n    /// @dev Called by ComposableCoW via getTradeableOrderWithSignature\\n    /// @param staticInput ABI-encoded orderHash\\n    /// @return order The GPv2Order.Data struct\\n    function getTradeableOrder(\\n        address,\\n        address,\\n        bytes32,\\n        bytes calldata staticInput,\\n        bytes calldata\\n    ) external view override returns (GPv2Order.Data memory order) {\\n        bytes32 orderHash = abi.decode(staticInput, (bytes32));\\n        IKapanConditionalOrderManager.OrderContext memory ctx = manager.getOrder(orderHash);\\n\\n        // Validate order is active\\n        if (ctx.status != IKapanConditionalOrderManager.OrderStatus.Active) {\\n            revert PollNever(\\\"order_not_active\\\");\\n        }\\n\\n        // Get trigger\\n        IOrderTrigger trigger = IOrderTrigger(ctx.params.trigger);\\n\\n        // Check if order is complete\\n        if (trigger.isComplete(ctx.params.triggerStaticData, ctx.params.user, ctx.iterationCount)) {\\n            revert PollNever(\\\"trigger_complete\\\");\\n        }\\n        if (ctx.params.maxIterations > 0 && ctx.iterationCount >= ctx.params.maxIterations) {\\n            revert PollNever(\\\"max_iterations_reached\\\");\\n        }\\n\\n        // Use cached amounts if available (set by pre-hook before state changes)\\n        uint256 sellAmount = manager.cachedSellAmount(orderHash);\\n        uint256 minBuyAmount = manager.cachedBuyAmount(orderHash);\\n\\n        if (sellAmount == 0) {\\n            // No cached amounts - calculate fresh from trigger\\n            (bool shouldExecute, string memory reason) = trigger.shouldExecute(\\n                ctx.params.triggerStaticData,\\n                ctx.params.user\\n            );\\n\\n            if (!shouldExecute) {\\n                revert PollTryNextBlock(reason);\\n            }\\n\\n            (sellAmount, minBuyAmount) = trigger.calculateExecution(\\n                ctx.params.triggerStaticData,\\n                ctx.params.user\\n            );\\n\\n            if (sellAmount == 0) {\\n                revert PollNever(\\\"zero_sell_amount\\\");\\n            }\\n        }\\n\\n        // Calculate deterministic validTo\\n        uint256 validTo = _calculateValidTo(ctx.createdAt, ctx.iterationCount);\\n\\n        // Verify order hasn't expired\\n        if (block.timestamp > validTo) {\\n            revert PollTryNextBlock(\\\"window_expired\\\");\\n        }\\n\\n        // Build the order - receiver is manager (for post-hook token handling)\\n        order = GPv2Order.Data({\\n            sellToken: IERC20(ctx.params.sellToken),\\n            buyToken: IERC20(ctx.params.buyToken),\\n            receiver: address(manager),\\n            sellAmount: sellAmount,\\n            buyAmount: minBuyAmount,\\n            validTo: uint32(validTo),\\n            appData: ctx.params.appDataHash,\\n            feeAmount: 0,\\n            kind: GPv2Order.KIND_SELL,\\n            partiallyFillable: false,\\n            sellTokenBalance: GPv2Order.BALANCE_ERC20,\\n            buyTokenBalance: GPv2Order.BALANCE_ERC20\\n        });\\n    }\\n\\n    /// @notice Verify that a proposed order matches the conditional order\\n    /// @dev Called by ComposableCoW during signature verification\\n    function verify(\\n        address,\\n        address,\\n        bytes32,\\n        bytes32,\\n        bytes32,\\n        bytes calldata staticInput,\\n        bytes calldata,\\n        GPv2Order.Data calldata order\\n    ) external view override {\\n        bytes32 orderHash = abi.decode(staticInput, (bytes32));\\n        IKapanConditionalOrderManager.OrderContext memory ctx = manager.getOrder(orderHash);\\n\\n        if (ctx.status != IKapanConditionalOrderManager.OrderStatus.Active) {\\n            revert OrderNotValid(\\\"order_not_active\\\");\\n        }\\n\\n        // Validate tokens match\\n        if (address(order.sellToken) != ctx.params.sellToken) {\\n            revert OrderNotValid(\\\"sell_token_mismatch\\\");\\n        }\\n        if (address(order.buyToken) != ctx.params.buyToken) {\\n            revert OrderNotValid(\\\"buy_token_mismatch\\\");\\n        }\\n\\n        // Validate receiver is manager\\n        if (order.receiver != address(manager)) {\\n            revert OrderNotValid(\\\"invalid_receiver\\\");\\n        }\\n\\n        // Validate appData\\n        if (order.appData != ctx.params.appDataHash) {\\n            revert OrderNotValid(\\\"appdata_mismatch\\\");\\n        }\\n    }\\n\\n    // ============ Internal Functions ============\\n\\n    /// @notice Calculate deterministic validTo timestamp\\n    function _calculateValidTo(uint256 createdAt, uint256 iterationCount) internal view returns (uint256) {\\n        uint256 chunkWindowStart = createdAt + (iterationCount * CHUNK_WINDOW);\\n        uint256 chunkWindowEnd = chunkWindowStart + CHUNK_WINDOW - 1;\\n\\n        if (block.timestamp <= chunkWindowEnd) {\\n            return chunkWindowEnd;\\n        }\\n\\n        // Extend to current window\\n        uint256 elapsedSinceCreate = block.timestamp - createdAt;\\n        uint256 currentWindowIndex = elapsedSinceCreate / CHUNK_WINDOW;\\n        return createdAt + ((currentWindowIndex + 1) * CHUNK_WINDOW) - 1;\\n    }\\n\\n    // ============ ERC-165 Implementation ============\\n\\n    /// @notice Check if contract supports an interface\\n    /// @dev Required for ComposableCoW to verify handler compatibility\\n    function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {\\n        return interfaceId == type(IConditionalOrderGenerator).interfaceId ||\\n               interfaceId == type(IConditionalOrder).interfaceId ||\\n               interfaceId == type(IERC165).interfaceId;\\n    }\\n}\\n\",\"keccak256\":\"0x755f3198f501310ed1eea3eb3a5cac720f5d6d3732a29f42abda1138131154eb\",\"license\":\"MIT\"},\"contracts/v2/interfaces/IOrderTrigger.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\n/// @title IOrderTrigger\\n/// @notice Interface for pluggable order triggers in the Kapan conditional order system\\n/// @dev Triggers determine when an order should execute and how much to trade\\ninterface IOrderTrigger {\\n    /// @notice Check if the order should execute based on current conditions\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner (user whose position is being monitored)\\n    /// @return shouldExecute True if the trigger condition is met\\n    /// @return reason Human-readable reason for the result (for debugging/logging)\\n    function shouldExecute(\\n        bytes calldata staticData,\\n        address owner\\n    ) external view returns (bool shouldExecute, string memory reason);\\n\\n    /// @notice Calculate the execution amounts when the trigger fires\\n    /// @dev Only called when shouldExecute returns true\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner\\n    /// @return sellAmount Amount of sell token to trade in this execution\\n    /// @return minBuyAmount Minimum amount to receive (includes slippage protection)\\n    function calculateExecution(\\n        bytes calldata staticData,\\n        address owner\\n    ) external view returns (uint256 sellAmount, uint256 minBuyAmount);\\n\\n    /// @notice Check if the order is complete and should stop executing\\n    /// @dev Called after each execution to determine if order should be marked complete\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner\\n    /// @param iterationCount Number of executions completed so far\\n    /// @return complete True if the order goal has been reached\\n    function isComplete(\\n        bytes calldata staticData,\\n        address owner,\\n        uint256 iterationCount\\n    ) external view returns (bool complete);\\n\\n    /// @notice Get human-readable name of the trigger type\\n    /// @return name Trigger name (e.g., \\\"LTV\\\", \\\"Price\\\", \\\"HealthFactor\\\")\\n    function triggerName() external pure returns (string memory name);\\n}\\n\",\"keccak256\":\"0x0a4632796415a05e04d2d42eabc5691183c2c0b98088fd47e8a939d30c11a308\",\"license\":\"MIT\"},\"contracts/v2/interfaces/cow/GPv2Order.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport { IERC20 } from \\\"@openzeppelin/contracts/token/ERC20/IERC20.sol\\\";\\n\\n/// @title GPv2Order - CoW Protocol order library\\n/// @notice Data structures and helpers for CoW Protocol orders\\nlibrary GPv2Order {\\n    /// @dev The complete order data that is signed by the user\\n    struct Data {\\n        IERC20 sellToken;\\n        IERC20 buyToken;\\n        address receiver;\\n        uint256 sellAmount;\\n        uint256 buyAmount;\\n        uint32 validTo;\\n        bytes32 appData;\\n        uint256 feeAmount;\\n        bytes32 kind;\\n        bool partiallyFillable;\\n        bytes32 sellTokenBalance;\\n        bytes32 buyTokenBalance;\\n    }\\n\\n    /// @dev Order kind constants\\n    bytes32 internal constant KIND_SELL =\\n        keccak256(\\\"sell\\\");\\n    bytes32 internal constant KIND_BUY =\\n        keccak256(\\\"buy\\\");\\n\\n    /// @dev Token balance constants\\n    bytes32 internal constant BALANCE_ERC20 =\\n        keccak256(\\\"erc20\\\");\\n    bytes32 internal constant BALANCE_EXTERNAL =\\n        keccak256(\\\"external\\\");\\n    bytes32 internal constant BALANCE_INTERNAL =\\n        keccak256(\\\"internal\\\");\\n\\n    /// @dev The order EIP-712 type hash\\n    bytes32 internal constant TYPE_HASH =\\n        keccak256(\\n            \\\"Order(\\\"\\n            \\\"address sellToken,\\\"\\n            \\\"address buyToken,\\\"\\n            \\\"address receiver,\\\"\\n            \\\"uint256 sellAmount,\\\"\\n            \\\"uint256 buyAmount,\\\"\\n            \\\"uint32 validTo,\\\"\\n            \\\"bytes32 appData,\\\"\\n            \\\"uint256 feeAmount,\\\"\\n            \\\"string kind,\\\"\\n            \\\"bool partiallyFillable,\\\"\\n            \\\"string sellTokenBalance,\\\"\\n            \\\"string buyTokenBalance\\\"\\n            \\\")\\\"\\n        );\\n\\n    /// @dev Computes the order hash for the given order data\\n    /// @param order The order to hash\\n    /// @param domainSeparator The EIP-712 domain separator\\n    /// @return orderDigest The order digest\\n    function hash(Data memory order, bytes32 domainSeparator) internal pure returns (bytes32 orderDigest) {\\n        bytes32 structHash = keccak256(\\n            abi.encode(\\n                TYPE_HASH,\\n                order.sellToken,\\n                order.buyToken,\\n                order.receiver,\\n                order.sellAmount,\\n                order.buyAmount,\\n                order.validTo,\\n                order.appData,\\n                order.feeAmount,\\n                order.kind,\\n                order.partiallyFillable,\\n                order.sellTokenBalance,\\n                order.buyTokenBalance\\n            )\\n        );\\n        orderDigest = keccak256(abi.encodePacked(\\\"\\\\x19\\\\x01\\\", domainSeparator, structHash));\\n    }\\n}\\n\",\"keccak256\":\"0x9b8e973f4ab364c4dc43f72ee73171a589c5a9cadfb2778281e3c1e6bfc531f9\",\"license\":\"MIT\"},\"contracts/v2/interfaces/cow/IConditionalOrder.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport { GPv2Order } from \\\"./GPv2Order.sol\\\";\\n\\n/// @title IConditionalOrder - Interface for conditional order handlers\\n/// @notice Defines the interface for creating conditional/programmatic orders on CoW Protocol\\ninterface IConditionalOrder {\\n    /// @dev Conditional order parameters stored on-chain\\n    struct ConditionalOrderParams {\\n        IConditionalOrder handler;\\n        bytes32 salt;\\n        bytes staticData;\\n    }\\n\\n    /// @notice Verifies that a discrete order is valid for the conditional order\\n    /// @param owner The owner of the conditional order\\n    /// @param sender The msg.sender calling isValidSignature\\n    /// @param _hash The EIP-712 order digest\\n    /// @param domainSeparator The EIP-712 domain separator\\n    /// @param ctx The execution context (H(params) for single, merkle root for tree)\\n    /// @param staticInput Order-specific data known at creation time\\n    /// @param offchainInput Order-specific data NOT known at creation time\\n    /// @param order The proposed discrete order\\n    function verify(\\n        address owner,\\n        address sender,\\n        bytes32 _hash,\\n        bytes32 domainSeparator,\\n        bytes32 ctx,\\n        bytes calldata staticInput,\\n        bytes calldata offchainInput,\\n        GPv2Order.Data calldata order\\n    ) external view;\\n}\\n\\n/// @title IConditionalOrderGenerator - Interface for conditional order generators\\n/// @notice Extends IConditionalOrder to generate tradeable orders\\ninterface IConditionalOrderGenerator is IConditionalOrder {\\n    /// @notice Generates a tradeable GPv2Order based on the current state\\n    /// @param owner The owner of the conditional order\\n    /// @param sender The msg.sender (usually ComposableCoW)\\n    /// @param ctx The execution context\\n    /// @param staticInput Order-specific data known at creation time\\n    /// @param offchainInput Order-specific data provided by the watch-tower\\n    /// @return order The generated GPv2Order.Data struct\\n    function getTradeableOrder(\\n        address owner,\\n        address sender,\\n        bytes32 ctx,\\n        bytes calldata staticInput,\\n        bytes calldata offchainInput\\n    ) external view returns (GPv2Order.Data memory order);\\n}\\n\\n/// @title Conditional Order Errors\\n/// @notice Custom errors for signaling to watch-towers\\n\\n/// @dev Signal to try polling again at the next block\\nerror PollTryNextBlock(string reason);\\n\\n/// @dev Signal to try polling at a specific block\\nerror PollTryAtBlock(uint256 blockNumber, string reason);\\n\\n/// @dev Signal to try polling at a specific timestamp\\nerror PollTryAtEpoch(uint256 timestamp, string reason);\\n\\n/// @dev Signal to stop polling this order (completed or cancelled)\\nerror PollNever(string reason);\\n\\n/// @dev Signal that the order parameters are invalid\\nerror OrderNotValid(string reason);\\n\\n/// @dev Signal that the order is not currently tradeable\\nerror OrderNotReady(string reason);\\n\",\"keccak256\":\"0x8ed6bb23c9714b66979060191d71c9601b8cc69df40b8d9b06d284e00b318eca\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x60a0346100b757601f610f6338819003918201601f19168301916001600160401b038311848410176100bb578084926020946040528339810103126100b757516001600160a01b038116908190036100b757801561008057608052604051610e9390816100d0823960805181818161012d0152818161073001526107f20152f35b60405162461bcd60e51b815260206004820152600f60248201526e24b73b30b634b21036b0b730b3b2b960891b6044820152606490fd5b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe6080806040526004361015610012575f80fd5b5f3560e01c90816301ffc9a714610a01575080630b648128146109e557806314a2a7841461075f578063481c6a751461071b5763b8296fc414610053575f80fd5b346105075760a03660031901126105075761006c610a6c565b50610075610a82565b506064356001600160401b03811161050757610095903690600401610a98565b6084356001600160401b038111610507576020916100b884923690600401610a98565b50505f6101606040516100ca81610ac5565b82815282868201528260408201528260608201528260808201528260a08201528260c08201528260e082015282610100820152826101208201528261014082015201528101031261050757604051632bbc239560e11b81529035600482018190527f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316905f83602481855afa928315610513575f936106f7575b50602083015160048110156106e3575f19016106c95782516020808201516040808401519351818801805192516343fc086560e01b8152606060048201526001600160a01b039485169896919590949093859384939216916101d2906064850190610d44565b91602484015260448301520381885afa908115610513575f9161068f575b506106565761010085510151801515908161064a575b5061060b5760405163268a0ec160e01b81526004810184905293602085602481865afa948515610513575f956105d7575b508493604051906303fc40f560e51b82526004820152602081602481875afa908115610513575f916105a5575b5094156103eb575b506060850151905161027d91610db1565b908142116103b45761018094519260018060a01b036080850151169460e060018060a01b0360a08701511695015163ffffffff604051956102bd87610ac5565b888752602087019788526040870195865260608701948552608087019384528160a088019116815260c0870192835260e08701935f85526101008801957ff3b277728b3fee749481eb3e0b3b48980dbbab78658fc419025cb16eee34677587526101208901975f89526101606101408b019a5f516020610e3e5f395f51905f528c52019a5f516020610e3e5f395f51905f528c526040519c8d5260018060a01b0390511660208d015260018060a01b0390511660408c01525160608b01525160808a0152511660a08801525160c08701525160e0860152516101008501525115156101208401525161014083015251610160820152f35b60405163d05f306560e01b815260206004820152600e60248201526d1dda5b991bddd7d95e1c1a5c995960921b6044820152606490fd5b85516040808201519151905163632224a760e01b815293965093945090925f9183918291610426916001600160a01b03169060048401610d68565b0381855afa908115610513575f905f92610547575b501561051e5750835160408082015191518151632b548a7b60e11b8152949391928592918391829161047c916001600160a01b039091169060048401610d68565b03915afa8015610513575f925f916104d6575b5092821561049d575f61026c565b60405163981b64cd60e01b815260206004820152601060248201526f1e995c9bd7dcd95b1b17d85b5bdd5b9d60821b6044820152606490fd5b9250506040823d60401161050b575b816104f260409383610af5565b8101031261050757602082519201515f61048f565b5f80fd5b3d91506104e5565b6040513d5f823e3d90fd5b60405163d05f306560e01b815260206004820152908190610543906024830190610d44565b0390fd5b9150503d805f833e6105598183610af5565b81016040828203126105075761056e82610d37565b602083015190926001600160401b03821161050757019080601f8301121561050757815161059e92602001610b2c565b905f61043b565b90506020813d6020116105cf575b816105c060209383610af5565b8101031261050757515f610264565b3d91506105b3565b9094506020813d602011610603575b816105f360209383610af5565b810103126105075751935f610237565b3d91506105e6565b60405163981b64cd60e01b81526020600482015260166024820152751b585e17da5d195c985d1a5bdb9cd7dc995858da195960521b6044820152606490fd5b9050815110155f610206565b60405163981b64cd60e01b815260206004820152601060248201526f747269676765725f636f6d706c65746560801b6044820152606490fd5b90506020813d6020116106c1575b816106aa60209383610af5565b81010312610507576106bb90610d37565b5f6101f0565b3d915061069d565b60405163981b64cd60e01b81528061054360048201610d0c565b634e487b7160e01b5f52602160045260245ffd5b6107149193503d805f833e61070c8183610af5565b810190610b8e565b915f61016c565b34610507575f366003190112610507576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346105075761026036600319011261050757610779610a6c565b50610782610a82565b5060a4356001600160401b038111610507576107a2903690600401610a98565b60c4356001600160401b038111610507576107c1903690600401610a98565b50506101803660e319011261050757816020918101031261050757604051632bbc239560e11b8152903560048201527f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165f82602481845afa918215610513575f926109c9575b50602082015160048110156106e3575f19016109af5760e4356001600160a01b0381169081810361050757508251608001516001600160a01b03160361097357610104356001600160a01b038116908181036105075750825160a001516001600160a01b03160361093857610124356001600160a01b0381169081900361050757036108ff575160e001516101a435036108c657005b60405163c8fc272560e01b815260206004820152601060248201526f0c2e0e0c8c2e8c2bedad2e6dac2e8c6d60831b6044820152606490fd5b60405163c8fc272560e01b815260206004820152601060248201526f34b73b30b634b22fb932b1b2b4bb32b960811b6044820152606490fd5b60405163c8fc272560e01b81526020600482015260126024820152710c4eaf2bee8ded6cadcbedad2e6dac2e8c6d60731b6044820152606490fd5b60405163c8fc272560e01b81526020600482015260136024820152720e6cad8d8bee8ded6cadcbedad2e6dac2e8c6d606b1b6044820152606490fd5b60405163c8fc272560e01b81528061054360048201610d0c565b6109de9192503d805f833e61070c8183610af5565b9082610830565b34610507575f3660031901126105075760206040516107088152f35b34610507576020366003190112610507576004359063ffffffff60e01b821680920361050757602091632e0a5bf160e21b8114908115610a5b575b8115610a4a575b5015158152f35b6301ffc9a760e01b14905083610a43565b630528a9e160e21b81149150610a3c565b600435906001600160a01b038216820361050757565b602435906001600160a01b038216820361050757565b9181601f84011215610507578235916001600160401b038311610507576020838186019501011161050757565b61018081019081106001600160401b03821117610ae157604052565b634e487b7160e01b5f52604160045260245ffd5b601f909101601f19168101906001600160401b03821190821017610ae157604052565b51906001600160a01b038216820361050757565b9192916001600160401b038211610ae15760405191610b55601f8201601f191660200184610af5565b829481845281830111610507578281602093845f96015e010152565b9080601f83011215610507578151610b8b92602001610b2c565b90565b602081830312610507578051906001600160401b03821161050757016080818303126105075760405191608083016001600160401b03811184821017610ae15760405281516001600160401b03811161050757820161014081830312610507576040519161014083016001600160401b03811184821017610ae157604052610c1582610b18565b8352610c2360208301610b18565b602084015260408201516001600160401b0381116105075781610c47918401610b71565b604084015260608201516001600160401b0381116105075781610c6b918401610b71565b6060840152610c7c60808301610b18565b6080840152610c8d60a08301610b18565b60a084015260c0820151916001600160401b03831161050757610cb861012092610cd9948301610b71565b60c085015260e081015160e085015261010081015161010085015201610b18565b61012082015282526020810151906004821015610507576060916020840152604081015160408401520151606082015290565b60609060208152601060208201526f6f726465725f6e6f745f61637469766560801b60408201520190565b5190811515820361050757565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b90610d80602091949394604084526040840190610d44565b6001600160a01b03909416910152565b91908201809211610d9d57565b634e487b7160e01b5f52601160045260245ffd5b906107088102908082046107081490151715610d9d57610dd19082610d90565b610708810190818111610d9d5761070701908111610d9d5780421115610e385750804203428111610d9d57610708900460018101809111610d9d576107088102908082046107081490151715610d9d57610e2a91610d90565b5f198101908111610d9d5790565b90509056fe5a28e9363bb942b639270062aa6bb295f434bcdfc42c97267bf003f272060dc9a2646970667358221220dee839a6f04dfb98bd514572c72383e9b25ab7e48c0867c987be36c984f1914464736f6c634300081e0033",
+  "deployedBytecode": "0x6080806040526004361015610012575f80fd5b5f3560e01c90816301ffc9a714610a01575080630b648128146109e557806314a2a7841461075f578063481c6a751461071b5763b8296fc414610053575f80fd5b346105075760a03660031901126105075761006c610a6c565b50610075610a82565b506064356001600160401b03811161050757610095903690600401610a98565b6084356001600160401b038111610507576020916100b884923690600401610a98565b50505f6101606040516100ca81610ac5565b82815282868201528260408201528260608201528260808201528260a08201528260c08201528260e082015282610100820152826101208201528261014082015201528101031261050757604051632bbc239560e11b81529035600482018190527f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316905f83602481855afa928315610513575f936106f7575b50602083015160048110156106e3575f19016106c95782516020808201516040808401519351818801805192516343fc086560e01b8152606060048201526001600160a01b039485169896919590949093859384939216916101d2906064850190610d44565b91602484015260448301520381885afa908115610513575f9161068f575b506106565761010085510151801515908161064a575b5061060b5760405163268a0ec160e01b81526004810184905293602085602481865afa948515610513575f956105d7575b508493604051906303fc40f560e51b82526004820152602081602481875afa908115610513575f916105a5575b5094156103eb575b506060850151905161027d91610db1565b908142116103b45761018094519260018060a01b036080850151169460e060018060a01b0360a08701511695015163ffffffff604051956102bd87610ac5565b888752602087019788526040870195865260608701948552608087019384528160a088019116815260c0870192835260e08701935f85526101008801957ff3b277728b3fee749481eb3e0b3b48980dbbab78658fc419025cb16eee34677587526101208901975f89526101606101408b019a5f516020610e3e5f395f51905f528c52019a5f516020610e3e5f395f51905f528c526040519c8d5260018060a01b0390511660208d015260018060a01b0390511660408c01525160608b01525160808a0152511660a08801525160c08701525160e0860152516101008501525115156101208401525161014083015251610160820152f35b60405163d05f306560e01b815260206004820152600e60248201526d1dda5b991bddd7d95e1c1a5c995960921b6044820152606490fd5b85516040808201519151905163632224a760e01b815293965093945090925f9183918291610426916001600160a01b03169060048401610d68565b0381855afa908115610513575f905f92610547575b501561051e5750835160408082015191518151632b548a7b60e11b8152949391928592918391829161047c916001600160a01b039091169060048401610d68565b03915afa8015610513575f925f916104d6575b5092821561049d575f61026c565b60405163981b64cd60e01b815260206004820152601060248201526f1e995c9bd7dcd95b1b17d85b5bdd5b9d60821b6044820152606490fd5b9250506040823d60401161050b575b816104f260409383610af5565b8101031261050757602082519201515f61048f565b5f80fd5b3d91506104e5565b6040513d5f823e3d90fd5b60405163d05f306560e01b815260206004820152908190610543906024830190610d44565b0390fd5b9150503d805f833e6105598183610af5565b81016040828203126105075761056e82610d37565b602083015190926001600160401b03821161050757019080601f8301121561050757815161059e92602001610b2c565b905f61043b565b90506020813d6020116105cf575b816105c060209383610af5565b8101031261050757515f610264565b3d91506105b3565b9094506020813d602011610603575b816105f360209383610af5565b810103126105075751935f610237565b3d91506105e6565b60405163981b64cd60e01b81526020600482015260166024820152751b585e17da5d195c985d1a5bdb9cd7dc995858da195960521b6044820152606490fd5b9050815110155f610206565b60405163981b64cd60e01b815260206004820152601060248201526f747269676765725f636f6d706c65746560801b6044820152606490fd5b90506020813d6020116106c1575b816106aa60209383610af5565b81010312610507576106bb90610d37565b5f6101f0565b3d915061069d565b60405163981b64cd60e01b81528061054360048201610d0c565b634e487b7160e01b5f52602160045260245ffd5b6107149193503d805f833e61070c8183610af5565b810190610b8e565b915f61016c565b34610507575f366003190112610507576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346105075761026036600319011261050757610779610a6c565b50610782610a82565b5060a4356001600160401b038111610507576107a2903690600401610a98565b60c4356001600160401b038111610507576107c1903690600401610a98565b50506101803660e319011261050757816020918101031261050757604051632bbc239560e11b8152903560048201527f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165f82602481845afa918215610513575f926109c9575b50602082015160048110156106e3575f19016109af5760e4356001600160a01b0381169081810361050757508251608001516001600160a01b03160361097357610104356001600160a01b038116908181036105075750825160a001516001600160a01b03160361093857610124356001600160a01b0381169081900361050757036108ff575160e001516101a435036108c657005b60405163c8fc272560e01b815260206004820152601060248201526f0c2e0e0c8c2e8c2bedad2e6dac2e8c6d60831b6044820152606490fd5b60405163c8fc272560e01b815260206004820152601060248201526f34b73b30b634b22fb932b1b2b4bb32b960811b6044820152606490fd5b60405163c8fc272560e01b81526020600482015260126024820152710c4eaf2bee8ded6cadcbedad2e6dac2e8c6d60731b6044820152606490fd5b60405163c8fc272560e01b81526020600482015260136024820152720e6cad8d8bee8ded6cadcbedad2e6dac2e8c6d606b1b6044820152606490fd5b60405163c8fc272560e01b81528061054360048201610d0c565b6109de9192503d805f833e61070c8183610af5565b9082610830565b34610507575f3660031901126105075760206040516107088152f35b34610507576020366003190112610507576004359063ffffffff60e01b821680920361050757602091632e0a5bf160e21b8114908115610a5b575b8115610a4a575b5015158152f35b6301ffc9a760e01b14905083610a43565b630528a9e160e21b81149150610a3c565b600435906001600160a01b038216820361050757565b602435906001600160a01b038216820361050757565b9181601f84011215610507578235916001600160401b038311610507576020838186019501011161050757565b61018081019081106001600160401b03821117610ae157604052565b634e487b7160e01b5f52604160045260245ffd5b601f909101601f19168101906001600160401b03821190821017610ae157604052565b51906001600160a01b038216820361050757565b9192916001600160401b038211610ae15760405191610b55601f8201601f191660200184610af5565b829481845281830111610507578281602093845f96015e010152565b9080601f83011215610507578151610b8b92602001610b2c565b90565b602081830312610507578051906001600160401b03821161050757016080818303126105075760405191608083016001600160401b03811184821017610ae15760405281516001600160401b03811161050757820161014081830312610507576040519161014083016001600160401b03811184821017610ae157604052610c1582610b18565b8352610c2360208301610b18565b602084015260408201516001600160401b0381116105075781610c47918401610b71565b604084015260608201516001600160401b0381116105075781610c6b918401610b71565b6060840152610c7c60808301610b18565b6080840152610c8d60a08301610b18565b60a084015260c0820151916001600160401b03831161050757610cb861012092610cd9948301610b71565b60c085015260e081015160e085015261010081015161010085015201610b18565b61012082015282526020810151906004821015610507576060916020840152604081015160408401520151606082015290565b60609060208152601060208201526f6f726465725f6e6f745f61637469766560801b60408201520190565b5190811515820361050757565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b90610d80602091949394604084526040840190610d44565b6001600160a01b03909416910152565b91908201809211610d9d57565b634e487b7160e01b5f52601160045260245ffd5b906107088102908082046107081490151715610d9d57610dd19082610d90565b610708810190818111610d9d5761070701908111610d9d5780421115610e385750804203428111610d9d57610708900460018101809111610d9d576107088102908082046107081490151715610d9d57610e2a91610d90565b5f198101908111610d9d5790565b90509056fe5a28e9363bb942b639270062aa6bb295f434bcdfc42c97267bf003f272060dc9a2646970667358221220dee839a6f04dfb98bd514572c72383e9b25ab7e48c0867c987be36c984f1914464736f6c634300081e0033",
+  "devdoc": {
+    "details": "Implements IConditionalOrderGenerator for ComposableCoW integration.      This is a STATELESS handler that reads order data from KapanConditionalOrderManager.      Separating handler from manager is required because:      - Handler must implement IERC165 for ComposableCoW to verify interface support      - Manager (owner) must NOT implement IERC165 to avoid Safe/fallback handler path",
+    "errors": {
+      "OrderNotValid(string)": [
+        {
+          "details": "Signal that the order parameters are invalid"
+        }
+      ],
+      "PollNever(string)": [
+        {
+          "details": "Signal to stop polling this order (completed or cancelled)"
+        }
+      ],
+      "PollTryNextBlock(string)": [
+        {
+          "details": "Signal to try polling again at the next block"
+        }
+      ]
+    },
+    "kind": "dev",
+    "methods": {
+      "getTradeableOrder(address,address,bytes32,bytes,bytes)": {
+        "details": "Called by ComposableCoW via getTradeableOrderWithSignature",
+        "params": {
+          "staticInput": "ABI-encoded orderHash"
+        },
+        "returns": {
+          "order": "The GPv2Order.Data struct"
+        }
+      },
+      "supportsInterface(bytes4)": {
+        "details": "Required for ComposableCoW to verify handler compatibility"
+      },
+      "verify(address,address,bytes32,bytes32,bytes32,bytes,bytes,(address,address,address,uint256,uint256,uint32,bytes32,uint256,bytes32,bool,bytes32,bytes32))": {
+        "details": "Called by ComposableCoW during signature verification"
+      }
+    },
+    "title": "KapanConditionalOrderHandler",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "CHUNK_WINDOW()": {
+        "notice": "Chunk window duration for deterministic validTo"
+      },
+      "getTradeableOrder(address,address,bytes32,bytes,bytes)": {
+        "notice": "Generate a tradeable order if trigger condition is met"
+      },
+      "manager()": {
+        "notice": "The KapanConditionalOrderManager that stores order contexts"
+      },
+      "supportsInterface(bytes4)": {
+        "notice": "Check if contract supports an interface"
+      },
+      "verify(address,address,bytes32,bytes32,bytes32,bytes,bytes,(address,address,address,uint256,uint256,uint32,bytes32,uint256,bytes32,bool,bytes32,bytes32))": {
+        "notice": "Verify that a proposed order matches the conditional order"
+      }
+    },
+    "notice": "Generates CoW Protocol orders for Kapan conditional/trigger-based orders (ADL, stop-loss, etc.)",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}

@@ -1021,7 +1021,7 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                               isUtil ? "w-20 text-center" :
                               isActions ? "w-28" :
                               "text-right"
-                            } ${canSort ? "cursor-pointer transition-colors hover:text-base-content/60" : ""}`}
+                            } ${canSort ? "hover:text-base-content/60 cursor-pointer transition-colors" : ""}`}
                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                           >
                             {!header.isPlaceholder && (
@@ -1053,7 +1053,7 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                         return (
                           <td
                             key={cell.id}
-                            className={`py-2.5 transition-colors group-hover:bg-base-200/30 ${
+                            className={`group-hover:bg-base-200/30 py-2.5 transition-colors ${
                               isMarket ? "rounded-l-lg pl-3" :
                               isCollaterals ? "px-3" :
                               isUtil ? "text-center" :

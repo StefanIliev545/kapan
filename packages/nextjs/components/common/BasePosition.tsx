@@ -202,6 +202,9 @@ export interface BasePositionProps {
 
   // Quick action button in header (e.g., "Move" badge for borrow)
   headerQuickAction?: ReactNode;
+
+  // ADL protection status - lights up left border when active
+  adlActive?: boolean;
 }
 
 export const BasePosition: FC<BasePositionProps> = ({
@@ -240,6 +243,7 @@ export const BasePosition: FC<BasePositionProps> = ({
   noBalanceText = "No balance",
   beforeActionsContent,
   headerQuickAction,
+  adlActive = false,
 }) => {
   const expanded = useToggle(defaultExpanded);
   const isExpanded = controlledExpanded ?? expanded.isOpen;
@@ -389,7 +393,8 @@ export const BasePosition: FC<BasePositionProps> = ({
           isExpanded && hasAnyActions ? "px-4 pb-0 pt-4 sm:px-5" : "p-4 sm:p-5",
           hasAnyActions ? "hover:bg-base-200/60 hover:border-base-content/15 cursor-pointer" : "cursor-default",
           !containerClassName?.includes("rounded") && "rounded-xl",
-          containerClassName
+          containerClassName,
+          adlActive && "border-l-2 border-l-green-400/70 shadow-[inset_4px_0_8px_-4px_rgba(74,222,128,0.25)]"
         )}
         onClick={toggleExpanded}
       >

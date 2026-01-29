@@ -1717,7 +1717,7 @@ const DetailsSection: FC<DetailsSectionProps> = ({
           {executionType === "market" && isSwapQuoteLoading ? (
             <span className="loading loading-dots loading-xs" />
           ) : flashLoanAmountRaw > 0n ? (
-            <span className="flex items-center gap-1">{shortAmount.toFixed(2)} <ArrowRightIcon className="size-3 inline" /> {Number(minCollateralOut.formatted).toFixed(2)}</span>
+            <span className="flex items-center gap-1">{shortAmount.toFixed(2)} <ArrowRightIcon className="inline size-3" /> {Number(minCollateralOut.formatted).toFixed(2)}</span>
           ) : "-"}
         </span>
       </div>

@@ -52532,6 +52532,298 @@ const contracts = {
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
       },
     },
+    AutoLeverageTrigger: {
+      address: "0x132230dD2e5dC7881823b4F6423c73e4fEA5D3a0",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct AutoLeverageTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     CompoundGatewayView: {
       address: "0xe3678fC83B13f4dB4712a97f30245EB86618849e",
       abi: [
@@ -54689,7 +54981,7 @@ const contracts = {
       },
     },
     KapanConditionalOrderHandler: {
-      address: "0xccC7d2b98E8cAE1fcff4f0955100D9380c942fD9",
+      address: "0x8292810E039776F2CB2632939e829d0edB8822ED",
       abi: [
         {
           inputs: [
@@ -54998,7 +55290,7 @@ const contracts = {
       },
     },
     KapanConditionalOrderManager: {
-      address: "0xa2eE6BE37436227959Aa8589951E8Db7F7329A2b",
+      address: "0xD49D9C9F7A4C3dD06762D5d8FC14bcED8E6D552D",
       abi: [
         {
           inputs: [
@@ -55096,6 +55388,11 @@ const contracts = {
         },
         {
           inputs: [],
+          name: "MaxOrdersExceeded",
+          type: "error",
+        },
+        {
+          inputs: [],
           name: "NoTokensReceived",
           type: "error",
         },
@@ -55164,6 +55461,11 @@ const contracts = {
         },
         {
           inputs: [],
+          name: "SaltAlreadyUsed",
+          type: "error",
+        },
+        {
+          inputs: [],
           name: "TriggerNotMet",
           type: "error",
         },
@@ -55181,25 +55483,6 @@ const contracts = {
           inputs: [],
           name: "ZeroAddress",
           type: "error",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "oldComposableCoW",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newComposableCoW",
-              type: "address",
-            },
-          ],
-          name: "ComposableCowUpdated",
-          type: "event",
         },
         {
           anonymous: false,
@@ -55288,25 +55571,6 @@ const contracts = {
             {
               indexed: true,
               internalType: "address",
-              name: "oldTrampoline",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newTrampoline",
-              type: "address",
-            },
-          ],
-          name: "HooksTrampolineUpdated",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
               name: "oldHandler",
               type: "address",
             },
@@ -55318,25 +55582,6 @@ const contracts = {
             },
           ],
           name: "OrderHandlerUpdated",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: false,
-              internalType: "string",
-              name: "field",
-              type: "string",
-            },
-            {
-              indexed: false,
-              internalType: "bool",
-              name: "matches",
-              type: "bool",
-            },
-          ],
-          name: "OrderMatchDebug",
           type: "event",
         },
         {
@@ -55400,25 +55645,6 @@ const contracts = {
             },
           ],
           name: "PreHookExecuted",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "oldRouter",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newRouter",
-              type: "address",
-            },
-          ],
-          name: "RouterUpdated",
           type: "event",
         },
         {
@@ -55518,6 +55744,19 @@ const contracts = {
         {
           inputs: [],
           name: "CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MAX_ORDERS_PER_USER",
           outputs: [
             {
               internalType: "uint256",
@@ -55680,209 +55919,6 @@ const contracts = {
             },
           ],
           stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              components: [
-                {
-                  internalType: "contract IERC20",
-                  name: "sellToken",
-                  type: "address",
-                },
-                {
-                  internalType: "contract IERC20",
-                  name: "buyToken",
-                  type: "address",
-                },
-                {
-                  internalType: "address",
-                  name: "receiver",
-                  type: "address",
-                },
-                {
-                  internalType: "uint256",
-                  name: "sellAmount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "buyAmount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint32",
-                  name: "validTo",
-                  type: "uint32",
-                },
-                {
-                  internalType: "bytes32",
-                  name: "appData",
-                  type: "bytes32",
-                },
-                {
-                  internalType: "uint256",
-                  name: "feeAmount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "bytes32",
-                  name: "kind",
-                  type: "bytes32",
-                },
-                {
-                  internalType: "bool",
-                  name: "partiallyFillable",
-                  type: "bool",
-                },
-                {
-                  internalType: "bytes32",
-                  name: "sellTokenBalance",
-                  type: "bytes32",
-                },
-                {
-                  internalType: "bytes32",
-                  name: "buyTokenBalance",
-                  type: "bytes32",
-                },
-              ],
-              internalType: "struct GPv2Order.Data",
-              name: "a",
-              type: "tuple",
-            },
-            {
-              components: [
-                {
-                  internalType: "contract IERC20",
-                  name: "sellToken",
-                  type: "address",
-                },
-                {
-                  internalType: "contract IERC20",
-                  name: "buyToken",
-                  type: "address",
-                },
-                {
-                  internalType: "address",
-                  name: "receiver",
-                  type: "address",
-                },
-                {
-                  internalType: "uint256",
-                  name: "sellAmount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint256",
-                  name: "buyAmount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "uint32",
-                  name: "validTo",
-                  type: "uint32",
-                },
-                {
-                  internalType: "bytes32",
-                  name: "appData",
-                  type: "bytes32",
-                },
-                {
-                  internalType: "uint256",
-                  name: "feeAmount",
-                  type: "uint256",
-                },
-                {
-                  internalType: "bytes32",
-                  name: "kind",
-                  type: "bytes32",
-                },
-                {
-                  internalType: "bool",
-                  name: "partiallyFillable",
-                  type: "bool",
-                },
-                {
-                  internalType: "bytes32",
-                  name: "sellTokenBalance",
-                  type: "bytes32",
-                },
-                {
-                  internalType: "bytes32",
-                  name: "buyTokenBalance",
-                  type: "bytes32",
-                },
-              ],
-              internalType: "struct GPv2Order.Data",
-              name: "b",
-              type: "tuple",
-            },
-          ],
-          name: "debugOrderMatch",
-          outputs: [
-            {
-              internalType: "bool",
-              name: "sellToken",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "buyToken",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "receiver",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "sellAmount",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "buyAmount",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "validTo",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "appData",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "feeAmount",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "kind",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "partiallyFillable",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "sellTokenBalance",
-              type: "bool",
-            },
-            {
-              internalType: "bool",
-              name: "buyTokenBalance",
-              type: "bool",
-            },
-          ],
-          stateMutability: "pure",
           type: "function",
         },
         {
@@ -56394,50 +56430,11 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
-              name: "_composableCoW",
-              type: "address",
-            },
-          ],
-          name: "setComposableCoW",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_hooksTrampoline",
-              type: "address",
-            },
-          ],
-          name: "setHooksTrampoline",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
               name: "_orderHandler",
               type: "address",
             },
           ],
           name: "setOrderHandler",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_router",
-              type: "address",
-            },
-          ],
-          name: "setRouter",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -57226,7 +57223,7 @@ const contracts = {
       },
     },
     KapanOrderHandler: {
-      address: "0xb66bFA73b0EFFE7166021275ec960B063a566262",
+      address: "0x465dCf045FE5445d043d144700D45a28b59B8429",
       abi: [
         {
           inputs: [
@@ -57597,7 +57594,7 @@ const contracts = {
       },
     },
     KapanOrderManager: {
-      address: "0x89e5251E98373954d4ad4277022dc6108b29768d",
+      address: "0x2bFc3eF2f6Bb19FA01B927b76a9C988245E05688",
       abi: [
         {
           inputs: [
@@ -57695,6 +57692,11 @@ const contracts = {
         },
         {
           inputs: [],
+          name: "MaxOrdersExceeded",
+          type: "error",
+        },
+        {
+          inputs: [],
           name: "NotHooksTrampoline",
           type: "error",
         },
@@ -57758,6 +57760,11 @@ const contracts = {
         },
         {
           inputs: [],
+          name: "SaltAlreadyUsed",
+          type: "error",
+        },
+        {
+          inputs: [],
           name: "Unauthorized",
           type: "error",
         },
@@ -57795,44 +57802,6 @@ const contracts = {
             },
           ],
           name: "ChunkExecuted",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "oldComposableCoW",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newComposableCoW",
-              type: "address",
-            },
-          ],
-          name: "ComposableCoWUpdated",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "oldTrampoline",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newTrampoline",
-              type: "address",
-            },
-          ],
-          name: "HooksTrampolineUpdated",
           type: "event",
         },
         {
@@ -58005,23 +57974,17 @@ const contracts = {
           type: "event",
         },
         {
-          anonymous: false,
-          inputs: [
+          inputs: [],
+          name: "MAX_ORDERS_PER_USER",
+          outputs: [
             {
-              indexed: true,
-              internalType: "address",
-              name: "oldRouter",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newRouter",
-              type: "address",
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
-          name: "RouterUpdated",
-          type: "event",
+          stateMutability: "view",
+          type: "function",
         },
         {
           inputs: [
@@ -58697,50 +58660,11 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
-              name: "_composableCoW",
-              type: "address",
-            },
-          ],
-          name: "setComposableCoW",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_hooksTrampoline",
-              type: "address",
-            },
-          ],
-          name: "setHooksTrampoline",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
               name: "_handler",
               type: "address",
             },
           ],
           name: "setOrderHandler",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_router",
-              type: "address",
-            },
-          ],
-          name: "setRouter",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",

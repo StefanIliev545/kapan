@@ -29,6 +29,8 @@ export type SupplyPositionProps = ProtocolPosition & {
   position?: PositionManager;
   disableMove?: boolean;
   containerClassName?: string;
+  /** ADL protection status - lights up left border when active */
+  adlActive?: boolean;
   hideBalanceColumn?: boolean;
   subtitle?: ReactNode;
   infoButton?: ReactNode;
@@ -90,6 +92,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   extraStats = EMPTY_EXTRA_STATS,
   showExpandIndicator = true,
   defaultExpanded = false,
+  adlActive = false,
 }) => {
   const moveModal = useModal();
   const depositModal = useModal();
@@ -319,6 +322,8 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         // Balance display
         balanceClassName="text-success"
         isNegativeBalance={false}
+        // ADL status
+        adlActive={adlActive}
       />
 
       {quickDepositButton}

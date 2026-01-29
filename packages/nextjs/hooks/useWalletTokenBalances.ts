@@ -1,3 +1,23 @@
+/**
+ * useWalletTokenBalances Hook
+ *
+ * Core implementation for multi-token balance fetching across networks.
+ * This hook is the internal workhorse that powers useTokenBalance and useMultiTokenBalance.
+ *
+ * **Features:**
+ * - EVM: Uses multicall for efficient batched RPC calls
+ * - Starknet: Parallel RPC calls with snake_case/camelCase fallback
+ * - React Query caching with 30s stale time
+ * - Automatic refetching every 30 seconds
+ *
+ * **For most use cases, prefer the higher-level hooks:**
+ * - Single token: `useTokenBalance` from `~~/hooks/useTokenBalance`
+ * - Multiple tokens: `useMultiTokenBalance` from `~~/hooks/balance`
+ * - Native currency: `useNativeBalance` from `~~/hooks/balance`
+ *
+ * @module useWalletTokenBalances
+ */
+
 import { useQuery } from "@tanstack/react-query";
 import { useProvider as useStarkProvider } from "@starknet-react/core";
 import { Abi, Address } from "viem";
@@ -6,16 +26,24 @@ import { ERC20ABI } from "~~/contracts/externalContracts";
 import { useAccount as useStarkAccount } from "./useAccount";
 import { addrKey } from "~~/utils/address";
 
+/** Network type for balance fetching */
 type NetworkType = "evm" | "starknet" | "stark";
 
+/** Input for a single token balance query */
 type TokenBalanceInput = {
+  /** Token contract address */
   address: string;
+  /** Known decimals (optional, fetched if not provided) */
   decimals?: number;
 };
 
+/** Result map: normalized address -> balance info */
 type TokenBalanceResult = Record<string, { balance: bigint; decimals?: number }>;
 
-/** @deprecated Use addrKey from ~~/utils/address instead */
+/**
+ * Normalize an address to lowercase for use as a map key.
+ * @deprecated Use addrKey from ~~/utils/address instead
+ */
 export const normalizeAddress = addrKey;
 
 const getCallResult = (response: unknown): string[] | undefined => {
@@ -26,10 +54,12 @@ const getCallResult = (response: unknown): string[] | undefined => {
   return (response as { result?: string[] })?.result;
 };
 
-const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number) => {
-  const { address } = useEvmAccount();
+const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number, ownerAddress?: string) => {
+  const { address: connectedAddress } = useEvmAccount();
   const publicClient = usePublicClient({ chainId });
 
+  // Use provided owner address or fall back to connected wallet
+  const address = (ownerAddress ?? connectedAddress) as Address | undefined;
   const enabled = Boolean(address && publicClient && tokens.length > 0);
 
   return useQuery({
@@ -95,10 +125,12 @@ const useEvmBalances = (tokens: TokenBalanceInput[], chainId?: number) => {
   });
 };
 
-const useStarknetBalances = (tokens: TokenBalanceInput[]) => {
-  const { address } = useStarkAccount();
+const useStarknetBalances = (tokens: TokenBalanceInput[], ownerAddress?: string) => {
+  const { address: connectedAddress } = useStarkAccount();
   const { provider } = useStarkProvider();
 
+  // Use provided owner address or fall back to connected wallet
+  const address = ownerAddress ?? connectedAddress;
   const enabled = Boolean(address && provider && tokens.length > 0);
 
   return useQuery({
@@ -183,22 +215,60 @@ const useStarknetBalances = (tokens: TokenBalanceInput[]) => {
   });
 };
 
+/**
+ * Hook for fetching multiple token balances efficiently.
+ *
+ * This is the core multi-token balance hook. For most use cases, consider using
+ * the higher-level `useMultiTokenBalance` from `~~/hooks/balance` instead.
+ *
+ * **EVM Implementation:**
+ * - Uses viem's multicall to batch balanceOf and decimals calls
+ * - Single RPC round-trip for all tokens
+ *
+ * **Starknet Implementation:**
+ * - Parallel RPC calls (no native multicall)
+ * - Tries snake_case (balance_of) then camelCase (balanceOf) for compatibility
+ *
+ * @example
+ * ```tsx
+ * const { balances, isLoading, refetch } = useWalletTokenBalances({
+ *   tokens: [
+ *     { address: "0xUSDC...", decimals: 6 },
+ *     { address: "0xWETH..." }, // decimals will be fetched
+ *   ],
+ *   network: "evm",
+ *   chainId: 42161,
+ * });
+ *
+ * // Access balance by normalized (lowercase) address
+ * const usdcBalance = balances["0xusdc..."]?.balance ?? 0n;
+ * ```
+ *
+ * @param options - Configuration object
+ * @returns Object with balances map, loading state, and refetch function
+ */
 export const useWalletTokenBalances = ({
   tokens,
   network,
   chainId,
+  ownerAddress,
 }: {
+  /** Array of tokens to fetch balances for */
   tokens: TokenBalanceInput[];
+  /** Network type: "evm", "starknet", or "stark" */
   network: NetworkType;
+  /** Chain ID (EVM only, uses current chain if not specified) */
   chainId?: number;
+  /** Owner address to check balance for. Defaults to connected wallet. */
+  ownerAddress?: string;
 }) => {
   const normalizedNetwork = network === "stark" ? "starknet" : network;
   const isEvm = normalizedNetwork === "evm";
 
   // Call both hooks unconditionally to satisfy React's rules of hooks
   // Pass empty arrays when not the active network to avoid unnecessary requests
-  const evmResult = useEvmBalances(isEvm ? tokens : [], chainId);
-  const starkResult = useStarknetBalances(isEvm ? [] : tokens);
+  const evmResult = useEvmBalances(isEvm ? tokens : [], chainId, ownerAddress);
+  const starkResult = useStarknetBalances(isEvm ? [] : tokens, ownerAddress);
 
   const queryResult = isEvm ? evmResult : starkResult;
 

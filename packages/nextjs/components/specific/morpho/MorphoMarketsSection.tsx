@@ -1102,7 +1102,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                             header.id === "util" ? "w-20 text-center" :
                             header.id === "actions" ? "w-28" :
                             "text-right"
-                          } ${header.column.getCanSort() ? "cursor-pointer transition-colors hover:text-base-content/60" : ""}`}
+                          } ${header.column.getCanSort() ? "hover:text-base-content/60 cursor-pointer transition-colors" : ""}`}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <span className={`inline-flex items-center gap-1 ${header.column.getIsSorted() ? "text-primary" : ""}`}>
@@ -1128,7 +1128,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                         return (
                           <td
                             key={cell.id}
-                            className={`py-2.5 transition-colors group-hover:bg-base-200/30 ${
+                            className={`group-hover:bg-base-200/30 py-2.5 transition-colors ${
                               cell.column.id === "market" ? "pl-3" :
                               cell.column.id === "util" ? "text-center" :
                               cell.column.id === "actions" ? "pr-3 text-right" :

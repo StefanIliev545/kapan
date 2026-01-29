@@ -155,3 +155,49 @@ export {
     type UseTokenSelectModalOptions,
     type UseTokenSelectModalResult,
 } from "./useTokenSelectModal";
+
+// ============================================================================
+// Unified Swap Modal Architecture
+// ============================================================================
+
+// Swap configuration types
+export {
+    type SwapQuoteResult,
+    type SwapQuoteConfig,
+    type SwapQuoteHookResult,
+    type FlashLoanInfo,
+    type FlashLoanConfig,
+    type LimitOrderConfig,
+    type SwapOperationConfig,
+    type UseWalletSwapConfigProps,
+    type UseCollateralSwapConfigProps,
+    type UseDebtSwapConfigProps,
+    type UseClosePositionConfigProps,
+    type MarketOrderBuildParams,
+    type MarketOrderBuildResult,
+} from "./swapConfigTypes";
+
+// Swap quote hook
+export {
+    useSwapQuote,
+    getBestSwapRouter,
+    type UseSwapQuoteOptions,
+} from "./useSwapQuote";
+
+// Operation-specific config hooks
+export {
+    useWalletSwapConfig,
+} from "./useWalletSwapConfig";
+
+export {
+    useCollateralSwapConfig,
+} from "./useCollateralSwapConfig";
+
+export {
+    useDebtSwapConfig,
+    type EulerCollateralInfo,
+} from "./useDebtSwapConfig";
+
+export {
+    useClosePositionConfig,
+} from "./useClosePositionConfig";

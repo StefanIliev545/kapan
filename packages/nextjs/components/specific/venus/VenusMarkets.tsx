@@ -3,6 +3,7 @@ import { formatUnits } from "viem";
 import { MarketsSection, MarketData } from "~~/components/markets/MarketsSection";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+import { useExternalYields } from "~~/hooks/useExternalYields";
 import formatPercentage from "~~/utils/formatPercentage";
 import { venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
 
@@ -39,6 +40,9 @@ export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search, chainId 
     chainId: chainId as any,
   });
 
+  // Fetch external yields (LST staking yields, PT fixed yields, etc.)
+  const { getEffectiveSupplyRate } = useExternalYields(chainId);
+
   const markets: MarketData[] = useMemo(() => {
     if (!marketDetails || !ratesData) return [];
     const network = (chainId && CHAIN_ID_TO_NETWORK[chainId]) || "arbitrum";
@@ -48,14 +52,16 @@ export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search, chainId 
       .map((token: string, i: number) => {
         if (token === "0x0000000000000000000000000000000000000000") return null;
         const { displayName, logo } = getTokenDisplay(token, symbols[i]);
-        const supplyAPY = venusRateToAPY(supplyRates[i]);
+        const protocolSupplyAPY = venusRateToAPY(supplyRates[i]);
         const borrowAPY = venusRateToAPY(borrowRates[i]);
+        // Get effective supply rate (includes LST staking yields, PT fixed yields, etc.)
+        const effectiveSupplyAPY = getEffectiveSupplyRate(token, symbols[i], protocolSupplyAPY);
         const price = Number(formatUnits(prices[i], 18 + (18 - decimals[i])));
-        const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
+        const utilization = borrowAPY > 0 ? (protocolSupplyAPY / borrowAPY) * 100 : 0;
         return {
           icon: logo,
           name: displayName,
-          supplyRate: `${formatPercentage(supplyAPY)}%`,
+          supplyRate: `${formatPercentage(effectiveSupplyAPY)}%`,
           borrowRate: `${formatPercentage(borrowAPY)}%`,
           price: price.toFixed(2),
           utilization: utilization.toFixed(2),
@@ -66,7 +72,7 @@ export const VenusMarkets: FC<VenusMarketsProps> = ({ viewMode, search, chainId 
         } as MarketData;
       })
       .filter(Boolean) as MarketData[];
-  }, [marketDetails, ratesData, chainId]);
+  }, [marketDetails, ratesData, chainId, getEffectiveSupplyRate]);
 
   return <MarketsSection title="Venus Markets" markets={markets} viewMode={viewMode} search={search} />;
 };

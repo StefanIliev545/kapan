@@ -22,7 +22,8 @@ import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 import { formatBps } from "~~/utils/risk";
 import { MultiplyEvmModal } from "./modals/MultiplyEvmModal";
 import { useAaveEMode } from "~~/hooks/useAaveEMode";
-import { usePendlePTYields, usePTEnhancedApyMaps, isPTToken } from "~~/hooks/usePendlePTYields";
+import { usePTEnhancedApyMaps } from "~~/hooks/usePendlePTYields";
+import { useExternalYields, type ExternalYield } from "~~/hooks/useExternalYields";
 import { HealthStatus } from "./specific/common";
 
 // --- Helper functions extracted to reduce cognitive complexity ---
@@ -77,20 +78,30 @@ function createEModeFilter(userEMode: { id: number; label: string } | null | und
   };
 }
 
-/** Get PT yield override for a position if available */
-function getPTYieldOverride(
+/** Get external yield override for a position if available (PT tokens, LSTs, etc.)
+ * For LSTs (wstETH, rETH, etc.), the external yield is ADDED to the protocol rate
+ * For PT tokens, the external yield REPLACES the protocol rate (they're fixed yield tokens)
+ */
+function getExternalYieldOverride(
   position: { name: string; tokenAddress: string; currentRate: number },
-  yieldsByAddress: Map<string, { fixedApy: number }>,
-  yieldsBySymbol: Map<string, { fixedApy: number }>
+  findYield: (address?: string, symbol?: string) => ExternalYield | undefined
 ): number {
-  if (!isPTToken(position.name)) {
+  const externalYield = findYield(position.tokenAddress, position.name);
+
+  if (!externalYield) {
     return position.currentRate;
   }
 
-  const ptYield = yieldsByAddress.get(position.tokenAddress.toLowerCase())
-    || yieldsBySymbol.get(position.name.toLowerCase());
+  // Use source to determine yield logic (more reliable than symbol parsing)
+  // - Pendle PT tokens: fixed yield REPLACES protocol rate
+  // - LSTs, Maple: staking/external yield ADDS to protocol rate
+  if (externalYield.source === "pendle") {
+    return externalYield.apy;
+  }
 
-  return ptYield?.fixedApy ?? position.currentRate;
+  // For LSTs, Maple, and other yield sources, add external yield to protocol supply rate
+  // e.g., wstETH at 2.3% staking yield + 0.01% Aave supply = 2.31% total
+  return externalYield.apy + position.currentRate;
 }
 
 /** Convert a ProtocolPosition to a SwapAsset format */
@@ -594,8 +605,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const isAaveProtocol = protocolName.toLowerCase().includes("aave");
   const { userEMode } = useAaveEMode(isAaveProtocol && chainId ? chainId : undefined);
 
-  // Fetch PT token yields from Pendle
-  const { yieldsByAddress, yieldsBySymbol } = usePendlePTYields(chainId);
+  // Fetch external yields (PT tokens, LSTs, Maple, etc.)
+  const { findYield } = useExternalYields(chainId);
 
   // Determine if user has any positions with balance
   const hasPositions = useMemo(() => {
@@ -667,9 +678,9 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const suppliedPositionsWithPTYields = useMemo(() => {
     return suppliedPositions.map(p => ({
       ...p,
-      currentRate: getPTYieldOverride(p, yieldsByAddress, yieldsBySymbol),
+      currentRate: getExternalYieldOverride(p, findYield),
     }));
-  }, [suppliedPositions, yieldsByAddress, yieldsBySymbol]);
+  }, [suppliedPositions, findYield]);
 
   const { netYield30d, netApyPercent } = useMemo(
     () =>
@@ -703,11 +714,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
       : suppliedPositions.filter(p => p.balance > 0);
 
     return basePositions.map(p => {
-      const currentRate = getPTYieldOverride(p, yieldsByAddress, yieldsBySymbol);
+      const currentRate = getExternalYieldOverride(p, findYield);
       const positionWithRate = { ...p, currentRate };
       return applyReadOnlyToPosition(positionWithRate, readOnly);
     });
-  }, [showAllInLists, suppliedPositions, yieldsByAddress, yieldsBySymbol, readOnly]);
+  }, [showAllInLists, suppliedPositions, findYield, readOnly]);
 
   // Filter and transform borrowed positions
   const filteredBorrowedPositions = useMemo(() => {
@@ -1088,7 +1099,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                     <SupplyPosition
                       key={`market-supply-${position.tokenAddress}`}
                       {...position}
-                      currentRate={getPTYieldOverride(position, yieldsByAddress, yieldsBySymbol)}
+                      currentRate={getExternalYieldOverride(position, findYield)}
                       protocolName={protocolName}
                       networkType={networkType}
                       chainId={chainId}

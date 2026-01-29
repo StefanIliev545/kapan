@@ -23,14 +23,14 @@ export function ReferralStats({ walletAddress, className }: ReferralStatsProps) 
     return (
       <div className={clsx("flex items-center gap-2", className)}>
         <LoadingSpinner size="sm" />
-        <span className="text-sm text-base-content/70">Loading stats...</span>
+        <span className="text-base-content/70 text-sm">Loading stats...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={clsx("text-sm text-error", className)}>
+      <div className={clsx("text-error text-sm", className)}>
         Failed to load referral stats
       </div>
     );
@@ -38,7 +38,7 @@ export function ReferralStats({ walletAddress, className }: ReferralStatsProps) 
 
   return (
     <div className={clsx("flex flex-col gap-4", className)}>
-      <div className="stats stats-vertical lg:stats-horizontal shadow bg-base-200">
+      <div className="stats stats-vertical lg:stats-horizontal bg-base-200 shadow">
         <div className="stat">
           <div className="stat-title">Total Referrals</div>
           <div className="stat-value text-primary">{totalReferrals}</div>
@@ -58,9 +58,9 @@ export function ReferralStats({ walletAddress, className }: ReferralStatsProps) 
 
       {recentReferrals.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h4 className="font-semibold text-sm">Recent Referrals</h4>
+          <h4 className="text-sm font-semibold">Recent Referrals</h4>
           <div className="overflow-x-auto">
-            <table className="table table-sm bg-base-200 rounded-lg">
+            <table className="table-sm bg-base-200 table rounded-lg">
               <thead>
                 <tr>
                   <th>Address</th>
@@ -73,7 +73,7 @@ export function ReferralStats({ walletAddress, className }: ReferralStatsProps) 
                     <td className="font-mono text-sm">
                       {truncateAddress(referral.refereeAddress)}
                     </td>
-                    <td className="text-sm text-base-content/70">
+                    <td className="text-base-content/70 text-sm">
                       {new Date(referral.createdAt).toLocaleDateString()}
                     </td>
                   </tr>

@@ -28,7 +28,7 @@ import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { formatSignedPercent } from "../utils";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
 import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
-import { ADLAutomationModal } from "~~/components/modals/ADLAutomationModal";
+import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
 import { useADLContracts } from "~~/hooks/useADLOrder";
 import type { Address } from "viem";
 
@@ -404,7 +404,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
                   <Cog6ToothIcon className="size-3.5" />
                   {/* Hover tooltip for inactive */}
                   <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                    Set up Auto-Deleverage Protection
+                    Set up LTV Automation
                   </span>
                 </>
               )}
@@ -462,6 +462,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
           extraStats={extraStats}
           showExpandIndicator={false}
           onSwap={row.hasCollateral ? handleSwapClick : undefined}
+          adlActive={hasActiveADL}
         />
 
         {/* Right: Debt (Borrow) */}
@@ -749,9 +750,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
         />
       )}
 
-      {/* ADL Automation Modal */}
+      {/* LTV Automation Modal (ADL + Auto-Leverage) */}
       {adlModalState && (
-        <ADLAutomationModal
+        <LTVAutomationModal
           isOpen={adlModalState.isOpen}
           onClose={handleCloseADLModal}
           protocolName="morpho-blue"

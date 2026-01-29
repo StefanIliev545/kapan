@@ -3,7 +3,7 @@ import Image from "next/image";
 import { DepositModal } from "~~/components/modals/DepositModal";
 import { WithdrawModal } from "~~/components/modals/WithdrawModal";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
-import { ADLAutomationModal } from "~~/components/modals/ADLAutomationModal";
+import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
 import { formatUnits, encodeAbiParameters } from "viem";
 import { useAccount } from "wagmi";
 import { FiatBalance } from "~~/components/FiatBalance";
@@ -731,7 +731,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
 
       {/* ADL Automation Modal */}
       {borrowDetails.borrowBalance > 0 && (
-        <ADLAutomationModal
+        <LTVAutomationModal
           isOpen={adlModal.isOpen}
           onClose={adlModal.close}
           protocolName="compound"

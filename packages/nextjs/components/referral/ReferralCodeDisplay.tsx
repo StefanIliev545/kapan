@@ -47,14 +47,14 @@ export function ReferralCodeDisplay({ walletAddress, className }: ReferralCodeDi
     return (
       <div className={clsx("flex items-center gap-2", className)}>
         <LoadingSpinner size="sm" />
-        <span className="text-sm text-base-content/70">Loading referral code...</span>
+        <span className="text-base-content/70 text-sm">Loading referral code...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={clsx("text-sm text-error", className)}>
+      <div className={clsx("text-error text-sm", className)}>
         Failed to load referral code
       </div>
     );
@@ -63,7 +63,7 @@ export function ReferralCodeDisplay({ walletAddress, className }: ReferralCodeDi
   if (!code) {
     return (
       <div className={clsx("flex flex-col gap-2", className)}>
-        <p className="text-sm text-base-content/70">
+        <p className="text-base-content/70 text-sm">
           Generate your referral code to share with friends
         </p>
         <button
@@ -81,7 +81,7 @@ export function ReferralCodeDisplay({ walletAddress, className }: ReferralCodeDi
           )}
         </button>
         {createError && (
-          <p className="text-xs text-error">{createError}</p>
+          <p className="text-error text-xs">{createError}</p>
         )}
       </div>
     );
@@ -89,9 +89,9 @@ export function ReferralCodeDisplay({ walletAddress, className }: ReferralCodeDi
 
   return (
     <div className={clsx("flex flex-col gap-2", className)}>
-      <p className="text-sm text-base-content/70">Your referral code</p>
+      <p className="text-base-content/70 text-sm">Your referral code</p>
       <div className="flex items-center gap-2">
-        <code className="bg-base-200 px-4 py-2 rounded-lg font-mono text-lg tracking-wider">
+        <code className="bg-base-200 rounded-lg px-4 py-2 font-mono text-lg tracking-wider">
           {code}
         </code>
         <button
@@ -103,11 +103,11 @@ export function ReferralCodeDisplay({ walletAddress, className }: ReferralCodeDi
           title="Copy to clipboard"
         >
           {copied ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="size-5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
               <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
             </svg>
