@@ -212,21 +212,17 @@ contract LtvTrigger is IOrderTrigger {
     }
 
     /// @inheritdoc IOrderTrigger
+    /// @dev ADL orders are continuous - they never auto-complete.
+    /// The order remains active and will re-trigger whenever LTV rises above
+    /// the trigger threshold, up to maxIterations or until user cancels.
+    /// This provides ongoing liquidation protection rather than one-shot execution.
     function isComplete(
-        bytes calldata staticData,
-        address owner,
+        bytes calldata /* staticData */,
+        address /* owner */,
         uint256 /* iterationCount */
-    ) external view override returns (bool) {
-        TriggerParams memory params = abi.decode(staticData, (TriggerParams));
-
-        uint256 currentLtv = _getCurrentLtv(params.protocolId, owner, params.protocolContext);
-
-        // Not complete if position doesn't exist (user closed it externally)
-        // Order stays active to protect future positions
-        if (currentLtv == 0) return false;
-
-        // Complete when LTV is at or below target (goal achieved)
-        return currentLtv <= params.targetLtvBps;
+    ) external pure override returns (bool) {
+        // Never auto-complete - rely on maxIterations for termination
+        return false;
     }
 
     /// @inheritdoc IOrderTrigger

@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState, useCallback, useMemo } from "react";
+import { FC, useState, useCallback, useMemo, memo } from "react";
 import { formatUnits } from "viem";
 import Image from "next/image";
 import type { MorphoPositionRow, MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
@@ -13,7 +13,7 @@ import formatPercentage from "~~/utils/formatPercentage";
 import { encodeMorphoContext, type MorphoMarketContextForEncoding } from "~~/utils/v2/instructionHelpers";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
 import { ExternalLink } from "lucide-react";
-import { Cog6ToothIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import { Cog6ToothIcon, ShieldCheckIcon, ArrowTrendingUpIcon } from "@heroicons/react/24/outline";
 import {
   formatLtvPercent,
   useConditionalOrders,
@@ -30,6 +30,7 @@ import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
 import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
 import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
 import { useADLContracts } from "~~/hooks/useADLOrder";
+import { useAutoLeverageContracts } from "~~/hooks/useAutoLeverageOrder";
 import type { Address } from "viem";
 
 interface MorphoPositionsSectionProps {
@@ -61,6 +62,34 @@ const TEXT_ERROR = "text-error";
 // Static available actions objects (can be reused across renders)
 const SUPPLY_ACTIONS_WITH_MOVE = { deposit: true, withdraw: true, move: true, swap: true } as const;
 const SUPPLY_ACTIONS_WITHOUT_MOVE = { deposit: true, withdraw: true, move: false, swap: true } as const;
+
+// ADL info type for position automation status
+interface ADLInfo {
+  hasActiveADL: boolean;
+  hasActiveAutoLev: boolean;
+  adlTriggerLtvBps: bigint | undefined;
+  adlTargetLtvBps: bigint | undefined;
+  isAboveTrigger: boolean;
+  isTriggerMet: boolean | undefined;
+  autoLevTriggerLtvBps: bigint | undefined;
+  autoLevTargetLtvBps: bigint | undefined;
+  isBelowAutoLevTrigger: boolean;
+  isAutoLevTriggerMet: boolean | undefined;
+}
+
+// Stable empty ADL info object to avoid creating new objects on every render
+const EMPTY_ADL_INFO: ADLInfo = {
+  hasActiveADL: false,
+  hasActiveAutoLev: false,
+  adlTriggerLtvBps: undefined,
+  adlTargetLtvBps: undefined,
+  isAboveTrigger: false,
+  isTriggerMet: undefined,
+  autoLevTriggerLtvBps: undefined,
+  autoLevTargetLtvBps: undefined,
+  isBelowAutoLevTrigger: false,
+  isAutoLevTriggerMet: undefined,
+};
 
 // Collateral Swap modal state for a position
 interface SwapModalState {
@@ -124,11 +153,17 @@ interface MorphoPositionRowProps {
   hasActiveADL?: boolean;
   adlTriggerLtvBps?: bigint;
   adlTargetLtvBps?: bigint;
-  /** True if current LTV is at or above trigger threshold */
+  /** True if current LTV is at or above ADL trigger threshold */
   isAboveTrigger?: boolean;
+  /** Auto-leverage props */
+  hasActiveAutoLev?: boolean;
+  autoLevTriggerLtvBps?: bigint;
+  autoLevTargetLtvBps?: bigint;
+  /** True if current LTV is below auto-leverage trigger threshold */
+  isBelowAutoLevTrigger?: boolean;
 }
 
-const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
+const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function MorphoPositionRowComponent({
   row,
   chainId,
   isExpanded,
@@ -142,7 +177,11 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
   adlTriggerLtvBps,
   adlTargetLtvBps,
   isAboveTrigger,
-}) => {
+  hasActiveAutoLev,
+  autoLevTriggerLtvBps,
+  autoLevTargetLtvBps,
+  isBelowAutoLevTrigger,
+}) {
   // Pre-encode the Morpho market context for modals
   const protocolContext = useMemo(() => encodeMorphoContext(row.context), [row.context]);
 
@@ -313,13 +352,24 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
 
   const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
 
-  // ADL shadow styling: subtle glow effect
-  // Green = below trigger (safe/protected), Red = at or above trigger (warning)
-  const adlShadowClass = hasActiveADL
-    ? isAboveTrigger
-      ? "shadow-[0_0_6px_rgba(239,68,68,0.25),0_0_12px_rgba(239,68,68,0.15)]" // Red glow
-      : "shadow-[0_0_6px_rgba(74,222,128,0.3),0_0_12px_rgba(74,222,128,0.18)]" // Green glow
-    : "";
+  // Combined automation status for visual indicator
+  const hasAnyAutomation = hasActiveADL || hasActiveAutoLev;
+
+  // Shadow styling: subtle glow effect based on automation status
+  // Green = safe/protected, Red = trigger condition met (warning), Blue = auto-leverage active
+  const getShadowClass = () => {
+    if (hasActiveADL && isAboveTrigger) {
+      return "shadow-[0_0_6px_rgba(239,68,68,0.25),0_0_12px_rgba(239,68,68,0.15)]"; // Red glow - ADL trigger met
+    }
+    if (hasActiveAutoLev && isBelowAutoLevTrigger) {
+      return "shadow-[0_0_6px_rgba(56,189,248,0.25),0_0_12px_rgba(56,189,248,0.15)]"; // Blue glow - Auto-lev trigger met
+    }
+    if (hasAnyAutomation) {
+      return "shadow-[0_0_6px_rgba(74,222,128,0.3),0_0_12px_rgba(74,222,128,0.18)]"; // Green glow - protected
+    }
+    return "";
+  };
+  const adlShadowClass = getShadowClass();
 
   return (
     <div
@@ -376,29 +426,51 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
         </div>
         {/* Right side: ADL indicator + Stats */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-          {/* ADL Settings/Status - show before stats */}
+          {/* LTV Automation Settings/Status - show before stats */}
           {isADLSupported && row.hasDebt && row.hasCollateral && (
             <button
               onClick={handleADLClick}
               className={`group relative flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors ${
-                hasActiveADL
+                hasAnyAutomation
                   ? "bg-success/10 text-success hover:bg-success/20"
                   : "text-base-content/50 hover:bg-base-200 hover:text-base-content"
               }`}
             >
-              {hasActiveADL ? (
-                <>
-                  <ShieldCheckIcon className="size-3.5" />
-                  <span className="text-[10px] font-medium">
-                    {formatLtvPercent(adlTriggerLtvBps!)} → {formatLtvPercent(adlTargetLtvBps!)}
-                  </span>
+              {hasAnyAutomation ? (
+                <div className="flex items-center gap-2">
+                  {/* ADL badge */}
+                  {hasActiveADL && (
+                    <div className="flex items-center gap-1">
+                      <ShieldCheckIcon className="size-3.5" />
+                      <span className="text-[10px] font-medium">
+                        {formatLtvPercent(adlTriggerLtvBps!)}↓{formatLtvPercent(adlTargetLtvBps!)}
+                      </span>
+                    </div>
+                  )}
+                  {/* Auto-leverage badge */}
+                  {hasActiveAutoLev && (
+                    <div className="text-info flex items-center gap-1">
+                      <ArrowTrendingUpIcon className="size-3.5" />
+                      <span className="text-[10px] font-medium">
+                        {formatLtvPercent(autoLevTriggerLtvBps!)}↑{formatLtvPercent(autoLevTargetLtvBps!)}
+                      </span>
+                    </div>
+                  )}
                   {/* Hover tooltip */}
                   <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                    <span className="text-warning">Trigger:</span> {formatLtvPercent(adlTriggerLtvBps!)} (starts deleveraging)
-                    <br />
-                    <span className="text-success">Target:</span> {formatLtvPercent(adlTargetLtvBps!)} (deleverage to)
+                    {hasActiveADL && (
+                      <>
+                        <span className="text-success">ADL:</span> {formatLtvPercent(adlTriggerLtvBps!)} → {formatLtvPercent(adlTargetLtvBps!)}
+                        {hasActiveAutoLev && <br />}
+                      </>
+                    )}
+                    {hasActiveAutoLev && (
+                      <>
+                        <span className="text-info">Auto-Lev:</span> {formatLtvPercent(autoLevTriggerLtvBps!)} → {formatLtvPercent(autoLevTargetLtvBps!)}
+                      </>
+                    )}
                   </span>
-                </>
+                </div>
               ) : (
                 <>
                   <Cog6ToothIcon className="size-3.5" />
@@ -462,7 +534,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
           extraStats={extraStats}
           showExpandIndicator={false}
           onSwap={row.hasCollateral ? handleSwapClick : undefined}
-          adlActive={hasActiveADL}
+          adlActive={hasAnyAutomation}
         />
 
         {/* Right: Debt (Borrow) */}
@@ -486,7 +558,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   title,
@@ -507,18 +579,20 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   // ADL modal state
   const [adlModalState, setAdlModalState] = useState<ADLModalState | null>(null);
 
-  // Check if ADL is supported on this chain
-  const { isSupported: isADLSupported } = useADLContracts(chainId);
+  // Check if ADL/Auto-Leverage is supported on this chain
+  const { isSupported: isADLSupported, ltvTriggerAddress } = useADLContracts(chainId);
+  const { autoLeverageTriggerAddress } = useAutoLeverageContracts(chainId);
 
-  // Fetch all conditional orders to find ADL for each position
+  // Fetch all conditional orders to find ADL/Auto-Leverage for each position
   const { orders: conditionalOrders } = useConditionalOrders({
     activeOnly: true,
     fetchTriggerStatus: true,
   });
 
-  // Build a map of market ID -> ADL order for quick lookup
-  const adlByMarketId = useMemo(() => {
-    const map = new Map<string, ConditionalOrder>();
+  // Build maps of market ID -> order for quick lookup (separate ADL and Auto-Leverage)
+  const { adlByMarketId, autoLevByMarketId } = useMemo(() => {
+    const adlMap = new Map<string, ConditionalOrder>();
+    const autoLevMap = new Map<string, ConditionalOrder>();
 
     for (const order of conditionalOrders) {
       if (order.context.status !== ConditionalOrderStatus.Active) continue;
@@ -531,43 +605,64 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
       const morphoContext = decodeMorphoContext(order.triggerParams.protocolContext);
       if (!morphoContext) continue;
 
-      // Use the marketId as key
-      map.set(morphoContext.marketId.toLowerCase(), order);
+      const marketId = morphoContext.marketId.toLowerCase();
+      const triggerAddr = order.context.params.trigger.toLowerCase();
+
+      // Separate by trigger type - only compare if addresses are loaded
+      if (autoLeverageTriggerAddress && triggerAddr === autoLeverageTriggerAddress.toLowerCase()) {
+        autoLevMap.set(marketId, order);
+      } else if (ltvTriggerAddress && triggerAddr === ltvTriggerAddress.toLowerCase()) {
+        adlMap.set(marketId, order);
+      }
     }
 
-    return map;
-  }, [conditionalOrders]);
+    return { adlByMarketId: adlMap, autoLevByMarketId: autoLevMap };
+  }, [conditionalOrders, ltvTriggerAddress, autoLeverageTriggerAddress]);
 
-  // Helper to get ADL info for a row
-  const getADLInfoForRow = useCallback((row: MorphoPositionRow) => {
-    // Get the market's unique key (this is the market ID)
-    const marketId = row.market.uniqueKey?.toLowerCase();
-    if (!marketId) return { hasActiveADL: false };
+  // Pre-compute ADL info for all rows to avoid creating new objects on each render
+  const adlInfoByMarketId = useMemo(() => {
+    const infoMap = new Map<string, ADLInfo>();
 
-    const adlOrder = adlByMarketId.get(marketId);
-    if (!adlOrder || !adlOrder.triggerParams) return { hasActiveADL: false };
+    for (const row of rows) {
+      const marketId = row.market.uniqueKey?.toLowerCase();
+      if (!marketId) continue;
 
-    const currentLtvBps = Math.round((row.currentLtv || 0) * 100);
-    const triggerLtvBps = Number(adlOrder.triggerParams.triggerLtvBps);
-    const isAboveTrigger = currentLtvBps >= triggerLtvBps;
+      const currentLtvBps = Math.round((row.currentLtv || 0) * 100);
 
-    return {
-      hasActiveADL: true,
-      adlTriggerLtvBps: adlOrder.triggerParams.triggerLtvBps,
-      adlTargetLtvBps: adlOrder.triggerParams.targetLtvBps,
-      isAboveTrigger,
-      isTriggerMet: adlOrder.isTriggerMet,
-    };
-  }, [adlByMarketId]);
+      // Check for ADL order
+      const adlOrder = adlByMarketId.get(marketId);
+      const adlTriggerLtvBps = adlOrder?.triggerParams?.triggerLtvBps;
+      const adlTargetLtvBps = adlOrder?.triggerParams?.targetLtvBps;
+      const hasActiveADL = adlTriggerLtvBps !== undefined && adlTargetLtvBps !== undefined;
+      const isAboveTrigger = hasActiveADL && currentLtvBps >= Number(adlTriggerLtvBps);
+
+      // Check for Auto-Leverage order
+      const autoLevOrder = autoLevByMarketId.get(marketId);
+      const autoLevTriggerLtvBps = autoLevOrder?.triggerParams?.triggerLtvBps;
+      const autoLevTargetLtvBps = autoLevOrder?.triggerParams?.targetLtvBps;
+      const hasActiveAutoLev = autoLevTriggerLtvBps !== undefined && autoLevTargetLtvBps !== undefined;
+      const isBelowAutoLevTrigger = hasActiveAutoLev && currentLtvBps < Number(autoLevTriggerLtvBps);
+
+      infoMap.set(marketId, {
+        hasActiveADL,
+        adlTriggerLtvBps,
+        adlTargetLtvBps,
+        isAboveTrigger,
+        isTriggerMet: adlOrder?.isTriggerMet,
+        hasActiveAutoLev,
+        autoLevTriggerLtvBps,
+        autoLevTargetLtvBps,
+        isBelowAutoLevTrigger,
+        isAutoLevTriggerMet: autoLevOrder?.isTriggerMet,
+      });
+    }
+
+    return infoMap;
+  }, [rows, adlByMarketId, autoLevByMarketId]);
 
   const toggleRowExpanded = useCallback((key: string) => {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
-
-  // Memoize toggle handlers for each row to avoid creating new functions on each render
-  const getToggleHandler = useCallback((key: string) => {
-    return () => toggleRowExpanded(key);
-  }, [toggleRowExpanded]);
 
   // Handle swap modal open request
   const handleSwapRequest = useCallback((state: SwapModalState) => {
@@ -625,14 +720,15 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
     }
 
     return rows.map((row) => {
-      const adlInfo = getADLInfoForRow(row);
+      const marketId = row.market.uniqueKey?.toLowerCase();
+      const adlInfo = marketId ? adlInfoByMarketId.get(marketId) ?? EMPTY_ADL_INFO : EMPTY_ADL_INFO;
       return (
         <MorphoPositionRowComponent
           key={row.key}
           row={row}
           chainId={chainId}
           isExpanded={!!expandedRows[row.key]}
-          onToggleExpanded={getToggleHandler(row.key)}
+          onToggleExpanded={() => toggleRowExpanded(row.key)}
           findYield={findYield}
           onSwapRequest={handleSwapRequest}
           onDebtSwapRequest={handleDebtSwapRequest}
@@ -642,6 +738,10 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
           adlTriggerLtvBps={adlInfo.adlTriggerLtvBps}
           adlTargetLtvBps={adlInfo.adlTargetLtvBps}
           isAboveTrigger={adlInfo.isAboveTrigger}
+          hasActiveAutoLev={adlInfo.hasActiveAutoLev}
+          autoLevTriggerLtvBps={adlInfo.autoLevTriggerLtvBps}
+          autoLevTargetLtvBps={adlInfo.autoLevTargetLtvBps}
+          isBelowAutoLevTrigger={adlInfo.isBelowAutoLevTrigger}
         />
       );
     });

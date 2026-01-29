@@ -52533,7 +52533,7 @@ const contracts = {
       },
     },
     AutoLeverageTrigger: {
-      address: "0x132230dD2e5dC7881823b4F6423c73e4fEA5D3a0",
+      address: "0xf2C952E7d78adAFf7bb2f5f0108456928019a4ad",
       abi: [
         {
           inputs: [
@@ -52736,12 +52736,12 @@ const contracts = {
           inputs: [
             {
               internalType: "bytes",
-              name: "staticData",
+              name: "",
               type: "bytes",
             },
             {
               internalType: "address",
-              name: "owner",
+              name: "",
               type: "address",
             },
             {
@@ -52758,7 +52758,7 @@ const contracts = {
               type: "bool",
             },
           ],
-          stateMutability: "view",
+          stateMutability: "pure",
           type: "function",
         },
         {
@@ -61599,7 +61599,7 @@ const contracts = {
       },
     },
     LtvTrigger: {
-      address: "0x9D108F62FA38C6578ba3eBfEdcD139571c747E02",
+      address: "0x0ef538d9EF4a070B3F3D0885Cc08B94eCfE4C58C",
       abi: [
         {
           inputs: [
@@ -61897,12 +61897,12 @@ const contracts = {
           inputs: [
             {
               internalType: "bytes",
-              name: "staticData",
+              name: "",
               type: "bytes",
             },
             {
               internalType: "address",
-              name: "owner",
+              name: "",
               type: "address",
             },
             {
@@ -61919,7 +61919,7 @@ const contracts = {
               type: "bool",
             },
           ],
-          stateMutability: "view",
+          stateMutability: "pure",
           type: "function",
         },
         {

@@ -183,17 +183,17 @@ contract AutoLeverageTrigger is IOrderTrigger {
     }
 
     /// @inheritdoc IOrderTrigger
+    /// @dev Auto-leverage orders are continuous - they never auto-complete.
+    /// The order remains active and will re-trigger whenever LTV drops below
+    /// the trigger threshold, up to maxIterations or until user cancels.
+    /// This provides ongoing leverage management rather than one-shot execution.
     function isComplete(
-        bytes calldata staticData,
-        address owner,
+        bytes calldata /* staticData */,
+        address /* owner */,
         uint256 /* iterationCount */
-    ) external view override returns (bool) {
-        TriggerParams memory params = abi.decode(staticData, (TriggerParams));
-
-        uint256 currentLtv = viewRouter.getCurrentLtv(params.protocolId, owner, params.protocolContext);
-
-        // Complete when LTV reaches or exceeds target
-        return currentLtv >= params.targetLtvBps;
+    ) external pure override returns (bool) {
+        // Never auto-complete - rely on maxIterations for termination
+        return false;
     }
 
     /// @inheritdoc IOrderTrigger

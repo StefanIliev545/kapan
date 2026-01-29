@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAccount, useChainId } from "wagmi";
@@ -36,7 +36,8 @@ import {
   type ConditionalOrder,
 } from "~~/hooks/useConditionalOrders";
 import { useConditionalOrderEvents } from "~~/hooks/useConditionalOrderEvents";
-import { ShieldCheckIcon } from "@heroicons/react/24/outline";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { ShieldCheckIcon, ArrowTrendingUpIcon } from "@heroicons/react/24/outline";
 
 function formatAmount(amount: bigint, decimals: number): string {
   const formatted = formatUnits(amount, decimals);
@@ -59,15 +60,15 @@ interface OrderWithHash {
   context: OrderContext;
 }
 
-// Component to fetch and display USD value
-function UsdValue({ symbol, amount }: { symbol: string; amount: number }) {
+// Memoized component to fetch and display USD value - prevents unnecessary re-renders
+const UsdValue = memo(function UsdValue({ symbol, amount }: { symbol: string; amount: number }) {
   const priceData = useTokenPriceApi(symbol);
   const price = priceData.isSuccess ? (priceData as { price: number }).price : undefined;
-  
+
   if (!price) return null;
   const usdValue = amount * price;
   return <span className="text-base-content/40">{formatUsd(usdValue)}</span>;
-}
+});
 
 export function PendingOrdersDrawer() {
   const { address: userAddress } = useAccount();
@@ -90,6 +91,10 @@ export function PendingOrdersDrawer() {
 
   // Watch for conditional order events (created, completed, cancelled) to trigger real-time refreshes
   useConditionalOrderEvents();
+
+  // Get trigger contract addresses to differentiate ADL vs Auto-Leverage orders
+  const { data: autoLeverageTriggerInfo } = useDeployedContractInfo({ contractName: "AutoLeverageTrigger", chainId } as any);
+  const autoLeverageTriggerAddress = autoLeverageTriggerInfo?.address?.toLowerCase();
 
   const [isOpen, setIsOpen] = useState(false);
   const [orders, setOrders] = useState<OrderWithHash[]>([]);
@@ -237,14 +242,16 @@ export function PendingOrdersDrawer() {
   }, []);
 
   // Filter to recent orders (past 7 days), exclude cancelled, sort newest first
-  const now = Math.floor(Date.now() / 1000);
+  // Use minute-level precision to avoid recalculating on every render
+  const nowMinute = useMemo(() => Math.floor(Date.now() / 60000) * 60, []);
 
   const recentOrders = useMemo(() => {
+    const now = Math.floor(Date.now() / 1000); // Use fresh timestamp inside memo
     return orders
       .filter(o => now - Number(o.context.createdAt) < SEVEN_DAYS_SECONDS)
       .filter(o => o.context.status !== OrderStatus.Cancelled) // Exclude cancelled orders
       .sort((a, b) => Number(b.context.createdAt) - Number(a.context.createdAt));
-  }, [orders, now]);
+  }, [orders, nowMinute]); // Only recalculate when orders change or minute changes
   
   const hasOlderOrders = orders.length > recentOrders.length;
   const activeOrders = recentOrders.filter(o => o.context.status === OrderStatus.Active);
@@ -716,13 +723,25 @@ export function PendingOrdersDrawer() {
     const completedIterations = Number(iterationCount);
     const progressPercent = maxIterations > 0 ? (completedIterations / maxIterations) * 100 : 0;
 
+    // Determine order type based on trigger address
+    // Only compare if we have the address loaded, otherwise default to ADL
+    const triggerAddress = context.params.trigger.toLowerCase();
+    const isAutoLeverage = autoLeverageTriggerAddress
+      ? triggerAddress === autoLeverageTriggerAddress
+      : false;
+    const orderTypeLabel = isAutoLeverage ? "Auto-Lev" : "ADL";
+    const OrderIcon = isAutoLeverage ? ArrowTrendingUpIcon : ShieldCheckIcon;
+
     return (
       <div key={orderHash} className={`hover:bg-base-50 px-4 py-3 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
-        {/* Row 0: ADL badge + Status */}
+        {/* Row 0: Order type badge + Status */}
         <div className="mb-1.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="bg-success/20 text-success rounded px-1.5 py-0.5 text-[10px] font-medium">
-              ADL
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium flex items-center gap-1 ${
+              isAutoLeverage ? 'bg-info/20 text-info' : 'bg-success/20 text-success'
+            }`}>
+              <OrderIcon className="size-3" />
+              {orderTypeLabel}
             </span>
             {isTriggerMet && (
               <span className="bg-warning/20 text-warning rounded px-1.5 py-0.5 text-[10px] font-medium">
