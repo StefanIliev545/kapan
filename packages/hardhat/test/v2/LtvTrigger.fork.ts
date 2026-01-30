@@ -878,6 +878,104 @@ describe("LtvTrigger", function () {
     });
   });
 
+  // Skip: Precision truncation temporarily removed to debug order filling issues
+  describe.skip("Precision truncation", () => {
+    it("should truncate small fluctuations (same result for minor changes)", async () => {
+      const currentLtv = await ltvTrigger.getCurrentLtv(AAVE_V3, userAddress, "0x");
+
+      // Skip if no position exists
+      if (currentLtv === 0n) {
+        console.log("  Skipping: No position exists for user");
+        return;
+      }
+
+      // Use current LTV + buffer for trigger to ensure it fires
+      const triggerLtvBps = currentLtv > 100n ? currentLtv - 100n : 1n;
+      const targetLtvBps = currentLtv > 500n ? currentLtv - 500n : 1n;
+
+      const params = {
+        protocolId: AAVE_V3,
+        protocolContext: "0x",
+        triggerLtvBps: triggerLtvBps,
+        targetLtvBps: targetLtvBps,
+        collateralToken: WSTETH,
+        debtToken: USDC,
+        collateralDecimals: 18,
+        debtDecimals: 6,
+        maxSlippageBps: 100,
+        numChunks: 1,
+      };
+
+      const staticData = await ltvTrigger.encodeTriggerParams(params);
+      const [sellAmount1] = await ltvTrigger.calculateExecution(staticData, userAddress);
+
+      console.log(`  Current LTV: ${currentLtv.toString()} bps`);
+      console.log(`  Sell amount: ${ethers.formatEther(sellAmount1)} wstETH`);
+      console.log(`  Raw value: ${sellAmount1.toString()}`);
+
+      // Check that sellAmount is truncated (last 2 digits should be 0)
+      const PRECISION_DIVISOR = 10n ** 2n;
+      const truncated = (sellAmount1 / PRECISION_DIVISOR) * PRECISION_DIVISOR;
+
+      console.log(`  Truncated: ${truncated.toString()}`);
+      console.log(`  Matches: ${sellAmount1 === truncated}`);
+
+      // sellAmount should already be truncated
+      expect(sellAmount1).to.equal(truncated);
+    });
+
+    it("should produce same sellAmount for amounts differing by less than 1e2", async () => {
+      // This tests that the precision truncation prevents order spam
+      // by ensuring similar amounts produce identical results
+
+      // Example: 1.23456789012345e18 and 1.23456789012346e18 should both truncate to same value
+      const PRECISION_DIVISOR = 10n ** 2n;
+
+      const amount1 = ethers.parseEther("1.234567890123456789");
+      const amount2 = ethers.parseEther("1.234567890123456790"); // differs by 1 wei
+
+      const truncated1 = (amount1 / PRECISION_DIVISOR) * PRECISION_DIVISOR;
+      const truncated2 = (amount2 / PRECISION_DIVISOR) * PRECISION_DIVISOR;
+
+      console.log(`  Amount 1: ${amount1.toString()}`);
+      console.log(`  Amount 2: ${amount2.toString()}`);
+      console.log(`  Truncated 1: ${truncated1.toString()}`);
+      console.log(`  Truncated 2: ${truncated2.toString()}`);
+
+      // Both should truncate to the same value
+      expect(truncated1).to.equal(truncated2);
+
+      // Verify the precision: last 2 digits are zeroed
+      expect(truncated1 % PRECISION_DIVISOR).to.equal(0n);
+    });
+
+    it("should preserve significant figures for typical DeFi amounts", async () => {
+      // Test that we don't lose too much precision for realistic amounts
+      const PRECISION_DIVISOR = 10n ** 2n;
+
+      // Typical amounts
+      const amounts = [
+        ethers.parseEther("0.001"), // 0.001 ETH
+        ethers.parseEther("1"), // 1 ETH
+        ethers.parseEther("100"), // 100 ETH
+        ethers.parseEther("10000"), // 10,000 ETH
+      ];
+
+      for (const amount of amounts) {
+        const truncated = (amount / PRECISION_DIVISOR) * PRECISION_DIVISOR;
+        const loss = amount - truncated;
+        const lossPercent = (Number(loss) / Number(amount)) * 100;
+
+        console.log(`  ${ethers.formatEther(amount)} ETH -> ${ethers.formatEther(truncated)} ETH (loss: ${lossPercent.toFixed(10)}%)`);
+
+        // Loss should be less than 0.001% for amounts >= 0.001 ETH
+        if (amount >= ethers.parseEther("0.001")) {
+          expect(lossPercent).to.be.lt(0.001);
+        }
+      }
+    });
+  });
+
   describe("Chunking behavior", () => {
     it("should return full amount when numChunks = 0", async () => {
       const currentLtv = await ltvTrigger.getCurrentLtv(AAVE_V3, userAddress, "0x");
@@ -945,8 +1043,9 @@ describe("LtvTrigger", function () {
       console.log(`  Full amount: ${ethers.formatEther(sellAmountFull)} wstETH`);
       console.log(`  Half amount (2 chunks): ${ethers.formatEther(sellAmountHalf)} wstETH`);
 
-      // Half should be exactly half (accounting for integer division)
-      expect(sellAmountHalf).to.equal(sellAmountFull / 2n);
+      // Check that half is approximately full/2 (integer division)
+      const expectedHalf = sellAmountFull / 2n;
+      expect(sellAmountHalf).to.equal(expectedHalf);
     });
 
     it("should split amount when numChunks = 5", async () => {
@@ -980,8 +1079,9 @@ describe("LtvTrigger", function () {
       console.log(`  Full amount: ${ethers.formatEther(sellAmountFull)} wstETH`);
       console.log(`  1/5 amount (5 chunks): ${ethers.formatEther(sellAmountFifth)} wstETH`);
 
-      // Should be 1/5 (accounting for integer division)
-      expect(sellAmountFifth).to.equal(sellAmountFull / 5n);
+      // Check that fifth is approximately full/5 (integer division)
+      const expectedFifth = sellAmountFull / 5n;
+      expect(sellAmountFifth).to.equal(expectedFifth);
     });
 
     it("should calculate correct minBuyAmount for chunked amount", async () => {
@@ -1019,8 +1119,9 @@ describe("LtvTrigger", function () {
         `  Chunked (4): sell ${ethers.formatEther(sellAmountChunked)} wstETH, min buy ${ethers.formatUnits(minBuyChunked, 6)} USDC`,
       );
 
-      // Sell amounts should be in 4:1 ratio
-      expect(sellAmountChunked).to.equal(sellAmountFull / 4n);
+      // Check that chunked is exactly 1/4 of full (integer division)
+      const expectedChunked = sellAmountFull / 4n;
+      expect(sellAmountChunked).to.equal(expectedChunked);
 
       // MinBuy should also be roughly in 4:1 ratio (may differ slightly due to rounding)
       const minBuyRatio = (minBuyFull * 1000n) / minBuyChunked;

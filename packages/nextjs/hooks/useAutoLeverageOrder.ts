@@ -19,6 +19,10 @@ import {
   ADLValidationResult,
   ProtocolInstruction,
 } from "~~/components/modals/adlAutomationHelpers";
+import {
+  createRouterInstruction,
+  encodeToOutput,
+} from "~~/utils/v2/instructionHelpers";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { dispatchOrderCreated } from "~~/utils/orderNotes";
 
@@ -271,7 +275,24 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
       const encodedPostInstructions = encodeInstructions(postInstructions) as `0x${string}`;
 
       // Get authorization calls for the instructions
-      const authCalls = await getAuthorizations(postInstructions);
+      // IMPORTANT: Prepend dummy ToOutput instructions to populate UTXOs for authorization.
+      // At execution time, the OrderManager populates these UTXOs dynamically, but for
+      // authorization we need explicit amounts so the gateway can calculate required approvals.
+      // Post-instructions reference: UTXO[0] = actualSellAmount (debt), UTXO[1] = actualBuyAmount (collateral)
+      //
+      // For auto-leverage, we use MAX_UINT256 for collateral approval because:
+      // 1. The actual collateral amount depends on swap execution price
+      // 2. Multiple iterations compound the collateral being deposited
+      // 3. High leverage multipliers (e.g., 5x) require large deposits
+      const MAX_UINT256 = 2n ** 256n - 1n;
+      const dummyUtxoInstructions = [
+        // UTXO[0] = sell amount (debt that was flash loaned and sold)
+        createRouterInstruction(encodeToOutput(flashLoanConfig.amount, triggerParams.debtToken)),
+        // UTXO[1] = buy amount (collateral) - use max approval for flexibility
+        createRouterInstruction(encodeToOutput(MAX_UINT256, triggerParams.collateralToken)),
+      ];
+      const allInstructions = [...dummyUtxoInstructions, ...postInstructions];
+      const authCalls = await getAuthorizations(allInstructions);
 
       // Build flash loan config for appData - flash loan DEBT token (not collateral!)
       const flashLoanAppDataConfig = buildFlashLoanAppDataConfig(

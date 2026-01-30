@@ -1,10 +1,11 @@
 "use client";
 
-import { FC, useState, useMemo, useEffect, ReactNode, useCallback } from "react";
-import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { FC, useState, useMemo, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
-import { ChevronDownIcon, ChevronUpIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { BaseProtocolHeader, type HeaderMetric } from "../common";
+import { CollapsibleSection } from "~~/components/common/CollapsibleSection";
+import { MetricColors } from "~~/utils/protocolMetrics";
 import {
   useEulerLendingPositions,
   useEulerVaults,
@@ -27,34 +28,13 @@ import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
 import { useTokenPrices } from "~~/hooks/useTokenPrice";
 import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useGlobalState } from "~~/services/store/store";
-import { formatCurrencyCompact } from "~~/utils/formatNumber";
-import { formatSignedPercent } from "../utils";
 import { useModal } from "~~/hooks/useModal";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { useTxCompletedListenerDelayed } from "~~/hooks/common/useTxCompletedListener";
 
-/**
- * Reusable collapsible section with animated expand/collapse.
- */
-interface CollapsibleSectionProps {
-  isOpen: boolean;
-  children: ReactNode;
-}
-
-// Static image error handler
-const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-  (e.target as HTMLImageElement).src = "/logos/default.svg";
-};
-
-// Static animation constants
-const COLLAPSE_TRANSITION = { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const };
-const COLLAPSE_INITIAL = { opacity: 0, height: 0 };
-const COLLAPSE_ANIMATE = { opacity: 1, height: "auto" };
-
-// CSS class constants
+// CSS class constants (used by EulerPositionGroupRow)
 const TEXT_SUCCESS = "text-success";
 const TEXT_ERROR = "text-error";
-const TEXT_MUTED = "text-base-content/40";
 
 /** Metrics computed from user positions */
 interface PositionMetrics {
@@ -72,37 +52,6 @@ const EMPTY_METRICS: PositionMetrics = {
   netApyPercent: null,
   positionsWithDebt: 0,
 };
-
-/**
- * Get the appropriate text color class for a numeric value.
- */
-function getValueColorClass(hasPositions: boolean, value: number): string {
-  if (!hasPositions) return TEXT_MUTED;
-  return value >= 0 ? TEXT_SUCCESS : TEXT_ERROR;
-}
-
-/**
- * Get the appropriate text color class for the APY value.
- */
-function getApyColorClass(hasPositions: boolean, apyValue: number | null): string {
-  if (!hasPositions || apyValue == null) return TEXT_MUTED;
-  return apyValue >= 0 ? TEXT_SUCCESS : TEXT_ERROR;
-}
-
-/**
- * Format a metric value for display, or return placeholder if no positions.
- */
-function formatMetricValue(hasPositions: boolean, value: number): string {
-  return hasPositions ? formatCurrencyCompact(value) : "—";
-}
-
-/**
- * Format APY value for display, or return placeholder if no positions or null APY.
- */
-function formatApyValue(hasPositions: boolean, apyValue: number | null): string {
-  if (!hasPositions || apyValue == null) return "—";
-  return formatSignedPercent(apyValue);
-}
 
 /** Collateral swap state for tracking which collateral is being swapped */
 interface CollateralSwapState {
@@ -281,6 +230,30 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
     })),
     [collaterals, pricesRaw, getIcon]
   );
+
+  // Calculate total collateral and debt USD values for ADL modal (scaled to 8 decimals)
+  const { totalCollateralUsd, totalDebtUsd } = useMemo(() => {
+    let collateralUsd = 0n;
+    for (const col of collaterals) {
+      const symbol = col.vault.asset.symbol?.toLowerCase();
+      const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+      if (col.balance > 0n && priceRaw > 0n) {
+        // balance * price / 10^decimals gives USD value in 8 decimals
+        collateralUsd += (col.balance * priceRaw) / BigInt(10 ** col.vault.asset.decimals);
+      }
+    }
+
+    let debtUsd = 0n;
+    if (debt && debt.balance > 0n) {
+      const symbol = debt.vault.asset.symbol?.toLowerCase();
+      const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+      if (priceRaw > 0n) {
+        debtUsd = (debt.balance * priceRaw) / BigInt(10 ** debt.vault.asset.decimals);
+      }
+    }
+
+    return { totalCollateralUsd: collateralUsd, totalDebtUsd: debtUsd };
+  }, [collaterals, debt, pricesRaw]);
 
   // Handler to open collateral swap modal
   const handleOpenSwap = useCallback((collateral: typeof collaterals[0]) => {
@@ -669,20 +642,30 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
           chainId={chainId}
           currentLtvBps={Math.round(healthStatus.currentLtv * 100)}
           liquidationLtvBps={Math.round(healthStatus.effectiveLltv * 100)}
-          collateralTokens={collaterals.map((col): SwapAsset => ({
-            symbol: col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol,
-            address: col.vault.asset.address,
-            decimals: col.vault.asset.decimals,
-            rawBalance: col.balance,
-            balance: Number(col.balance) / (10 ** col.vault.asset.decimals),
-            icon: getIcon(col.vault.asset.symbol),
-            price: pricesRaw[col.vault.asset.symbol?.toLowerCase()] ?? 0n,
-          }))}
+          collateralTokens={collaterals.map((col): SwapAsset => {
+            const symbol = col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol;
+            const priceRaw = pricesRaw[symbol.toLowerCase()] ?? 0n;
+            const balance = Number(col.balance) / (10 ** col.vault.asset.decimals);
+            const usdValue = balance * (Number(priceRaw) / 1e8);
+            return {
+              symbol,
+              address: col.vault.asset.address,
+              decimals: col.vault.asset.decimals,
+              rawBalance: col.balance,
+              balance,
+              icon: getIcon(col.vault.asset.symbol),
+              price: priceRaw,
+              usdValue,
+            };
+          })}
           debtToken={{
             address: debt.vault.asset.address,
             symbol: debt.vault.asset.symbol === "???" ? "unknown" : debt.vault.asset.symbol,
             decimals: debt.vault.asset.decimals,
+            balance: debt.balance,
           }}
+          totalCollateralUsd={totalCollateralUsd}
+          totalDebtUsd={totalDebtUsd}
           eulerBorrowVault={debt.vault.address}
           eulerCollateralVaults={collaterals.map(c => c.vault.address)}
           eulerSubAccountIndex={subAccountIndex}
@@ -691,26 +674,6 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
     </div>
   );
 };
-
-const CollapsibleSection: FC<CollapsibleSectionProps> = ({ isOpen, children }) => (
-  <AnimatePresence initial={false}>
-    {isOpen && (
-      <motion.div
-        initial={COLLAPSE_INITIAL}
-        animate={COLLAPSE_ANIMATE}
-        exit={COLLAPSE_INITIAL}
-        transition={COLLAPSE_TRANSITION}
-        className="overflow-hidden"
-      >
-        <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-md">
-          <div className="card-body p-4">
-            {children}
-          </div>
-        </div>
-      </motion.div>
-    )}
-  </AnimatePresence>
-);
 
 interface EulerProtocolViewProps {
   chainId?: number;
@@ -901,140 +864,36 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     });
   }, [isCollapsed]);
 
+  // Build metrics array for the header
+  const headerMetrics: HeaderMetric[] = useMemo(() => [
+    { label: "Balance", value: metrics.netBalance, type: "currency" },
+    { label: "30D Yield", mobileLabel: "30D", value: metrics.netYield30d, type: "currency" },
+    { label: "Net APY", value: metrics.netApyPercent, type: "apy" },
+    {
+      label: "Positions",
+      value: metrics.positionsWithDebt,
+      type: "custom",
+      customRender: (hasData: boolean) => (
+        <span className={`font-mono text-xs font-bold tabular-nums ${hasData ? 'text-base-content' : MetricColors.MUTED}`}>
+          {hasData ? metrics.positionsWithDebt : "—"}
+        </span>
+      ),
+    },
+  ], [metrics]);
+
   return (
     <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 p-3'}`}>
-      {/* Protocol Header Card */}
-      <div
-        className="card-surface-interactive shadow-lg"
-        onClick={toggleCollapsed}
-      >
-        <div className="card-body p-3 sm:px-5">
-          {/* Mobile Layout */}
-          <div className="space-y-3 sm:hidden">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="token-icon-wrapper-md">
-                  <Image
-                    src="/logos/euler.svg"
-                    alt="Euler icon"
-                    width={20}
-                    height={20}
-                    className="object-contain drop-shadow-sm"
-                    onError={handleImageError}
-                  />
-                </div>
-                <span className="text-sm font-bold tracking-tight">Euler</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn btn-xs btn-ghost gap-1"
-                  type="button"
-                  onClick={toggleMarketsOpen}
-                >
-                  <span className="text-[9px] font-semibold uppercase tracking-wider">Markets</span>
-                  {isMarketsOpen ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />}
-                </button>
-                <ChevronDownIcon
-                  className={`text-base-content/40 size-4 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
-                />
-              </div>
-            </div>
-            {/* Stats grid */}
-            <div className="grid grid-cols-4 gap-1">
-              <div className="flex flex-col items-center py-1">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Balance</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${getValueColorClass(hasPositions, metrics.netBalance)}`}>
-                  {formatMetricValue(hasPositions, metrics.netBalance)}
-                </span>
-              </div>
-              <div className="flex flex-col items-center py-1">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">30D</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${getValueColorClass(hasPositions, metrics.netYield30d)}`}>
-                  {formatMetricValue(hasPositions, metrics.netYield30d)}
-                </span>
-              </div>
-              <div className="flex flex-col items-center py-1">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Net APY</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${getApyColorClass(hasPositions, metrics.netApyPercent)}`}>
-                  {formatApyValue(hasPositions, metrics.netApyPercent)}
-                </span>
-              </div>
-              <div className="flex flex-col items-center py-1">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Positions</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${hasPositions ? 'text-base-content' : TEXT_MUTED}`}>
-                  {hasPositions ? metrics.positionsWithDebt : "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop Layout */}
-          <div className="hidden flex-wrap items-center gap-x-6 gap-y-4 sm:flex">
-            <div className="flex items-center gap-3">
-              <div className="token-icon-wrapper-lg">
-                <Image
-                  src="/logos/euler.svg"
-                  alt="Euler icon"
-                  width={24}
-                  height={24}
-                  className="object-contain drop-shadow-sm"
-                  onError={handleImageError}
-                />
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="label-text-xs-semibold">Protocol</span>
-                <span className="text-base font-bold tracking-tight">Euler</span>
-              </div>
-            </div>
-
-            <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
-
-            <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
-              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                <span className="label-text-xs-semibold">Balance</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${getValueColorClass(hasPositions, metrics.netBalance)}`}>
-                  {formatMetricValue(hasPositions, metrics.netBalance)}
-                </span>
-              </div>
-
-              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                <span className="label-text-xs-semibold">30D Yield</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${getValueColorClass(hasPositions, metrics.netYield30d)}`}>
-                  {formatMetricValue(hasPositions, metrics.netYield30d)}
-                </span>
-              </div>
-
-              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                <span className="label-text-xs-semibold">Net APY</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${getApyColorClass(hasPositions, metrics.netApyPercent)}`}>
-                  {formatApyValue(hasPositions, metrics.netApyPercent)}
-                </span>
-              </div>
-
-              <div className="group/util hover:bg-base-200/30 flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                <span className="label-text-xs-semibold">Positions</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${hasPositions ? 'text-base-content' : TEXT_MUTED}`}>
-                  {hasPositions ? metrics.positionsWithDebt : "—"}
-                </span>
-              </div>
-            </div>
-
-            <div className="border-base-300/50 flex items-center gap-2.5 border-l pl-2">
-              <button
-                className="btn btn-sm btn-ghost gap-1.5"
-                type="button"
-                onClick={toggleMarketsOpen}
-              >
-                <span className="text-[10px] font-semibold uppercase tracking-widest">Markets</span>
-                {isMarketsOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}
-              </button>
-              <ChevronDownIcon
-                className={`text-base-content/40 size-5 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Protocol Header */}
+      <BaseProtocolHeader
+        protocolName="Euler"
+        protocolIcon="/logos/euler.svg"
+        isCollapsed={isCollapsed}
+        isMarketsOpen={isMarketsOpen}
+        onToggleCollapsed={toggleCollapsed}
+        onToggleMarkets={toggleMarketsOpen}
+        hasPositions={hasPositions}
+        metrics={headerMetrics}
+      />
 
       {/* Markets Section - expandable */}
       <CollapsibleSection isOpen={isMarketsOpen && !isCollapsed}>

@@ -43,6 +43,8 @@ export interface LTVAutomationModalProps {
     address: string;
     symbol: string;
     decimals: number;
+    /** Raw balance in token units (for price calculation) */
+    balance?: bigint;
   };
   totalCollateralUsd?: bigint;
   totalDebtUsd?: bigint;
@@ -203,7 +205,7 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
 
   const adlFlashLoanConfig = useMemo(() => {
     if (!selectedCollateral || !totalCollateralUsd || !totalDebtUsd) return null;
-    const perChunkFlashLoanUsd = calculateADLFlashLoanAmount(totalCollateralUsd, totalDebtUsd, adlTriggerLtvBps, adlTargetLtvBps, numChunks, 2000);
+    const perChunkFlashLoanUsd = calculateADLFlashLoanAmount(totalCollateralUsd, totalDebtUsd, adlTriggerLtvBps, adlTargetLtvBps, numChunks);
     if (perChunkFlashLoanUsd === 0n) return null;
     const collateralPrice = selectedCollateral.usdValue && selectedCollateral.balance > 0
       ? BigInt(Math.round((selectedCollateral.usdValue / selectedCollateral.balance) * 1e8)) : 0n;
@@ -215,16 +217,27 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
   }, [selectedCollateral, totalCollateralUsd, totalDebtUsd, adlTriggerLtvBps, adlTargetLtvBps, numChunks, debtToken.decimals]);
 
   const autoLevFlashLoanConfig = useMemo(() => {
-    if (!selectedCollateral || !totalCollateralUsd || !totalDebtUsd) return null;
-    const perChunkFlashLoanUsd = calculateAutoLeverageFlashLoanAmount(totalCollateralUsd, totalDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, 2000);
+    // For auto-leverage, we only need collateral (user might have 0 debt, wanting to leverage up)
+    if (!selectedCollateral || !totalCollateralUsd) return null;
+    // Pass 0n for debt if undefined - auto-leverage can start from 0% LTV
+    const effectiveDebtUsd = totalDebtUsd ?? 0n;
+    const perChunkFlashLoanUsd = calculateAutoLeverageFlashLoanAmount(totalCollateralUsd, effectiveDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, 2000);
     if (perChunkFlashLoanUsd === 0n) return null;
 
     // For auto-leverage, we flash loan DEBT tokens (not collateral!)
-    // We need the debt token price to convert USD → debt token amount
-    // For stablecoins (USDC, USDT, DAI, etc.), price ≈ $1.00 = 1e8
-    // TODO: For volatile debt tokens, we should pass actual price as a prop
-    const STABLECOIN_PRICE = BigInt(1e8); // $1.00 in 8 decimals
-    const debtTokenPrice = STABLECOIN_PRICE;
+    // Calculate debt token price from totalDebtUsd and balance if available
+    let debtTokenPrice: bigint;
+    if (debtToken.balance && debtToken.balance > 0n && totalDebtUsd && totalDebtUsd > 0n) {
+      // Price = totalDebtUsd / balance, scaled to 8 decimals
+      // totalDebtUsd is in 8 decimals, balance is in token decimals
+      // price = (totalDebtUsd * 10^tokenDecimals) / balance gives price in 8 decimals
+      debtTokenPrice = (totalDebtUsd * BigInt(10 ** debtToken.decimals)) / debtToken.balance;
+    } else {
+      // Fallback for stablecoins or when balance not available
+      const STABLECOIN_PRICE = BigInt(1e8); // $1.00 in 8 decimals
+      debtTokenPrice = STABLECOIN_PRICE;
+      console.warn("[AutoLeverage] Using stablecoin fallback price - pass debtToken.balance for accurate pricing");
+    }
 
     // Flash loan amount in DEBT token units (not collateral!)
     const perChunkFlashLoanAmount = usdToTokenAmount(perChunkFlashLoanUsd, debtTokenPrice, debtToken.decimals);
@@ -233,8 +246,15 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
     // perChunkSellAmount is used as a reference but the trigger calculates actual sell amount
     const perChunkSellAmount = perChunkFlashLoanAmount;
 
+    console.log("[AutoLeverage] Flash loan config:", {
+      perChunkFlashLoanUsd: perChunkFlashLoanUsd.toString(),
+      debtTokenPrice: debtTokenPrice.toString(),
+      perChunkFlashLoanAmount: perChunkFlashLoanAmount.toString(),
+      debtTokenBalance: debtToken.balance?.toString(),
+    });
+
     return { amount: perChunkFlashLoanAmount, perChunkSellAmount };
-  }, [selectedCollateral, totalCollateralUsd, totalDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, debtToken.decimals]);
+  }, [selectedCollateral, totalCollateralUsd, totalDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, debtToken.decimals, debtToken.balance]);
 
   const { createOrder: createADLOrder, isLoading: isCreatingADL } = useADLOrder({
     protocolName, chainId,
@@ -401,7 +421,7 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
           <div className="grid grid-cols-2 gap-x-6 gap-y-2">
             {/* Row 1: Trigger inputs */}
             {enableADL ? (
-              <LtvInput label="Trigger" value={adlTriggerLtvBps} min={currentLtvBps + 100} max={liquidationLtvBps - 100}
+              <LtvInput label="Trigger" value={adlTriggerLtvBps} min={500} max={liquidationLtvBps - 100}
                 colorClass="border-warning"
                 onChange={v => { setAdlTriggerLtvBps(v); if (adlTargetLtvBps >= v) setAdlTargetLtvBps(Math.max(v - 500, 100)); }} />
             ) : <div />}

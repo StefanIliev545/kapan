@@ -148,6 +148,8 @@ contract AutoLeverageTrigger is IOrderTrigger {
             sellAmount = sellAmount / chunks;
         }
 
+        if (sellAmount == 0) return (0, 0);
+
         // Calculate minBuyAmount (collateral) with slippage
         // This must cover the flash loan repayment
         uint256 expectedCollateral;
@@ -212,4 +214,5 @@ contract AutoLeverageTrigger is IOrderTrigger {
     function encodeTriggerParams(TriggerParams memory params) external pure returns (bytes memory) {
         return abi.encode(params);
     }
+
 }

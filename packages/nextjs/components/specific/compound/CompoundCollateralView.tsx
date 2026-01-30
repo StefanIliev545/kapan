@@ -317,7 +317,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   // Parse borrow value and price from compound data
   const borrowDetails = useMemo(() => {
     if (!compoundData) {
-      return { borrowBalance: 0, borrowValue: 0 };
+      return { borrowBalance: 0, borrowValue: 0, borrowBalanceRaw: 0n };
     }
 
     // CompoundData returns [supplyRate, borrowRate, balance, borrowBalance, price, priceScale]
@@ -332,7 +332,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     // Calculate USD value of the borrowed amount (price is in 8 decimals)
     const price8 = baseTokenUsdPrice && baseTokenUsdPrice > 0n ? baseTokenUsdPrice : price;
     const borrowUsdValue = borrowBalance * Number(formatUnits(price8, 8));
-    return { borrowBalance, borrowValue: borrowUsdValue };
+    return { borrowBalance, borrowValue: borrowUsdValue, borrowBalanceRaw: borrowBalanceRaw ?? 0n };
   }, [compoundData, baseTokenDecimalsArray, baseTokenUsdPrice]);
 
   // Process collateral data with prices
@@ -743,6 +743,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
             address: baseToken,
             symbol: baseTokenSymbol || "UNKNOWN",
             decimals: Number(baseTokenDecimalsArray[0]),
+            balance: borrowDetails.borrowBalanceRaw,
           }}
           compoundMarket={baseToken}
         />

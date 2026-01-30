@@ -60,7 +60,7 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, e
   const { isSupported: isADLSupported } = useADLContracts(chainId || 1);
 
   // Check if there's an active ADL order for this protocol
-  const { hasActiveADL, triggerLtvBps, targetLtvBps } = useActiveADL({
+  const { hasActiveADL, activeADL, triggerLtvBps, targetLtvBps } = useActiveADL({
     protocolName,
     chainId: chainId || 1,
   });
@@ -156,6 +156,8 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, e
               autoExpandOnPositions
               hasLoadedOnce={hasLoadedOnce}
               headerElement={headerElement}
+              adlCollateralToken={activeADL?.triggerParams?.collateralToken}
+              adlDebtToken={activeADL?.triggerParams?.debtToken}
             />
 
             {/* ADL Automation Modal */}
@@ -172,6 +174,7 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, e
                   address: selectedDebt.tokenAddress,
                   symbol: selectedDebt.name,
                   decimals: selectedDebt.tokenDecimals || 18,
+                  balance: selectedDebt.tokenBalance,
                 }}
                 totalCollateralUsd={totalCollateralUsd}
                 totalDebtUsd={totalDebtUsd}

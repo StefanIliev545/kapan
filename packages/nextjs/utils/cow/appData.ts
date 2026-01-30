@@ -59,7 +59,9 @@ export type KapanOperationType =
   | "leverage-up"
   | "close-position"
   | "debt-swap"
-  | "collateral-swap";
+  | "collateral-swap"
+  | "adl"
+  | "auto-leverage";
 
 /**
  * Lending protocol identifiers for appCode
@@ -102,7 +104,7 @@ export function parseOperationTypeFromAppCode(appCode: string): KapanOperationTy
   // Handle format "kapan:operation-type/protocol" or "kapan:operation-type"
   const rest = appCode.slice(6);
   const type = rest.split("/")[0] as KapanOperationType;
-  const validTypes: KapanOperationType[] = ["leverage-up", "close-position", "debt-swap", "collateral-swap"];
+  const validTypes: KapanOperationType[] = ["leverage-up", "close-position", "debt-swap", "collateral-swap", "adl", "auto-leverage"];
   return validTypes.includes(type) ? type : undefined;
 }
 

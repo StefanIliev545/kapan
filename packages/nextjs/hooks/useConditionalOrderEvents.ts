@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { type Address, type Log } from "viem";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { logger } from "~~/utils/logger";
+import { qk } from "~~/lib/queryKeys";
 
 // Event ABIs for KapanConditionalOrderManager
 const CONDITIONAL_ORDER_EVENTS_ABI = [
@@ -55,19 +56,42 @@ export function useConditionalOrderEvents() {
   const isEnabled = !!contractAddress && !!publicClient && !!userAddress;
 
   // Callback to invalidate queries when any conditional order event fires
-  const handleEvent = useCallback(
+  const handleOrderEvent = useCallback(
     (logs: Log[]) => {
       if (logs.length === 0) return;
 
-      logger.info("[useConditionalOrderEvents] Event received, invalidating queries", {
+      logger.info("[useConditionalOrderEvents] Order event received, invalidating queries", {
         eventCount: logs.length,
         chainId,
       });
 
-      // Invalidate all conditional order queries
+      // Invalidate conditional order queries
       queryClient.invalidateQueries({ queryKey: ["conditionalOrders"] });
     },
     [queryClient, chainId],
+  );
+
+  // Callback for order completion - also refresh positions since they changed
+  const handleOrderCompleted = useCallback(
+    (logs: Log[]) => {
+      if (logs.length === 0) return;
+
+      logger.info("[useConditionalOrderEvents] Order COMPLETED, refreshing positions", {
+        eventCount: logs.length,
+        chainId,
+        user: userAddress,
+      });
+
+      // Invalidate conditional order queries
+      queryClient.invalidateQueries({ queryKey: ["conditionalOrders"] });
+
+      // Refresh positions - the order execution changed the user's position
+      queryClient.invalidateQueries({ queryKey: qk.morpho.all(chainId) });
+      queryClient.invalidateQueries({ queryKey: qk.euler.all(chainId) });
+      queryClient.invalidateQueries({ queryKey: qk.positions(chainId, userAddress) });
+      queryClient.invalidateQueries({ queryKey: qk.balances(chainId, userAddress) });
+    },
+    [queryClient, chainId, userAddress],
   );
 
   // Watch for ConditionalOrderCreated
@@ -75,16 +99,17 @@ export function useConditionalOrderEvents() {
     address: contractAddress,
     abi: CONDITIONAL_ORDER_EVENTS_ABI,
     eventName: "ConditionalOrderCreated",
-    onLogs: handleEvent,
+    onLogs: handleOrderEvent,
     enabled: isEnabled,
   });
 
-  // Watch for ConditionalOrderCompleted (ADL executed)
+  // Watch for ConditionalOrderCompleted (ADL/AutoLeverage executed)
+  // This also refreshes positions since the order changed the user's position
   useWatchContractEvent({
     address: contractAddress,
     abi: CONDITIONAL_ORDER_EVENTS_ABI,
     eventName: "ConditionalOrderCompleted",
-    onLogs: handleEvent,
+    onLogs: handleOrderCompleted,
     enabled: isEnabled,
   });
 
@@ -93,7 +118,7 @@ export function useConditionalOrderEvents() {
     address: contractAddress,
     abi: CONDITIONAL_ORDER_EVENTS_ABI,
     eventName: "ConditionalOrderCancelled",
-    onLogs: handleEvent,
+    onLogs: handleOrderEvent,
     enabled: isEnabled,
   });
 

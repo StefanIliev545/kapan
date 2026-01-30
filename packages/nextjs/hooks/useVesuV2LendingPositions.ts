@@ -14,13 +14,12 @@ import {
   normalizePrice,
   computeUsdValue,
   parsePositionTuples,
+  toHexAddress,
   type PositionTuple,
 } from "./useProtocolPositions";
 import { usePositionLoadingState } from "./useProtocolPositions/usePositionLoadingState";
 
 const ZERO_ADDRESS = normalizeStarknetAddress(0n);
-
-const toHexAddress = (raw: bigint): string => `0x${raw.toString(16).padStart(64, "0")}`;
 
 const resolveSymbol = (symbol: unknown, address: string): string => {
   if (typeof symbol === "bigint") {

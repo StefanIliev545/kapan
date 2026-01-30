@@ -11,7 +11,8 @@
 
 /**
  * Default chunk window duration in seconds (30 minutes)
- * Matches CHUNK_WINDOW in KapanOrderHandler.sol
+ * Matches DEFAULT_CHUNK_WINDOW in KapanConditionalOrderManager.sol
+ * @dev Increased to 30 minutes to allow sufficient time for solver competition and fills
  */
 export const CHUNK_WINDOW_SECONDS = 30 * 60; // 30 minutes
 

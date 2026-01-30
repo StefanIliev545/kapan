@@ -51,6 +51,7 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     error ValidToOverflow();
     error SaltAlreadyUsed();
     error MaxOrdersExceeded();
+    error InvalidChunkWindow();
 
     // ============ Enums ============
     enum OrderStatus {
@@ -116,10 +117,23 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
 
     // ============ Constants ============
 
-    /// @notice Chunk window duration for deterministic validTo
-    uint256 public constant CHUNK_WINDOW = 30 minutes;
+    /// @notice Default chunk window duration (30 minutes)
+    /// @dev Must be > 60 seconds due to CoW Protocol's min_order_validity_period (default 1 minute)
+    /// Increased to 30 minutes to allow sufficient time for solver competition and fills
+    uint256 public constant DEFAULT_CHUNK_WINDOW = 30 minutes;
+
+    /// @notice Minimum allowed chunk window (65 seconds)
+    /// @dev Must be > 60 seconds due to CoW Protocol's min_order_validity_period
+    uint256 public constant MIN_CHUNK_WINDOW = 65 seconds;
+
+    /// @notice Maximum allowed chunk window (1 hour)
+    uint256 public constant MAX_CHUNK_WINDOW = 1 hours;
 
     // ============ State Variables ============
+
+    /// @notice Chunk window duration for deterministic validTo
+    /// @dev Configurable to tune order validity based on watchtower polling and token characteristics
+    uint256 public chunkWindow = DEFAULT_CHUNK_WINDOW;
 
     /// @notice The KapanRouter for executing lending operations (immutable)
     IKapanRouter public immutable router;
@@ -187,6 +201,7 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     event TokensRecovered(address indexed token, address indexed to, uint256 amount);
     event StuckOrderReset(bytes32 indexed orderHash, address indexed user);
     event OrderHandlerUpdated(address indexed oldHandler, address indexed newHandler);
+    event ChunkWindowUpdated(uint256 oldWindow, uint256 newWindow);
 
     // ============ Constructor ============
 
@@ -226,6 +241,17 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         address oldHandler = orderHandler;
         orderHandler = _orderHandler;
         emit OrderHandlerUpdated(oldHandler, _orderHandler);
+    }
+
+    /// @notice Update the chunk window for order validity
+    /// @param _chunkWindow New chunk window in seconds
+    function setChunkWindow(uint256 _chunkWindow) external onlyOwner {
+        if (_chunkWindow < MIN_CHUNK_WINDOW || _chunkWindow > MAX_CHUNK_WINDOW) {
+            revert InvalidChunkWindow();
+        }
+        uint256 oldWindow = chunkWindow;
+        chunkWindow = _chunkWindow;
+        emit ChunkWindowUpdated(oldWindow, _chunkWindow);
     }
 
     // ============ Order Creation ============
@@ -609,15 +635,16 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     // ============ Internal Functions ============
 
     function _calculateValidTo(uint256 createdAt, uint256 iterationCount) internal view returns (uint256 validTo) {
-        uint256 chunkWindowStart = createdAt + (iterationCount * CHUNK_WINDOW);
-        uint256 chunkWindowEnd = chunkWindowStart + CHUNK_WINDOW - 1;
+        uint256 window = chunkWindow;
+        uint256 chunkWindowStart = createdAt + (iterationCount * window);
+        uint256 chunkWindowEnd = chunkWindowStart + window - 1;
 
         if (block.timestamp <= chunkWindowEnd) {
             validTo = chunkWindowEnd;
         } else {
             uint256 elapsedSinceCreate = block.timestamp - createdAt;
-            uint256 currentWindowIndex = elapsedSinceCreate / CHUNK_WINDOW;
-            validTo = createdAt + ((currentWindowIndex + 1) * CHUNK_WINDOW) - 1;
+            uint256 currentWindowIndex = elapsedSinceCreate / window;
+            validTo = createdAt + ((currentWindowIndex + 1) * window) - 1;
         }
 
         // Ensure safe cast to uint32 (GPv2Order requirement)

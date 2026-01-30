@@ -179,13 +179,6 @@ export const WalletSection: FC<WalletSectionProps> = ({
     refetch();
   }, [refetch]);
 
-  // Don't render if no tokens and not loading
-  const shouldRender = isLoading || tokenCount > 0;
-
-  if (!shouldRender) {
-    return null;
-  }
-
   return (
     <>
       <div className="card-surface-interactive shadow-lg">

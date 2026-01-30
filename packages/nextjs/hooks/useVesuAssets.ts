@@ -5,6 +5,7 @@ import type { TokenMetadata } from "~~/utils/protocols";
 import { toAnnualRates } from "~~/utils/protocols";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import { useLogError } from "~~/hooks/common";
+import { toHexAddress } from "~~/hooks/useProtocolPositions/utils";
 
 const normalizeDecimals = (value: unknown): number | null => {
   if (value === undefined || value === null) return 18;
@@ -90,8 +91,6 @@ const parseSupportedAssets = (assets: unknown): TokenMetadata[] => {
 };
 
 export type AssetWithRates = TokenMetadata & { borrowAPR: number; supplyAPY: number };
-
-const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
 
 export const useVesuAssets = (poolId: bigint) => {
   const {

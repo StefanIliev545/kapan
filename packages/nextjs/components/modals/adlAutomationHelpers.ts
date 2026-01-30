@@ -432,22 +432,25 @@ export function validateADLParams(params: {
 // ============ Flash Loan Amount Calculation ============
 
 /**
- * Calculate the estimated flash loan amount needed for ADL
+ * Calculate the flash loan amount needed for ADL
  *
- * This calculates based on trigger→target transition, not current→target,
- * because the order may be set up before the trigger condition is met.
+ * IMPORTANT: This is for automated/conditional orders where the same appData
+ * must work for all future iterations. The order could trigger at much higher
+ * LTV than the trigger threshold (e.g., during a market crash).
  *
- * Formula for trigger→target:
- * At trigger: debt/collateral = triggerLtv
- * At target: debt/collateral = targetLtv
- * Delta = (triggerLtv - targetLtv) * collateral
+ * Strategy: Calculate correct amount based on trigger→target, then multiply
+ * by a safety factor (3x). Excess flash loan is automatically refunded via
+ * sellTokenRefundAddress, so there's no cost to over-estimating.
+ *
+ * Formula matching LtvTrigger.sol:
+ *   X = (triggerLtv - targetLtv) * collateral / (1 - targetLtv)
  *
  * @param collateralValueUsd - Total collateral value in USD (8 decimals)
- * @param debtValueUsd - Total debt value in USD (8 decimals)
- * @param triggerLtvBps - Trigger LTV in basis points (when to start deleveraging)
+ * @param debtValueUsd - Total debt value in USD (8 decimals) - unused, kept for API compat
+ * @param triggerLtvBps - Trigger LTV in basis points
  * @param targetLtvBps - Target LTV in basis points
  * @param numChunks - Number of chunks to split the deleverage into
- * @param bufferBps - Additional buffer in basis points (default 2000 = 20%)
+ * @param safetyMultiplier - Multiplier for future-proofing (default 3x)
  * @returns Per-chunk flash loan amount in USD (8 decimals)
  */
 export function calculateADLFlashLoanAmount(
@@ -456,28 +459,35 @@ export function calculateADLFlashLoanAmount(
   triggerLtvBps: number,
   targetLtvBps: number,
   numChunks: number,
-  bufferBps = 2000, // 20% buffer
+  safetyMultiplier = 3,
 ): bigint {
   const BPS_BASE = 10000n;
   const triggerLtv = BigInt(triggerLtvBps);
   const targetLtv = BigInt(targetLtvBps);
 
-  // Calculate based on trigger→target transition
-  // Delta LTV = triggerLtv - targetLtv (how much to reduce)
+  // Must have triggerLtv > targetLtv for deleverage
   if (triggerLtv <= targetLtv) {
-    return 0n; // Invalid: trigger must be higher than target for deleverage
+    return 0n;
   }
 
+  // Prevent division by zero at 100% target LTV
+  if (targetLtv >= BPS_BASE) {
+    return 0n;
+  }
+
+  // Formula matching LtvTrigger.sol _calculateDeleverageAmount:
+  // X = (triggerLtv - targetLtv) * collateral / (1 - targetLtv)
   const deltaLtv = triggerLtv - targetLtv;
-  const deltaDebtUsd = (deltaLtv * collateralValueUsd) / BPS_BASE;
+  const denominator = BPS_BASE - targetLtv;
+  const deleverageUsd = (deltaLtv * collateralValueUsd) / denominator;
 
   // Per-chunk amount
-  const perChunkAmount = deltaDebtUsd / BigInt(Math.max(1, numChunks));
+  const perChunkAmount = deleverageUsd / BigInt(Math.max(1, numChunks));
 
-  // Add buffer for price movements and slippage
-  const withBuffer = (perChunkAmount * (BPS_BASE + BigInt(bufferBps))) / BPS_BASE;
+  // Multiply by safety factor for future iterations (excess is refunded)
+  const withSafety = perChunkAmount * BigInt(safetyMultiplier);
 
-  return withBuffer;
+  return withSafety;
 }
 
 /**

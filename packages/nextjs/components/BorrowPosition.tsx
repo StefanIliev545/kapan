@@ -350,6 +350,8 @@ export type BorrowPositionProps = ProtocolPosition & {
   suppressDisabledMessage?: boolean;
   demoOptimalOverride?: { protocol: string; rate: number };
   defaultExpanded?: boolean;
+  /** ADL protected status - lights up right border when debt is protected */
+  adlProtected?: boolean;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -391,6 +393,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   suppressDisabledMessage = false,
   demoOptimalOverride,
   defaultExpanded = false,
+  adlProtected = false,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -650,6 +653,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
         noBalanceText="No debt"
         // Header quick action (Move badge)
         headerQuickAction={headerQuickAction}
+        // ADL protected status
+        adlProtected={adlProtected}
       />
 
       {/* Collateral View (if provided) - Only visible when expanded */}

@@ -19,6 +19,10 @@ import {
   TriggerParamsInput,
   ADLValidationResult,
 } from "~~/components/modals/adlAutomationHelpers";
+import {
+  createRouterInstruction,
+  encodeToOutput,
+} from "~~/utils/v2/instructionHelpers";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { dispatchOrderCreated } from "~~/utils/orderNotes";
 
@@ -322,7 +326,28 @@ export function useADLOrder(input: UseADLOrderInput): UseADLOrderReturn {
 
       // Get authorization calls for the instructions
       // This returns the approvals/delegations needed for the router to execute on user's behalf
-      const allInstructions = [...preInstructions, ...postInstructions];
+      //
+      // IMPORTANT: Prepend dummy ToOutput instructions to populate UTXOs for authorization.
+      // At execution time, the OrderManager populates these UTXOs dynamically, but for
+      // authorization we need explicit amounts so the gateway can calculate required approvals.
+      // Post-instructions reference: UTXO[0] = actualSellAmount, UTXO[1] = actualBuyAmount
+      //
+      // Use FULL collateral balance + 20% buffer for authorization because:
+      // 1. Order could trigger days/weeks later when aToken balance has accrued interest
+      // 2. Multiple iterations might need progressively larger withdrawals
+      // 3. The trigger calculates actual amounts dynamically based on LTV at execution time
+      // 4. 20% buffer accounts for ~1 year of interest at typical DeFi rates
+      const AUTH_BUFFER_BPS = 2000n; // 20% buffer
+      const collateralWithBuffer = flashLoanConfig.userCollateralBalance * (10000n + AUTH_BUFFER_BPS) / 10000n;
+      const buyAmountWithBuffer = flashLoanConfig.perChunkBuyAmount * (10000n + AUTH_BUFFER_BPS) / 10000n;
+
+      const dummyUtxoInstructions = [
+        // UTXO[0] = sell amount - use full collateral balance + buffer for interest accrual
+        createRouterInstruction(encodeToOutput(collateralWithBuffer, triggerParams.collateralToken)),
+        // UTXO[1] = buy amount (debt received from swap to repay) + buffer
+        createRouterInstruction(encodeToOutput(buyAmountWithBuffer, triggerParams.debtToken)),
+      ];
+      const allInstructions = [...dummyUtxoInstructions, ...preInstructions, ...postInstructions];
       const authCalls = await getAuthorizations(allInstructions);
 
       // Build flash loan config for appData (required for ADL)
@@ -341,7 +366,7 @@ export function useADLOrder(input: UseADLOrderInput): UseADLOrderReturn {
         userAddress,
         salt,
         {
-          operationType: "close-position", // ADL is similar to close-position
+          operationType: "adl",
           protocol,
           preHookGasLimit: "500000", // Pre-hook: pull flash loan + push to OrderManager
           postHookGasLimit: "1500000", // Post-hook: repay debt + withdraw collateral

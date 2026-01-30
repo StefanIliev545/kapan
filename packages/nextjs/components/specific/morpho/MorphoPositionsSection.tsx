@@ -136,6 +136,7 @@ interface ADLModalState {
   debtTokenAddress: string;
   debtTokenSymbol: string;
   debtTokenDecimals: number;
+  debtBalance: bigint;
   debtBalanceUsd: number;
 }
 
@@ -346,6 +347,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
       debtTokenAddress: row.market.loanAsset.address,
       debtTokenSymbol: row.loanSymbol,
       debtTokenDecimals: row.borrowDecimals,
+      debtBalance: row.borrowBalance,
       debtBalanceUsd: row.borrowBalanceUsd,
     });
   }, [onADLRequest, row]);
@@ -873,6 +875,7 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
             address: adlModalState.debtTokenAddress,
             symbol: adlModalState.debtTokenSymbol,
             decimals: adlModalState.debtTokenDecimals,
+            balance: adlModalState.debtBalance,
           }}
           morphoContext={adlModalState.morphoContext ?? undefined}
           totalCollateralUsd={BigInt(Math.round(adlModalState.collateralBalanceUsd * 1e8))}

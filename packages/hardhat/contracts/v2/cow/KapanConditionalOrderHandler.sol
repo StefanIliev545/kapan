@@ -34,6 +34,7 @@ interface IKapanConditionalOrderManager {
     function getOrder(bytes32 orderHash) external view returns (OrderContext memory);
     function cachedSellAmount(bytes32 orderHash) external view returns (uint256);
     function cachedBuyAmount(bytes32 orderHash) external view returns (uint256);
+    function chunkWindow() external view returns (uint256);
 }
 
 /// @title KapanConditionalOrderHandler
@@ -44,11 +45,6 @@ interface IKapanConditionalOrderManager {
 ///      - Handler must implement IERC165 for ComposableCoW to verify interface support
 ///      - Manager (owner) must NOT implement IERC165 to avoid Safe/fallback handler path
 contract KapanConditionalOrderHandler is IConditionalOrderGenerator, IERC165 {
-
-    // ============ Constants ============
-
-    /// @notice Chunk window duration for deterministic validTo
-    uint256 public constant CHUNK_WINDOW = 30 minutes;
 
     // ============ State Variables ============
 
@@ -185,9 +181,11 @@ contract KapanConditionalOrderHandler is IConditionalOrderGenerator, IERC165 {
     // ============ Internal Functions ============
 
     /// @notice Calculate deterministic validTo timestamp
+    /// @dev Reads chunkWindow from manager for consistency
     function _calculateValidTo(uint256 createdAt, uint256 iterationCount) internal view returns (uint256) {
-        uint256 chunkWindowStart = createdAt + (iterationCount * CHUNK_WINDOW);
-        uint256 chunkWindowEnd = chunkWindowStart + CHUNK_WINDOW - 1;
+        uint256 window = manager.chunkWindow();
+        uint256 chunkWindowStart = createdAt + (iterationCount * window);
+        uint256 chunkWindowEnd = chunkWindowStart + window - 1;
 
         if (block.timestamp <= chunkWindowEnd) {
             return chunkWindowEnd;
@@ -195,8 +193,8 @@ contract KapanConditionalOrderHandler is IConditionalOrderGenerator, IERC165 {
 
         // Extend to current window
         uint256 elapsedSinceCreate = block.timestamp - createdAt;
-        uint256 currentWindowIndex = elapsedSinceCreate / CHUNK_WINDOW;
-        return createdAt + ((currentWindowIndex + 1) * CHUNK_WINDOW) - 1;
+        uint256 currentWindowIndex = elapsedSinceCreate / window;
+        return createdAt + ((currentWindowIndex + 1) * window) - 1;
     }
 
     // ============ ERC-165 Implementation ============

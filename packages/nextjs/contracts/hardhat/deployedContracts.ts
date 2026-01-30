@@ -52533,7 +52533,7 @@ const contracts = {
       },
     },
     AutoLeverageTrigger: {
-      address: "0xf2C952E7d78adAFf7bb2f5f0108456928019a4ad",
+      address: "0x148E524518BE97020fCb72a12a46978491168331",
       abi: [
         {
           inputs: [
@@ -54981,7 +54981,7 @@ const contracts = {
       },
     },
     KapanConditionalOrderHandler: {
-      address: "0x8292810E039776F2CB2632939e829d0edB8822ED",
+      address: "0x56F9e6F3AD2d2D63917d7aFcf05066694dCd63F2",
       abi: [
         {
           inputs: [
@@ -55026,19 +55026,6 @@ const contracts = {
           ],
           name: "PollTryNextBlock",
           type: "error",
-        },
-        {
-          inputs: [],
-          name: "CHUNK_WINDOW",
-          outputs: [
-            {
-              internalType: "uint256",
-              name: "",
-              type: "uint256",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
         },
         {
           inputs: [
@@ -55290,7 +55277,7 @@ const contracts = {
       },
     },
     KapanConditionalOrderManager: {
-      address: "0xD49D9C9F7A4C3dD06762D5d8FC14bcED8E6D552D",
+      address: "0xEBe83a05f3622CE2B8933dAee4C81Db8a726ddab",
       abi: [
         {
           inputs: [
@@ -55369,6 +55356,11 @@ const contracts = {
             },
           ],
           name: "InstructionUserMismatch",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidChunkWindow",
           type: "error",
         },
         {
@@ -55483,6 +55475,25 @@ const contracts = {
           inputs: [],
           name: "ZeroAddress",
           type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "oldWindow",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "newWindow",
+              type: "uint256",
+            },
+          ],
+          name: "ChunkWindowUpdated",
+          type: "event",
         },
         {
           anonymous: false,
@@ -55743,7 +55754,20 @@ const contracts = {
         },
         {
           inputs: [],
-          name: "CHUNK_WINDOW",
+          name: "DEFAULT_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MAX_CHUNK_WINDOW",
           outputs: [
             {
               internalType: "uint256",
@@ -55757,6 +55781,19 @@ const contracts = {
         {
           inputs: [],
           name: "MAX_ORDERS_PER_USER",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MIN_CHUNK_WINDOW",
           outputs: [
             {
               internalType: "uint256",
@@ -55829,6 +55866,19 @@ const contracts = {
           name: "cancelOrder",
           outputs: [],
           stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "chunkWindow",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
           type: "function",
         },
         {
@@ -56424,6 +56474,19 @@ const contracts = {
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_chunkWindow",
+              type: "uint256",
+            },
+          ],
+          name: "setChunkWindow",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -61599,7 +61662,7 @@ const contracts = {
       },
     },
     LtvTrigger: {
-      address: "0x0ef538d9EF4a070B3F3D0885Cc08B94eCfE4C58C",
+      address: "0x1014CFE91f3f8A738a62f62fDc56bF4dB2759b6b",
       abi: [
         {
           inputs: [

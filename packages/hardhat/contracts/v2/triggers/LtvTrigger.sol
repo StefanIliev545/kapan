@@ -197,7 +197,7 @@ contract LtvTrigger is IOrderTrigger {
             return (0, 0);
         }
 
-        // 5. Calculate minimum buy amount with slippage
+        // 6. Calculate minimum buy amount with slippage
         // ViewRouter.calculateMinBuy uses Aave/Chainlink prices for fair market rates
         minBuyAmount = _calculateMinBuy(
             params.protocolId,
@@ -349,4 +349,5 @@ contract LtvTrigger is IOrderTrigger {
                 context
             );
     }
+
 }

@@ -533,6 +533,10 @@ interface ProtocolViewProps {
   hasLoadedOnce?: boolean;
   /** Optional element to render in the header (e.g., E-Mode toggle) */
   headerElement?: React.ReactNode;
+  /** Collateral token address protected by ADL - shows left border on matching supply positions */
+  adlCollateralToken?: string;
+  /** Debt token address protected by ADL - shows right border on matching borrow positions */
+  adlDebtToken?: string;
 }
 
 export const ProtocolView: FC<ProtocolViewProps> = ({
@@ -556,6 +560,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   autoExpandOnPositions = false,
   hasLoadedOnce = true,
   headerElement,
+  adlCollateralToken,
+  adlDebtToken,
 }) => {
   const [isMarketsOpen, setIsMarketsOpen] = useState(false);
   const [isTokenSelectModalOpen, setIsTokenSelectModalOpen] = useState(false);
@@ -1190,6 +1196,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                               onSwap={supplySwapHandlers[key]}
                               suppressDisabledMessage
                               defaultExpanded={expandFirstPositions && index === 0}
+                              adlActive={adlCollateralToken?.toLowerCase() === position.tokenAddress.toLowerCase()}
                             />
                           </div>
                         );
@@ -1269,6 +1276,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                               suppressDisabledMessage
                               controlledExpanded={isExpanded}
                               onToggleExpanded={borrowExpandToggleHandlers[key]}
+                              adlProtected={adlDebtToken?.toLowerCase() === position.tokenAddress.toLowerCase()}
                             />
                           </div>
                         );
