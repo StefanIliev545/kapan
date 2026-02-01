@@ -46,6 +46,8 @@ function mapKapanOperationType(kapanType: KapanOperationType): OperationType {
     case "close-position": return "close_position";
     case "debt-swap": return "debt_swap";
     case "collateral-swap": return "collateral_swap";
+    case "adl": return "close_position"; // ADL maps to close_position for display
+    case "auto-leverage": return "leverage_up"; // Auto-leverage maps to leverage_up for display
   }
 }
 

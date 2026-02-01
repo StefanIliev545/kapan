@@ -16,7 +16,7 @@
  */
 
 import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from "react";
-import { formatUnits, parseUnits, type Address, encodeAbiParameters, type Hex } from "viem";
+import { formatUnits, parseUnits, type Address, encodeAbiParameters, type Hex, type TransactionReceipt } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { useDebounceValue } from "usehooks-ts";
 import { track } from "@vercel/analytics";
@@ -28,7 +28,12 @@ import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
-import { useCowLimitOrder } from "~~/hooks/useCowLimitOrder";
+import {
+  useCowConditionalOrder,
+  encodeLimitPriceTriggerParams,
+  getProtocolId,
+  type ConditionalOrderInstructions,
+} from "~~/hooks/useCowConditionalOrder";
 import { useCowQuote } from "~~/hooks/useCowQuote";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { use1inchQuoteOnly } from "~~/hooks/use1inchQuoteOnly";
@@ -36,7 +41,7 @@ import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useSaveOrder } from "~~/hooks/useOrderHistory";
 
 import { parseAmount } from "~~/utils/validation";
-import { getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee, storeOrderQuoteRate } from "~~/utils/cow";
+import { getCowFlashLoanProviders, getPreferredFlashLoanLender, calculateFlashLoanFee, storeOrderQuoteRate, getCowExplorerAddressUrl, getKapanCowAdapter } from "~~/utils/cow";
 import {
   is1inchSupported,
   isKyberSupported,
@@ -57,11 +62,11 @@ import {
   encodeFlashLoan,
   encodeLendingInstruction,
   encodePushToken,
-  encodePullToken,
   encodeToOutput,
-  encodeAdd,
   LendingOp,
   encodeEulerContext,
+  normalizeProtocolName,
+  calculateLimitPrice,
 } from "~~/utils/v2/instructionHelpers";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
@@ -71,13 +76,8 @@ import {
   trackModalOpen,
   createLimitOrderAnalyticsProps,
   buildCowFlashLoanInfo,
-  buildCowChunkInstructions,
   logLimitOrderBuildStart,
-  buildLimitOrderCallParams,
-  handleLimitOrderBuildFailure,
   saveLimitOrderNote,
-  executeSequentialLimitOrder,
-  handleLimitOrderError,
   calculateRequiredCollateral,
   calculateLimitOrderCollateral,
 } from "../closeWithCollateralEvmHelpers";
@@ -187,12 +187,13 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   const { data: walletClient } = useWalletClient({ chainId });
   const publicClient = usePublicClient({ chainId });
 
-  // CoW limit order hook
+  // CoW conditional order hook (new system)
   const {
-    buildOrderCalls: buildLimitOrderCalls,
-    isReady: limitOrderReady,
-    orderManagerAddress,
-  } = useCowLimitOrder();
+    buildOrderCalls: buildConditionalOrderCalls,
+    isReady: conditionalOrderReady,
+    managerAddress: conditionalOrderManagerAddress,
+    limitPriceTriggerAddress,
+  } = useCowConditionalOrder();
   const saveOrder = useSaveOrder();
 
   // Track modal open
@@ -529,6 +530,56 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       ? checkCollateralSufficiency(effectiveLimitOrderCollateral, selectedTo.rawBalance)
       : hasEnoughCollateral;
 
+  // Conditional order trigger params - encodes parameters for LimitPriceTrigger contract
+  const conditionalOrderTriggerParams = useMemo(() => {
+    if (!selectedTo || !limitPriceTriggerAddress) return null;
+    if (effectiveLimitOrderCollateral === 0n || limitOrderBuyAmount === 0n) return null;
+
+    // Normalize protocol name for getProtocolId
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+
+    // Calculate limit price (8 decimals, like Chainlink)
+    // limitPrice = (buyAmount / sellAmount) * 1e8
+    // For close position: we sell collateral to buy debt
+    const limitPrice = calculateLimitPrice(
+      effectiveLimitOrderCollateral, selectedTo.decimals,
+      limitOrderBuyAmount, debtDecimals
+    );
+
+    // Close position is a BUY order: we want exact debt amount (buyAmount) for repayment
+    // totalSellAmount = max collateral we're willing to sell, totalBuyAmount = exact debt to buy
+    // IMPORTANT: Add slippage buffer to totalSellAmount! The trigger calculates sellAmount with slippage,
+    // then caps it to totalSellAmount. Without buffer, the slippage would be negated by the cap.
+    const totalSellAmountWithSlippage = (effectiveLimitOrderCollateral * BigInt(10000 + Math.round(slippage * 100))) / 10000n;
+
+    return encodeLimitPriceTriggerParams({
+      protocolId: getProtocolId(normalizedProtocol),
+      protocolContext: (context || "0x") as `0x${string}`,
+      sellToken: selectedTo.address as Address,
+      buyToken: debtToken as Address,
+      sellDecimals: selectedTo.decimals,
+      buyDecimals: debtDecimals,
+      limitPrice,
+      triggerAbovePrice: false, // Execute when price <= limit (we want good rates for selling)
+      totalSellAmount: totalSellAmountWithSlippage, // Max willing to sell (with slippage buffer)
+      totalBuyAmount: limitOrderBuyAmount, // Exact amount to buy (debt for repayment)
+      numChunks: numChunks,
+      maxSlippageBps: Math.round(slippage * 100), // Use actual slippage setting
+      isKindBuy: true, // BUY order: exact buyAmount, max sellAmount
+    });
+  }, [
+    selectedTo,
+    limitPriceTriggerAddress,
+    effectiveLimitOrderCollateral,
+    limitOrderBuyAmount,
+    protocolName,
+    context,
+    debtToken,
+    debtDecimals,
+    numChunks,
+    slippage,
+  ]);
+
   // ============ Output Amount ============
   const amountOut = useMemo(() => {
     if (executionType === "limit" && useCustomBuyAmount && customBuyAmount) {
@@ -545,16 +596,20 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
     return buildCowFlashLoanInfo(chainId, limitOrderConfig, executionType, selectedTo, effectiveLimitOrderCollateral);
   }, [chainId, limitOrderConfig, executionType, effectiveLimitOrderCollateral, selectedTo]);
 
-  // Build CoW instructions
-  const buildCowInstructions = useMemo(() => {
-    if (!selectedTo || !userAddress || !orderManagerAddress || !cowFlashLoanInfo) {
+  // Build conditional order instructions for the new system
+  // UTXO layout: [0] = actualSellAmount, [1] = actualBuyAmount
+  const buildConditionalOrderInstructionsData = useMemo((): ConditionalOrderInstructions[] => {
+    if (!selectedTo || !userAddress || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
       return [{ preInstructions: [], postInstructions: [] }];
     }
 
+    const numChunksVal = limitOrderConfig?.numChunks ?? 1;
+
+    // Normalize protocol name
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+
     // Euler-specific handling
     if (isEuler && eulerContextEncoded && eulerBorrowVault) {
-      const numChunksVal = limitOrderConfig?.numChunks ?? 1;
-      const chunkBuyAmount = limitOrderBuyAmount / BigInt(numChunksVal);
       const selectedCollateralVault =
         (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault ||
         eulerCollateralVaults?.[0];
@@ -568,35 +623,37 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
         .fill(null)
         .map(() => {
           const postInstructions: ProtocolInstruction[] = [];
+          // UTXO layout after manager injects:
+          // [0] = actualSellAmount (collateral sold)
+          // [1] = actualBuyAmount (debt received) - already in router, no PullToken needed
           let utxoIndex = 2;
 
-          postInstructions.push(
-            createRouterInstruction(encodePullToken(chunkBuyAmount, debtToken as Address, orderManagerAddress as Address))
-          );
-          const pulledDebtUtxo = utxoIndex++;
+          // [0] Approve UTXO[1] (debt tokens already in router) for repayment
+          postInstructions.push(createRouterInstruction(encodeApprove(1, normalizedProtocol)));
+          utxoIndex++; // = 2
 
-          postInstructions.push(createRouterInstruction(encodeApprove(pulledDebtUtxo, "euler")));
-          utxoIndex++;
-
+          // [1] Repay debt using UTXO[1]
           postInstructions.push(
             createProtocolInstruction(
-              "euler",
-              encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, eulerContextEncoded, pulledDebtUtxo)
+              normalizedProtocol,
+              encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, eulerContextEncoded, 1)
             )
           );
-          const repayRefundUtxo = utxoIndex++;
+          const repayRefundUtxo = utxoIndex++; // = 3
 
+          // [2] Withdraw collateral using UTXO[0] (actualSellAmount)
           postInstructions.push(
             createProtocolInstruction(
-              "euler",
+              normalizedProtocol,
               encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedTo.address, userAddress, 0n, eulerContextEncoded, 0)
             )
           );
-          const withdrawUtxo = utxoIndex++;
+          const withdrawUtxo = utxoIndex++; // = 4
 
-          postInstructions.push(createRouterInstruction(encodeAdd(withdrawUtxo, 1)));
-          const flashLoanRepayUtxo = utxoIndex++;
+          // [3] Push withdrawn collateral to manager for flash loan repayment
+          postInstructions.push(createRouterInstruction(encodePushToken(withdrawUtxo, conditionalOrderManagerAddress)));
 
+          // [4] Return repay refund to user (if closing entire position)
           if (isMax) {
             postInstructions.push(createRouterInstruction(encodePushToken(repayRefundUtxo, userAddress)));
           }
@@ -604,43 +661,71 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
           return {
             preInstructions: [],
             postInstructions,
-            flashLoanRepaymentUtxoIndex: flashLoanRepayUtxo,
+            flashLoanRepaymentUtxoIndex: withdrawUtxo,
           };
         });
     }
 
-    // Standard flow
-    return buildCowChunkInstructions({
-      selectedTo,
-      userAddress,
-      repayAmountRaw: limitOrderBuyAmount,
-      orderManagerAddress,
-      protocolName,
-      context,
-      debtToken,
-      debtName,
-      debtDecimals,
-      cowFlashLoanInfo,
-      limitOrderConfig,
-      isMax,
-    });
+    // Standard flow for other protocols (Aave, Compound, Venus, Morpho)
+    return Array(numChunksVal)
+      .fill(null)
+      .map(() => {
+        const postInstructions: ProtocolInstruction[] = [];
+        // UTXO layout after manager injects:
+        // [0] = actualSellAmount (collateral sold)
+        // [1] = actualBuyAmount (debt received) - already in router, no PullToken needed
+        let utxoIndex = 2;
+
+        // [0] Approve UTXO[1] (debt tokens already in router) for repayment
+        postInstructions.push(createRouterInstruction(encodeApprove(1, normalizedProtocol)));
+        utxoIndex++; // = 2
+
+        // [1] Repay debt using UTXO[1]
+        postInstructions.push(
+          createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, context as Hex || "0x", 1)
+          )
+        );
+        const repayRefundUtxo = utxoIndex++; // = 3
+
+        // [2] Withdraw collateral using UTXO[0] (actualSellAmount)
+        postInstructions.push(
+          createProtocolInstruction(
+            normalizedProtocol,
+            encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedTo.address, userAddress, 0n, context as Hex || "0x", 0)
+          )
+        );
+        const withdrawUtxo = utxoIndex++; // = 4
+
+        // [3] Push withdrawn collateral to manager for flash loan repayment
+        postInstructions.push(createRouterInstruction(encodePushToken(withdrawUtxo, conditionalOrderManagerAddress)));
+
+        // [4] Return repay refund to user (if closing entire position)
+        if (isMax) {
+          postInstructions.push(createRouterInstruction(encodePushToken(repayRefundUtxo, userAddress)));
+        }
+
+        return {
+          preInstructions: [],
+          postInstructions,
+          flashLoanRepaymentUtxoIndex: withdrawUtxo,
+        };
+      });
   }, [
     selectedTo,
     userAddress,
-    limitOrderBuyAmount,
-    orderManagerAddress,
-    protocolName,
-    context,
-    debtToken,
-    debtName,
-    debtDecimals,
+    conditionalOrderManagerAddress,
     cowFlashLoanInfo,
-    limitOrderConfig,
-    isMax,
+    limitOrderConfig?.numChunks,
+    protocolName,
     isEuler,
     eulerContextEncoded,
     eulerBorrowVault,
     eulerCollateralVaults,
+    debtToken,
+    context,
+    isMax,
   ]);
 
   // ============ Build Flow (Market Orders) ============
@@ -672,16 +757,17 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
           encodeLendingInstruction(LendingOp.Swap, selectedTo.address, userAddress, 0n, swapContext, 1)
         )
       );
-      instructions.push(createRouterInstruction(encodeApprove(3, "euler")));
+      const normalizedProtocol = normalizeProtocolName(protocolName);
+      instructions.push(createRouterInstruction(encodeApprove(3, normalizedProtocol)));
       instructions.push(
         createProtocolInstruction(
-          "euler",
+          normalizedProtocol,
           encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, eulerContextEncoded, 3)
         )
       );
       instructions.push(
         createProtocolInstruction(
-          "euler",
+          normalizedProtocol,
           encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedTo.address, userAddress, 0n, eulerContextEncoded, 0)
         )
       );
@@ -785,13 +871,13 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
     handleSwap,
   ]);
 
-  // Limit Order Submit Handler
+  // Conditional Order Submit Handler (new system)
   const handleLimitOrderSubmit = useCallback(async () => {
-    if (!selectedTo || !userAddress || !orderManagerAddress || !walletClient || !publicClient) {
-      throw new Error("Missing required data for limit order");
+    if (!selectedTo || !userAddress || !conditionalOrderManagerAddress || !walletClient || !publicClient) {
+      throw new Error("Missing required data for conditional order");
     }
-    if (!limitOrderConfig?.selectedProvider || !cowFlashLoanInfo) {
-      throw new Error("No flash loan provider selected");
+    if (!cowFlashLoanInfo || !limitPriceTriggerAddress || !conditionalOrderTriggerParams) {
+      throw new Error("Missing trigger or flash loan configuration");
     }
 
     const analyticsProps = createLimitOrderAnalyticsProps({
@@ -804,14 +890,13 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       debtDecimals,
       limitOrderCollateral: effectiveLimitOrderCollateral,
       requiredCollateral,
-      flashLoanProviderName: limitOrderConfig.selectedProvider.name,
+      flashLoanProviderName: limitOrderConfig?.selectedProvider?.name ?? "unknown",
     });
 
     setIsLimitSubmitting(true);
-    let notificationId: string | number | undefined;
 
     try {
-      track("close_with_collateral_limit_order_begin", analyticsProps);
+      track("close_with_collateral_conditional_order_begin", analyticsProps);
 
       logLimitOrderBuildStart({
         selectedTo,
@@ -823,77 +908,113 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
         cowQuote,
       });
 
-      const callParams = buildLimitOrderCallParams({
-        selectedTo,
-        debtToken,
-        limitOrderCollateral: effectiveLimitOrderCollateral,
-        repayAmountRaw: limitOrderBuyAmount,
-        cowFlashLoanInfo,
-        buildCowInstructions,
-        limitOrderConfig,
+      // Get the first chunk's instructions (for close position, typically single chunk)
+      const instructionsData = buildConditionalOrderInstructionsData[0] || { preInstructions: [], postInstructions: [] };
+
+      const result = await buildConditionalOrderCalls({
+        triggerAddress: limitPriceTriggerAddress,
+        triggerStaticData: conditionalOrderTriggerParams,
+        sellToken: selectedTo.address as Address,
+        buyToken: debtToken as Address,
+        preInstructions: instructionsData.preInstructions,
+        postInstructions: instructionsData.postInstructions,
+        maxIterations: numChunks,
+        flashLoan: {
+          lender: cowFlashLoanInfo.lender as Address,
+          token: selectedTo.address as Address,
+          // Include slippage buffer to match trigger's totalSellAmount calculation
+          // BUY orders have maxSellAmount = collateral * (1 + slippage), so flash loan must cover that
+          amount: (effectiveLimitOrderCollateral * BigInt(10000 + Math.round(slippage * 100))) / 10000n / BigInt(numChunks),
+        },
+        sellTokenRefundAddress: getKapanCowAdapter(chainId) as Address, // KapanCowAdapter for flash loan repayment
+        operationType: "close-position",
         protocolName,
+        isKindBuy: true, // BUY order: exact buyAmount, max sellAmount
       });
 
-      const limitOrderResult = await buildLimitOrderCalls(callParams);
-
-      if (!limitOrderResult) {
-        throw new Error("Failed to build limit order calls");
+      if (!result || !result.success) {
+        const errorMsg = result?.error || "Failed to build conditional order calls";
+        notification.error(
+          <TransactionToast step="failed" message={`CoW API Error: ${errorMsg}`} />
+        );
+        throw new Error(errorMsg);
       }
 
-      if (!limitOrderResult.success) {
-        handleLimitOrderBuildFailure(limitOrderResult, analyticsProps);
+      // Save order note
+      if (result.salt) {
+        saveLimitOrderNote(result.salt, protocolName, selectedTo.symbol, debtName, chainId);
       }
 
-      console.log("[Limit Order] Order calls built:", limitOrderResult.calls.length);
-
-      saveLimitOrderNote(limitOrderResult.salt, protocolName, selectedTo.symbol, debtName, chainId);
-
-      const allCalls = limitOrderResult.calls;
-      notificationId = notification.loading(
-        <TransactionToast step="pending" message={`Creating limit order (${allCalls.length} operations)...`} />
+      const notificationId = notification.loading(
+        <TransactionToast step="pending" message={`Creating conditional order (${result.calls.length} operations)...`} />
       );
 
-      await executeSequentialLimitOrder({
-        allCalls,
-        walletClient,
-        publicClient,
-        chainId,
-        orderManagerAddress,
-        userAddress,
-        salt: limitOrderResult.salt,
-        appDataHash: limitOrderResult.appDataHash,
-        analyticsProps,
-        onClose,
-        notificationId,
-        onSuccess: receipts => {
-          const orderHash = extractOrderHash(receipts, orderManagerAddress) ?? undefined;
+      const receipts: TransactionReceipt[] = [];
+      for (let i = 0; i < result.calls.length; i++) {
+        const call = result.calls[i];
+        notification.remove(notificationId as string);
 
-          if (orderHash && effectiveLimitOrderCollateral > 0n && repayAmountRaw > 0n) {
-            const quoteRate = Number(effectiveLimitOrderCollateral) / Number(repayAmountRaw);
-            storeOrderQuoteRate(chainId, orderHash, quoteRate);
-          }
+        const stepNotificationId = notification.loading(
+          <TransactionToast step="pending" message={`Executing step ${i + 1}/${result.calls.length}...`} />
+        );
 
-          if (limitOrderResult.salt && selectedTo) {
-            saveOrder.mutate({
-              orderUid: limitOrderResult.salt,
-              orderHash,
-              salt: limitOrderResult.salt,
-              userAddress,
-              chainId,
-              orderType: "close_position",
-              protocol: protocolName,
-              sellToken: selectedTo.address,
-              buyToken: debtToken,
-              sellTokenSymbol: selectedTo.symbol,
-              buyTokenSymbol: debtName,
-              sellAmount: effectiveLimitOrderCollateral.toString(),
-              buyAmount: repayAmountRaw.toString(),
-            });
-          }
-        },
-      });
+        const txHash = await walletClient.sendTransaction({
+          account: userAddress,
+          to: call.to,
+          data: call.data,
+          chain: null,
+        });
+
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+        receipts.push(receipt);
+        notification.remove(stepNotificationId as string);
+      }
+
+      const explorerUrl = getCowExplorerAddressUrl(chainId, userAddress);
+      notification.success(
+        <TransactionToast
+          step="confirmed"
+          message="Conditional order created!"
+          blockExplorerLink={explorerUrl}
+        />
+      );
+
+      const orderHash = extractOrderHash(receipts, conditionalOrderManagerAddress) ?? undefined;
+
+      if (result.salt && selectedTo) {
+        saveOrder.mutate({
+          orderUid: result.salt,
+          orderHash,
+          salt: result.salt,
+          userAddress,
+          chainId,
+          orderType: "close_position",
+          protocol: protocolName,
+          sellToken: selectedTo.address,
+          buyToken: debtToken,
+          sellTokenSymbol: selectedTo.symbol,
+          buyTokenSymbol: debtName,
+          sellAmount: effectiveLimitOrderCollateral.toString(),
+          buyAmount: repayAmountRaw.toString(),
+        });
+
+        if (orderHash && effectiveLimitOrderCollateral > 0n && repayAmountRaw > 0n) {
+          const quoteRate = Number(effectiveLimitOrderCollateral) / Number(repayAmountRaw);
+          storeOrderQuoteRate(chainId, orderHash, quoteRate);
+        }
+      }
+
+      track("close_with_collateral_conditional_order_complete", { ...analyticsProps, status: "success" });
+      onClose();
     } catch (e) {
-      handleLimitOrderError(e, notificationId, analyticsProps);
+      track("close_with_collateral_conditional_order_complete", {
+        ...analyticsProps,
+        status: "error",
+        error: e instanceof Error ? e.message : String(e),
+      });
+      notification.error(
+        <TransactionToast step="failed" message={e instanceof Error ? e.message : "Order creation failed"} />
+      );
       throw e;
     } finally {
       setIsLimitSubmitting(false);
@@ -901,23 +1022,25 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   }, [
     selectedTo,
     userAddress,
-    orderManagerAddress,
+    conditionalOrderManagerAddress,
     walletClient,
     publicClient,
-    limitOrderConfig,
     cowFlashLoanInfo,
+    limitPriceTriggerAddress,
+    conditionalOrderTriggerParams,
     protocolName,
     chainId,
     debtToken,
     debtName,
     repayAmountRaw,
-    limitOrderBuyAmount,
     debtDecimals,
     effectiveLimitOrderCollateral,
     requiredCollateral,
+    limitOrderConfig?.selectedProvider?.name,
     cowQuote,
-    buildCowInstructions,
-    buildLimitOrderCalls,
+    buildConditionalOrderInstructionsData,
+    buildConditionalOrderCalls,
+    numChunks,
     onClose,
     saveOrder,
   ]);
@@ -928,11 +1051,12 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter && quoteCoversDebt;
   const canSubmitLimit =
     executionType === "limit" &&
-    limitOrderReady &&
+    conditionalOrderReady &&
     !!cowFlashLoanInfo &&
     parseFloat(amountIn) > 0 &&
     hasEnoughCollateralForLimit &&
-    !!orderManagerAddress &&
+    !!conditionalOrderManagerAddress &&
+    !!conditionalOrderTriggerParams &&
     effectiveLimitOrderCollateral > 0n;
   const canSubmit = executionType === "market" ? canSubmitMarket : canSubmitLimit;
 
@@ -1000,7 +1124,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
           value={executionType}
           onChange={handleExecutionTypeChange}
           limitAvailable={cowAvailable}
-          limitReady={limitOrderReady}
+          limitReady={conditionalOrderReady}
         />
 
         {executionType === "market" && (
@@ -1167,7 +1291,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       executionType,
       handleExecutionTypeChange,
       cowAvailable,
-      limitOrderReady,
+      conditionalOrderReady,
       slippage,
       priceImpact,
       formattedPriceImpact,

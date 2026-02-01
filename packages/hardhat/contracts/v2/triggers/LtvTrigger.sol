@@ -144,7 +144,8 @@ contract LtvTrigger is IOrderTrigger {
     /// @inheritdoc IOrderTrigger
     function calculateExecution(
         bytes calldata staticData,
-        address owner
+        address owner,
+        uint256 /* iterationCount */
     ) external view override returns (uint256 sellAmount, uint256 minBuyAmount) {
         TriggerParams memory params = abi.decode(staticData, (TriggerParams));
 
@@ -197,18 +198,35 @@ contract LtvTrigger is IOrderTrigger {
             return (0, 0);
         }
 
-        // 6. Calculate minimum buy amount with slippage
+        // 5. Truncate precision to prevent order spam from interest accrual
+        // Interest-bearing tokens (aTokens, wstETH, etc.) change balance every block.
+        // Without truncation, each poll returns slightly different amounts → different order hash → spam.
+        // We truncate to ~0.01% precision (4 significant decimal places) which absorbs interest fluctuations.
+        sellAmount = _truncatePrecision(sellAmount, params.collateralDecimals);
+
+        if (sellAmount == 0) {
+            return (0, 0);
+        }
+
+        // 6. Calculate expected buy amount WITHOUT slippage first
         // ViewRouter.calculateMinBuy uses Aave/Chainlink prices for fair market rates
-        minBuyAmount = _calculateMinBuy(
+        uint256 expectedBuyAmount = _calculateMinBuy(
             params.protocolId,
             sellAmount,
-            params.maxSlippageBps,
+            0, // No slippage - we apply it after truncation
             params.collateralToken,
             params.debtToken,
             params.collateralDecimals,
             params.debtDecimals,
             params.protocolContext
         );
+
+        // 7. Truncate expectedBuyAmount to prevent spam from price fluctuations
+        // Must truncate BEFORE applying slippage to preserve full slippage protection
+        expectedBuyAmount = _truncatePrecision(expectedBuyAmount, params.debtDecimals);
+
+        // 8. Apply slippage AFTER truncation
+        minBuyAmount = (expectedBuyAmount * (10000 - params.maxSlippageBps)) / 10000;
     }
 
     /// @inheritdoc IOrderTrigger
@@ -348,6 +366,20 @@ contract LtvTrigger is IOrderTrigger {
                 debtDecimals,
                 context
             );
+    }
+
+    /// @dev Truncate precision to prevent order spam from interest accrual
+    /// - 18 decimals (ETH): keep 5 → 0.00001 (~$0.03)
+    /// - 8 decimals (WBTC): keep 6 → 0.000001 (~$0.10)
+    /// - 6 decimals (USDC): keep 4 → $0.0001
+    function _truncatePrecision(uint256 amount, uint8 decimals) internal pure returns (uint256) {
+        if (decimals <= 4) return amount;
+        uint256 keep;
+        if (decimals > 12) keep = 5;      // ETH-like
+        else if (decimals > 6) keep = 6;  // WBTC-like
+        else keep = 4;                     // USDC-like
+        uint256 precision = 10 ** (decimals - keep);
+        return (amount / precision) * precision;
     }
 
 }

@@ -18,19 +18,19 @@ const ORDER_CONFIG = {
   // User wallet address
   user: process.env.ORDER_USER || "0xdedb4d230d8b1e9268fd46779a8028d5daaa8fa3",
 
-  // Salt from appData
-  salt: process.env.SALT || "0xf59a255b06965d8b2890ac1ca62d4dc99b155561a05ac5cf2c60fdbf37f04672",
+  // Salt from appData (Auto-Leverage wstETH/WETH)
+  salt: process.env.SALT || "0x6845e24848bbe506cd5ec51c3b774e87aff3444415e403d842ab2ba3cd6ceb48",
 
-  // Tokens (defaults for syrupUSDC/USDT on Arbitrum)
-  sellToken: process.env.SELL_TOKEN || "0x41CA7586cC1311807B4605fBB748a3B8862b42b5",
-  buyToken: process.env.BUY_TOKEN || "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
-  sellDecimals: parseInt(process.env.SELL_DECIMALS || "6"),
-  buyDecimals: parseInt(process.env.BUY_DECIMALS || "6"),
+  // Tokens (wstETH -> WETH auto-leverage)
+  sellToken: process.env.SELL_TOKEN || "0x5979D7b546E38E414F7E9822514be443A4800529", // wstETH
+  buyToken: process.env.BUY_TOKEN || "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", // WETH
+  sellDecimals: parseInt(process.env.SELL_DECIMALS || "18"),
+  buyDecimals: parseInt(process.env.BUY_DECIMALS || "18"),
 
   // Flash loan config from appData
   flashLoan: {
-    amount: process.env.FLASH_AMOUNT || "223843617",
-    token: process.env.FLASH_TOKEN || process.env.SELL_TOKEN || "0x41CA7586cC1311807B4605fBB748a3B8862b42b5",
+    amount: process.env.FLASH_AMOUNT || "36265543007316139", // 0.0362 wstETH
+    token: process.env.FLASH_TOKEN || "0x5979D7b546E38E414F7E9822514be443A4800529", // wstETH
     lender: process.env.FLASH_LENDER || "0x6c247b1F6182318877311737BaC0844bAa518F5e",
   },
 

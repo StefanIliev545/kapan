@@ -26,7 +26,9 @@ import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { saveOrderNote, createDebtSwapNote } from "~~/utils/orderNotes";
 import { getCowQuoteSellAmount, type CowQuoteResponse } from "~~/hooks/useCowQuote";
-import type { ChunkInstructions } from "~~/hooks/useCowLimitOrder";
+
+// TODO: Migrate to new conditional order system - ChunkInstructions defined locally
+type ChunkInstructions = { preInstructions: ProtocolInstruction[]; postInstructions: ProtocolInstruction[]; flashLoanRepaymentUtxoIndex?: number };
 
 import type { SwapAsset } from "./SwapModalShell";
 import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
@@ -175,21 +177,17 @@ export function buildCowFlashLoanInfo(
  * balance to account for interest that accrues between quote and execution.
  * Any excess is refunded to the user via a PushToken instruction.
  *
- * Buffer: 0.5% (50 basis points)
- * - Covers ~3.5 days at 50% APY or ~10 days at 17.5% APY
- * - Critical for Euler where any leftover debt blocks collateral withdrawal
+ * Buffer: 0.001% (0.01 basis points)
+ * - Minimal buffer to cover rounding and minor interest accrual
+ * - Excess is refunded to user
  *
  * @param amount - The debt amount to buffer
  * @returns The buffered amount (amount + dust buffer)
  */
 export function calculateDustBuffer(amount: bigint): bigint {
-    // Add 0.5% (50 basis points) = multiply by 10050/10000
-    // This covers interest accrual between quote and execution:
-    // - ~3.5 days at 50% APY (extreme)
-    // - ~10 days at 17.5% APY (typical)
-    // Larger buffer needed for Euler debt swaps where leftover debt blocks withdrawal
-    const DUST_BUFFER_NUMERATOR = 10050n;
-    const DUST_BUFFER_DENOMINATOR = 10000n;
+    // Add 0.001% = multiply by 100001/100000
+    const DUST_BUFFER_NUMERATOR = 100001n;
+    const DUST_BUFFER_DENOMINATOR = 100000n;
 
     return (amount * DUST_BUFFER_NUMERATOR) / DUST_BUFFER_DENOMINATOR;
 }

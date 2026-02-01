@@ -98,7 +98,8 @@ contract AutoLeverageTrigger is IOrderTrigger {
     ///   - minBuyAmount: collateral tokens expected (must cover flash loan + fee)
     function calculateExecution(
         bytes calldata staticData,
-        address owner
+        address owner,
+        uint256 /* iterationCount */
     ) external view override returns (uint256 sellAmount, uint256 minBuyAmount) {
         TriggerParams memory params = abi.decode(staticData, (TriggerParams));
 
@@ -150,6 +151,12 @@ contract AutoLeverageTrigger is IOrderTrigger {
 
         if (sellAmount == 0) return (0, 0);
 
+        // Truncate precision to prevent order spam from interest-bearing tokens
+        // Interest changes cause slightly different amounts each block → different order hash → spam
+        sellAmount = _truncatePrecision(sellAmount, params.debtDecimals);
+
+        if (sellAmount == 0) return (0, 0);
+
         // Calculate minBuyAmount (collateral) with slippage
         // This must cover the flash loan repayment
         uint256 expectedCollateral;
@@ -180,7 +187,11 @@ contract AutoLeverageTrigger is IOrderTrigger {
             }
         }
 
-        // Apply slippage
+        // Truncate expectedCollateral to prevent spam from price fluctuations
+        // Must truncate BEFORE applying slippage to preserve full slippage protection
+        expectedCollateral = _truncatePrecision(expectedCollateral, params.collateralDecimals);
+
+        // Apply slippage AFTER truncation
         minBuyAmount = (expectedCollateral * (10000 - params.maxSlippageBps)) / 10000;
     }
 
@@ -213,6 +224,22 @@ contract AutoLeverageTrigger is IOrderTrigger {
     /// @notice Encode trigger params for order creation
     function encodeTriggerParams(TriggerParams memory params) external pure returns (bytes memory) {
         return abi.encode(params);
+    }
+
+    // ============ Internal Functions ============
+
+    /// @dev Truncate precision to prevent order spam from interest accrual
+    /// - 18 decimals (ETH): keep 5 → 0.00001
+    /// - 8 decimals (WBTC): keep 6 → 0.000001
+    /// - 6 decimals (USDC): keep 4 → $0.0001
+    function _truncatePrecision(uint256 amount, uint8 decimals) internal pure returns (uint256) {
+        if (decimals <= 4) return amount;
+        uint256 keep;
+        if (decimals > 12) keep = 5;
+        else if (decimals > 6) keep = 6;
+        else keep = 4;
+        uint256 precision = 10 ** (decimals - keep);
+        return (amount / precision) * precision;
     }
 
 }

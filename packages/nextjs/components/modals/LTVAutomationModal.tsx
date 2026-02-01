@@ -207,8 +207,11 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
     if (!selectedCollateral || !totalCollateralUsd || !totalDebtUsd) return null;
     const perChunkFlashLoanUsd = calculateADLFlashLoanAmount(totalCollateralUsd, totalDebtUsd, adlTriggerLtvBps, adlTargetLtvBps, numChunks);
     if (perChunkFlashLoanUsd === 0n) return null;
-    const collateralPrice = selectedCollateral.usdValue && selectedCollateral.balance > 0
-      ? BigInt(Math.round((selectedCollateral.usdValue / selectedCollateral.balance) * 1e8)) : 0n;
+    // Price = usdValue / rawBalance, scaled to 8 decimals
+    // usdValue is a number in USD, rawBalance is in token decimals
+    // price = (usdValue * 10^8 * 10^tokenDecimals) / rawBalance gives price in 8 decimals
+    const collateralPrice = selectedCollateral.usdValue && selectedCollateral.rawBalance > 0n
+      ? (BigInt(Math.round(selectedCollateral.usdValue * 1e8)) * BigInt(10 ** selectedCollateral.decimals)) / selectedCollateral.rawBalance : 0n;
     if (collateralPrice === 0n) return null;
     const perChunkFlashLoanAmount = usdToTokenAmount(perChunkFlashLoanUsd, collateralPrice, selectedCollateral.decimals);
     const debtPrice = totalDebtUsd > 0n && totalCollateralUsd > 0n ? (totalDebtUsd * BigInt(1e8)) / totalCollateralUsd : BigInt(1e8);

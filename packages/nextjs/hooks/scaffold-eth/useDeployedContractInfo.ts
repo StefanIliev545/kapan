@@ -81,7 +81,8 @@ export function useDeployedContractInfo<TContractName extends ContractName>(
         setStatus(newStatus);
       } catch (e) {
         console.error(e);
-        deploymentStatusCache.set(cacheKey, ContractCodeStatus.NOT_FOUND);
+        // Don't cache network errors - they might be temporary
+        // Only update local state, allowing retry on next render
         setStatus(ContractCodeStatus.NOT_FOUND);
       }
     };

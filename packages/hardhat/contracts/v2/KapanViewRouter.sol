@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import { MarketParams } from "./interfaces/morpho/IMorphoBlue.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
  * @title Gateway View Interfaces
@@ -631,12 +632,29 @@ contract KapanViewRouter {
         }
         if (protocolId == MORPHO_BLUE) {
             // For Morpho, derive collateral price from the oracle
-            // Oracle returns collateral/loan rate at 36 decimals
-            // collateralPrice = oraclePrice / 1e28 (to get 8 decimal USD price)
+            // Oracle returns collateral/loan exchange rate scaled by 10^(36 + loanDecimals - collateralDecimals)
+            // We want price in 8 decimals, so divide by 10^(36 + loanDecimals - collateralDecimals - 8)
+            // = 10^(28 + loanDecimals - collateralDecimals)
             MarketParams memory params = abi.decode(context, (MarketParams));
             uint256 oraclePrice = IMorphoBlueGatewayView(gateway).getOraclePrice(params);
             if (oraclePrice > 0) {
-                return oraclePrice / 1e28; // Convert from 36 to 8 decimals
+                uint8 loanDecimals = _getDecimals(params.loanToken);
+                uint8 collateralDecimals = _getDecimals(params.collateralToken);
+                // exponent = 28 + loanDecimals - collateralDecimals
+                // Examples:
+                //   WBTC(8)/USDC(6):  28 + 6 - 8  = 26
+                //   ETH(18)/USDC(6):  28 + 6 - 18 = 16
+                //   USDC(6)/ETH(18):  28 + 18 - 6 = 40
+                //   USDC(6)/USDT(6):  28 + 6 - 6  = 28
+                int16 exponent = 28 + int16(uint16(loanDecimals)) - int16(uint16(collateralDecimals));
+                if (exponent >= 0) {
+                    return oraclePrice / (10 ** uint16(exponent));
+                } else {
+                    // Negative exponent means multiply instead of divide
+                    // This would only happen if collateralDecimals > 28 + loanDecimals
+                    // (e.g., a token with 35+ decimals, which doesn't exist in practice)
+                    return oraclePrice * (10 ** uint16(-exponent));
+                }
             }
         }
         // Euler and fallback: return placeholder (caller should handle)
@@ -777,5 +795,14 @@ contract KapanViewRouter {
 
         // Apply slippage tolerance
         minBuyAmount = (minBuyAmount * (10000 - maxSlippageBps)) / 10000;
+    }
+
+    /// @dev Get token decimals with fallback to 18
+    function _getDecimals(address token) internal view returns (uint8) {
+        try IERC20Metadata(token).decimals() returns (uint8 d) {
+            return d;
+        } catch {
+            return 18;
+        }
     }
 }

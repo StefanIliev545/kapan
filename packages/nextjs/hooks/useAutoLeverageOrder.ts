@@ -130,6 +130,7 @@ const CONDITIONAL_ORDER_MANAGER_ABI = [
           { name: "appDataHash", type: "bytes32" },
           { name: "maxIterations", type: "uint256" },
           { name: "sellTokenRefundAddress", type: "address" },
+          { name: "isKindBuy", type: "bool" },
         ],
       },
       { name: "salt", type: "bytes32" },
@@ -339,6 +340,7 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
         maxIterations: BigInt(maxIterations),
         // buyTokenRefundAddress goes to adapter for flash loan repayment
         sellTokenRefundAddress: validCowAdapter,
+        isKindBuy: false, // Auto-leverage is a SELL order (exact debt to sell, min collateral to receive)
       };
 
       // Encode the createOrder call

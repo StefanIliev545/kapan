@@ -105,6 +105,9 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         // Address to refund remaining sellToken after post-hook (e.g., adapter for flash loan repayment)
         // If zero, no refund is sent (user must handle via post-instructions)
         address sellTokenRefundAddress;
+
+        // Order kind: true = BUY (exact buyAmount, max sellAmount), false = SELL (exact sellAmount, min buyAmount)
+        bool isKindBuy;
     }
 
     /// @notice Order context stored on-chain
@@ -169,11 +172,10 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     mapping(bytes32 => uint256) public preHookSellBalance;
     mapping(bytes32 => uint256) public preHookBuyBalance;
 
-    /// @notice Cached execution amounts (set before pre-hook, used in signature verification)
-    /// This is needed because pre-hook may change protocol state (e.g., LTV),
-    /// which would cause getTradeableOrder to return different amounts.
-    mapping(bytes32 => uint256) public cachedSellAmount;
-    mapping(bytes32 => uint256) public cachedBuyAmount;
+    // ============ IMPORTANT: NO AMOUNT CACHING ============
+    // DO NOT add cached sell/buy amounts here. The handler calls trigger.calculateExecution()
+    // directly and any caching here is DEAD CODE that breaks orders.
+    // Amounts are dynamic and determined at execution time by the trigger.
 
     // ============ Security: Order Limits ============
 
@@ -391,11 +393,11 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         // Get sell/buy amounts from trigger BEFORE executing instructions
         // (instructions may change protocol state, affecting future calculations)
         IOrderTrigger trigger = IOrderTrigger(params.trigger);
-        (uint256 sellAmount, uint256 minBuyAmount) = trigger.calculateExecution(params.triggerStaticData, params.user);
-
-        // Cache amounts for signature verification (getTradeableOrder will use these)
-        cachedSellAmount[orderHash] = sellAmount;
-        cachedBuyAmount[orderHash] = minBuyAmount;
+        (uint256 sellAmount, ) = trigger.calculateExecution(
+            params.triggerStaticData,
+            params.user,
+            ctx.iterationCount
+        );
 
         // Mark pre-hook as executed
         preHookExecutedForIteration[orderHash] = ctx.iterationCount + 1;
@@ -435,8 +437,6 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
 
         delete preHookSellBalance[orderHash];
         delete preHookBuyBalance[orderHash];
-        delete cachedSellAmount[orderHash];
-        delete cachedBuyAmount[orderHash];
 
         uint256 actualSellAmount = sellBefore > sellAfter ? sellBefore - sellAfter : 0;
         uint256 actualBuyAmount = buyAfter > buyBefore ? buyAfter - buyBefore : 0;
@@ -629,7 +629,7 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
         }
 
         IOrderTrigger trigger = IOrderTrigger(ctx.params.trigger);
-        return trigger.calculateExecution(ctx.params.triggerStaticData, ctx.params.user);
+        return trigger.calculateExecution(ctx.params.triggerStaticData, ctx.params.user, ctx.iterationCount);
     }
 
     // ============ Internal Functions ============

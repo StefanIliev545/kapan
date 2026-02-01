@@ -191,6 +191,7 @@ const CONDITIONAL_ORDER_MANAGER_ABI = [
           { name: "appDataHash", type: "bytes32" },
           { name: "maxIterations", type: "uint256" },
           { name: "sellTokenRefundAddress", type: "address" },
+          { name: "isKindBuy", type: "bool" },
         ],
       },
       { name: "salt", type: "bytes32" },
@@ -393,6 +394,7 @@ export function useADLOrder(input: UseADLOrderInput): UseADLOrderReturn {
         appDataHash,
         maxIterations: BigInt(maxIterations),
         sellTokenRefundAddress: validCowAdapter, // For flash loan repayment
+        isKindBuy: false, // ADL is a SELL order (exact collateral to sell, min debt to receive)
       };
 
       // Encode the createOrder call

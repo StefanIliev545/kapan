@@ -23,7 +23,12 @@ import { Tooltip } from "@radix-ui/themes";
 import { use1inchQuote } from "~~/hooks/use1inchQuote";
 import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useCowQuote } from "~~/hooks/useCowQuote";
-import { useCowLimitOrder, type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
+import {
+    useCowConditionalOrder,
+    encodeLimitPriceTriggerParams,
+    getProtocolId,
+    type ConditionalOrderInstructions,
+} from "~~/hooks/useCowConditionalOrder";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
@@ -49,6 +54,7 @@ import {
     normalizeProtocolName,
     encodeMorphoContext,
     encodeEulerContext,
+    calculateLimitPrice,
     type MorphoMarketContextForEncoding,
 } from "~~/utils/v2/instructionHelpers";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -64,11 +70,11 @@ import {
     isCowProtocolSupported,
 } from "~~/utils/chainFeatures";
 import {
-    CompletionType,
     getCowExplorerAddressUrl,
     getPreferredFlashLoanLender,
     calculateFlashLoanFee,
     storeOrderQuoteRate,
+    getKapanCowAdapter,
 } from "~~/utils/cow";
 import { calculateSuggestedSlippage } from "~~/utils/slippage";
 import { notification } from "~~/utils/scaffold-stark/notification";
@@ -254,7 +260,12 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
     const { address: userAddress } = useAccount();
     const { data: walletClient } = useWalletClient({ chainId });
     const publicClient = usePublicClient({ chainId });
-    const { buildOrderCalls: buildLimitOrderCalls, isReady: limitOrderReady, orderManagerAddress } = useCowLimitOrder();
+    const {
+        buildOrderCalls: buildConditionalOrderCalls,
+        isReady: conditionalOrderReady,
+        managerAddress: conditionalOrderManagerAddress,
+        limitPriceTriggerAddress,
+    } = useCowConditionalOrder();
     const saveOrder = useSaveOrder();
 
     // ============ Morpho Markets ============
@@ -645,148 +656,318 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         return (currentDebtBalance * amount) / selectedFrom.rawBalance;
     }, [isMorpho, currentDebtBalance, selectedFrom?.rawBalance, selectedFrom?.decimals, amountIn, isMax]);
 
-    // ============ CoW Instructions Builder ============
-    const buildCowInstructions = useMemo((): ChunkInstructions[] => {
-        if (!selectedFrom || !selectedTo || !userAddress || amountInBigInt === 0n || !orderManagerAddress || !cowFlashLoanInfo) {
-            return [{ preInstructions: [], postInstructions: [] }];
+    // ============ Conditional Order Instructions Builder ============
+    // For KapanConditionalOrderManager, post-hook UTXOs are:
+    // UTXO[0] = actualSellAmount (what was sold in the swap)
+    // UTXO[1] = actualBuyAmount (received from swap)
+    //
+    // For flash loan repayment with BUY orders:
+    // - Flash loan provided X, swap sold Y (Y ≤ X)
+    // - Leftover in manager = X - Y
+    // - Withdraw Y (UTXO[0]) from protocol
+    // - Total to refund = (X - Y) + Y = X = flash loan amount ✓
+    const buildConditionalOrderInstructionsData = useMemo((): ConditionalOrderInstructions => {
+        if (!selectedFrom || !selectedTo || !userAddress || amountInBigInt === 0n || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
+            return { preInstructions: [], postInstructions: [] };
         }
 
         const normalizedProtocol = normalizeProtocolName(protocolName);
         const depositOp = getDepositOperation(protocolName);
 
-        const chunkSellAmount = amountInBigInt / BigInt(numChunks);
-        const chunkFlashLoanFee = cowFlashLoanInfo.fee / BigInt(numChunks);
-        const chunkWithdrawAmount = chunkSellAmount + chunkFlashLoanFee;
+        // Morpho flow - needs proper context encoding for both old and new markets
+        // For Morpho pair-isolated markets, must also migrate debt from old to new market
+        if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded) {
+            // Check if there's debt to migrate
+            const hasDebt = currentDebtBalance !== undefined && currentDebtBalance > 0n;
 
-        // Morpho (Pair-Isolated) flow
-        if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && debtTokenAddress) {
-            const useFixedDebtAmount = currentDebtBalance !== undefined && currentDebtBalance > 0n && !isMax;
-            const chunkDebtAmount = useFixedDebtAmount && selectedFrom?.rawBalance
-                ? (currentDebtBalance * chunkSellAmount) / selectedFrom.rawBalance
-                : 0n;
-
-            return Array(numChunks).fill(null).map(() => {
+            if (hasDebt && debtTokenAddress) {
+                /**
+                 * Morpho Pair-Isolated Collateral Swap with Debt Migration (Conditional Order):
+                 *
+                 * Manager prepends (KapanConditionalOrderManager._buildPostHookInstructions):
+                 * - UTXO[0] = ToOutput(actualSellAmount, sellToken)
+                 * - UTXO[1] = ToOutput(actualBuyAmount, buyToken)
+                 *
+                 * User postInstructions:
+                 * [0] Approve(input=1, morpho) → UTXO[2] (dummy)
+                 * [1] DepositCollateral(buyToken, input=1, NEW_MARKET) → NO OUTPUT
+                 * [2] GetBorrowBalance(debtToken, OLD_MARKET) → UTXO[3] (debt amount with accrued interest)
+                 * [3] Borrow(debtToken, input=3, NEW_MARKET) → UTXO[4] (borrowed tokens)
+                 * [4] Approve(input=4, morpho) → UTXO[5] (dummy)
+                 * [5] Repay(debtToken, input=3, OLD_MARKET) → UTXO[6] (refund, usually 0)
+                 * [6] WithdrawCollateral(sellToken, input=0, OLD_MARKET) → UTXO[7]
+                 *
+                 * Flash loan repayment: Manager sends remaining sellToken to sellTokenRefundAddress
+                 */
                 const postInstructions: ProtocolInstruction[] = [
-                    createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+                    // 1. Approve new collateral (UTXO[1]) for deposit → produces UTXO[2] (dummy)
+                    createRouterInstruction(encodeApprove(1, normalizedProtocol)),
+
+                    // 2. Deposit new collateral into NEW market → NO OUTPUT
                     createProtocolInstruction(
                         normalizedProtocol,
-                        encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, newMorphoContextEncoded, 0)
+                        encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, newMorphoContextEncoded, 1)
                     ),
+
+                    // 3. GetBorrowBalance on OLD market → UTXO[3] (exact debt with accrued interest)
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.GetBorrowBalance, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 999)
+                    ),
+
+                    // 4. Borrow from NEW market (amount from UTXO[3]) → UTXO[4]
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.Borrow, debtTokenAddress, userAddress, 0n, newMorphoContextEncoded, 3)
+                    ),
+
+                    // 5. Approve gateway to spend borrowed tokens (UTXO[4]) → UTXO[5] (dummy)
+                    createRouterInstruction(encodeApprove(4, normalizedProtocol)),
+
+                    // 6. Repay on OLD market (amount from UTXO[3]) → UTXO[6]
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.Repay, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 3)
+                    ),
+
+                    // 7. Withdraw old collateral from OLD market (UTXO[0] = sellAmount) → UTXO[7]
+                    createProtocolInstruction(
+                        normalizedProtocol,
+                        encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, oldMorphoContextEncoded, 0)
+                    ),
+
+                    // 8. Push withdrawn collateral (UTXO[7]) from router to OrderManager for flash loan repayment
+                    createRouterInstruction(encodePushToken(7, conditionalOrderManagerAddress)),
                 ];
-
-                if (useFixedDebtAmount) {
-                    postInstructions.push(
-                        createRouterInstruction(encodeToOutput(chunkDebtAmount, debtTokenAddress))
-                    );
-                } else {
-                    postInstructions.push(
-                        createProtocolInstruction(
-                            normalizedProtocol,
-                            encodeLendingInstruction(LendingOp.GetBorrowBalance, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 999)
-                        )
-                    );
-                }
-
-                postInstructions.push(
-                    createProtocolInstruction(
-                        normalizedProtocol,
-                        encodeLendingInstruction(LendingOp.Borrow, debtTokenAddress, userAddress, 0n, newMorphoContextEncoded, 2)
-                    ),
-                    createRouterInstruction(encodeApprove(3, normalizedProtocol)),
-                    createProtocolInstruction(
-                        normalizedProtocol,
-                        encodeLendingInstruction(LendingOp.Repay, debtTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 2)
-                    ),
-                    createProtocolInstruction(
-                        normalizedProtocol,
-                        encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, chunkWithdrawAmount, oldMorphoContextEncoded, 999)
-                    )
-                );
+                console.log("[CollateralSwap] Morpho WITH debt flow - postInstructions count:", postInstructions.length);
 
                 return {
                     preInstructions: [],
                     postInstructions,
-                    flashLoanRepaymentUtxoIndex: 6,
                 };
-            });
+            }
+
+            // No debt - simple collateral swap (collateral-only position)
+            /**
+             * Morpho Collateral Swap without Debt (Conditional Order):
+             *
+             * Manager prepends:
+             * - UTXO[0] = ToOutput(actualSellAmount, sellToken)
+             * - UTXO[1] = ToOutput(actualBuyAmount, buyToken)
+             *
+             * User postInstructions:
+             * [0] Approve(input=1, morpho) → UTXO[2] (dummy)
+             * [1] DepositCollateral(buyToken, input=1, NEW_MARKET) → NO OUTPUT
+             * [2] WithdrawCollateral(sellToken, input=0, OLD_MARKET) → UTXO[3]
+             */
+            const postInstructions: ProtocolInstruction[] = [
+                // 1. Approve new collateral (UTXO[1]) for deposit → UTXO[2] (dummy)
+                createRouterInstruction(encodeApprove(1, normalizedProtocol)),
+
+                // 2. Deposit new collateral into NEW market → NO OUTPUT
+                createProtocolInstruction(
+                    normalizedProtocol,
+                    encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, newMorphoContextEncoded, 1)
+                ),
+
+                // 3. Withdraw old collateral from OLD market (UTXO[0] = sellAmount) → UTXO[3]
+                createProtocolInstruction(
+                    normalizedProtocol,
+                    encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, oldMorphoContextEncoded, 0)
+                ),
+
+                // 4. Push withdrawn collateral (UTXO[3]) from router to OrderManager for flash loan repayment
+                createRouterInstruction(encodePushToken(3, conditionalOrderManagerAddress)),
+            ];
+            console.log("[CollateralSwap] Morpho NO debt flow - postInstructions count:", postInstructions.length);
+
+            return {
+                preInstructions: [],
+                postInstructions,
+            };
         }
 
         // Euler flow
         if (isEuler && oldEulerContextEncoded && newEulerContextEncoded) {
-            return Array(numChunks).fill(null).map(() => {
-                const postInstructions: ProtocolInstruction[] = [
-                    createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-                    createProtocolInstruction(
-                        normalizedProtocol,
-                        encodeLendingInstruction(LendingOp.DepositCollateral, selectedTo.address, userAddress, 0n, newEulerContextEncoded, 0)
-                    ),
-                    createProtocolInstruction(
-                        normalizedProtocol,
-                        encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, chunkWithdrawAmount, oldEulerContextEncoded, 999)
-                    ),
-                ];
-
-                if (isMax) {
-                    postInstructions.push(
-                        createProtocolInstruction(
-                            normalizedProtocol,
-                            encodeLendingInstruction(LendingOp.GetSupplyBalance, selectedFrom.address, userAddress, 0n, oldEulerContextEncoded, 999)
-                        ),
-                        createProtocolInstruction(
-                            normalizedProtocol,
-                            encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, oldEulerContextEncoded, 3)
-                        ),
-                        createRouterInstruction(encodePushToken(4, userAddress))
-                    );
-                }
-
-                return {
-                    preInstructions: [],
-                    postInstructions,
-                    flashLoanRepaymentUtxoIndex: 2,
-                };
-            });
-        }
-
-        // Standard flow (Aave, Compound, Venus)
-        return Array(numChunks).fill(null).map(() => {
+            /**
+             * Euler Collateral Swap (Conditional Order):
+             *
+             * Manager prepends:
+             * - UTXO[0] = ToOutput(actualSellAmount, sellToken)
+             * - UTXO[1] = ToOutput(actualBuyAmount, buyToken)
+             *
+             * User postInstructions:
+             * [0] Approve(input=1, euler) → UTXO[2] (dummy)
+             * [1] DepositCollateral(buyToken, input=1, NEW_VAULT) → NO OUTPUT
+             * [2] WithdrawCollateral(sellToken, input=0, OLD_VAULT) → UTXO[3]
+             *
+             * For isMax (dust clearing):
+             * [3] GetSupplyBalance(sellToken, OLD_VAULT) → UTXO[4] (remaining dust)
+             * [4] WithdrawCollateral(sellToken, input=4, OLD_VAULT) → UTXO[5]
+             * [5] PushToken(5, user) → send dust to user
+             */
             const postInstructions: ProtocolInstruction[] = [
-                createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+                // 1. Approve new collateral (UTXO[1]) for deposit → UTXO[2] (dummy)
+                createRouterInstruction(encodeApprove(1, normalizedProtocol)),
+                // 2. Deposit new collateral into NEW vault → NO OUTPUT
                 createProtocolInstruction(
                     normalizedProtocol,
-                    encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, context || "0x", 0)
+                    encodeLendingInstruction(LendingOp.DepositCollateral, selectedTo.address, userAddress, 0n, newEulerContextEncoded, 1)
                 ),
+                // 3. Withdraw old collateral from OLD vault (UTXO[0] = sellAmount) → UTXO[3]
                 createProtocolInstruction(
                     normalizedProtocol,
-                    encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, chunkWithdrawAmount, context || "0x", 999)
+                    encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, oldEulerContextEncoded, 0)
                 ),
+                // 4. Push withdrawn collateral (UTXO[3]) from router to OrderManager for flash loan repayment
+                createRouterInstruction(encodePushToken(3, conditionalOrderManagerAddress)),
             ];
 
+            // For isMax: Add dust clearing instructions
+            // Note: PushToken at [3] doesn't create a UTXO, so indices remain 4, 5
             if (isMax) {
+                // [4] GetSupplyBalance(oldCollateral, OLD_VAULT) → UTXO[4]
                 postInstructions.push(
                     createProtocolInstruction(
                         normalizedProtocol,
-                        encodeLendingInstruction(LendingOp.GetSupplyBalance, selectedFrom.address, userAddress, 0n, context || "0x", 999)
-                    ),
+                        encodeLendingInstruction(LendingOp.GetSupplyBalance, selectedFrom.address, userAddress, 0n, oldEulerContextEncoded, 999)
+                    )
+                );
+                // [5] WithdrawCollateral(oldCollateral, input=4, OLD_VAULT) → UTXO[5]
+                postInstructions.push(
                     createProtocolInstruction(
                         normalizedProtocol,
-                        encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, context || "0x", 3)
-                    ),
-                    createRouterInstruction(encodePushToken(4, userAddress))
+                        encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, oldEulerContextEncoded, 4)
+                    )
+                );
+                // [6] PushToken(5, userAddress) → send dust to user
+                postInstructions.push(
+                    createRouterInstruction(encodePushToken(5, userAddress))
                 );
             }
 
             return {
                 preInstructions: [],
                 postInstructions,
-                flashLoanRepaymentUtxoIndex: 2,
             };
+        }
+
+        // Standard flow (Aave, Compound, Venus)
+        /**
+         * Standard Collateral Swap (Conditional Order):
+         *
+         * Manager prepends:
+         * - UTXO[0] = ToOutput(actualSellAmount, sellToken)
+         * - UTXO[1] = ToOutput(actualBuyAmount, buyToken)
+         *
+         * User postInstructions:
+         * [0] Approve(input=1, protocol) → UTXO[2] (dummy)
+         * [1] Deposit(buyToken, input=1) → NO OUTPUT
+         * [2] WithdrawCollateral(sellToken, input=0) → UTXO[3]
+         *
+         * [3] PushToken(3, manager) → sends withdrawn collateral to manager (no UTXO created)
+         *
+         * For isMax (dust clearing):
+         * [4] GetSupplyBalance(sellToken) → UTXO[4] (remaining dust)
+         * [5] WithdrawCollateral(sellToken, input=4) → UTXO[5]
+         * [6] PushToken(5, user) → send dust to user
+         */
+        const postInstructions: ProtocolInstruction[] = [
+            // 1. Approve new collateral (UTXO[1]) for deposit → UTXO[2] (dummy)
+            createRouterInstruction(encodeApprove(1, normalizedProtocol)),
+            // 2. Deposit new collateral → NO OUTPUT
+            createProtocolInstruction(
+                normalizedProtocol,
+                encodeLendingInstruction(depositOp, selectedTo.address, userAddress, 0n, context || "0x", 1)
+            ),
+            // 3. Withdraw old collateral (UTXO[0] = sellAmount) → UTXO[3]
+            createProtocolInstruction(
+                normalizedProtocol,
+                encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, context || "0x", 0)
+            ),
+            // 4. Push withdrawn collateral (UTXO[3]) from router to OrderManager for flash loan repayment
+            createRouterInstruction(encodePushToken(3, conditionalOrderManagerAddress)),
+        ];
+        console.log("[CollateralSwap] Standard flow - postInstructions count:", postInstructions.length, "isMax:", isMax, "manager:", conditionalOrderManagerAddress);
+
+        // For isMax: Add dust clearing instructions
+        // Note: PushToken at [3] doesn't create a UTXO, so indices remain 4, 5
+        if (isMax) {
+            // [4] GetSupplyBalance(oldCollateral) → UTXO[4]
+            postInstructions.push(
+                createProtocolInstruction(
+                    normalizedProtocol,
+                    encodeLendingInstruction(LendingOp.GetSupplyBalance, selectedFrom.address, userAddress, 0n, context || "0x", 999)
+                )
+            );
+            // [5] WithdrawCollateral(oldCollateral, input=4) → UTXO[5]
+            postInstructions.push(
+                createProtocolInstruction(
+                    normalizedProtocol,
+                    encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedFrom.address, userAddress, 0n, context || "0x", 4)
+                )
+            );
+            // [6] PushToken(5, userAddress) → send dust to user
+            postInstructions.push(
+                createRouterInstruction(encodePushToken(5, userAddress))
+            );
+            console.log("[CollateralSwap] After isMax additions - postInstructions count:", postInstructions.length);
+        }
+
+        console.log("[CollateralSwap] Final postInstructions:", postInstructions.map((p, i) => `[${i}] ${p.protocolName}`).join(", "));
+        return {
+            preInstructions: [],
+            postInstructions,
+        };
+    }, [
+        selectedFrom, selectedTo, userAddress, amountInBigInt, conditionalOrderManagerAddress,
+        cowFlashLoanInfo, protocolName, context, isMorpho, oldMorphoContextEncoded,
+        newMorphoContextEncoded, isEuler, oldEulerContextEncoded, newEulerContextEncoded,
+        currentDebtBalance, debtTokenAddress, isMax
+    ]);
+
+    // ============ Conditional Order Trigger Params ============
+    const conditionalOrderTriggerParams = useMemo(() => {
+        if (!selectedFrom || !selectedTo || !limitPriceTriggerAddress || amountInBigInt === 0n || minBuyAmount.raw === 0n) {
+            return null;
+        }
+
+        // Determine the proper protocol context
+        let triggerContext: `0x${string}` = (context || "0x") as `0x${string}`;
+        if (isMorpho && oldMorphoContextEncoded) {
+            // For Morpho, use the old market context (where we're withdrawing from)
+            triggerContext = oldMorphoContextEncoded as `0x${string}`;
+        } else if (isEuler && oldEulerContextEncoded) {
+            triggerContext = oldEulerContextEncoded as `0x${string}`;
+        }
+
+        // Calculate limit price (8 decimals, Chainlink style)
+        // limitPrice = (buyAmount / sellAmount) * 1e8
+        const limitPrice = calculateLimitPrice(
+            amountInBigInt, selectedFrom.decimals,
+            minBuyAmount.raw, selectedTo.decimals
+        );
+
+        // Collateral swap is a SELL order: we're selling exact old collateral for min new collateral
+        return encodeLimitPriceTriggerParams({
+            protocolId: getProtocolId(protocolName),
+            protocolContext: triggerContext,
+            sellToken: selectedFrom.address,
+            buyToken: selectedTo.address,
+            sellDecimals: selectedFrom.decimals,
+            buyDecimals: selectedTo.decimals,
+            limitPrice,
+            triggerAbovePrice: false,
+            totalSellAmount: amountInBigInt, // Exact amount to sell
+            totalBuyAmount: 0n, // Not used for SELL orders
+            numChunks,
+            maxSlippageBps: Math.round(limitSlippage * 100),
+            isKindBuy: false, // SELL order: exact sellAmount, min buyAmount
         });
     }, [
-        selectedFrom, selectedTo, userAddress, amountInBigInt, orderManagerAddress, protocolName,
-        context, cowFlashLoanInfo, numChunks, isMax, isMorpho, oldMorphoContextEncoded,
-        newMorphoContextEncoded, debtTokenAddress, currentDebtBalance, isEuler,
-        oldEulerContextEncoded, newEulerContextEncoded
+        selectedFrom, selectedTo, limitPriceTriggerAddress, amountInBigInt,
+        minBuyAmount.raw, protocolName, context, numChunks, limitSlippage,
+        isMorpho, oldMorphoContextEncoded, isEuler, oldEulerContextEncoded
     ]);
 
     // ============ Market Order Flow Builder ============
@@ -948,42 +1129,37 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         simulateWhenBatching: true,
     });
 
-    // ============ Limit Order Execution ============
-    const executeLimitOrder = useCallback(async (txBeginProps: Record<string, string | number | boolean | null>): Promise<void> => {
-        track("collateral_swap_limit_order_begin", txBeginProps);
+    // ============ Conditional Order Execution (New System) ============
+    const executeConditionalOrder = useCallback(async (txBeginProps: Record<string, string | number | boolean | null>): Promise<void> => {
+        track("collateral_swap_conditional_order_begin", { ...txBeginProps, orderSystem: "conditional" });
 
-        if (!selectedFrom || !selectedTo || !userAddress || !orderManagerAddress || !cowFlashLoanInfo) {
-            throw new Error("Missing required data for limit order");
+        if (!selectedFrom || !selectedTo || !userAddress || !conditionalOrderManagerAddress || !cowFlashLoanInfo || !limitPriceTriggerAddress || !conditionalOrderTriggerParams) {
+            throw new Error("Missing required data for conditional order");
         }
 
-        const chunkSellAmount = amountInBigInt / BigInt(numChunks);
-        const chunkMinBuyAmount = minBuyAmount.raw / BigInt(numChunks);
-        const chunkFlashLoanAmount = chunkSellAmount;
-
-        const result = await buildLimitOrderCalls({
+        console.log("[CollateralSwap] Creating order with postInstructions count:", buildConditionalOrderInstructionsData.postInstructions.length);
+        console.log("[CollateralSwap] Instructions:", buildConditionalOrderInstructionsData.postInstructions.map((p, i) => `[${i}] ${p.protocolName}`).join(", "));
+        const result = await buildConditionalOrderCalls({
+            triggerAddress: limitPriceTriggerAddress,
+            triggerStaticData: conditionalOrderTriggerParams,
             sellToken: selectedFrom.address as Address,
             buyToken: selectedTo.address as Address,
-            chunkSize: chunkSellAmount,
-            minBuyPerChunk: chunkMinBuyAmount,
-            totalAmount: amountInBigInt,
-            chunks: buildCowInstructions,
-            completion: CompletionType.Iterations,
-            targetValue: numChunks,
-            minHealthFactor: "1.1",
-            seedAmount: 0n,
+            preInstructions: buildConditionalOrderInstructionsData.preInstructions,
+            postInstructions: buildConditionalOrderInstructionsData.postInstructions,
+            maxIterations: numChunks,
             flashLoan: {
                 lender: cowFlashLoanInfo.lender,
                 token: selectedFrom.address as Address,
-                amount: chunkFlashLoanAmount,
+                amount: amountInBigInt / BigInt(numChunks),
             },
-            preOrderInstructions: buildCowInstructions[0]?.postInstructions || [],
-            isKindBuy: false,
+            sellTokenRefundAddress: getKapanCowAdapter(chainId) as Address, // KapanCowAdapter for flash loan repayment
             operationType: "collateral-swap",
             protocolName,
+            isKindBuy: false, // SELL order: exact sellAmount, min buyAmount
         });
 
         if (!result || !result.success) {
-            const errorMsg = result?.error || "Failed to build CoW order calls";
+            const errorMsg = result?.error || "Failed to build conditional order calls";
             notification.error(
                 <TransactionToast step="failed" message={`CoW API Error: ${errorMsg}`} />
             );
@@ -1002,7 +1178,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         }
 
         const notificationId = notification.loading(
-            <TransactionToast step="pending" message={`Creating limit order (${result.calls.length} operations)...`} />
+            <TransactionToast step="pending" message={`Creating conditional order (${result.calls.length} operations)...`} />
         );
 
         if (!walletClient || !publicClient) {
@@ -1034,12 +1210,12 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         notification.success(
             <TransactionToast
                 step="confirmed"
-                message="Limit order created!"
+                message="Conditional order created!"
                 blockExplorerLink={explorerUrl}
             />
         );
 
-        const orderHash = extractOrderHash(receipts, orderManagerAddress) ?? undefined;
+        const orderHash = extractOrderHash(receipts, conditionalOrderManagerAddress) ?? undefined;
 
         if (result.salt && selectedFrom && selectedTo) {
             saveOrder.mutate({
@@ -1064,12 +1240,13 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
             }
         }
 
-        track("collateral_swap_limit_order_complete", { ...txBeginProps, status: "success", mode: "sequential" });
+        track("collateral_swap_conditional_order_complete", { ...txBeginProps, status: "success", orderSystem: "conditional" });
         onClose();
     }, [
-        selectedFrom, selectedTo, userAddress, orderManagerAddress, cowFlashLoanInfo,
-        amountInBigInt, numChunks, minBuyAmount, buildCowInstructions, buildLimitOrderCalls,
-        protocolName, chainId, walletClient, publicClient, saveOrder, onClose
+        selectedFrom, selectedTo, userAddress, conditionalOrderManagerAddress, cowFlashLoanInfo,
+        limitPriceTriggerAddress, conditionalOrderTriggerParams, buildConditionalOrderCalls,
+        buildConditionalOrderInstructionsData, numChunks, amountInBigInt, protocolName, chainId,
+        walletClient, publicClient, saveOrder, minBuyAmount.raw, onClose
     ]);
 
     // ============ Main Submit Handler ============
@@ -1096,7 +1273,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
             setIsSubmitting(true);
 
             if (executionType === "limit") {
-                await executeLimitOrder(txBeginProps);
+                await executeConditionalOrder(txBeginProps);
             } else {
                 track("collateral_swap_tx_begin", txBeginProps);
                 await handleSwap(amountIn, isMax);
@@ -1114,7 +1291,8 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
             setIsSubmitting(false);
         }
     }, [
-        executionType, executeLimitOrder, handleSwap, protocolName, chainId, context,
+        executionType, executeConditionalOrder,
+        handleSwap, protocolName, chainId, context,
         selectedFrom, selectedTo, amountIn, isMax, limitSlippage, slippage,
         batchingPreference.enabled, selectedProvider, swapRouter
     ]);
@@ -1128,7 +1306,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
     const morphoDebtInfoNotLoaded = isMorpho && !isMax && parseFloat(amountIn) > 0 && currentDebtBalance === undefined;
 
     const canSubmitMarket = hasQuote && hasAdapter && parseFloat(amountIn) > 0 && !morphoDebtInfoNotLoaded;
-    const canSubmitLimit = !!selectedFrom && !!selectedTo && parseFloat(amountIn) > 0 && limitOrderReady && !!cowFlashLoanInfo && !morphoDebtInfoNotLoaded;
+    const canSubmitLimit = !!selectedFrom && !!selectedTo && parseFloat(amountIn) > 0 && conditionalOrderReady && !!cowFlashLoanInfo && !!limitPriceTriggerAddress && !!conditionalOrderTriggerParams && !morphoDebtInfoNotLoaded;
     const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
 
     // Prefer Morpho for limit orders
@@ -1253,9 +1431,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                     value={executionType}
                     onChange={setExecutionType}
                     limitAvailable={cowAvailable}
-                    limitReady={limitOrderReady}
+                    limitReady={conditionalOrderReady}
                     limitDisabledReason={
-                        !limitOrderReady
+                        !conditionalOrderReady
                             ? "CoW contracts not deployed on this chain"
                             : undefined
                     }
@@ -1424,7 +1602,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
             </div>
         );
     }, [
-        executionType, setExecutionType, cowAvailable, limitOrderReady, isQuoteLoading,
+        executionType, setExecutionType, cowAvailable, conditionalOrderReady, isQuoteLoading,
         marketRate, selectedFrom, selectedTo, limitSlippage, minBuyAmount, numChunks,
         amountInBigInt, slippage, priceImpact, amountOut, flashLoanProviders,
         selectedProvider, liquidityData, swapRouter, oneInchAvailable, pendleAvailable,
@@ -1495,8 +1673,8 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
     // ============ Limit Order Config ============
     const limitOrderConfig: LimitOrderConfig = useMemo(() => ({
         available: cowAvailable,
-        ready: limitOrderReady,
-        orderManagerAddress,
+        ready: conditionalOrderReady,
+        orderManagerAddress: conditionalOrderManagerAddress,
         numChunks,
         setNumChunks,
         customBuyAmount,
@@ -1506,8 +1684,8 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
             setUseCustomBuyAmount(true);
         },
         flashLoanInfo: cowFlashLoanInfo,
-        chunkInstructions: buildCowInstructions,
-    }), [cowAvailable, limitOrderReady, orderManagerAddress, numChunks, customBuyAmount, useCustomBuyAmount, cowFlashLoanInfo, buildCowInstructions]);
+        chunkInstructions: [],
+    }), [cowAvailable, conditionalOrderReady, conditionalOrderManagerAddress, numChunks, customBuyAmount, useCustomBuyAmount, cowFlashLoanInfo]);
 
     // ============ Return Config ============
     return {

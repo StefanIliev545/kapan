@@ -41,7 +41,9 @@ export const use1inchQuote = ({
         queryFn: async () => {
             const effectiveChainId = getEffectiveChainId(chainId);
 
-            // Try preferred router first
+            // Try preferred router first, with fallback to alternatives
+            let kyberFailed = false;
+
             if (preferredRouter === "kyber" && isKyberSupported(chainId)) {
                 try {
                     const kyberResponse = await fetchKyberSwap(effectiveChainId, {
@@ -68,13 +70,13 @@ export const use1inchQuote = ({
                         },
                     } as unknown as OneInchSwapResponse;
                 } catch (kyberError) {
-                    logger.warn("Kyber Swap failed:", kyberError);
-                    // Don't fallback to 1inch if Kyber was preferred - the swap data format would be wrong
+                    logger.warn("Kyber Swap failed, trying 1inch fallback:", kyberError);
+                    kyberFailed = true;
                 }
             }
 
-            // Try 1inch if preferred or as fallback when Kyber isn't supported
-            if ((preferredRouter === "1inch" || !isKyberSupported(chainId)) && is1inchSupported(chainId)) {
+            // Try 1inch if preferred, or as fallback when Kyber failed or isn't supported
+            if ((preferredRouter === "1inch" || kyberFailed || !isKyberSupported(chainId)) && is1inchSupported(chainId)) {
                 try {
                     return await fetch1inchSwap(effectiveChainId, {
                         src,

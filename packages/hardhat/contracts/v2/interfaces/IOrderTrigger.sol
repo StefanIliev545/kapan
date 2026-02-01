@@ -19,11 +19,13 @@ interface IOrderTrigger {
     /// @dev Only called when shouldExecute returns true
     /// @param staticData ABI-encoded trigger-specific parameters
     /// @param owner The order owner
+    /// @param iterationCount Number of executions completed so far (for chunked orders)
     /// @return sellAmount Amount of sell token to trade in this execution
     /// @return minBuyAmount Minimum amount to receive (includes slippage protection)
     function calculateExecution(
         bytes calldata staticData,
-        address owner
+        address owner,
+        uint256 iterationCount
     ) external view returns (uint256 sellAmount, uint256 minBuyAmount);
 
     /// @notice Check if the order is complete and should stop executing

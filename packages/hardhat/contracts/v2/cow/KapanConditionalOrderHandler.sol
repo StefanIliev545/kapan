@@ -22,6 +22,7 @@ interface IKapanConditionalOrderManager {
         bytes32 appDataHash;
         uint256 maxIterations;
         address sellTokenRefundAddress;
+        bool isKindBuy;
     }
 
     struct OrderContext {
@@ -32,8 +33,6 @@ interface IKapanConditionalOrderManager {
     }
 
     function getOrder(bytes32 orderHash) external view returns (OrderContext memory);
-    function cachedSellAmount(bytes32 orderHash) external view returns (uint256);
-    function cachedBuyAmount(bytes32 orderHash) external view returns (uint256);
     function chunkWindow() external view returns (uint256);
 }
 
@@ -90,29 +89,25 @@ contract KapanConditionalOrderHandler is IConditionalOrderGenerator, IERC165 {
             revert PollNever("max_iterations_reached");
         }
 
-        // Use cached amounts if available (set by pre-hook before state changes)
-        uint256 sellAmount = manager.cachedSellAmount(orderHash);
-        uint256 minBuyAmount = manager.cachedBuyAmount(orderHash);
+        // Check trigger condition
+        (bool shouldExecute, string memory reason) = trigger.shouldExecute(
+            ctx.params.triggerStaticData,
+            ctx.params.user
+        );
+
+        if (!shouldExecute) {
+            revert PollTryNextBlock(reason);
+        }
+
+        // Calculate amounts from trigger (trigger handles precision truncation to prevent spam)
+        (uint256 sellAmount, uint256 minBuyAmount) = trigger.calculateExecution(
+            ctx.params.triggerStaticData,
+            ctx.params.user,
+            ctx.iterationCount
+        );
 
         if (sellAmount == 0) {
-            // No cached amounts - calculate fresh from trigger
-            (bool shouldExecute, string memory reason) = trigger.shouldExecute(
-                ctx.params.triggerStaticData,
-                ctx.params.user
-            );
-
-            if (!shouldExecute) {
-                revert PollTryNextBlock(reason);
-            }
-
-            (sellAmount, minBuyAmount) = trigger.calculateExecution(
-                ctx.params.triggerStaticData,
-                ctx.params.user
-            );
-
-            if (sellAmount == 0) {
-                revert PollNever("zero_sell_amount");
-            }
+            revert PollNever("zero_sell_amount");
         }
 
         // Calculate deterministic validTo
@@ -124,6 +119,8 @@ contract KapanConditionalOrderHandler is IConditionalOrderGenerator, IERC165 {
         }
 
         // Build the order - receiver is manager (for post-hook token handling)
+        // For BUY orders: sellAmount = maxSellAmount, buyAmount = exact buyAmount
+        // For SELL orders: sellAmount = exact sellAmount, buyAmount = minBuyAmount
         order = GPv2Order.Data({
             sellToken: IERC20(ctx.params.sellToken),
             buyToken: IERC20(ctx.params.buyToken),
@@ -133,7 +130,7 @@ contract KapanConditionalOrderHandler is IConditionalOrderGenerator, IERC165 {
             validTo: uint32(validTo),
             appData: ctx.params.appDataHash,
             feeAmount: 0,
-            kind: GPv2Order.KIND_SELL,
+            kind: ctx.params.isKindBuy ? GPv2Order.KIND_BUY : GPv2Order.KIND_SELL,
             partiallyFillable: false,
             sellTokenBalance: GPv2Order.BALANCE_ERC20,
             buyTokenBalance: GPv2Order.BALANCE_ERC20

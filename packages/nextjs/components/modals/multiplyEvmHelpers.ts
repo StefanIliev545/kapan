@@ -20,7 +20,9 @@ import {
   ProtocolInstruction,
 } from "~~/utils/v2/instructionHelpers";
 import { calculateFlashLoanFee, getPreferredFlashLoanLender, type ChunkCalculationResult } from "~~/utils/cow";
-import { type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
+
+// TODO: Migrate to new conditional order system - ChunkInstructions defined locally
+type ChunkInstructions = { preInstructions: ProtocolInstruction[]; postInstructions: ProtocolInstruction[]; flashLoanRepaymentUtxoIndex?: number };
 import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 
 // Protocol identifier constants
@@ -451,13 +453,18 @@ function buildDepositInstructions(
   const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
+  // UTXO layout (KapanConditionalOrderManager prepends two ToOutput instructions):
+  // UTXO[0] = actualSellAmount (debt tokens sold in swap)
+  // UTXO[1] = actualBuyAmount (collateral received from swap, already transferred to router)
+  // UTXO[2] = Approve output
+  // (Deposit produces NO output)
   return [
-    // 1. Approve collateral for lending protocol - amount comes from swap output (set as Output[0])
-    createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-    // 2. Deposit collateral received from swap
+    // 1. Approve collateral for lending protocol - amount from UTXO[1] (swap output)
+    createRouterInstruction(encodeApprove(1, normalizedProtocol)),
+    // 2. Deposit collateral received from swap (UTXO[1])
     createProtocolInstruction(
       normalizedProtocol,
-      encodeLendingInstruction(depositOp, collateralAddress, userAddress, 0n, context, 0)
+      encodeLendingInstruction(depositOp, collateralAddress, userAddress, 0n, context, 1)
     ),
   ];
 }
@@ -495,33 +502,46 @@ function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInst
     const feeThisChunk = calculateFlashLoanFee(chunkSize, selectedProviderType);
     const chunkRepayAmount = chunkSize + feeThisChunk;
 
+    // UTXO layout (KapanConditionalOrderManager prepends two ToOutput instructions):
+    // UTXO[0] = actualSellAmount (debt tokens sold in swap)
+    // UTXO[1] = actualBuyAmount (collateral received from swap, already transferred to router)
+    // UTXO[2] = Pull margin output
+    // UTXO[3] = Add output (swap collateral + margin)
+    // UTXO[4] = Approve output
+    // UTXO[5] = Borrow output (for flash loan repayment)
+    // PushToken(5) → zeroes UTXO[5], transfers to OrderManager (no new UTXO created)
     const postInstructions: ProtocolInstruction[] = [
-      // 1. Pull this chunk's margin -> UTXO[1]
+      // 1. Pull this chunk's margin from user -> UTXO[2]
       createRouterInstruction(encodePullToken(marginThisChunk, collateral.address, userAddress)),
 
-      // 2. Add swap output + margin -> UTXO[2]
-      createRouterInstruction(encodeAdd(0, 1)),
+      // 2. Add swap output (UTXO[1]) + margin (UTXO[2]) -> UTXO[3]
+      createRouterInstruction(encodeAdd(1, 2)),
 
-      // 3. Approve total collateral for lending protocol -> UTXO[3]
-      createRouterInstruction(encodeApprove(2, normalizedProtocol)),
+      // 3. Approve total collateral for lending protocol -> UTXO[4]
+      createRouterInstruction(encodeApprove(3, normalizedProtocol)),
 
-      // 4. Deposit all collateral
+      // 4. Deposit all collateral using UTXO[3]
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 2)
+        encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 3)
       ),
 
-      // 5. Borrow to repay this chunk's flash loan -> UTXO[4]
+      // 5. Borrow to repay this chunk's flash loan -> UTXO[5]
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, chunkRepayAmount, context, 999)
       ),
+
+      // 6. PushToken: push borrowed debt (UTXO[5]) back to OrderManager
+      // OrderManager will refund excess to sellTokenRefundAddress (Adapter)
+      // Adapter uses it to repay flash loan
+      createRouterInstruction(encodePushToken(5, params.orderManagerAddress)),
     ];
 
     chunks.push({
       preInstructions: [],
       postInstructions,
-      flashLoanRepaymentUtxoIndex: 4,
+      flashLoanRepaymentUtxoIndex: 5, // Borrow output at UTXO[5], pushed to OrderManager
     });
   }
 
@@ -533,7 +553,7 @@ function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInst
     marginPerChunk: formatUnits(baseMarginPerChunk, collateral.decimals),
     totalMargin: formatUnits(marginAmountRaw, collateral.decimals),
     lender: chunkParams.flashLoanLender,
-    flow: "swap[0] + pull[1] -> add[2] -> approve[3] -> deposit -> borrow[4] -> (hook appends push)",
+    flow: "[0]=sellAmt, [1]=buyAmt, [2]=pull margin, [3]=add(1+2), [4]=approve, [5]=borrow → push to OrderManager",
   });
 
   return chunks;
@@ -568,13 +588,15 @@ function buildMultiChunkModeChunks(params: CowInstructionsBuildParams): ChunkIns
       });
     } else {
       // Non-final chunk - deposit + borrow + push to OrderManager
+      // UTXO layout after depositInstructions:
+      // [0]=sellAmt, [1]=buyAmt(collateral), [2]=approve, (deposit produces NO output), [3]=borrow
       const postInstructionsWithBorrow: ProtocolInstruction[] = [
         ...depositInstructions,
         createProtocolInstruction(
           normalizedProtocol,
           encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, chunkSize, context, 999)
         ),
-        createRouterInstruction(encodePushToken(2, orderManagerAddress)),
+        createRouterInstruction(encodePushToken(3, orderManagerAddress)),
       ];
       chunks.push({
         preInstructions: [],

@@ -28,7 +28,9 @@ import { TransactionToast } from "~~/components/TransactionToast";
 import { saveOrderNote, createClosePositionNote } from "~~/utils/orderNotes";
 import { getCowQuoteSellAmount, type CowQuoteResponse } from "~~/hooks/useCowQuote";
 import { executeSequentialTransactions, type TransactionCall } from "~~/utils/transactionSimulation";
-import type { ChunkInstructions } from "~~/hooks/useCowLimitOrder";
+
+// TODO: Migrate to new conditional order system - ChunkInstructions defined locally
+type ChunkInstructions = { preInstructions: ProtocolInstruction[]; postInstructions: ProtocolInstruction[]; flashLoanRepaymentUtxoIndex?: number };
 
 import type { SwapAsset } from "./SwapModalShell";
 import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
