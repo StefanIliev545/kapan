@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAccount, useChainId } from "wagmi";
-import { type Address } from "viem";
+import { type Address, decodeAbiParameters } from "viem";
 import { useTokenInfo } from "~~/hooks/useTokenInfo";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { tokenNameToLogo, PROTOCOL_ICONS } from "~~/contracts/externalContracts";
 import { ORDER_CREATED_EVENT } from "~~/utils/orderNotes";
 import { timeAgo } from "~~/utils/deadline";
 import { truncateAddress } from "~~/utils/address";
@@ -15,10 +15,78 @@ import {
   ConditionalOrderStatus,
   formatLtvPercent,
   type ConditionalOrder,
+  PROTOCOL_IDS,
 } from "~~/hooks/useConditionalOrders";
 import { useConditionalOrderEvents } from "~~/hooks/useConditionalOrderEvents";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { ShieldCheckIcon, ArrowTrendingUpIcon, ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import { type KapanProtocol } from "~~/utils/cow/appData";
+
+// ============ Limit Price Trigger Decoding ============
+
+interface DecodedLimitPriceParams {
+  protocolId: `0x${string}`;
+  sellToken: Address;
+  buyToken: Address;
+  limitPrice: bigint;
+  triggerAbovePrice: boolean;
+  totalSellAmount: bigint;
+  totalBuyAmount: bigint;
+  numChunks: number;
+  isKindBuy: boolean;
+}
+
+function decodeLimitPriceTriggerParams(data: `0x${string}`): DecodedLimitPriceParams | undefined {
+  try {
+    const decoded = decodeAbiParameters(
+      [{
+        type: "tuple",
+        components: [
+          { name: "protocolId", type: "bytes4" },
+          { name: "protocolContext", type: "bytes" },
+          { name: "sellToken", type: "address" },
+          { name: "buyToken", type: "address" },
+          { name: "sellDecimals", type: "uint8" },
+          { name: "buyDecimals", type: "uint8" },
+          { name: "limitPrice", type: "uint256" },
+          { name: "triggerAbovePrice", type: "bool" },
+          { name: "totalSellAmount", type: "uint256" },
+          { name: "totalBuyAmount", type: "uint256" },
+          { name: "numChunks", type: "uint8" },
+          { name: "maxSlippageBps", type: "uint256" },
+          { name: "isKindBuy", type: "bool" },
+        ],
+      }],
+      data,
+    );
+    const p = decoded[0];
+    return {
+      protocolId: p.protocolId as `0x${string}`,
+      sellToken: p.sellToken,
+      buyToken: p.buyToken,
+      limitPrice: p.limitPrice,
+      triggerAbovePrice: p.triggerAbovePrice,
+      totalSellAmount: p.totalSellAmount,
+      totalBuyAmount: p.totalBuyAmount,
+      numChunks: p.numChunks,
+      isKindBuy: p.isKindBuy,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+// ============ Protocol ID to Name Mapping ============
+
+function getProtocolNameFromId(protocolId: `0x${string}`): KapanProtocol | undefined {
+  if (protocolId === PROTOCOL_IDS.AAVE_V3) return "aave";
+  if (protocolId === PROTOCOL_IDS.COMPOUND_V3) return "compound";
+  if (protocolId === PROTOCOL_IDS.MORPHO_BLUE) return "morpho";
+  if (protocolId === PROTOCOL_IDS.EULER_V2) return "morpho"; // Use morpho icon for euler for now
+  if (protocolId === PROTOCOL_IDS.VENUS) return "venus";
+  return undefined;
+}
+
 
 const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
 
@@ -307,33 +375,61 @@ export function PendingOrdersDrawer() {
     const completedIterations = Number(iterationCount);
     const progressPercent = maxIterations > 0 ? (completedIterations / maxIterations) * 100 : 0;
 
+    // Get protocol from trigger params
+    let protocolName: KapanProtocol | undefined;
+    let limitPriceParams: DecodedLimitPriceParams | undefined;
+
+    if (orderType === "limit" && context.params.triggerStaticData) {
+      // Decode limit price trigger params
+      limitPriceParams = decodeLimitPriceTriggerParams(context.params.triggerStaticData as `0x${string}`);
+      if (limitPriceParams) {
+        protocolName = getProtocolNameFromId(limitPriceParams.protocolId);
+      }
+    } else if (triggerParams) {
+      // Get protocol from LTV trigger params
+      protocolName = getProtocolNameFromId(triggerParams.protocolId);
+    }
+
+    // Determine order label and styling
     let orderTypeLabel: string;
     let OrderIcon: typeof ArrowTrendingUpIcon;
     let badgeClass: string;
 
     if (orderType === "autoLeverage") {
-      orderTypeLabel = "Auto-Lev";
+      orderTypeLabel = "Auto Leverage";
       OrderIcon = ArrowTrendingUpIcon;
       badgeClass = "bg-info/20 text-info";
     } else if (orderType === "limit") {
-      orderTypeLabel = "Limit";
+      // For limit orders, try to infer operation type from token pair
+      // In the future, we can fetch appData for more accurate labels
+      orderTypeLabel = "Swap";
       OrderIcon = ArrowsRightLeftIcon;
       badgeClass = "bg-primary/20 text-primary";
     } else {
-      orderTypeLabel = "ADL";
+      orderTypeLabel = "Auto Deleverage";
       OrderIcon = ShieldCheckIcon;
       badgeClass = "bg-success/20 text-success";
     }
 
+    // Get protocol icon
+    const protocolIcon = protocolName ? PROTOCOL_ICONS[protocolName] : undefined;
+
     return (
       <div key={orderHash} className={`hover:bg-base-50 px-4 py-3 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
-        {/* Row 0: Order type badge + Status */}
+        {/* Row 0: Order type badge with protocol + Status */}
         <div className="mb-1.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium flex items-center gap-1 ${badgeClass}`}>
               <OrderIcon className="size-3" />
               {orderTypeLabel}
             </span>
+            {/* Protocol badge */}
+            {protocolIcon && (
+              <span className="bg-base-200 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium">
+                <Image src={protocolIcon} alt={protocolName || ""} width={12} height={12} className="rounded-full" />
+                {protocolName?.charAt(0).toUpperCase()}{protocolName?.slice(1)}
+              </span>
+            )}
             {isTriggerMet && (
               <span className="bg-warning/20 text-warning rounded px-1.5 py-0.5 text-[10px] font-medium">
                 Trigger Met
@@ -369,6 +465,22 @@ export function PendingOrdersDrawer() {
             <div className="flex items-center justify-between text-xs">
               <span className="text-base-content/60">Target LTV</span>
               <span className="text-success font-medium">{formatLtvPercent(triggerParams.targetLtvBps)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Row 2b: Limit order details */}
+        {orderType === "limit" && limitPriceParams && (
+          <div className="bg-base-200/50 mb-2 rounded-lg p-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">
+                {limitPriceParams.triggerAbovePrice ? "Execute when price ≥" : "Execute when price ≤"}
+              </span>
+              <span className="font-medium">${(Number(limitPriceParams.limitPrice) / 1e8).toFixed(4)}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">Chunks</span>
+              <span className="font-medium">{limitPriceParams.numChunks}</span>
             </div>
           </div>
         )}

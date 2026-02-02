@@ -274,6 +274,78 @@ contract EulerGatewayView {
         liquidationLTV = IEulerVault(borrowVault).LTVLiquidation(collateralVault);
     }
 
+    // ============ Position Value Queries (for ADL/AL) ============
+
+    /// @notice Get total collateral and debt values in USD (8 decimals)
+    /// @dev Used by ADL/AL triggers to calculate position values
+    /// @param borrowVault The vault where the user has debt
+    /// @param user The user address
+    /// @param subAccountIndex The sub-account index
+    /// @return totalCollateralUsd Total collateral value in 8 decimals USD
+    /// @return totalDebtUsd Total debt value in 8 decimals USD
+    function getUserAccountData(
+        address borrowVault,
+        address user,
+        uint8 subAccountIndex
+    ) external view returns (uint256 totalCollateralUsd, uint256 totalDebtUsd) {
+        address subAccount = getSubAccount(user, subAccountIndex);
+
+        // Get raw collateral and liability values from Euler
+        // Using liquidation=false to get borrow-adjusted values
+        // Note: accountLiquidityFull reverts if sub-account has no controller
+        address[] memory collaterals;
+        uint256[] memory collateralValues;
+        uint256 liabilityValue;
+
+        try IEulerVault(borrowVault).accountLiquidityFull(subAccount, false) returns (
+            address[] memory c,
+            uint256[] memory cv,
+            uint256 lv
+        ) {
+            collaterals = c;
+            collateralValues = cv;
+            liabilityValue = lv;
+        } catch {
+            // No position (no controller set) - return (0, 0)
+            return (0, 0);
+        }
+
+        // Sum raw collateral values (un-adjust by dividing by borrow LTV)
+        uint256 rawCollateralValue = 0;
+        for (uint256 i = 0; i < collaterals.length; i++) {
+            if (collateralValues[i] > 0) {
+                uint16 ltv = IEulerVault(borrowVault).LTVBorrow(collaterals[i]);
+                if (ltv > 0) {
+                    // rawValue = adjustedValue * 10000 / LTV
+                    rawCollateralValue += (collateralValues[i] * 10000) / ltv;
+                }
+            }
+        }
+
+        // Get unit of account decimals to convert to 8 decimals (Chainlink format)
+        address unitOfAccount = IEulerVault(borrowVault).unitOfAccount();
+        uint8 uoaDecimals = 18; // Default to 18 if we can't get decimals
+        if (unitOfAccount != address(0)) {
+            try IERC20Metadata(unitOfAccount).decimals() returns (uint8 d) {
+                uoaDecimals = d;
+            } catch {}
+        }
+
+        // Convert from unit of account decimals to 8 decimals
+        if (uoaDecimals > 8) {
+            uint256 divisor = 10 ** (uoaDecimals - 8);
+            totalCollateralUsd = rawCollateralValue / divisor;
+            totalDebtUsd = liabilityValue / divisor;
+        } else if (uoaDecimals < 8) {
+            uint256 multiplier = 10 ** (8 - uoaDecimals);
+            totalCollateralUsd = rawCollateralValue * multiplier;
+            totalDebtUsd = liabilityValue * multiplier;
+        } else {
+            totalCollateralUsd = rawCollateralValue;
+            totalDebtUsd = liabilityValue;
+        }
+    }
+
     // ============ Price Queries (for ADL) ============
 
     /// @notice Get exchange rate between two tokens via vault's oracle

@@ -393,9 +393,9 @@ export function validateADLParams(params: {
   }
 
   // Target LTV should have buffer from liquidation
-  const SAFETY_BUFFER_BPS = 500; // 5%
+  const SAFETY_BUFFER_BPS = 200; // 2%
   if (params.targetLtvBps > params.liquidationLtvBps - SAFETY_BUFFER_BPS) {
-    errors.push("Target LTV should be at least 5% below liquidation threshold");
+    errors.push("Target LTV should be at least 2% below liquidation threshold");
   }
 
   // Trigger LTV should be below liquidation
@@ -778,9 +778,9 @@ export function validateAutoLeverageParams(params: {
   }
 
   // Target LTV should have buffer from liquidation
-  const SAFETY_BUFFER_BPS = 300; // 3% safety buffer for auto-leverage
+  const SAFETY_BUFFER_BPS = 200; // 2% safety buffer for auto-leverage
   if (params.targetLtvBps > params.liquidationLtvBps - SAFETY_BUFFER_BPS) {
-    errors.push("Target LTV should be at least 3% below liquidation threshold");
+    errors.push("Target LTV should be at least 2% below liquidation threshold");
   }
 
   // Trigger LTV should be reasonable (not too low)

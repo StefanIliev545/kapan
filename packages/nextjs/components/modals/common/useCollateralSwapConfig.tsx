@@ -667,7 +667,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
     // - Withdraw Y (UTXO[0]) from protocol
     // - Total to refund = (X - Y) + Y = X = flash loan amount ✓
     const buildConditionalOrderInstructionsData = useMemo((): ConditionalOrderInstructions => {
-        if (!selectedFrom || !selectedTo || !userAddress || amountInBigInt === 0n || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
+        if (!selectedFrom || !selectedFrom.address || !selectedTo || !selectedTo.address || !userAddress || amountInBigInt === 0n || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
             return { preInstructions: [], postInstructions: [] };
         }
 
@@ -928,7 +928,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // ============ Conditional Order Trigger Params ============
     const conditionalOrderTriggerParams = useMemo(() => {
-        if (!selectedFrom || !selectedTo || !limitPriceTriggerAddress || amountInBigInt === 0n || minBuyAmount.raw === 0n) {
+        if (!selectedFrom || !selectedFrom.address || !selectedTo || !selectedTo.address || !limitPriceTriggerAddress || amountInBigInt === 0n || minBuyAmount.raw === 0n) {
             return null;
         }
 

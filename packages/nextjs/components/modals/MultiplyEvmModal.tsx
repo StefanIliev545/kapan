@@ -664,7 +664,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // Conditional order trigger params for LimitPriceTrigger
   const conditionalOrderTriggerParams = useMemo(() => {
-    if (!collateral || !debt || !limitPriceTriggerAddress || !userAddress) return null;
+    if (!collateral || !collateral.address || !debt || !debt.address || !limitPriceTriggerAddress || !userAddress) return null;
     if (flashLoanAmountRaw === 0n || minCollateralOut.raw === 0n) return null;
 
     // Normalize protocol name for getProtocolId

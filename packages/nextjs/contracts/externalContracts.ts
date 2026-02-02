@@ -232,6 +232,15 @@ const contractLogos = {
   eth: "/logos/ethereum.svg",
 };
 
+// Protocol icons for lending protocols
+export const PROTOCOL_ICONS: Record<string, string> = {
+  aave: "/logos/aave.svg",
+  compound: "/logos/compound.svg",
+  morpho: "/logos/morpho.svg",
+  venus: "/logos/venus.svg",
+  euler: "/logos/euler.svg",
+};
+
 export const contractNameToLogo = (contractName: keyof typeof contractLogos) => {
   return contractLogos[contractName];
 };

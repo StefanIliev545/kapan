@@ -55,6 +55,7 @@ interface IEulerGatewayView {
     function getLiquidationLtvBps(address vault) external view returns (uint256);
     function getAssetPrice(address vault, address token) external view returns (uint256);
     function getCollateralToDebtRate(address borrowVault, address collateralVault) external view returns (uint256);
+    function getUserAccountData(address borrowVault, address user, uint8 subAccountIndex) external view returns (uint256 totalCollateralUsd, uint256 totalDebtUsd);
 }
 
 interface IVenusGatewayView {
@@ -595,9 +596,9 @@ contract KapanViewRouter {
         if (protocolId == VENUS) {
             return IVenusGatewayView(gateway).getUserAccountData(user);
         }
-        // Euler V2 not yet supported for position value queries
         if (protocolId == EULER_V2) {
-            revert UnsupportedProtocolId(protocolId);
+            (address vault, uint8 subAccountIndex) = abi.decode(context, (address, uint8));
+            return IEulerGatewayView(gateway).getUserAccountData(vault, user, subAccountIndex);
         }
 
         revert UnsupportedProtocolId(protocolId);

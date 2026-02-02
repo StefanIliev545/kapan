@@ -531,7 +531,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
 
   // ============ Conditional Order Trigger Params ============
   const conditionalOrderTriggerParams = useMemo(() => {
-    if (!selectedTo || !limitPriceTriggerAddress || effectiveLimitOrderNewDebt === 0n || limitOrderBuyAmount === 0n) {
+    if (!selectedTo || !selectedTo.address || !debtFromToken || !limitPriceTriggerAddress || effectiveLimitOrderNewDebt === 0n || limitOrderBuyAmount === 0n) {
       return null;
     }
 
@@ -579,7 +579,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
   // UTXO[0] = actualSellAmount (new debt we're selling)
   // UTXO[1] = actualBuyAmount (old debt we received from swap)
   const buildConditionalOrderInstructionsData = useMemo((): ConditionalOrderInstructions => {
-    if (!selectedTo || !userAddress || effectiveLimitOrderNewDebt === 0n || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
+    if (!selectedTo || !selectedTo.address || !debtFromToken || !userAddress || effectiveLimitOrderNewDebt === 0n || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
       return { preInstructions: [], postInstructions: [] };
     }
 

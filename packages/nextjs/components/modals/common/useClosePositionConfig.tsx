@@ -532,7 +532,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
 
   // Conditional order trigger params - encodes parameters for LimitPriceTrigger contract
   const conditionalOrderTriggerParams = useMemo(() => {
-    if (!selectedTo || !limitPriceTriggerAddress) return null;
+    if (!selectedTo || !selectedTo.address || !debtToken || !limitPriceTriggerAddress) return null;
     if (effectiveLimitOrderCollateral === 0n || limitOrderBuyAmount === 0n) return null;
 
     // Normalize protocol name for getProtocolId
@@ -599,7 +599,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   // Build conditional order instructions for the new system
   // UTXO layout: [0] = actualSellAmount, [1] = actualBuyAmount
   const buildConditionalOrderInstructionsData = useMemo((): ConditionalOrderInstructions[] => {
-    if (!selectedTo || !userAddress || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
+    if (!selectedTo || !selectedTo.address || !debtToken || !userAddress || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
       return [{ preInstructions: [], postInstructions: [] }];
     }
 
