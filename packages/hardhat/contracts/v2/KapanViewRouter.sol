@@ -56,6 +56,11 @@ interface IEulerGatewayView {
     function getAssetPrice(address vault, address token) external view returns (uint256);
     function getCollateralToDebtRate(address borrowVault, address collateralVault) external view returns (uint256);
     function getUserAccountData(address borrowVault, address user, uint8 subAccountIndex) external view returns (uint256 totalCollateralUsd, uint256 totalDebtUsd);
+    function getVaultAsset(address vault) external view returns (address);
+}
+
+interface IEulerVaultUoA {
+    function unitOfAccount() external view returns (address);
 }
 
 interface IVenusGatewayView {
@@ -75,7 +80,7 @@ interface IVenusGatewayView {
  *   - "aave-v3": Aave V3 (context: empty)
  *   - "compound-v3": Compound V3 (context: abi.encode(baseToken address))
  *   - "morpho-blue": Morpho Blue (context: abi.encode(MarketParams))
- *   - "euler-v2": Euler V2 (context: abi.encode(vault address, subAccountIndex uint8))
+ *   - "euler-v2": Euler V2 (context: abi.encode(borrowVault address, collateralVaults address[], subAccountIndex uint8))
  *   - "venus": Venus (context: empty)
  */
 contract KapanViewRouter {
@@ -532,7 +537,7 @@ contract KapanViewRouter {
     ///   - AAVE_V3: empty bytes
     ///   - COMPOUND_V3: abi.encode(baseToken address)
     ///   - MORPHO_BLUE: abi.encode(MarketParams)
-    ///   - EULER_V2: abi.encode(vault address, subAccountIndex uint8)
+    ///   - EULER_V2: abi.encode(borrowVault address, collateralVaults address[], subAccountIndex uint8)
     ///   - VENUS: empty bytes
     /// @return ltvBps Current LTV in basis points
     function getCurrentLtv(
@@ -556,7 +561,8 @@ contract KapanViewRouter {
             return IMorphoBlueGatewayView(gateway).getCurrentLtvBps(params, user);
         }
         if (protocolId == EULER_V2) {
-            (address vault, uint8 subAccountIndex) = abi.decode(context, (address, uint8));
+            // Context format: (borrowVault, collateralVaults[], subAccountIndex)
+            (address vault, , uint8 subAccountIndex) = abi.decode(context, (address, address[], uint8));
             return IEulerGatewayView(gateway).getCurrentLtvBps(vault, user, subAccountIndex);
         }
         if (protocolId == VENUS) {
@@ -597,7 +603,8 @@ contract KapanViewRouter {
             return IVenusGatewayView(gateway).getUserAccountData(user);
         }
         if (protocolId == EULER_V2) {
-            (address vault, uint8 subAccountIndex) = abi.decode(context, (address, uint8));
+            // Context format: (borrowVault, collateralVaults[], subAccountIndex)
+            (address vault, , uint8 subAccountIndex) = abi.decode(context, (address, address[], uint8));
             return IEulerGatewayView(gateway).getUserAccountData(vault, user, subAccountIndex);
         }
 
@@ -658,7 +665,30 @@ contract KapanViewRouter {
                 }
             }
         }
-        // Euler and fallback: return placeholder (caller should handle)
+        if (protocolId == EULER_V2) {
+            // Euler: get price via vault's oracle
+            // Context format: (borrowVault, collateralVaults[], subAccountIndex)
+            (address borrowVault, , ) = abi.decode(context, (address, address[], uint8));
+            // Get collateral price in unit of account
+            uint256 priceInUoa = IEulerGatewayView(gateway).getAssetPrice(borrowVault, collateralToken);
+            if (priceInUoa == 0) return 0;
+            // Euler prices are in unit of account decimals (usually 18 for USD)
+            // Convert to 8 decimals for consistency with other protocols
+            address unitOfAccount = IEulerVaultUoA(borrowVault).unitOfAccount();
+            uint8 uoaDecimals = 18;
+            if (unitOfAccount != address(0) && unitOfAccount.code.length > 0) {
+                try IERC20Metadata(unitOfAccount).decimals() returns (uint8 d) {
+                    uoaDecimals = d;
+                } catch {}
+            }
+            if (uoaDecimals > 8) {
+                return priceInUoa / (10 ** (uoaDecimals - 8));
+            } else if (uoaDecimals < 8) {
+                return priceInUoa * (10 ** (8 - uoaDecimals));
+            }
+            return priceInUoa;
+        }
+        // Fallback: return placeholder (caller should handle)
         return 1e8;
     }
 
@@ -694,7 +724,29 @@ contract KapanViewRouter {
             // This is consistent with how getPositionValue calculates debt in "loan token terms"
             return 1e8;
         }
-        // Euler and fallback: return placeholder (caller should handle)
+        if (protocolId == EULER_V2) {
+            // Euler: get price via vault's oracle
+            // Context format: (borrowVault, collateralVaults[], subAccountIndex)
+            (address borrowVault, , ) = abi.decode(context, (address, address[], uint8));
+            // Get debt price in unit of account
+            uint256 priceInUoa = IEulerGatewayView(gateway).getAssetPrice(borrowVault, debtToken);
+            if (priceInUoa == 0) return 0;
+            // Convert to 8 decimals
+            address unitOfAccount = IEulerVaultUoA(borrowVault).unitOfAccount();
+            uint8 uoaDecimals = 18;
+            if (unitOfAccount != address(0) && unitOfAccount.code.length > 0) {
+                try IERC20Metadata(unitOfAccount).decimals() returns (uint8 d) {
+                    uoaDecimals = d;
+                } catch {}
+            }
+            if (uoaDecimals > 8) {
+                return priceInUoa / (10 ** (uoaDecimals - 8));
+            } else if (uoaDecimals < 8) {
+                return priceInUoa * (10 ** (8 - uoaDecimals));
+            }
+            return priceInUoa;
+        }
+        // Fallback: return placeholder (caller should handle)
         return 1e8;
     }
 
@@ -732,10 +784,22 @@ contract KapanViewRouter {
 
         if (protocolId == EULER_V2) {
             // Euler uses 18-decimal exchange rate
-            (address borrowVault, ) = abi.decode(context, (address, uint8));
+            // Context format: (borrowVault, collateralVaults[], subAccountIndex)
+            (address borrowVault, address[] memory collateralVaults, ) = abi.decode(context, (address, address[], uint8));
+
+            // Find the collateral vault that matches the collateralToken
+            address collateralVault = address(0);
+            for (uint256 i = 0; i < collateralVaults.length; i++) {
+                if (IEulerGatewayView(gateway).getVaultAsset(collateralVaults[i]) == collateralToken) {
+                    collateralVault = collateralVaults[i];
+                    break;
+                }
+            }
+            if (collateralVault == address(0)) return 0;
+
             uint256 eulerExchangeRate = IEulerGatewayView(gateway).getCollateralToDebtRate(
                 borrowVault,
-                collateralToken
+                collateralVault
             );
             return
                 _calculateMinBuyFromRate(

@@ -70,7 +70,8 @@ export type KapanProtocol =
   | "aave"
   | "compound"
   | "venus"
-  | "morpho";
+  | "morpho"
+  | "euler";
 
 /**
  * Build the appCode string with operation type and optional protocol
@@ -92,6 +93,7 @@ export function normalizeProtocolForAppCode(protocolName: string): KapanProtocol
   if (lower.includes("aave")) return "aave";
   if (lower.includes("compound")) return "compound";
   if (lower.includes("venus")) return "venus";
+  if (lower.includes("euler")) return "euler";
   return undefined;
 }
 
@@ -118,7 +120,7 @@ export function parseProtocolFromAppCode(appCode: string): KapanProtocol | undef
   const parts = rest.split("/");
   if (parts.length < 2) return undefined;
   const protocol = parts[1] as KapanProtocol;
-  const validProtocols: KapanProtocol[] = ["aave", "compound", "venus", "morpho"];
+  const validProtocols: KapanProtocol[] = ["aave", "compound", "venus", "morpho", "euler"];
   return validProtocols.includes(protocol) ? protocol : undefined;
 }
 

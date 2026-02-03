@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAccount, useChainId } from "wagmi";
-import { type Address, decodeAbiParameters } from "viem";
+import { type Address, decodeAbiParameters, formatUnits } from "viem";
 import { useTokenInfo } from "~~/hooks/useTokenInfo";
 import { tokenNameToLogo, PROTOCOL_ICONS } from "~~/contracts/externalContracts";
 import { ORDER_CREATED_EVENT } from "~~/utils/orderNotes";
@@ -19,7 +19,7 @@ import {
 } from "~~/hooks/useConditionalOrders";
 import { useConditionalOrderEvents } from "~~/hooks/useConditionalOrderEvents";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
-import { ShieldCheckIcon, ArrowTrendingUpIcon, ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import { ShieldCheckIcon, ArrowTrendingUpIcon, ArrowsRightLeftIcon, QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 import { type KapanProtocol } from "~~/utils/cow/appData";
 
 // ============ Limit Price Trigger Decoding ============
@@ -28,6 +28,8 @@ interface DecodedLimitPriceParams {
   protocolId: `0x${string}`;
   sellToken: Address;
   buyToken: Address;
+  sellDecimals: number;
+  buyDecimals: number;
   limitPrice: bigint;
   triggerAbovePrice: boolean;
   totalSellAmount: bigint;
@@ -64,6 +66,8 @@ function decodeLimitPriceTriggerParams(data: `0x${string}`): DecodedLimitPricePa
       protocolId: p.protocolId as `0x${string}`,
       sellToken: p.sellToken,
       buyToken: p.buyToken,
+      sellDecimals: p.sellDecimals,
+      buyDecimals: p.buyDecimals,
       limitPrice: p.limitPrice,
       triggerAbovePrice: p.triggerAbovePrice,
       totalSellAmount: p.totalSellAmount,
@@ -82,7 +86,7 @@ function getProtocolNameFromId(protocolId: `0x${string}`): KapanProtocol | undef
   if (protocolId === PROTOCOL_IDS.AAVE_V3) return "aave";
   if (protocolId === PROTOCOL_IDS.COMPOUND_V3) return "compound";
   if (protocolId === PROTOCOL_IDS.MORPHO_BLUE) return "morpho";
-  if (protocolId === PROTOCOL_IDS.EULER_V2) return "morpho"; // Use morpho icon for euler for now
+  if (protocolId === PROTOCOL_IDS.EULER_V2) return "euler";
   if (protocolId === PROTOCOL_IDS.VENUS) return "venus";
   return undefined;
 }
@@ -119,6 +123,8 @@ export function PendingOrdersDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   // Track if we have a pending order that hasn't been fetched yet
   const [hasPendingNew, setHasPendingNew] = useState(false);
+  // Protocol filter - null means "All"
+  const [selectedProtocol, setSelectedProtocol] = useState<KapanProtocol | null>(null);
 
   // Listen for new order created events and refetch
   useEffect(() => {
@@ -143,23 +149,60 @@ export function PendingOrdersDrawer() {
     setIsOpen(false);
   }, []);
 
-  // Filter to recent orders (past 7 days), sort newest first
+  // Filter orders: show ALL active orders (regardless of age) + recent completed/cancelled (past 7 days)
   const recentOrders = useMemo(() => {
     const now = Math.floor(Date.now() / 1000);
     return conditionalOrders
-      .filter(o => now - Number(o.context.createdAt) < SEVEN_DAYS_SECONDS)
+      .filter(o => {
+        // Always show active orders
+        if (o.context.status === ConditionalOrderStatus.Active) return true;
+        // Only show recent completed/cancelled orders
+        return now - Number(o.context.createdAt) < SEVEN_DAYS_SECONDS;
+      })
       .sort((a, b) => Number(b.context.createdAt) - Number(a.context.createdAt));
   }, [conditionalOrders]);
 
   const hasOlderOrders = conditionalOrders.length > recentOrders.length;
 
-  // Categorize orders by type and status
-  const categorizedOrders = useMemo(() => {
+  // Helper to get protocol from order
+  const getOrderProtocol = useCallback((order: ConditionalOrder): KapanProtocol | undefined => {
+    const triggerAddr = order.context.params.trigger.toLowerCase();
+    if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) {
+      // Decode limit price trigger params
+      const params = decodeLimitPriceTriggerParams(order.context.params.triggerStaticData as `0x${string}`);
+      return params ? getProtocolNameFromId(params.protocolId) : undefined;
+    }
+    // For LTV-based triggers (ADL/AL), get from triggerParams
+    if (order.triggerParams) {
+      return getProtocolNameFromId(order.triggerParams.protocolId);
+    }
+    return undefined;
+  }, [limitPriceTriggerAddress]);
+
+  // Extract unique protocols from orders
+  const availableProtocols = useMemo(() => {
+    const protocols = new Set<KapanProtocol>();
+    for (const order of recentOrders) {
+      const protocol = getOrderProtocol(order);
+      if (protocol) protocols.add(protocol);
+    }
+    return Array.from(protocols).sort();
+  }, [recentOrders, getOrderProtocol]);
+
+  // Filter orders by selected protocol
+  const filteredOrders = useMemo(() => {
+    if (!selectedProtocol) return recentOrders;
+    return recentOrders.filter(order => getOrderProtocol(order) === selectedProtocol);
+  }, [recentOrders, selectedProtocol, getOrderProtocol]);
+
+  // Re-categorize filtered orders
+  const filteredCategorizedOrders = useMemo(() => {
     const adlOrders: ConditionalOrder[] = [];
     const autoLeverageOrders: ConditionalOrder[] = [];
     const limitOrders: ConditionalOrder[] = [];
+    const unknownOrders: ConditionalOrder[] = [];
 
-    for (const order of recentOrders) {
+    for (const order of filteredOrders) {
       const triggerAddress = order.context.params.trigger.toLowerCase();
       if (autoLeverageTriggerAddress && triggerAddress === autoLeverageTriggerAddress) {
         autoLeverageOrders.push(order);
@@ -168,33 +211,38 @@ export function PendingOrdersDrawer() {
       } else if (ltvTriggerAddress && triggerAddress === ltvTriggerAddress) {
         adlOrders.push(order);
       } else {
-        // Unknown trigger - treat as ADL for now
-        adlOrders.push(order);
+        // Put unrecognized triggers in unknown category so they can still be cancelled
+        unknownOrders.push(order);
       }
     }
 
     return {
       adl: {
         active: adlOrders.filter(o => o.context.status === ConditionalOrderStatus.Active),
-        past: adlOrders.filter(o => o.context.status !== ConditionalOrderStatus.Active),
+        completed: adlOrders.filter(o => o.context.status === ConditionalOrderStatus.Completed),
       },
       autoLeverage: {
         active: autoLeverageOrders.filter(o => o.context.status === ConditionalOrderStatus.Active),
-        past: autoLeverageOrders.filter(o => o.context.status !== ConditionalOrderStatus.Active),
+        completed: autoLeverageOrders.filter(o => o.context.status === ConditionalOrderStatus.Completed),
       },
       limit: {
         active: limitOrders.filter(o => o.context.status === ConditionalOrderStatus.Active),
-        past: limitOrders.filter(o => o.context.status !== ConditionalOrderStatus.Active),
+        completed: limitOrders.filter(o => o.context.status === ConditionalOrderStatus.Completed),
+      },
+      unknown: {
+        active: unknownOrders.filter(o => o.context.status === ConditionalOrderStatus.Active),
+        completed: unknownOrders.filter(o => o.context.status === ConditionalOrderStatus.Completed),
       },
     };
-  }, [recentOrders, autoLeverageTriggerAddress, limitPriceTriggerAddress, ltvTriggerAddress]);
+  }, [filteredOrders, autoLeverageTriggerAddress, limitPriceTriggerAddress, ltvTriggerAddress]);
 
-  // All past orders combined
-  const pastOrders = useMemo(() => [
-    ...categorizedOrders.adl.past,
-    ...categorizedOrders.autoLeverage.past,
-    ...categorizedOrders.limit.past,
-  ].sort((a, b) => Number(b.context.createdAt) - Number(a.context.createdAt)), [categorizedOrders]);
+  // Filtered completed orders (not cancelled)
+  const filteredCompletedOrders = useMemo(() => [
+    ...filteredCategorizedOrders.adl.completed,
+    ...filteredCategorizedOrders.autoLeverage.completed,
+    ...filteredCategorizedOrders.limit.completed,
+    ...filteredCategorizedOrders.unknown.completed,
+  ].sort((a, b) => Number(b.context.createdAt) - Number(a.context.createdAt)), [filteredCategorizedOrders]);
 
   // Token addresses for fetching info
   const tokenAddresses = useMemo(() => {
@@ -261,6 +309,36 @@ export function PendingOrdersDrawer() {
             </button>
           </div>
 
+          {/* Protocol Tabs */}
+          {availableProtocols.length > 1 && (
+            <div className="border-base-200 flex items-center gap-4 border-b px-4 py-2">
+              <button
+                onClick={() => setSelectedProtocol(null)}
+                className={`flex items-center gap-1.5 text-sm transition-colors ${
+                  selectedProtocol === null
+                    ? "text-base-content border-primary border-b-2 pb-0.5 font-medium"
+                    : "text-base-content/50 hover:text-base-content"
+                }`}
+              >
+                All
+              </button>
+              {availableProtocols.map(protocol => (
+                <button
+                  key={protocol}
+                  onClick={() => setSelectedProtocol(protocol)}
+                  className={`flex items-center gap-1.5 text-sm transition-colors ${
+                    selectedProtocol === protocol
+                      ? "text-base-content border-primary border-b-2 pb-0.5 font-medium"
+                      : "text-base-content/50 hover:text-base-content"
+                  }`}
+                >
+                  <Image src={PROTOCOL_ICONS[protocol]} alt={protocol} width={14} height={14} className="rounded-full" />
+                  {protocol.charAt(0).toUpperCase() + protocol.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
             {isLoading && conditionalOrders.length === 0 ? (
@@ -271,9 +349,9 @@ export function PendingOrdersDrawer() {
               <div className="text-base-content/50 py-16 text-center">
                 <p className="text-sm">No orders yet</p>
               </div>
-            ) : recentOrders.length === 0 ? (
+            ) : filteredOrders.length === 0 ? (
               <div className="text-base-content/50 py-16 text-center">
-                <p className="text-sm">No recent orders</p>
+                <p className="text-sm">No orders for this protocol</p>
                 {hasOlderOrders && (
                   <Link href="/orders" className="text-primary mt-2 inline-block text-sm hover:underline">
                     View all orders
@@ -283,7 +361,7 @@ export function PendingOrdersDrawer() {
             ) : (
               <div className="divide-base-200 divide-y">
                 {/* Active ADL Orders Section */}
-                {categorizedOrders.adl.active.length > 0 && (
+                {filteredCategorizedOrders.adl.active.length > 0 && (
                   <>
                     <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
                       <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
@@ -291,12 +369,12 @@ export function PendingOrdersDrawer() {
                         Auto-Deleverage Protection
                       </span>
                     </div>
-                    {categorizedOrders.adl.active.map((order) => renderOrderItem(order, "adl"))}
+                    {filteredCategorizedOrders.adl.active.map((order) => renderOrderItem(order, "adl"))}
                   </>
                 )}
 
                 {/* Active Auto-Leverage Orders Section */}
-                {categorizedOrders.autoLeverage.active.length > 0 && (
+                {filteredCategorizedOrders.autoLeverage.active.length > 0 && (
                   <>
                     <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
                       <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
@@ -304,12 +382,12 @@ export function PendingOrdersDrawer() {
                         Auto-Leverage
                       </span>
                     </div>
-                    {categorizedOrders.autoLeverage.active.map((order) => renderOrderItem(order, "autoLeverage"))}
+                    {filteredCategorizedOrders.autoLeverage.active.map((order) => renderOrderItem(order, "autoLeverage"))}
                   </>
                 )}
 
                 {/* Active Limit Orders Section */}
-                {categorizedOrders.limit.active.length > 0 && (
+                {filteredCategorizedOrders.limit.active.length > 0 && (
                   <>
                     <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
                       <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
@@ -317,28 +395,42 @@ export function PendingOrdersDrawer() {
                         Limit Orders
                       </span>
                     </div>
-                    {categorizedOrders.limit.active.map((order) => renderOrderItem(order, "limit"))}
+                    {filteredCategorizedOrders.limit.active.map((order) => renderOrderItem(order, "limit"))}
                   </>
                 )}
 
-                {/* Past orders section */}
-                {pastOrders.length > 0 && (
+                {/* Unknown Orders Section - orders with unrecognized triggers */}
+                {filteredCategorizedOrders.unknown.active.length > 0 && (
                   <>
                     <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
-                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">Past Orders</span>
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
+                        <QuestionMarkCircleIcon className="mr-1 inline size-3" />
+                        Unknown Orders
+                      </span>
                     </div>
-                    {/* Show only a few past orders in the drawer */}
-                    {pastOrders.slice(0, 5).map((order) => {
+                    {filteredCategorizedOrders.unknown.active.map((order) => renderOrderItem(order, "unknown"))}
+                  </>
+                )}
+
+                {/* Completed orders section */}
+                {filteredCompletedOrders.length > 0 && (
+                  <>
+                    <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">Completed</span>
+                    </div>
+                    {/* Show last 3 completed orders in the drawer */}
+                    {filteredCompletedOrders.slice(0, 3).map((order) => {
                       const triggerAddr = order.context.params.trigger.toLowerCase();
-                      let type: "adl" | "autoLeverage" | "limit" = "adl";
+                      let type: "adl" | "autoLeverage" | "limit" | "unknown" = "unknown";
                       if (autoLeverageTriggerAddress && triggerAddr === autoLeverageTriggerAddress) type = "autoLeverage";
                       else if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) type = "limit";
+                      else if (ltvTriggerAddress && triggerAddr === ltvTriggerAddress) type = "adl";
                       return renderOrderItem(order, type);
                     })}
-                    {pastOrders.length > 5 && (
+                    {filteredCompletedOrders.length > 3 && (
                       <div className="px-4 py-2 text-center">
                         <Link href="/orders" className="text-primary text-xs hover:underline">
-                          View all past orders
+                          View all completed orders
                         </Link>
                       </div>
                     )}
@@ -363,7 +455,7 @@ export function PendingOrdersDrawer() {
   );
 
   // Helper function to render an order item
-  function renderOrderItem(order: ConditionalOrder, orderType: "adl" | "autoLeverage" | "limit") {
+  function renderOrderItem(order: ConditionalOrder, orderType: "adl" | "autoLeverage" | "limit" | "unknown") {
     const { orderHash, context, triggerParams, isTriggerMet } = order;
     const { status, iterationCount, createdAt } = context;
     const isActive = status === ConditionalOrderStatus.Active;
@@ -405,6 +497,10 @@ export function PendingOrdersDrawer() {
       orderTypeLabel = "Swap";
       OrderIcon = ArrowsRightLeftIcon;
       badgeClass = "bg-primary/20 text-primary";
+    } else if (orderType === "unknown") {
+      orderTypeLabel = "Unknown";
+      OrderIcon = QuestionMarkCircleIcon;
+      badgeClass = "bg-warning/20 text-warning";
     } else {
       orderTypeLabel = "Auto Deleverage";
       OrderIcon = ShieldCheckIcon;
@@ -474,13 +570,31 @@ export function PendingOrdersDrawer() {
           <div className="bg-base-200/50 mb-2 rounded-lg p-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-base-content/60">
-                {limitPriceParams.triggerAbovePrice ? "Execute when price ≥" : "Execute when price ≤"}
+                {limitPriceParams.isKindBuy ? "Buy" : "Sell"}
               </span>
-              <span className="font-medium">${(Number(limitPriceParams.limitPrice) / 1e8).toFixed(4)}</span>
+              <span className="font-medium">
+                {limitPriceParams.isKindBuy
+                  ? `${Number(formatUnits(limitPriceParams.totalBuyAmount, limitPriceParams.buyDecimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${buySymbol}`
+                  : `${Number(formatUnits(limitPriceParams.totalSellAmount, limitPriceParams.sellDecimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${sellSymbol}`
+                }
+              </span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-base-content/60">Chunks</span>
-              <span className="font-medium">{limitPriceParams.numChunks}</span>
+              <span className="text-base-content/60">
+                {limitPriceParams.isKindBuy ? "For up to" : "For min"}
+              </span>
+              <span className="font-medium">
+                {limitPriceParams.isKindBuy
+                  ? `${Number(formatUnits(limitPriceParams.totalSellAmount, limitPriceParams.sellDecimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${sellSymbol}`
+                  : `${Number(formatUnits(limitPriceParams.totalBuyAmount, limitPriceParams.buyDecimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${buySymbol}`
+                }
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">
+                {limitPriceParams.triggerAbovePrice ? "When price ≥" : "When price ≤"}
+              </span>
+              <span className="font-medium">${(Number(limitPriceParams.limitPrice) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
             </div>
           </div>
         )}

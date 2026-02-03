@@ -50354,7 +50354,7 @@ const contracts = {
       },
     },
     AutoLeverageTrigger: {
-      address: "0xC4abeC1C2BbE9E0C3C6ff43bB3d15CA02E38395f",
+      address: "0x66A4fD394206416e0aB14A0fB41b82Bd3ff05877",
       abi: [
         {
           inputs: [
@@ -52117,6 +52117,517 @@ const contracts = {
         renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
+    },
+    EulerGatewayView: {
+      address: "0x2A455e1fec7C97aC652eA9fCd632003dD8cfeE45",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "evc_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "evc",
+          outputs: [
+            {
+              internalType: "contract IEVC",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getAcceptedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getBorrowLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCollateralBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "borrowLTV",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "liquidationLTV",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralToDebtRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBpsSimple",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getDebtBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "quoteToken",
+              type: "address",
+            },
+          ],
+          name: "getExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getHealthFactor",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMainSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultAsset",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultSymbol",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "isHealthy",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
     },
     EulerGatewayWrite: {
       address: "0x0965329d0Cb6B279fdE1EF0ce327Dc948176f334",
@@ -57563,7 +58074,7 @@ const contracts = {
       },
     },
     KapanViewRouter: {
-      address: "0x605e7b99eeaC2072A78e86bb3E31b301A0743637",
+      address: "0xc19d13Aa6fd4A25d4d9A61a682C4E46b81513B0d",
       abi: [
         {
           inputs: [
@@ -59465,7 +59976,7 @@ const contracts = {
       },
     },
     LimitPriceTrigger: {
-      address: "0xce6F125eD4e5B2c5eE662E331a3ED2DEed9Ea86C",
+      address: "0xBc827e408092d3D201BD8A464e6FAfE6baee8f55",
       abi: [
         {
           inputs: [
@@ -59850,7 +60361,7 @@ const contracts = {
       },
     },
     LtvTrigger: {
-      address: "0x267cDCd6Fc9495E42De029769b463D1CEa80c45D",
+      address: "0x12257A4f57Da71f3bD5EBeD236CfB7067410ff2E",
       abi: [
         {
           inputs: [

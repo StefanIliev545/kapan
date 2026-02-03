@@ -29,11 +29,13 @@ contract EulerGatewayView {
     // ============ Sub-Account Helpers ============
 
     /// @notice Get sub-account address from user and index
+    /// @dev Sub-account = (user & 0xFF...FF00) | subAccountIndex
+    ///      The user's "main" account has index = last byte of their address.
     /// @param user The user's main address
     /// @param subAccountIndex The sub-account index (0-255)
     /// @return The sub-account address
     function getSubAccount(address user, uint8 subAccountIndex) public pure returns (address) {
-        return address(uint160(uint160(user) ^ subAccountIndex));
+        return address(uint160(uint160(user) & ~uint160(0xFF)) | uint160(subAccountIndex));
     }
 
     /// @notice Get the user's "main" sub-account (index matches last byte of address)
@@ -47,7 +49,7 @@ contract EulerGatewayView {
     // ============ LTV Queries (for ADL) ============
 
     /// @notice Returns the current LTV (debt/collateral) in basis points
-    /// @dev Uses Euler's native accountLiquidity function
+    /// @dev Uses accountLiquidityFull to properly handle multi-collateral positions
     /// @param borrowVault The vault where the user has debt
     /// @param user The user address
     /// @param subAccountIndex The sub-account index
@@ -57,40 +59,11 @@ contract EulerGatewayView {
         address user,
         uint8 subAccountIndex
     ) external view returns (uint256) {
-        address subAccount = getSubAccount(user, subAccountIndex);
-
-        // Get account liquidity using liquidation=false (borrow LTV)
-        // collateralValue is already LTV-adjusted, so we need raw values
-        // Use liquidation=true to get values closer to raw (higher LTV means less adjustment)
-        (uint256 collateralValueLiq, uint256 liabilityValue) = IEulerVault(borrowVault).accountLiquidity(subAccount, true);
-
-        if (collateralValueLiq == 0 || liabilityValue == 0) return 0;
-
-        // accountLiquidity returns collateral adjusted by LLTV, so:
-        // rawCollateral ≈ collateralValueLiq / LLTV
-        // currentLTV = liability / rawCollateral = liability * LLTV / collateralValueLiq
-
-        // Get the effective LLTV (minimum across all collaterals)
-        address[] memory collaterals = IEulerVault(borrowVault).LTVList();
-        uint256 minLltv = 10000; // Default to 100% if no collaterals
-        for (uint256 i = 0; i < collaterals.length; i++) {
-            uint16 lltv = IEulerVault(borrowVault).LTVLiquidation(collaterals[i]);
-            if (lltv > 0 && lltv < minLltv) {
-                minLltv = lltv;
-            }
-        }
-
-        // currentLTV (bps) = (liability * LLTV) / collateralValueLiq
-        // Since LLTV is already in 1e4 scale (bps), and we want result in bps:
-        // currentLTV = (liability * 10000) / collateralValueLiq * (10000 / LLTV)
-        // Simplified: currentLTV = (liability * 10000 * 10000) / (collateralValueLiq * LLTV)
-
-        if (minLltv == 0) return 0;
-        return (liabilityValue * 10000 * 10000) / (collateralValueLiq * minLltv);
+        return _calculateLtvBps(borrowVault, getSubAccount(user, subAccountIndex));
     }
 
     /// @notice Returns the current LTV using raw collateral/liability values
-    /// @dev Alternative calculation that doesn't rely on LLTV adjustment
+    /// @dev Alias for getCurrentLtvBps (both now use the same accurate calculation)
     /// @param borrowVault The vault where the user has debt
     /// @param user The user address
     /// @param subAccountIndex The sub-account index
@@ -100,24 +73,47 @@ contract EulerGatewayView {
         address user,
         uint8 subAccountIndex
     ) external view returns (uint256) {
-        address subAccount = getSubAccount(user, subAccountIndex);
+        return _calculateLtvBps(borrowVault, getSubAccount(user, subAccountIndex));
+    }
 
-        // Get detailed liquidity to sum raw collateral values
-        (
-            address[] memory collaterals,
-            uint256[] memory collateralValues,
-            uint256 liabilityValue
-        ) = IEulerVault(borrowVault).accountLiquidityFull(subAccount, true);
+    /// @dev Internal LTV calculation that properly handles multi-collateral positions
+    /// @param borrowVault The vault where the user has debt
+    /// @param subAccount The sub-account address
+    /// @return Current LTV in basis points (0 if no position or error)
+    function _calculateLtvBps(
+        address borrowVault,
+        address subAccount
+    ) internal view returns (uint256) {
+        // Get detailed liquidity with per-collateral values
+        // Note: accountLiquidityFull reverts if sub-account has no controller set
+        address[] memory collaterals;
+        uint256[] memory collateralValues;
+        uint256 liabilityValue;
+
+        try IEulerVault(borrowVault).accountLiquidityFull(subAccount, true) returns (
+            address[] memory c,
+            uint256[] memory cv,
+            uint256 lv
+        ) {
+            collaterals = c;
+            collateralValues = cv;
+            liabilityValue = lv;
+        } catch {
+            // No position (no controller set) or other error - return 0
+            return 0;
+        }
 
         if (liabilityValue == 0) return 0;
 
-        // Sum raw collateral values (un-adjust by dividing by LLTV)
+        // Sum raw collateral values by un-adjusting each collateral's LLTV individually
+        // This correctly handles positions with multiple collaterals having different LLTVs
         uint256 rawCollateralValue = 0;
         for (uint256 i = 0; i < collaterals.length; i++) {
             if (collateralValues[i] > 0) {
                 uint16 lltv = IEulerVault(borrowVault).LTVLiquidation(collaterals[i]);
                 if (lltv > 0) {
-                    // rawValue = adjustedValue * 10000 / LLTV
+                    // Euler returns: adjustedValue = rawValue * LLTV / 10000
+                    // So: rawValue = adjustedValue * 10000 / LLTV
                     rawCollateralValue += (collateralValues[i] * 10000) / lltv;
                 }
             }
@@ -125,7 +121,7 @@ contract EulerGatewayView {
 
         if (rawCollateralValue == 0) return 0;
 
-        // currentLTV = liability / rawCollateral * 10000
+        // LTV (bps) = liability * 10000 / rawCollateral
         return (liabilityValue * 10000) / rawCollateralValue;
     }
 
@@ -173,34 +169,48 @@ contract EulerGatewayView {
     /// @param borrowVault The vault where the user has debt
     /// @param user The user address
     /// @param subAccountIndex The sub-account index
-    /// @return True if position is healthy
+    /// @return True if position is healthy (or no position)
     function isHealthy(
         address borrowVault,
         address user,
         uint8 subAccountIndex
     ) external view returns (bool) {
         address subAccount = getSubAccount(user, subAccountIndex);
-        (uint256 collateralValue, uint256 liabilityValue) = IEulerVault(borrowVault).accountLiquidity(subAccount, true);
 
-        // Position is healthy if collateralValue >= liabilityValue (using liquidation LTV)
-        return collateralValue >= liabilityValue;
+        try IEulerVault(borrowVault).accountLiquidity(subAccount, true) returns (
+            uint256 collateralValue,
+            uint256 liabilityValue
+        ) {
+            // Position is healthy if collateralValue >= liabilityValue (using liquidation LTV)
+            return collateralValue >= liabilityValue;
+        } catch {
+            // No position (no controller) - considered healthy
+            return true;
+        }
     }
 
     /// @notice Get health factor (collateral / liability ratio)
     /// @param borrowVault The vault where the user has debt
     /// @param user The user address
     /// @param subAccountIndex The sub-account index
-    /// @return Health factor in 1e18 scale (1e18 = 1.0)
+    /// @return Health factor in 1e18 scale (1e18 = 1.0, max = no debt)
     function getHealthFactor(
         address borrowVault,
         address user,
         uint8 subAccountIndex
     ) external view returns (uint256) {
         address subAccount = getSubAccount(user, subAccountIndex);
-        (uint256 collateralValue, uint256 liabilityValue) = IEulerVault(borrowVault).accountLiquidity(subAccount, true);
 
-        if (liabilityValue == 0) return type(uint256).max;
-        return (collateralValue * 1e18) / liabilityValue;
+        try IEulerVault(borrowVault).accountLiquidity(subAccount, true) returns (
+            uint256 collateralValue,
+            uint256 liabilityValue
+        ) {
+            if (liabilityValue == 0) return type(uint256).max;
+            return (collateralValue * 1e18) / liabilityValue;
+        } catch {
+            // No position (no controller) - infinite health factor
+            return type(uint256).max;
+        }
     }
 
     /// @notice Get debt balance for a sub-account
@@ -314,18 +324,28 @@ contract EulerGatewayView {
         uint256 rawCollateralValue = 0;
         for (uint256 i = 0; i < collaterals.length; i++) {
             if (collateralValues[i] > 0) {
-                uint16 ltv = IEulerVault(borrowVault).LTVBorrow(collaterals[i]);
-                if (ltv > 0) {
-                    // rawValue = adjustedValue * 10000 / LTV
-                    rawCollateralValue += (collateralValues[i] * 10000) / ltv;
+                try IEulerVault(borrowVault).LTVBorrow(collaterals[i]) returns (uint16 ltv) {
+                    if (ltv > 0) {
+                        // rawValue = adjustedValue * 10000 / LTV
+                        rawCollateralValue += (collateralValues[i] * 10000) / ltv;
+                    }
+                } catch {
+                    // Skip collateral if LTV lookup fails
+                    continue;
                 }
             }
         }
 
         // Get unit of account decimals to convert to 8 decimals (Chainlink format)
-        address unitOfAccount = IEulerVault(borrowVault).unitOfAccount();
+        address unitOfAccount;
+        try IEulerVault(borrowVault).unitOfAccount() returns (address uoa) {
+            unitOfAccount = uoa;
+        } catch {
+            // Default to 18 decimals if we can't get unit of account
+            return (rawCollateralValue / (10 ** 10), liabilityValue / (10 ** 10));
+        }
         uint8 uoaDecimals = 18; // Default to 18 if we can't get decimals
-        if (unitOfAccount != address(0)) {
+        if (unitOfAccount != address(0) && unitOfAccount.code.length > 0) {
             try IERC20Metadata(unitOfAccount).decimals() returns (uint8 d) {
                 uoaDecimals = d;
             } catch {}

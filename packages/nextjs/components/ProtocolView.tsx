@@ -19,11 +19,11 @@ import type { VesuContext } from "~~/utils/vesu";
 import { CollateralSwapModal } from "./modals/CollateralSwapModal";
 import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModal";
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
-import { formatBps } from "~~/utils/risk";
 import { MultiplyEvmModal } from "./modals/MultiplyEvmModal";
 import { useAaveEMode } from "~~/hooks/useAaveEMode";
 import { usePTEnhancedApyMaps } from "~~/hooks/usePendlePTYields";
 import { useExternalYields, type ExternalYield } from "~~/hooks/useExternalYields";
+import { useAaveReserveConfigs } from "~~/hooks/usePredictiveLtv";
 import { HealthStatus } from "./specific/common";
 
 // --- Helper functions extracted to reduce cognitive complexity ---
@@ -411,40 +411,87 @@ const MarketsButton: FC<MarketsButtonProps> = ({ show, isOpen, onToggle, isMobil
 
 MarketsButton.displayName = "MarketsButton";
 
-/** Utilization detail display on hover */
-interface UtilizationDetailProps {
-  currentLtvBps: bigint;
-  lltvBps: bigint;
-  currentLtvLabel: string | undefined;
+/** Collateral breakdown data for LTV tooltip */
+interface CollateralBreakdownItem {
+  name: string;
+  icon: string;
+  valueUsd: number;
+  ltvBps: number;
+  lltvBps: number;
+  weightPct: number; // Percentage of total collateral
 }
 
-const UtilizationDetail: FC<UtilizationDetailProps> = ({ currentLtvBps, lltvBps, currentLtvLabel }) => {
-  const hasValues = currentLtvBps > 0n || lltvBps > 0n;
+/** Collateral LTV breakdown component for tooltip */
+interface CollateralLtvBreakdownProps {
+  items: CollateralBreakdownItem[];
+  totalDebtUsd: number;
+}
 
-  if (!hasValues) {
-    return <span className="text-base-content/50">—</span>;
-  }
+const CollateralLtvBreakdown: FC<CollateralLtvBreakdownProps> = ({ items, totalDebtUsd }) => {
+  if (items.length === 0) return null;
+
+  const totalCollateralUsd = items.reduce((sum, item) => sum + item.valueUsd, 0);
+  const currentLtv = totalCollateralUsd > 0 ? (totalDebtUsd / totalCollateralUsd) * 100 : 0;
+  const weightedMaxLtv = totalCollateralUsd > 0
+    ? items.reduce((sum, item) => sum + (item.valueUsd * item.ltvBps), 0) / totalCollateralUsd / 100
+    : 0;
+  const weightedLltv = totalCollateralUsd > 0
+    ? items.reduce((sum, item) => sum + (item.valueUsd * item.lltvBps), 0) / totalCollateralUsd / 100
+    : 0;
 
   return (
-    <>
-      <span className="text-base-content/70">
-        <span className="text-base-content/50 text-[10px]">Current </span>
-        {currentLtvLabel || "0%"}
-      </span>
-      {lltvBps > 0n && (
-        <>
-          <span className="text-base-content/30">•</span>
-          <span className="text-base-content/70">
-            <span className="text-base-content/50 text-[10px]">LLTV </span>
-            {formatBps(lltvBps)}%
-          </span>
-        </>
-      )}
-    </>
+    <div className="flex flex-col gap-2 text-xs">
+      {/* Header with current LTV */}
+      <div className="flex items-center justify-between border-b border-base-300/50 pb-2">
+        <span className="text-base-content/60 text-[10px] font-semibold uppercase tracking-wide">
+          Collateral Breakdown
+        </span>
+        <span className="text-base-content font-mono font-bold">
+          {currentLtv.toFixed(1)}% LTV
+        </span>
+      </div>
+      {/* Per-collateral rows */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2 text-[10px] text-base-content/40">
+          <span className="flex-1">Asset</span>
+          <span className="w-16 text-right">Value</span>
+          <span className="w-12 text-right">Max LTV</span>
+        </div>
+        {items.map((item, idx) => (
+          <div key={idx} className="flex items-center gap-2">
+            <img src={item.icon} alt={item.name} className="size-4 rounded-full" />
+            <span className="text-base-content/90 flex-1 font-medium">{item.name}</span>
+            <span className="text-base-content/60 w-16 text-right tabular-nums">{formatCurrency(item.valueUsd)}</span>
+            <span className="text-base-content/50 w-12 text-right tabular-nums">{(item.ltvBps / 100).toFixed(0)}%</span>
+          </div>
+        ))}
+      </div>
+      {/* Summary */}
+      <div className="border-base-300/50 mt-1 flex flex-col gap-1 border-t pt-2 text-[11px]">
+        <div className="flex justify-between">
+          <span className="text-base-content/50">Total Collateral</span>
+          <span className="text-success font-medium tabular-nums">{formatCurrency(totalCollateralUsd)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-base-content/50">Total Debt</span>
+          <span className="text-error font-medium tabular-nums">{formatCurrency(totalDebtUsd)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-base-content/50">Weighted Max LTV</span>
+          <span className="text-base-content/70 font-medium tabular-nums">{weightedMaxLtv.toFixed(1)}%</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-base-content/50">Liquidation Threshold</span>
+          <span className="text-warning font-medium tabular-nums">{weightedLltv.toFixed(1)}%</span>
+        </div>
+      </div>
+    </div>
   );
 };
 
-UtilizationDetail.displayName = "UtilizationDetail";
+CollateralLtvBreakdown.displayName = "CollateralLtvBreakdown";
+
+/** Utilization detail display on hover */
 
 /** Connect wallet hint */
 interface ConnectHintProps {
@@ -611,6 +658,47 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   const isAaveProtocol = protocolName.toLowerCase().includes("aave");
   const { userEMode } = useAaveEMode(isAaveProtocol && chainId ? chainId : undefined);
 
+  // Fetch reserve configs for Aave collateral breakdown tooltip
+  const aaveCollateralTokens = useMemo(() => {
+    if (!isAaveProtocol) return [];
+    return suppliedPositions
+      .filter(p => p.balance > 0)
+      .map(p => p.tokenAddress as `0x${string}`);
+  }, [isAaveProtocol, suppliedPositions]);
+
+  const { configs: reserveConfigs } = useAaveReserveConfigs(
+    aaveCollateralTokens,
+    chainId,
+    isAaveProtocol && aaveCollateralTokens.length > 0
+  );
+
+  // Build collateral breakdown for LTV tooltip
+  const collateralBreakdown = useMemo((): CollateralBreakdownItem[] => {
+    if (!isAaveProtocol || reserveConfigs.length === 0) return [];
+
+    const positionsWithBalance = suppliedPositions.filter(p => p.balance > 0);
+    const totalCollateralUsd = positionsWithBalance.reduce((sum, p) => sum + p.balance, 0);
+
+    return positionsWithBalance.map(position => {
+      const config = reserveConfigs.find(
+        c => c.token.toLowerCase() === position.tokenAddress.toLowerCase()
+      );
+      return {
+        name: position.name,
+        icon: position.icon,
+        valueUsd: position.balance,
+        ltvBps: config ? Number(config.ltv) : 0,
+        lltvBps: config ? Number(config.liquidationThreshold) : 0,
+        weightPct: totalCollateralUsd > 0 ? (position.balance / totalCollateralUsd) * 100 : 0,
+      };
+    }).filter(item => item.valueUsd > 0);
+  }, [isAaveProtocol, reserveConfigs, suppliedPositions]);
+
+  // Calculate total debt for the breakdown tooltip
+  const totalDebtUsd = useMemo(() => {
+    return borrowedPositions.reduce((sum, p) => sum + Math.abs(p.balance), 0);
+  }, [borrowedPositions]);
+
   // Fetch external yields (PT tokens, LSTs, Maple, etc.)
   const { findYield } = useExternalYields(chainId);
 
@@ -668,12 +756,11 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   );
 
   // Calculate utilization metrics using extracted helper
-  const { utilizationPercentage, currentLtvBps } = useMemo(
+  const { utilizationPercentage } = useMemo(
     () => calculateUtilizationMetrics(suppliedPositions, borrowedPositions, ltvBps, lltvBps),
     [borrowedPositions, suppliedPositions, lltvBps, ltvBps]
   );
 
-  const currentLtvLabel = useMemo(() => (currentLtvBps > 0n ? `${formatBps(currentLtvBps)}%` : undefined), [currentLtvBps]);
 
   const positionManager = useMemo(
     () => PositionManager.fromPositions(suppliedPositions, borrowedPositions, Number(ltvBps)),
@@ -1030,14 +1117,22 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
                 <StatDisplay label="30D Yield" value={formatCurrency(netYield30d)} valueClass={getValueClass(netYield30d)} />
                 <StatDisplay label="Net APY" value={netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)} valueClass={getValueClass(netApyPercent)} />
                 {!hideUtilization && (
-                  <div className="group/util hover:bg-base-200/30 flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                    <span className="label-text-xs-semibold">Utilization</span>
-                    <div className="group-hover/util:hidden">
-                      <HealthStatus utilizationPercentage={utilizationPercentage} />
+                  <div className="group/util relative hover:bg-base-200/30 flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
+                    <div className="flex items-center gap-1">
+                      <span className="label-text-xs-semibold">Utilization</span>
+                      {collateralBreakdown.length > 0 && (
+                        <span className="text-primary text-[8px]">ⓘ</span>
+                      )}
                     </div>
-                    <div className="hidden items-center gap-2 font-mono text-xs tabular-nums group-hover/util:flex">
-                      <UtilizationDetail currentLtvBps={currentLtvBps} lltvBps={lltvBps} currentLtvLabel={currentLtvLabel} />
-                    </div>
+                    <HealthStatus utilizationPercentage={utilizationPercentage} />
+                    {/* Tooltip popover for collateral breakdown */}
+                    {collateralBreakdown.length > 0 && (
+                      <div className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 hidden -translate-x-1/2 group-hover/util:block">
+                        <div className="pointer-events-auto min-w-[280px] rounded-lg bg-base-100 p-3 shadow-xl ring-1 ring-base-300/50">
+                          <CollateralLtvBreakdown items={collateralBreakdown} totalDebtUsd={totalDebtUsd} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
