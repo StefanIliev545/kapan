@@ -289,7 +289,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const marginAmountRaw = useMemo(() => {
     try {
-      if (!depositToken) return 0n;
+      if (!depositToken) {
+        return 0n;
+      }
       const parsed = parseUnits(marginAmount || "0", depositDecimals);
       return parsed > 0n ? parsed : 0n;
     }
@@ -297,7 +299,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   }, [depositToken, depositDecimals, marginAmount]);
 
   const flashLoanAmountRaw = useMemo(() => {
-    if (!collateral || !debt || leverage <= 1 || marginAmountRaw === 0n) return 0n;
+    if (!collateral || !debt || leverage <= 1 || marginAmountRaw === 0n) {
+      return 0n;
+    }
 
     if (zapMode) {
       const leverageMultiplier = Math.round((leverage - 1) * 10000);
@@ -312,7 +316,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   }, [collateral, debt, leverage, marginAmountRaw, zapMode]);
 
   const totalSwapAmount = useMemo(() => {
-    if (!zapMode) return flashLoanAmountRaw;
+    if (!zapMode) {
+      return flashLoanAmountRaw;
+    }
     return marginAmountRaw + flashLoanAmountRaw;
   }, [zapMode, marginAmountRaw, flashLoanAmountRaw]);
 
@@ -325,8 +331,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   });
 
   const providerOptions = useMemo(() => {
-    if (flashLoanProviders?.length) return flashLoanProviders;
-    if (defaultFlashLoanProvider) return [defaultFlashLoanProvider];
+    if (flashLoanProviders?.length) {
+      return flashLoanProviders;
+    }
+    if (defaultFlashLoanProvider) {
+      return [defaultFlashLoanProvider];
+    }
     return getDefaultFlashLoanProviders(chainId, isAaveV3Supported, isBalancerV2Supported);
   }, [defaultFlashLoanProvider, flashLoanProviders, chainId]);
 
@@ -410,8 +420,10 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // Calculate market exchange rate (collateral per 1 unit of debt) from quote
   // This rate stays constant regardless of swap amount/leverage
   const marketRate = useMemo(() => {
-    if (!bestQuote || !collateral || !debt || swapQuoteAmount === 0n) return null;
-    // rate = collateralOut / debtIn (normalized to collateral decimals for 1 unit of debt)
+    if (!bestQuote || !collateral || !debt || swapQuoteAmount === 0n) {
+      return null;
+    }
+    // Rate = collateralOut / debtIn (normalized to collateral decimals for 1 unit of debt)
     const rateRaw = (bestQuote.amount * BigInt(10 ** debt.decimals)) / swapQuoteAmount;
     const rateFormatted = formatUnits(rateRaw, collateral.decimals);
     return { raw: rateRaw, formatted: rateFormatted };
@@ -426,8 +438,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // Auto-estimate slippage for market orders based on quote price impact
   useEffect(() => {
-    if (executionType !== "market" || hasAutoSetMarketSlippage) return;
-    if (quotesPriceImpact === null) return;
+    if (executionType !== "market" || hasAutoSetMarketSlippage) {
+      return;
+    }
+    if (quotesPriceImpact === null) {
+      return;
+    }
 
     const suggested = calculateSuggestedSlippage(quotesPriceImpact);
     setSlippage(suggested);
@@ -436,8 +452,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // Auto-estimate slippage for limit orders
   useEffect(() => {
-    if (executionType !== "limit" || hasAutoSetLimitSlippage) return;
-    if (quotesPriceImpact === null) return;
+    if (executionType !== "limit" || hasAutoSetLimitSlippage) {
+      return;
+    }
+    if (quotesPriceImpact === null) {
+      return;
+    }
 
     const suggested = calculateSuggestedSlippage(quotesPriceImpact);
     setLimitSlippage(suggested);
@@ -664,8 +684,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // Conditional order trigger params for LimitPriceTrigger
   const conditionalOrderTriggerParams = useMemo(() => {
-    if (!collateral || !collateral.address || !debt || !debt.address || !limitPriceTriggerAddress || !userAddress) return null;
-    if (flashLoanAmountRaw === 0n || minCollateralOut.raw === 0n) return null;
+    if (!collateral || !collateral.address || !debt || !debt.address || !limitPriceTriggerAddress || !userAddress) {
+      return null;
+    }
+    if (flashLoanAmountRaw === 0n || minCollateralOut.raw === 0n) {
+      return null;
+    }
 
     // Normalize protocol name for getProtocolId
     const normalizedProtocol = protocolName.toLowerCase().includes("aave")
@@ -754,8 +778,10 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const handleLeverageInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLeverageInput(e.target.value);
-    const val = parseFloat(e.target.value);
-    if (!isNaN(val)) updateLeverage(val);
+    const val = Number.parseFloat(e.target.value);
+    if (!Number.isNaN(val)) {
+      updateLeverage(val);
+    }
   }, [updateLeverage]);
 
   const handleLeverageInputBlur = useCallback(() => {
@@ -775,7 +801,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const handleFlashLoanProviderChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const p = providerOptions.find(provider => provider.name === e.target.value);
-    if (p) setSelectedProvider(p);
+    if (p) {
+      setSelectedProvider(p);
+    }
   }, [providerOptions, setSelectedProvider]);
 
   const handleToggleBatching = useCallback(() => setPreferBatching(!preferBatching), [setPreferBatching, preferBatching]);
@@ -783,13 +811,17 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const handleSelectDebt = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
     const address = e.currentTarget.dataset.address;
     const d = debtWithWalletBalance.find(debtItem => debtItem.address === address);
-    if (d) setDebt(d);
+    if (d) {
+      setDebt(d);
+    }
   }, [debtWithWalletBalance]);
 
   const handleSelectCollateral = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
     const address = e.currentTarget.dataset.address;
     const c = collateralsWithWalletBalance.find(col => col.address === address);
-    if (c) setCollateral(c);
+    if (c) {
+      setCollateral(c);
+    }
   }, [collateralsWithWalletBalance]);
 
   // ==================== Submit Handler ====================
@@ -803,10 +835,10 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       } else {
         await handleMarketOrderSubmitRef.current();
       }
-    } catch (e) {
+    } catch (error) {
       const status = executionType === "limit" ? "multiply_limit_order_complete" : "multiply_tx_complete";
-      track(status, { status: "error", error: e instanceof Error ? e.message : String(e) });
-      throw e;
+      track(status, { status: "error", error: error instanceof Error ? error.message : String(error) });
+      throw error;
     } finally {
       setIsSubmitting(false);
     }
@@ -1494,15 +1526,21 @@ const LimitOrderPricingSection: FC<LimitOrderPricingSectionProps> = (props) => {
 
   // Calculate inverted market rate for display
   const invertedMarketRate = useMemo(() => {
-    if (!marketRate || !collateral || !debt) return null;
+    if (!marketRate || !collateral || !debt) {
+      return null;
+    }
     const rate = Number(marketRate.formatted);
-    if (rate === 0) return null;
+    if (rate === 0) {
+      return null;
+    }
     return 1 / rate;
   }, [marketRate, collateral, debt]);
 
   // Format price with appropriate precision (preserve significant digits)
   const formatPrice = (value: number, decimals: number): string => {
-    if (value === 0) return "0";
+    if (value === 0) {
+      return "0";
+    }
     const precision = Math.min(decimals, 18);
     const magnitude = Math.floor(Math.log10(Math.abs(value)));
     const displayDecimals = Math.max(2, Math.min(precision, 6 - magnitude));
@@ -1537,8 +1575,10 @@ const LimitOrderPricingSection: FC<LimitOrderPricingSectionProps> = (props) => {
 
   // Adjust rate by percentage
   const adjustByPercent = (delta: number) => {
-    const currentRate = parseFloat(displayValue) || parseFloat(displayMarketRate);
-    if (!currentRate || currentRate === 0) return;
+    const currentRate = Number.parseFloat(displayValue) || Number.parseFloat(displayMarketRate);
+    if (!currentRate || currentRate === 0) {
+      return;
+    }
     const newRate = currentRate * (1 + delta / 100);
     setCustomMinPrice(formatPrice(newRate, displayDecimals));
   };
@@ -1556,7 +1596,7 @@ const LimitOrderPricingSection: FC<LimitOrderPricingSectionProps> = (props) => {
       return;
     }
     // Convert the current value to the new direction
-    const currentValue = parseFloat(customMinPrice);
+    const currentValue = Number.parseFloat(customMinPrice);
     if (currentValue > 0) {
       const newDecimals = priceInputInverted ? (collateral?.decimals ?? 18) : (debt?.decimals ?? 18);
       setCustomMinPrice(formatPrice(1 / currentValue, newDecimals));

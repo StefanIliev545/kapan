@@ -1,4 +1,4 @@
-import { Address } from "@starknet-react/chains";
+import type { Address } from "@starknet-react/chains";
 import { useScaffoldTokenBalance } from "./useScaffoldTokenBalance";
 
 type UseScaffoldStrkBalanceProps = {

@@ -20,7 +20,9 @@ const BALANCER_V3_NAME = "Balancer V3";
 
 // Helper to safely get addresses from protocol maps (throws at build time if missing)
 function requireAddress(address: string | undefined, name: string): string {
-  if (!address) throw new Error(`Missing required address: ${name}`);
+  if (!address) {
+    throw new Error(`Missing required address: ${name}`);
+  }
   return address;
 }
 
@@ -32,7 +34,9 @@ function requireAddress(address: string | undefined, name: string): string {
  */
 export function getCowExplorerOrderUrl(chainId: number, orderHash: string): string | undefined {
   const baseUrl = COW_EXPLORER_URLS[chainId];
-  if (!baseUrl) return undefined;
+  if (!baseUrl) {
+    return undefined;
+  }
   return `${baseUrl}/orders/${orderHash}`;
 }
 
@@ -44,7 +48,9 @@ export function getCowExplorerOrderUrl(chainId: number, orderHash: string): stri
  */
 export function getCowExplorerAddressUrl(chainId: number, address: string): string | undefined {
   const baseUrl = COW_EXPLORER_URLS[chainId];
-  if (!baseUrl) return undefined;
+  if (!baseUrl) {
+    return undefined;
+  }
   return `${baseUrl}/address/${address}`;
 }
 

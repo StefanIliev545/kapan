@@ -76,13 +76,14 @@ export enum IntegerVariant {
 
 export const isValidInteger = (dataType: IntegerVariant, value: string) => {
   const isSigned = dataType.startsWith("i");
-  const bitcount = Number(dataType.substring(isSigned ? 3 : 4));
+  const bitcount = Number(dataType.slice(isSigned ? 3 : 4));
 
   let valueAsBigInt;
   try {
     valueAsBigInt = BigInt(value);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (e) {}
+  } catch {
+    // Parsing failed, valueAsBigInt remains undefined
+  }
   if (typeof valueAsBigInt !== "bigint") {
     if (!value || typeof value !== "string") {
       return true;
@@ -95,6 +96,6 @@ export const isValidInteger = (dataType: IntegerVariant, value: string) => {
   const significantHexDigits = hexString.match(/.*x0*(.*)$/)?.[1] ?? "";
   return !(
     significantHexDigits.length * 4 > bitcount ||
-    (isSigned && significantHexDigits.length * 4 === bitcount && parseInt(significantHexDigits.slice(-1)?.[0], 16) < 8)
+    (isSigned && significantHexDigits.length * 4 === bitcount && Number.parseInt(significantHexDigits.slice(-1)?.[0], 16) < 8)
   );
 };

@@ -73,7 +73,9 @@ export function useClosePositionQuote({
   collateralDecimals,
 }: UseClosePositionQuoteProps): { remainderInfo: RemainderInfo | null } {
   const remainderInfo = useMemo((): RemainderInfo | null => {
-    if (!quote) return null;
+    if (!quote) {
+      return null;
+    }
 
     const used = quote.sellAmount;
     const remainder = collateralBalance > used ? collateralBalance - used : 0n;
@@ -82,8 +84,8 @@ export function useClosePositionQuote({
     // Calculate remainder USD value
     let remainderUsd: number | undefined = undefined;
 
-    const sellUnits = parseFloat(formatTokenAmount(quote.sellAmount.toString(), collateralDecimals));
-    const remainderUnits = parseFloat(remainderFormatted);
+    const sellUnits = Number.parseFloat(formatTokenAmount(quote.sellAmount.toString(), collateralDecimals));
+    const remainderUnits = Number.parseFloat(remainderFormatted);
 
     if (sellUnits > 0 && quote.sellAmountInUsd !== undefined) {
       // Proportional calculation: remainder_usd = sell_usd * (remainder_units / sell_units)

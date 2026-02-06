@@ -34,7 +34,7 @@ export const BorrowModalStark: FC<BorrowModalStarkProps> = ({
     decimalsForAction,
     vesuContext,
   );
-  if (token.decimals == null) {
+  if (token.decimals === undefined || token.decimals === null) {
     token.decimals = decimalsForAction;
   }
 

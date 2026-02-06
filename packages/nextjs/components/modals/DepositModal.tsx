@@ -1,4 +1,4 @@
-import { FC, useCallback } from "react";
+import { type FC, useCallback } from "react";
 import { BatchingPreference } from "./common/BatchingPreference";
 import {
   useDepositModalConfig,

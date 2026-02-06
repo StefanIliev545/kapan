@@ -38,24 +38,24 @@ import { getKapanOrderManagerAddress } from "~~/utils/constants";
 
 function formatAmount(amount: bigint, decimals: number, maxDecimals?: number): string {
   const formatted = formatUnits(amount, decimals);
-  const num = parseFloat(formatted);
+  const num = Number.parseFloat(formatted);
   const max = maxDecimals ?? (num >= 1000 ? 2 : num >= 1 ? 4 : 6);
   return num.toLocaleString(undefined, { maximumFractionDigits: max, minimumFractionDigits: 0 });
 }
 
 function formatAmountPrecise(amount: bigint, decimals: number): string {
   const formatted = formatUnits(amount, decimals);
-  const num = parseFloat(formatted);
-  if (num === 0) return "0";
-  if (num < 0.0001) return num.toExponential(4);
-  if (num < 1) return num.toFixed(6);
-  if (num < 100) return num.toFixed(4);
-  if (num < 10000) return num.toFixed(2);
+  const num = Number.parseFloat(formatted);
+  if (num === 0) { return "0"; }
+  if (num < 0.0001) { return num.toExponential(4); }
+  if (num < 1) { return num.toFixed(6); }
+  if (num < 100) { return num.toFixed(4); }
+  if (num < 10000) { return num.toFixed(2); }
   return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 function formatUsd(amount: number): string {
-  if (amount < 0.01) return "<$0.01";
+  if (amount < 0.01) { return "<$0.01"; }
   return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
@@ -837,7 +837,7 @@ export default function OrderDetailPage() {
   );
 
   const tokenAddresses = useMemo(() => {
-    if (!order) return [];
+    if (!order) { return []; }
     return [order.params.sellToken, order.params.buyToken] as Address[];
   }, [order]);
 
@@ -865,17 +865,17 @@ export default function OrderDetailPage() {
   const buyDecimals = order ? getTokenDecimals(order.params.buyToken) : 18;
 
   const executionSummary = useMemo(() => {
-    if (!executionData || !order || executionData.chunks.length === 0) return null;
+    if (!executionData || !order || executionData.chunks.length === 0) { return null; }
     return calculateExecutionSummary(executionData, order.params.minBuyPerChunk, sellDecimals, buyDecimals);
   }, [executionData, order, sellDecimals, buyDecimals]);
 
   const quoteData = useMemo(() => {
-    if (!orderHash) return null;
+    if (!orderHash) { return null; }
     return getOrderQuoteRate(chainId, orderHash);
   }, [chainId, orderHash]);
 
   const priceImpact = useMemo(() => {
-    if (!quoteData || !executionSummary) return null;
+    if (!quoteData || !executionSummary) { return null; }
     return calculatePriceImpact(executionSummary.actualRate, quoteData.quoteRate);
   }, [quoteData, executionSummary]);
 
@@ -918,9 +918,9 @@ export default function OrderDetailPage() {
   const isCompleted = order.status === OrderStatus.Completed;
   const isCancelled = order.status === OrderStatus.Cancelled;
 
-  const totalSoldUsd = sellPrice ? parseFloat(formatUnits(order.executedAmount, sellDecimals)) * sellPrice : null;
-  const totalReceivedUsd = buyPrice && executionData ? parseFloat(formatUnits(executionData.totalReceived, buyDecimals)) * buyPrice : null;
-  const surplusUsd = buyPrice && executionSummary ? parseFloat(formatUnits(executionSummary.surplusAmount, buyDecimals)) * buyPrice : null;
+  const totalSoldUsd = sellPrice ? Number.parseFloat(formatUnits(order.executedAmount, sellDecimals)) * sellPrice : null;
+  const totalReceivedUsd = buyPrice && executionData ? Number.parseFloat(formatUnits(executionData.totalReceived, buyDecimals)) * buyPrice : null;
+  const surplusUsd = buyPrice && executionSummary ? Number.parseFloat(formatUnits(executionSummary.surplusAmount, buyDecimals)) * buyPrice : null;
 
   return (
     <div className="min-h-screen px-4 py-8 md:px-8 lg:px-16">

@@ -108,7 +108,9 @@ const ScrambleText = ({
       scrambleReveal();
     }
     return () => {
-      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      if (frameRef.current) {
+        cancelAnimationFrame(frameRef.current);
+      }
     };
   }, [isActive, hasRevealed, scrambleReveal]);
 
@@ -138,8 +140,10 @@ const GlitchImage = ({ src, alt, isActive }: { src: string; alt: string; isActiv
 
   // Periodic glitch effect
   useEffect(() => {
-    if (!isActive) return;
-    
+    if (!isActive) {
+      return;
+    }
+
     const triggerGlitch = () => {
       setGlitchActive(true);
       setTimeout(() => setGlitchActive(false), 150 + Math.random() * 100);
@@ -366,11 +370,17 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => {
   }, [isActive]);
 
   const getAppUrl = useCallback(() => {
-    if (typeof window === "undefined") return "/app";
+    if (typeof window === "undefined") {
+      return "/app";
+    }
     const { protocol, hostname, host } = window.location;
     const baseHost = hostname.replace(/^www\./, "");
-    if (host.endsWith("localhost:3000")) return `${protocol}//app.localhost:3000`;
-    if (hostname.startsWith("app.")) return `${protocol}//${host}`;
+    if (host.endsWith("localhost:3000")) {
+      return `${protocol}//app.localhost:3000`;
+    }
+    if (hostname.startsWith("app.")) {
+      return `${protocol}//${host}`;
+    }
     return `${protocol}//app.${baseHost}`;
   }, []);
 

@@ -264,8 +264,8 @@ export function decodeTriggerParams(data: `0x${string}`): TriggerParams | undefi
       maxSlippageBps: params.maxSlippageBps,
       numChunks: params.numChunks,
     };
-  } catch (e) {
-    console.warn("[decodeTriggerParams] Failed to decode:", e);
+  } catch (error) {
+    console.warn("[decodeTriggerParams] Failed to decode:", error);
     return undefined;
   }
 }
@@ -299,9 +299,9 @@ export function useConditionalOrders(options: UseConditionalOrdersOptions = {}) 
   const queryClient = useQueryClient();
 
   const { data: contractInfo } = useDeployedContractInfo({
-    contractName: "KapanConditionalOrderManager",
+    contractName: "KapanConditionalOrderManager" as "KapanRouter",
     chainId,
-  } as any);
+  });
 
   const contractAddress = contractInfo?.address as Address | undefined;
   const isAvailable = !!contractAddress && !!publicClient && !!userAddress;
@@ -364,8 +364,8 @@ export function useConditionalOrders(options: UseConditionalOrdersOptions = {}) 
               })) as [boolean, string];
               isTriggerMet = shouldExecute;
               triggerReason = reason;
-            } catch (e) {
-              console.warn("[useConditionalOrders] Failed to fetch trigger status:", e);
+            } catch (error) {
+              console.warn("[useConditionalOrders] Failed to fetch trigger status:", error);
             }
           }
 
@@ -381,8 +381,8 @@ export function useConditionalOrders(options: UseConditionalOrdersOptions = {}) 
             isTriggerMet,
             triggerReason,
           });
-        } catch (e) {
-          console.warn(`[useConditionalOrders] Failed to fetch order ${orderHash}:`, e);
+        } catch (error) {
+          console.warn(`[useConditionalOrders] Failed to fetch order ${orderHash}:`, error);
         }
       }
 
@@ -390,8 +390,8 @@ export function useConditionalOrders(options: UseConditionalOrdersOptions = {}) 
       orders.sort((a, b) => Number(b.context.createdAt - a.context.createdAt));
 
       return orders;
-    } catch (e) {
-      console.error("[useConditionalOrders] Failed to fetch orders:", e);
+    } catch (error) {
+      console.error("[useConditionalOrders] Failed to fetch orders:", error);
       return [];
     }
   }, [isAvailable, contractAddress, publicClient, userAddress, activeOnly, fetchTriggerStatus]);
@@ -444,9 +444,10 @@ export function useConditionalOrders(options: UseConditionalOrdersOptions = {}) 
       await queryClient.invalidateQueries({ queryKey: ["conditionalOrders"] });
 
       return true;
-    } catch (error: any) {
+    } catch (error) {
       notification.remove(notificationId);
-      const message = error?.shortMessage || error?.message || "Failed to cancel order";
+      const err = error as { shortMessage?: string; message?: string };
+      const message = err?.shortMessage || err?.message || "Failed to cancel order";
       notification.error(message);
       console.error("[useConditionalOrders] Cancel error:", error);
       return false;

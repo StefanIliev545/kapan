@@ -74,7 +74,9 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
 
   // Determine source pool name to exclude from destination dropdown
   const sourcePoolName = useMemo(() => {
-    if (!position.poolId || (fromProtocol !== "Vesu" && fromProtocol !== "VesuV2")) return null;
+    if (!position.poolId || (fromProtocol !== "Vesu" && fromProtocol !== "VesuV2")) {
+      return null;
+    }
 
     if (fromProtocol === "Vesu") {
       const poolId = typeof position.poolId === "string" ? BigInt(position.poolId) : position.poolId;
@@ -202,33 +204,41 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   });
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     const isVesu = selectedProtocol === "Vesu" || selectedProtocol === "VesuV2";
-    if (!isVesu || !starkVesuPools) return;
+    if (!isVesu || !starkVesuPools) {
+      return;
+    }
 
     if (selectedVersion === "v1") {
       const sourceV1Id = fromProtocol === "Vesu" && position.poolId
         ? (typeof position.poolId === "string" ? BigInt(position.poolId) : position.poolId)
         : undefined;
-      const filtered = starkVesuPools.v1Pools.filter(p => sourceV1Id === undefined || p.id !== sourceV1Id);
-      const currentValid = starkVesuPools.v1Pools.some(p => p.id === selectedPoolId) && (!sourceV1Id || selectedPoolId !== sourceV1Id);
+      const filtered = starkVesuPools.v1Pools.find(pool => sourceV1Id === undefined || pool.id !== sourceV1Id);
+      const currentValid = starkVesuPools.v1Pools.some(pool => pool.id === selectedPoolId) && (!sourceV1Id || selectedPoolId !== sourceV1Id);
       if (!currentValid) {
-        const next = (filtered[0]?.id) ?? starkVesuPools.v1Pools[0]?.id;
-        if (next) setSelectedPoolId(next);
+        const next = filtered?.id ?? starkVesuPools.v1Pools[0]?.id;
+        if (next) {
+          setSelectedPoolId(next);
+        }
       }
     } else {
       const sourceV2Addr = fromProtocol === "VesuV2" && position.poolId ? String(position.poolId) : undefined;
       const sourceV2Normalized = sourceV2Addr ? sourceV2Addr.toLowerCase() : undefined;
       const currentValid = !!selectedV2PoolAddress
-        && starkVesuPools.v2Pools.some(p => p.address.toLowerCase() === selectedV2PoolAddress.toLowerCase())
+        && starkVesuPools.v2Pools.some(pool => pool.address.toLowerCase() === selectedV2PoolAddress.toLowerCase())
         && (!sourceV2Normalized || selectedV2PoolAddress.toLowerCase() !== sourceV2Normalized);
       if (!currentValid) {
-        const filtered = starkVesuPools.v2Pools.filter(p => !sourceV2Normalized || p.address.toLowerCase() !== sourceV2Normalized);
-        const next = (filtered[0]?.address) ?? starkVesuPools.v2Pools[0]?.address;
-        if (next) setSelectedV2PoolAddress(next);
+        const filtered = starkVesuPools.v2Pools.find(pool => !sourceV2Normalized || pool.address.toLowerCase() !== sourceV2Normalized);
+        const next = filtered?.address ?? starkVesuPools.v2Pools[0]?.address;
+        if (next) {
+          setSelectedV2PoolAddress(next);
+        }
       }
     }
-  }, [isOpen, selectedProtocol, selectedVersion, starkVesuPools, setSelectedPoolId, setSelectedV2PoolAddress]);
+  }, [isOpen, selectedProtocol, selectedVersion, starkVesuPools, setSelectedPoolId, setSelectedV2PoolAddress, fromProtocol, position.poolId, selectedPoolId, selectedV2PoolAddress]);
 
   // Auto-focus debt input using shared hook
   useDebtInputFocus({ isOpen, debtConfirmed, debtInputRef });
@@ -274,7 +284,9 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0;
 
   const handleExecuteMove = useCallback(async () => {
-    if (!debtConfirmed || !selectedProtocol) return;
+    if (!debtConfirmed || !selectedProtocol) {
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -307,8 +319,8 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
         status: "success",
       });
       setTimeout(() => onClose(), 2000);
-    } catch (e: any) {
-      console.error("Refinance flow error:", e);
+    } catch (error) {
+      console.error("Refinance flow error:", error);
       track("refinance_tx_complete", {
         network: "starknet",
         fromProtocol,
@@ -319,7 +331,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
         preferBatching: false,
         batchingUsed: false,
         status: "error",
-        error: e instanceof Error ? e.message : String(e),
+        error: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setIsSubmitting(false);

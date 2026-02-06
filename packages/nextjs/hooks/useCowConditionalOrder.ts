@@ -374,14 +374,14 @@ export function useCowConditionalOrder() {
   // Get deployed contracts
   // Note: Using type assertions until types are regenerated after deploy
   const { data: conditionalOrderManagerContract, isLoading: isManagerLoading } = useDeployedContractInfo({
-    contractName: "KapanConditionalOrderManager" as any,
+    contractName: "KapanConditionalOrderManager" as "KapanRouter",
   });
   const { data: routerContract } = useDeployedContractInfo({
     contractName: "KapanRouter",
   });
   // LimitPriceTrigger must be deployed for conditional orders to work
   const { data: limitPriceTriggerContract } = useDeployedContractInfo({
-    contractName: "LimitPriceTrigger" as any,
+    contractName: "LimitPriceTrigger" as "KapanRouter",
   });
 
   const managerAddress = conditionalOrderManagerContract?.address as Address | undefined;
@@ -558,7 +558,7 @@ export function useCowConditionalOrder() {
         data: encodeFunctionData({
           abi: conditionalOrderManagerContract?.abi ?? CONDITIONAL_ORDER_MANAGER_ABI,
           functionName: "createOrder",
-          args: [orderParams as any, salt],
+          args: [orderParams as Parameters<typeof encodeFunctionData>["args"], salt],
         }) as Hex,
       });
 

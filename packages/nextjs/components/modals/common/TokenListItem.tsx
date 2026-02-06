@@ -1,4 +1,4 @@
-import { FC, ReactNode } from "react";
+import type { FC, ReactNode } from "react";
 import Image from "next/image";
 import formatPercentage from "~~/utils/formatPercentage";
 

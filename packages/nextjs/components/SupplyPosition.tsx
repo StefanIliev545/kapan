@@ -10,6 +10,7 @@ import { BasePosition, usePositionState } from "./common/BasePosition";
 import { SegmentedAction } from "./common/SegmentedActionBar";
 import { useModal } from "~~/hooks/useModal";
 import { PositionManager } from "~~/utils/position";
+import { useExternalYields, isPTToken } from "~~/hooks/useExternalYields";
 
 // SupplyPositionProps extends ProtocolPosition but can add supply-specific props
 type ExtraStat = {
@@ -98,7 +99,20 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
   const depositModal = useModal();
   const withdrawModal = useModal();
 
-  const usdPrice = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
+  // For PT tokens, use Pendle's price to ensure consistency with displayed APY
+  const { findYield } = useExternalYields(chainId);
+  const effectiveTokenPrice = useMemo(() => {
+    if (isPTToken(name)) {
+      const ptYield = findYield(tokenAddress, name);
+      if (ptYield?.metadata?.ptPriceUsd && ptYield.metadata.ptPriceUsd > 0) {
+        // Convert USD price to 8 decimals (bigint format used by FiatBalance)
+        return BigInt(Math.round(ptYield.metadata.ptPriceUsd * 1e8));
+      }
+    }
+    return tokenPrice;
+  }, [name, tokenAddress, tokenPrice, findYield]);
+
+  const usdPrice = effectiveTokenPrice ? Number(effectiveTokenPrice) / 1e8 : 0;
 
   // Memoize the token object to avoid recreating it multiple times
   const tokenInfo = useMemo(
@@ -125,9 +139,9 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
       currentRate,
       rawBalance: normalizedBalance,
       decimals: tokenDecimals,
-      price: tokenPrice,
+      price: effectiveTokenPrice,
     }),
-    [name, icon, tokenAddress, currentRate, normalizedBalance, tokenDecimals, tokenPrice],
+    [name, icon, tokenAddress, currentRate, normalizedBalance, tokenDecimals, effectiveTokenPrice],
   );
 
   // Use shared position state hook
@@ -287,7 +301,7 @@ export const SupplyPosition: FC<SupplyPositionProps> = ({
         icon={icon}
         name={name}
         tokenAddress={tokenAddress}
-        tokenPrice={tokenPrice}
+        tokenPrice={effectiveTokenPrice}
         tokenDecimals={tokenDecimals}
         tokenBalance={normalizedBalance}
         // Protocol info

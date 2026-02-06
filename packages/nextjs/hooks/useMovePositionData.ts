@@ -10,8 +10,8 @@ import { VESU_V1_POOLS, VESU_V2_POOLS } from "~~/components/specific/vesu/pools"
 import { formatUnits } from "viem";
 
 // Helper function to safely stringify objects containing BigInt values
-const stringifyWithBigInt = (value: any): string => {
-  return JSON.stringify(value, (key, val) => (typeof val === "bigint" ? val.toString() : val));
+const stringifyWithBigInt = (value: unknown): string => {
+  return JSON.stringify(value, (_key, val) => (typeof val === "bigint" ? val.toString() : val));
 };
 
 export type NetworkType = "evm" | "starknet";

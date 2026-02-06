@@ -1,6 +1,6 @@
-import { TransactionWithFunction } from "./block";
-import { GenericContractsDeclaration } from "./contract";
-import { Abi, AbiFunction, decodeFunctionData, getAbiItem } from "viem";
+import type { TransactionWithFunction } from "./block";
+import type { GenericContractsDeclaration } from "./contract";
+import { type Abi, type AbiFunction, decodeFunctionData, getAbiItem } from "viem";
 import { hardhat } from "viem/chains";
 import contractData from "~~/contracts/deployedContracts";
 
@@ -26,15 +26,15 @@ export const decodeTransactionData = (tx: TransactionWithFunction) => {
           data: tx.input,
         });
         tx.functionName = functionName;
-        tx.functionArgs = args as any[];
+        tx.functionArgs = args as readonly unknown[];
         tx.functionArgNames = getAbiItem<AbiFunction[], string>({
           abi: contractAbi as AbiFunction[],
           name: functionName,
-        })?.inputs?.map((input: any) => input.name);
+        })?.inputs?.map((input: { name: string; type: string }) => input.name);
         tx.functionArgTypes = getAbiItem<AbiFunction[], string>({
           abi: contractAbi as AbiFunction[],
           name: functionName,
-        })?.inputs.map((input: any) => input.type);
+        })?.inputs.map((input: { name: string; type: string }) => input.type);
         foundInterface = true;
         break;
       } catch {

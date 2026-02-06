@@ -12,7 +12,7 @@
 
 import { useMemo } from "react";
 import { Address } from "viem";
-import { usePendlePTYields, isPTToken, type PTYield } from "./usePendlePTYields";
+import { usePendlePTYields, isPTToken, calculateFixedApy, type PTYield } from "./usePendlePTYields";
 import { useMapleYields, isSyrupToken, type MapleYield } from "./useMapleYields";
 import { useLSTYields, isLSTToken, type LSTYield } from "./useLSTYields";
 
@@ -36,6 +36,11 @@ export interface ExternalYield {
     expiry?: Date;
     daysToExpiry?: number;
     underlyingSymbol?: string;
+    underlyingAddress?: string;
+    /** PT price in USD from Pendle (use for consistent APY calculation) */
+    ptPriceUsd?: number;
+    /** Underlying price in USD from Pendle (use for consistent APY calculation) */
+    underlyingPriceUsd?: number;
     // Maple-specific
     dripsBoost?: number;
     baseApy?: number;
@@ -60,6 +65,9 @@ function ptYieldToExternal(pt: PTYield): ExternalYield {
       expiry: pt.expiry,
       daysToExpiry: pt.daysToExpiry,
       underlyingSymbol: pt.underlyingSymbol,
+      underlyingAddress: pt.underlyingAddress,
+      ptPriceUsd: pt.ptPriceUsd,
+      underlyingPriceUsd: pt.underlyingPriceUsd,
     },
   };
 }
@@ -229,6 +237,6 @@ export function useExternalYields(chainId?: number, enabled = true) {
   };
 }
 
-// Re-export type checks for convenience
-export { isPTToken, isSyrupToken, isLSTToken };
+// Re-export type checks and utilities for convenience
+export { isPTToken, isSyrupToken, isLSTToken, calculateFixedApy };
 export type { PTYield, MapleYield, LSTYield };

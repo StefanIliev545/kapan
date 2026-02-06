@@ -55,7 +55,7 @@ import {
 } from "~~/utils/chainFeatures";
 import {
   FlashLoanProvider,
-  ProtocolInstruction,
+  type ProtocolInstruction,
   createRouterInstruction,
   createProtocolInstruction,
   encodeApprove,
@@ -221,7 +221,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       address: debtToken,
       decimals: debtDecimals,
       rawBalance: debtBalance,
-      balance: parseFloat(formatUnits(debtBalance, debtDecimals)),
+      balance: Number.parseFloat(formatUnits(debtBalance, debtDecimals)),
       icon: debtIcon,
       price: debtPrice,
     }),
@@ -242,11 +242,15 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
 
   // Euler context encoding
   const eulerContextEncoded = useMemo(() => {
-    if (!isEuler || !eulerBorrowVault || !selectedTo) return undefined;
+    if (!isEuler || !eulerBorrowVault || !selectedTo) {
+      return undefined;
+    }
     const selectedCollateralVault =
       (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault ||
       eulerCollateralVaults?.[0];
-    if (!selectedCollateralVault) return undefined;
+    if (!selectedCollateralVault) {
+      return undefined;
+    }
     return encodeEulerContext({
       borrowVault: eulerBorrowVault as Address,
       collateralVault: selectedCollateralVault as Address,
@@ -284,10 +288,14 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
 
   // Initialize limitOrderConfig
   useEffect(() => {
-    if (executionType !== "limit" || limitOrderConfig?.selectedProvider) return;
+    if (executionType !== "limit" || limitOrderConfig?.selectedProvider) {
+      return;
+    }
 
     const providers = getCowFlashLoanProviders(chainId);
-    if (providers.length === 0) return;
+    if (providers.length === 0) {
+      return;
+    }
 
     const morphoProvider = providers.find(p => p.provider === "morpho");
     const defaultProvider = morphoProvider || providers[0];
@@ -348,7 +356,9 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   // Add buffer for interest accrual between quote time and execution
   // Calculate based on actual borrow rate and expected execution time
   const bufferedRepayAmount = useMemo(() => {
-    if (repayAmountRaw === 0n) return 0n;
+    if (repayAmountRaw === 0n) {
+      return 0n;
+    }
     const rate = borrowRateApy ?? FALLBACK_BORROW_RATE_APY;
     const minutes = executionType === "limit"
       ? LIMIT_ORDER_HOURS * 60
@@ -359,13 +369,17 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
 
   // For limit orders, the buy amount is the debt we want to receive
   const limitOrderBuyAmount = useMemo(() => {
-    if (executionType !== "limit") return repayAmountRaw;
+    if (executionType !== "limit") {
+      return repayAmountRaw;
+    }
     return bufferedRepayAmount; // Already includes limit order buffer
   }, [repayAmountRaw, executionType, bufferedRepayAmount]);
 
   // Unit quote (1 collateral -> X debt)
   const unitQuoteAmount = useMemo(() => {
-    if (!selectedTo) return "0";
+    if (!selectedTo) {
+      return "0";
+    }
     return parseUnits("1", selectedTo.decimals).toString();
   }, [selectedTo]);
 
@@ -459,11 +473,16 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   // Check if actual quote output covers debt - if not, we need more collateral
   // This handles price impact on larger swaps that unit quote doesn't capture
   const quoteShortfall = useMemo(() => {
-    if (!swapQuote || repayAmountRaw === 0n) return null;
+    if (!swapQuote || repayAmountRaw === 0n) {
+      return null;
+    }
     const quoteOutput = BigInt(swapQuote.dstAmount);
-    if (quoteOutput >= repayAmountRaw) return null; // Quote covers debt
+    if (quoteOutput >= repayAmountRaw) {
+      // Quote covers debt
+      return null;
+    }
     // Calculate shortfall ratio: how much more collateral we need
-    // e.g., if quote gives 98 but we need 100, ratio = 100/98 = 1.0204
+    // E.g., if quote gives 98 but we need 100, ratio = 100/98 = 1.0204
     return {
       needed: repayAmountRaw,
       received: quoteOutput,
@@ -507,7 +526,9 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   // Limit order collateral calculation
   const limitOrderCollateral = useMemo(() => {
     const cowCollateral = calculateLimitOrderCollateral(cowQuote, selectedTo, slippage);
-    if (cowCollateral > 0n) return cowCollateral;
+    if (cowCollateral > 0n) {
+      return cowCollateral;
+    }
     if (requiredCollateral > 0n) {
       console.log("[Limit Order] CoW quote unavailable, using 1inch/Pendle quote as fallback");
       return requiredCollateral;
@@ -517,8 +538,8 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
 
   const effectiveLimitOrderCollateral = useMemo(() => {
     if (useCustomBuyAmount && customBuyAmount && selectedTo) {
-      const parsed = parseFloat(customBuyAmount);
-      if (!isNaN(parsed) && parsed > 0) {
+      const parsed = Number.parseFloat(customBuyAmount);
+      if (!Number.isNaN(parsed) && parsed > 0) {
         return BigInt(Math.floor(parsed * 10 ** selectedTo.decimals));
       }
     }
@@ -532,8 +553,12 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
 
   // Conditional order trigger params - encodes parameters for LimitPriceTrigger contract
   const conditionalOrderTriggerParams = useMemo(() => {
-    if (!selectedTo || !selectedTo.address || !debtToken || !limitPriceTriggerAddress) return null;
-    if (effectiveLimitOrderCollateral === 0n || limitOrderBuyAmount === 0n) return null;
+    if (!selectedTo || !selectedTo.address || !debtToken || !limitPriceTriggerAddress) {
+      return null;
+    }
+    if (effectiveLimitOrderCollateral === 0n || limitOrderBuyAmount === 0n) {
+      return null;
+    }
 
     // Normalize protocol name for getProtocolId
     const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -548,10 +573,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
 
     // Close position is a BUY order: we want exact debt amount (buyAmount) for repayment
     // totalSellAmount = max collateral we're willing to sell, totalBuyAmount = exact debt to buy
-    // IMPORTANT: Add slippage buffer to totalSellAmount! The trigger calculates sellAmount with slippage,
-    // then caps it to totalSellAmount. Without buffer, the slippage would be negated by the cap.
-    const totalSellAmountWithSlippage = (effectiveLimitOrderCollateral * BigInt(10000 + Math.round(slippage * 100))) / 10000n;
-
+    // For limit orders, user sets exact price - no slippage buffer needed
     return encodeLimitPriceTriggerParams({
       protocolId: getProtocolId(normalizedProtocol),
       protocolContext: (context || "0x") as `0x${string}`,
@@ -561,10 +583,10 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       buyDecimals: debtDecimals,
       limitPrice,
       triggerAbovePrice: false, // Execute when price <= limit (we want good rates for selling)
-      totalSellAmount: totalSellAmountWithSlippage, // Max willing to sell (with slippage buffer)
+      totalSellAmount: effectiveLimitOrderCollateral, // Exact amount user is willing to sell
       totalBuyAmount: limitOrderBuyAmount, // Exact amount to buy (debt for repayment)
       numChunks: numChunks,
-      maxSlippageBps: Math.round(slippage * 100), // Use actual slippage setting
+      maxSlippageBps: 0, // No slippage for limit orders - price is exact
       isKindBuy: true, // BUY order: exact buyAmount, max sellAmount
     });
   }, [
@@ -730,7 +752,9 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
 
   // ============ Build Flow (Market Orders) ============
   const buildFlow = useCallback((): ProtocolInstruction[] => {
-    if (!swapQuote || !selectedTo || !hasAdapter || requiredCollateral === 0n) return [];
+    if (!swapQuote || !selectedTo || !hasAdapter || requiredCollateral === 0n) {
+      return [];
+    }
 
     const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
     const isAave = providerEnum === FlashLoanProvider.Aave || providerEnum === FlashLoanProvider.ZeroLend;
@@ -922,9 +946,8 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
         flashLoan: {
           lender: cowFlashLoanInfo.lender as Address,
           token: selectedTo.address as Address,
-          // Include slippage buffer to match trigger's totalSellAmount calculation
-          // BUY orders have maxSellAmount = collateral * (1 + slippage), so flash loan must cover that
-          amount: (effectiveLimitOrderCollateral * BigInt(10000 + Math.round(slippage * 100))) / 10000n / BigInt(numChunks),
+          // For limit orders, use exact amount per chunk - no slippage buffer
+          amount: effectiveLimitOrderCollateral / BigInt(numChunks),
         },
         sellTokenRefundAddress: getKapanCowAdapter(chainId) as Address, // KapanCowAdapter for flash loan repayment
         operationType: "close-position",
@@ -1048,12 +1071,12 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   // ============ Can Submit ============
   // Block submission if quote doesn't cover debt (would revert on-chain)
   const quoteCoversDebt = !quoteShortfall;
-  const canSubmitMarket = !!swapQuote && parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter && quoteCoversDebt;
+  const canSubmitMarket = !!swapQuote && Number.parseFloat(amountIn) > 0 && hasEnoughCollateral && hasAdapter && quoteCoversDebt;
   const canSubmitLimit =
     executionType === "limit" &&
     conditionalOrderReady &&
     !!cowFlashLoanInfo &&
-    parseFloat(amountIn) > 0 &&
+    Number.parseFloat(amountIn) > 0 &&
     hasEnoughCollateralForLimit &&
     !!conditionalOrderManagerAddress &&
     !!conditionalOrderTriggerParams &&
@@ -1067,16 +1090,24 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   const outputCoversRepay = swapQuote ? BigInt(swapQuote.dstAmount) >= repayAmountRaw : false;
 
   const srcUsdFallback = useMemo(() => {
-    if (!selectedTo?.price || requiredCollateral === 0n) return undefined;
-    const amount = parseFloat(formatUnits(requiredCollateral, selectedTo.decimals));
-    if (amount <= 0) return undefined;
+    if (!selectedTo?.price || requiredCollateral === 0n) {
+      return undefined;
+    }
+    const amount = Number.parseFloat(formatUnits(requiredCollateral, selectedTo.decimals));
+    if (amount <= 0) {
+      return undefined;
+    }
     return amount * Number(formatUnits(selectedTo.price, 8));
   }, [selectedTo?.price, selectedTo?.decimals, requiredCollateral]);
 
   const dstUsdFallback = useMemo(() => {
-    if (!debtPrice || !expectedOutput) return undefined;
-    const parsed = parseFloat(expectedOutput);
-    if (isNaN(parsed) || parsed <= 0) return undefined;
+    if (!debtPrice || !expectedOutput) {
+      return undefined;
+    }
+    const parsed = Number.parseFloat(expectedOutput);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      return undefined;
+    }
     return parsed * Number(formatUnits(debtPrice, 8));
   }, [debtPrice, expectedOutput]);
 
@@ -1095,7 +1126,9 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   const handleExecutionTypeChange = useCallback(
     (type: ExecutionType) => {
       setExecutionType(type);
-      if (type === "limit" && slippage < 1) setSlippage(1);
+      if (type === "limit" && slippage < 1) {
+        setSlippage(1);
+      }
     },
     [slippage]
   );
@@ -1135,7 +1168,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
                 <select
                   className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
                   value={slippage}
-                  onChange={e => setSlippage(parseFloat(e.target.value))}
+                  onChange={e => setSlippage(Number.parseFloat(e.target.value))}
                 >
                   {[0.1, 0.3, 0.5, 1, 3].map(s => (
                     <option key={s} value={s}>
@@ -1152,7 +1185,9 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
                     value={selectedProvider?.name || ""}
                     onChange={e => {
                       const p = flashLoanProviders.find(provider => provider.name === e.target.value);
-                      if (p) setSelectedProvider(p);
+                      if (p) {
+                        setSelectedProvider(p);
+                      }
                     }}
                   >
                     {flashLoanProviders.map(p => (
@@ -1177,7 +1212,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
               {exchangeRate && (
                 <div className="flex items-center justify-between">
                   <span className="text-base-content/50">Rate</span>
-                  <span className="text-base-content/80">1:{parseFloat(exchangeRate).toFixed(2)}</span>
+                  <span className="text-base-content/80">1:{Number.parseFloat(exchangeRate).toFixed(2)}</span>
                 </div>
               )}
               {swapQuote && expectedOutput && (
@@ -1192,7 +1227,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
                         : "text-base-content/80"
                     }
                   >
-                    {parseFloat(expectedOutput).toFixed(4)} {debtName}
+                    {Number.parseFloat(expectedOutput).toFixed(4)} {debtName}
                   </span>
                 </div>
               )}
@@ -1243,11 +1278,13 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
                       const limitRate =
                         Number(formatUnits(limitOrderCollateral, selectedTo.decimals)) /
                         Number(formatUnits(repayAmountRaw, debtDecimals));
-                      const marketRate = parseFloat(exchangeRate);
+                      const marketRate = Number.parseFloat(exchangeRate);
                       const pctDiff = ((limitRate - marketRate) / marketRate) * 100;
                       const isAbove = pctDiff > 0;
                       const absDiff = Math.abs(pctDiff);
-                      if (absDiff < 0.01) return <span className="text-base-content/40">at market price</span>;
+                      if (absDiff < 0.01) {
+                        return <span className="text-base-content/40">at market price</span>;
+                      }
                       return (
                         <span className={isAbove ? "text-warning" : "text-success"}>
                           {absDiff.toFixed(2)}% {isAbove ? "above" : "below"} market
@@ -1270,7 +1307,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
                     className="border-base-300 bg-base-200 text-base-content/80 w-14 rounded border px-2 py-0.5 text-right text-xs font-medium"
                     value={numChunks}
                     onChange={e => {
-                      const val = parseInt(e.target.value) || 1;
+                      const val = Number.parseInt(e.target.value) || 1;
                       setNumChunks(Math.max(1, Math.min(100, val)));
                     }}
                   />
@@ -1407,14 +1444,18 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   ]);
 
   const limitPriceButtons: ReactNode = useMemo(() => {
-    if (executionType !== "limit" || !selectedTo || limitOrderCollateral === 0n) return null;
+    if (executionType !== "limit" || !selectedTo || limitOrderCollateral === 0n) {
+      return null;
+    }
 
     const adjustByPercent = (delta: number) => {
       const currentAmount =
         useCustomBuyAmount && customBuyAmount
-          ? parseFloat(customBuyAmount)
+          ? Number.parseFloat(customBuyAmount)
           : Number(formatUnits(limitOrderCollateral, selectedTo.decimals));
-      if (isNaN(currentAmount)) return;
+      if (Number.isNaN(currentAmount)) {
+        return;
+      }
       const newAmount = currentAmount * (1 + delta / 100);
       setCustomBuyAmount(newAmount.toFixed(6));
       setUseCustomBuyAmount(true);
@@ -1538,7 +1579,7 @@ const InfoStep: React.FC<InfoStepProps> = ({ step, title, isLast, children }) =>
       <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">
         {step}
       </div>
-      {!isLast && <div className="bg-base-300 my-1 h-full w-0.5"></div>}
+      {!isLast && <div className="bg-base-300 my-1 h-full w-0.5" />}
     </div>
     <div className={isLast ? "" : "pb-4"}>
       <h4 className="text-sm font-medium">{title}</h4>

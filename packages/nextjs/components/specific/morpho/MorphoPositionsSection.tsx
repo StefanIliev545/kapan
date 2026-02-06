@@ -188,7 +188,9 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
 
   // Calculate collateral rate (PT tokens have fixed yield)
   const collateralRate = useMemo(() => {
-    if (!hasExternalYield(row.collateralSymbol)) return 0;
+    if (!hasExternalYield(row.collateralSymbol)) {
+      return 0;
+    }
     const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
     const ptYield = findYield?.(collateralAddr, row.collateralSymbol);
     return ptYield?.fixedApy ?? 0;
@@ -210,7 +212,9 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
 
   // Memoized borrow position object
   const borrowPosition = useMemo(() => {
-    if (!row.hasCollateral) return null;
+    if (!row.hasCollateral) {
+      return null;
+    }
     return {
       icon: tokenNameToLogo(row.loanSymbol.toLowerCase()),
       name: row.loanSymbol,
@@ -271,7 +275,9 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
 
   // Handle debt swap button click - opens debt swap modal
   const handleDebtSwapClick = useCallback(() => {
-    if (!onDebtSwapRequest || !row.hasDebt || !row.hasCollateral) return;
+    if (!onDebtSwapRequest || !row.hasDebt || !row.hasCollateral) {
+      return;
+    }
     onDebtSwapRequest({
       isOpen: true,
       morphoContext: row.context,
@@ -311,7 +317,9 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
 
   // Handle swap button click - opens collateral swap modal
   const handleSwapClick = useCallback(() => {
-    if (!onSwapRequest || !row.hasCollateral) return;
+    if (!onSwapRequest || !row.hasCollateral) {
+      return;
+    }
     // Convert price to 1e8 format for SwapAsset compatibility
     const priceIn1e8 = BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8));
     onSwapRequest({
@@ -331,7 +339,9 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
   // Handle ADL button click - opens ADL automation modal
   const handleADLClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!onADLRequest || !row.hasDebt || !row.hasCollateral) return;
+    if (!onADLRequest || !row.hasDebt || !row.hasCollateral) {
+      return;
+    }
     const priceIn1e8 = BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8));
     onADLRequest({
       isOpen: true,
@@ -597,15 +607,23 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
     const autoLevMap = new Map<string, ConditionalOrder>();
 
     for (const order of conditionalOrders) {
-      if (order.context.status !== ConditionalOrderStatus.Active) continue;
-      if (!order.triggerParams) continue;
+      if (order.context.status !== ConditionalOrderStatus.Active) {
+        continue;
+      }
+      if (!order.triggerParams) {
+        continue;
+      }
 
       // Only match Morpho orders
-      if (order.triggerParams.protocolId !== PROTOCOL_IDS.MORPHO_BLUE) continue;
+      if (order.triggerParams.protocolId !== PROTOCOL_IDS.MORPHO_BLUE) {
+        continue;
+      }
 
       // Decode the protocol context to get market params
       const morphoContext = decodeMorphoContext(order.triggerParams.protocolContext);
-      if (!morphoContext) continue;
+      if (!morphoContext) {
+        continue;
+      }
 
       const marketId = morphoContext.marketId.toLowerCase();
       const triggerAddr = order.context.params.trigger.toLowerCase();
@@ -627,7 +645,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
     for (const row of rows) {
       const marketId = row.market.uniqueKey?.toLowerCase();
-      if (!marketId) continue;
+      if (!marketId) {
+        continue;
+      }
 
       const currentLtvBps = Math.round((row.currentLtv || 0) * 100);
 
@@ -751,7 +771,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
   // Build available assets for swap modal from current position
   const swapAvailableAssets = useMemo(() => {
-    if (!swapModalState) return [];
+    if (!swapModalState) {
+      return [];
+    }
     // Convert raw balance to human-readable number
     const humanBalance = Number(formatUnits(swapModalState.collateralBalance, swapModalState.collateralDecimals));
     return [{
@@ -767,7 +789,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
   // Build position prop for swap modal
   const swapPosition = useMemo(() => {
-    if (!swapModalState) return null;
+    if (!swapModalState) {
+      return null;
+    }
     return {
       name: swapModalState.collateralSymbol,
       tokenAddress: swapModalState.collateralAddress,
@@ -779,7 +803,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
   // Build available assets for debt swap modal from current position
   const debtSwapAvailableAssets = useMemo(() => {
-    if (!debtSwapModalState) return [];
+    if (!debtSwapModalState) {
+      return [];
+    }
     // Convert raw balance to human-readable number
     const humanBalance = Number(formatUnits(debtSwapModalState.debtBalance, debtSwapModalState.debtTokenDecimals));
     return [{

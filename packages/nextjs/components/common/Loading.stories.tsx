@@ -1,13 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import {
-  LoadingSpinner,
-  LoadingOverlay,
   ButtonLoading,
   LoadingAlert,
-  SkeletonLine,
-  SkeletonCircle,
-  SkeletonRow,
+  LoadingOverlay,
+  LoadingSpinner,
   SectionLoading,
+  SkeletonCircle,
+  SkeletonLine,
+  SkeletonRow,
 } from "./Loading";
 
 const meta: Meta<typeof LoadingSpinner> = {

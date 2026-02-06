@@ -158,7 +158,7 @@ export function calculateChunkParams(input: ChunkCalculationInput): ChunkCalcula
 
   // Calculate chunk size
   const chunkSize = totalDebtAmount / BigInt(n);
-  const chunkSizes = Array(n).fill(chunkSize) as bigint[];
+  const chunkSizes = Array.from({ length: n }, () => chunkSize);
   
   // Handle remainder
   const remainder = totalDebtAmount - chunkSize * BigInt(n);
@@ -211,7 +211,9 @@ export function calculateSwapRate(
   buyAmount: bigint,
   buyDecimals: number,
 ): bigint {
-  if (sellAmount === 0n) return 0n;
+  if (sellAmount === 0n) {
+    return 0n;
+  }
   const normalizedBuy = buyAmount * BigInt(10 ** (18 + sellDecimals));
   const normalizedSell = sellAmount * BigInt(10 ** buyDecimals);
   return normalizedBuy / normalizedSell;

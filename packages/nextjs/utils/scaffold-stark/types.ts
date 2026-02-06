@@ -14,7 +14,7 @@ import type {
   CairoU256,
   CairoVoid,
 } from "abi-wan-kanabi/kanabi";
-import { AbiEnum, AbiStruct } from "./contract";
+import type { AbiEnum, AbiStruct } from "./contract";
 
 export const isCairoInt = (type: string): type is CairoInt =>
   /core::integer::(u|i)(8|16|32)$/.test(type);
@@ -23,7 +23,7 @@ export const isCairoBigInt = (type: string): type is CairoBigInt =>
   /core::integer::(u|i)(64|128)$/.test(type);
 
 export const isCairoU256 = (type: string): type is CairoU256 =>
-  /core::integer::u256$/.test(type);
+  type.endsWith("core::integer::u256");
 
 export const isCairoContractAddress = (
   type: string,
@@ -85,7 +85,7 @@ export const isCairoType = (type: string): boolean => {
   );
 };
 
-export function isStructOrEnum(member: any): member is AbiStruct | AbiEnum {
+export function isStructOrEnum(member: { type: string }): member is AbiStruct | AbiEnum {
   return member.type === "struct" || member.type === "enum";
 }
 
@@ -100,13 +100,16 @@ export const isCairoResult = (type: string): boolean =>
 
 export function parseGenericType(typeString: string): string[] | string {
   const match = typeString.match(/<([^>]*(?:<(?:[^<>]*|<[^>]*>)*>[^>]*)*)>/);
-  if (!match) return typeString;
-
-  const content = match[1];
-  if (content.startsWith("(") && content.endsWith(")")) {
-    return content; // Return the tuple as a single string
+  if (!match) {
+    return typeString;
   }
 
-  const types = content.split(/,(?![^\(\)]*\))/);
+  const [, content] = match;
+  if (content.startsWith("(") && content.endsWith(")")) {
+    // Return the tuple as a single string
+    return content;
+  }
+
+  const types = content.split(/,(?![^()]*\))/);
   return types.map((type) => type.trim());
 }

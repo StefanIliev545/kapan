@@ -79,8 +79,12 @@ export type KapanProtocol =
  * Examples: "kapan:collateral-swap/morpho", "kapan:debt-swap/aave", "kapan:leverage-up"
  */
 export function buildAppCode(operationType?: KapanOperationType, protocol?: KapanProtocol): string {
-  if (!operationType) return "kapan";
-  if (!protocol) return `kapan:${operationType}`;
+  if (!operationType) {
+    return "kapan";
+  }
+  if (!protocol) {
+    return `kapan:${operationType}`;
+  }
   return `kapan:${operationType}/${protocol}`;
 }
 
@@ -89,11 +93,21 @@ export function buildAppCode(operationType?: KapanOperationType, protocol?: Kapa
  */
 export function normalizeProtocolForAppCode(protocolName: string): KapanProtocol | undefined {
   const lower = protocolName.toLowerCase();
-  if (lower.includes("morpho")) return "morpho";
-  if (lower.includes("aave")) return "aave";
-  if (lower.includes("compound")) return "compound";
-  if (lower.includes("venus")) return "venus";
-  if (lower.includes("euler")) return "euler";
+  if (lower.includes("morpho")) {
+    return "morpho";
+  }
+  if (lower.includes("aave")) {
+    return "aave";
+  }
+  if (lower.includes("compound")) {
+    return "compound";
+  }
+  if (lower.includes("venus")) {
+    return "venus";
+  }
+  if (lower.includes("euler")) {
+    return "euler";
+  }
   return undefined;
 }
 
@@ -102,7 +116,9 @@ export function normalizeProtocolForAppCode(protocolName: string): KapanProtocol
  * Returns undefined if not a kapan appCode or no operation type encoded
  */
 export function parseOperationTypeFromAppCode(appCode: string): KapanOperationType | undefined {
-  if (!appCode.startsWith("kapan:")) return undefined;
+  if (!appCode.startsWith("kapan:")) {
+    return undefined;
+  }
   // Handle format "kapan:operation-type/protocol" or "kapan:operation-type"
   const rest = appCode.slice(6);
   const type = rest.split("/")[0] as KapanOperationType;
@@ -115,10 +131,14 @@ export function parseOperationTypeFromAppCode(appCode: string): KapanOperationTy
  * Returns undefined if not present
  */
 export function parseProtocolFromAppCode(appCode: string): KapanProtocol | undefined {
-  if (!appCode.startsWith("kapan:")) return undefined;
+  if (!appCode.startsWith("kapan:")) {
+    return undefined;
+  }
   const rest = appCode.slice(6);
   const parts = rest.split("/");
-  if (parts.length < 2) return undefined;
+  if (parts.length < 2) {
+    return undefined;
+  }
   const protocol = parts[1] as KapanProtocol;
   const validProtocols: KapanProtocol[] = ["aave", "compound", "venus", "morpho", "euler"];
   return validProtocols.includes(protocol) ? protocol : undefined;
@@ -706,9 +726,13 @@ export async function registerAppData(
         baseDelay: 1000,
         isRetryable: (error) => {
           // Retry on network errors and rate limits
-          if (isNetworkError(error) || isRateLimitError(error)) return true;
+          if (isNetworkError(error) || isRateLimitError(error)) {
+            return true;
+          }
           // Retry on server errors (wrapped in Error objects from our throw above)
-          if (error instanceof Error && error.message.startsWith("API error 5")) return true;
+          if (error instanceof Error && error.message.startsWith("API error 5")) {
+            return true;
+          }
           return false;
         },
         onRetry: (attempt, error, delay) => {
@@ -858,7 +882,9 @@ export async function fetchOperationTypeFromAppData(
   appDataHash: string
 ): Promise<KapanOperationType | undefined> {
   const appData = await fetchAppData(chainId, appDataHash);
-  if (!appData) return undefined;
+  if (!appData) {
+    return undefined;
+  }
 
   return parseOperationTypeFromAppCode(appData.appCode);
 }

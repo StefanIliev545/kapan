@@ -22,10 +22,11 @@
  * Supports both market orders (instant via flash loans) and limit orders (via CoW Protocol).
  */
 
-import { FC } from "react";
-import { type Address } from "viem";
-import { SwapModalShell, type SwapAsset } from "./SwapModalShell";
+import type { FC } from "react";
+import type { Address } from "viem";
+import type { SwapAsset } from "./SwapModalShell";
 import { useClosePositionConfig } from "./common/useClosePositionConfig";
+import { SwapModalShell } from "./SwapModalShell";
 
 interface ClosePositionModalV2Props {
   isOpen: boolean;
@@ -37,7 +38,8 @@ interface ClosePositionModalV2Props {
   debtName: string;
   debtIcon: string;
   debtDecimals: number;
-  debtPrice?: bigint; // Price in 8 decimals (e.g., from Chainlink)
+  /** Price in 8 decimals (e.g., from Chainlink) */
+  debtPrice?: bigint;
   debtBalance: bigint;
   // Available collateral assets for "To" selection (collateral to sell)
   availableCollaterals: SwapAsset[];

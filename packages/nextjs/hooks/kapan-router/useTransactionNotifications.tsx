@@ -100,7 +100,7 @@ export const useTransactionNotifications = ({
         queryClient.refetchQueries({ queryKey: qk.morpho.all(chainId), type: 'active' }),
         // Euler-specific queries
         queryClient.refetchQueries({ queryKey: qk.euler.all(chainId), type: 'active' }),
-      ]).catch(e => logger.warn("Post-tx refetch err:", e));
+      ]).catch(error => logger.warn("Post-tx refetch err:", error));
 
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("txCompleted"));

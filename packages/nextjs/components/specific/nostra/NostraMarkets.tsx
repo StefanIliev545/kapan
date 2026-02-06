@@ -37,7 +37,9 @@ export const NostraMarkets: FC<NostraMarketsProps> = ({ viewMode, search }) => {
   });
 
   const markets: MarketData[] = useMemo(() => {
-    if (!assetInfos || !interestRates) return [];
+    if (!assetInfos || !interestRates) {
+      return [];
+    }
     const infos = assetInfos as unknown as any[];
     const rates = interestRates as unknown as any[];
     const priceArr = (prices as unknown as bigint[]) || [];

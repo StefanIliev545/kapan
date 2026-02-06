@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useAccount } from "~~/hooks/useAccount";
 import scaffoldConfig from "~~/scaffold.config";
 import { useGlobalState } from "~~/services/store/store";
-import { ChainWithAttributes } from "~~/utils/scaffold-stark";
+import type { ChainWithAttributes } from "~~/utils/scaffold-stark";
 
 /**
  * Retrieves the connected wallet's network from scaffold.config or defaults to the 0th network in the list if the wallet is not connected.

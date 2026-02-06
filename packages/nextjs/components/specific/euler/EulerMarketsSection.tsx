@@ -74,21 +74,6 @@ interface VaultRow {
 
 const columnHelper = createColumnHelper<VaultRow>();
 
-// Utilization bar component
-function UtilizationBar({ value }: { value: number }) {
-  const percent = Math.min(100, Math.max(0, value * 100));
-  const color = value >= 0.95 ? "bg-error" : value >= 0.85 ? "bg-warning" : "bg-primary/70";
-  const barStyle = React.useMemo(() => ({ width: `${percent}%` }), [percent]);
-
-  return (
-    <Tooltip content={`${percent.toFixed(1)}% utilized`}>
-      <div className="bg-base-content/10 mx-auto h-1.5 w-14 overflow-hidden rounded-full">
-        <div className={`h-full ${color} rounded-full`} style={barStyle} />
-      </div>
-    </Tooltip>
-  );
-}
-
 // Token Icon component
 function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
   const src = tokenNameToLogo(symbol.toLowerCase());
@@ -155,7 +140,11 @@ function CategoryButton({
   return (
     <button
       onClick={handleClick}
-      className={`btn btn-xs ${isActive ? 'btn-primary' : 'btn-ghost'}`}
+      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+        isActive
+          ? 'bg-primary text-primary-content'
+          : 'text-base-content/60 hover:text-base-content hover:bg-base-200/50'
+      }`}
     >
       {TOKEN_CATEGORIES[category].label}
     </button>
@@ -322,20 +311,20 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   const dropdownContent = isOpen && position && typeof document !== "undefined" ? (
     <div
       ref={dropdownRef}
-      className="bg-base-100 border-base-300 fixed z-[9999] w-80 rounded-xl border shadow-2xl"
+      className="bg-base-100 fixed z-[9999] w-80 rounded-xl shadow-xl ring-1 ring-base-content/5"
       style={dropdownStyle}
       onClick={handleStopPropagation}
     >
-      <div className="border-base-300 border-b p-3">
+      <div className="p-4 pb-3">
         <div className="relative">
-          <Search className="text-base-content/50 absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+          <Search className="text-base-content/40 absolute left-3 top-1/2 size-4 -translate-y-1/2" />
           <input
             ref={inputRef}
             type="text"
             placeholder={`Search ${placeholder.toLowerCase()}...`}
             value={searchTerm}
             onChange={handleSearchChange}
-            className="input input-sm input-bordered bg-base-200/50 w-full pl-9 pr-8"
+            className="input input-sm bg-base-200/30 w-full border-0 pl-9 pr-8 focus:bg-base-200/50 focus:outline-none"
           />
           {searchTerm && (
             <button
@@ -347,16 +336,16 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
           )}
         </div>
       </div>
-      <div className="border-base-300 border-b px-3 py-2">
-        <div className="flex flex-wrap items-center gap-1">
+      <div className="px-4 pb-3">
+        <div className="flex flex-wrap items-center gap-1.5">
           {(Object.keys(TOKEN_CATEGORIES) as TokenCategory[]).map(cat => (
             <CategoryButton key={cat} category={cat} isActive={activeCategory === cat} onClick={setActiveCategory} />
           ))}
           <div className="flex-1" />
-          <button onClick={handleClear} className="btn btn-xs btn-ghost text-base-content/60">Clear</button>
+          <button onClick={handleClear} className="text-xs text-base-content/50 hover:text-base-content/70 transition-colors">Clear</button>
         </div>
       </div>
-      <div className="max-h-72 overflow-y-auto p-2">
+      <div className="max-h-72 overflow-y-auto px-2 pb-2">
         <OptionButton option="all" isSelected={isAllSelected} onSelect={handleSelect} displayLabel={allLabel} />
         {filteredOptions.length === 0 ? (
           <div className="text-base-content/50 py-8 text-center text-sm">No matches found</div>
@@ -381,7 +370,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
       <button
         ref={triggerRef}
         type="button"
-        className="btn btn-sm btn-ghost border-base-300 hover:border-base-content/30 min-w-[140px] justify-between gap-2 border font-normal"
+        className="flex min-w-[140px] items-center justify-between gap-2 rounded-lg bg-base-200/40 px-3 py-1.5 text-sm transition-colors hover:bg-base-200/70"
         onClick={handleToggleOpen}
       >
         <div className="flex items-center gap-2 overflow-hidden">
@@ -395,9 +384,9 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
               ))}
             </div>
           )}
-          <span className="truncate text-sm">{displayValue}</span>
+          <span className="truncate">{displayValue}</span>
         </div>
-        <ChevronDown className={`size-4 flex-shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`size-4 flex-shrink-0 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       {dropdownContent && typeof document !== "undefined" && ReactDOM.createPortal(dropdownContent, document.body)}
     </>
@@ -727,7 +716,7 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
     columnHelper.accessor("utilization01", {
       id: "util",
       header: "Util",
-      cell: info => <UtilizationBar value={info.getValue()} />,
+      cell: info => formatPercent(info.getValue(), 0),
       sortingFn: "basic",
     }),
     columnHelper.accessor("supplyApy01", {
@@ -766,9 +755,12 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
       id: "actions",
       header: "",
       cell: info => (
-        <Button size="1" variant="soft" onClick={() => handleSupplyClick(info.row.original.vault)}>
+        <button
+          onClick={() => handleSupplyClick(info.row.original.vault)}
+          className="text-sm font-medium text-base-content hover:text-primary transition-colors"
+        >
           Supply
-        </Button>
+        </button>
       ),
     }),
   ], [chainId, usd]);
@@ -1018,8 +1010,8 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                             className={`label-text-xs pb-2 ${
                               isMarket ? "text-left" :
                               isCollaterals ? "px-3 text-left" :
-                              isUtil ? "w-20 text-center" :
-                              isActions ? "w-28" :
+                              isUtil ? "text-center" :
+                              isActions ? "pl-6" :
                               "text-right"
                             } ${canSort ? "hover:text-base-content/60 cursor-pointer transition-colors" : ""}`}
                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
@@ -1047,7 +1039,6 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                         const isMarket = columnId === "market";
                         const isCollaterals = columnId === "collaterals";
                         const isUtil = columnId === "util";
-                        const isEarn = columnId === "supplyApy01";
                         const isActions = columnId === "actions";
 
                         return (
@@ -1057,8 +1048,7 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                               isMarket ? "rounded-l-lg pl-3" :
                               isCollaterals ? "px-3" :
                               isUtil ? "text-center" :
-                              isEarn ? "text-right tabular-nums" :
-                              isActions ? "rounded-r-lg pr-3 text-right" :
+                              isActions ? "rounded-r-lg pl-6 pr-3 text-right" :
                               "text-right tabular-nums"
                             }`}
                           >

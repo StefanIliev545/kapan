@@ -60,7 +60,7 @@ function flattenInstructions(
   }
   
   // It's a single ProtocolInstruction[] - check if elements are ProtocolInstruction or arrays
-  if (instructions.length > 0 && typeof (instructions[0] as any).protocolName === 'string') {
+  if (instructions.length > 0 && typeof (instructions[0] as ProtocolInstruction).protocolName === 'string') {
     return instructions as ProtocolInstruction[];
   }
   
@@ -308,10 +308,11 @@ export function useCowOrder() {
       );
       
       return txHash;
-    } catch (error: any) {
+    } catch (error) {
       notification.remove(notificationId);
       logger.error("[useCowOrder] Error setting delegation:", error);
-      notification.error(`Failed to set delegation: ${error.shortMessage || error.message}`);
+      const err = error as { shortMessage?: string; message?: string };
+      notification.error(`Failed to set delegation: ${err.shortMessage || err.message}`);
       return undefined;
     }
   }, [userAddress, orderManagerAddress, walletClient, routerContract, publicClient, chainId]);
@@ -440,7 +441,7 @@ export function useCowOrder() {
       data: encodeFunctionData({
         abi: orderManagerContract?.abi ?? ORDER_MANAGER_ABI,
         functionName: "createOrder",
-        args: [orderParams as any, salt as `0x${string}`, seedAmount],
+        args: [orderParams as Parameters<typeof encodeFunctionData>["args"], salt as `0x${string}`, seedAmount],
       }) as Hex,
     };
 
@@ -612,7 +613,7 @@ export function useCowOrder() {
       const createCalldata = encodeFunctionData({
         abi: orderManagerContract?.abi ?? ORDER_MANAGER_ABI,
         functionName: "createOrder",
-        args: [orderParams as any, salt as `0x${string}`, seedAmount],
+        args: [orderParams as Parameters<typeof encodeFunctionData>["args"], salt as `0x${string}`, seedAmount],
       });
 
       const txHash = await walletClient.sendTransaction({
@@ -687,20 +688,21 @@ export function useCowOrder() {
 
       return orderHash;
 
-    } catch (error: any) {
+    } catch (error) {
       if (notificationId) notification.remove(notificationId);
-      
-      const message = error?.shortMessage || error?.message || "Failed to create order";
-      const isRejection = message.toLowerCase().includes("rejected") || 
+
+      const err = error as { shortMessage?: string; message?: string };
+      const message = err?.shortMessage || err?.message || "Failed to create order";
+      const isRejection = message.toLowerCase().includes("rejected") ||
                           message.toLowerCase().includes("denied");
-      
+
       notification.error(
-        <TransactionToast 
-          step="failed" 
+        <TransactionToast
+          step="failed"
           message={isRejection ? "User rejected request" : message}
         />
       );
-      
+
       logger.error("[useCowOrder] Create order failed:", error);
       return undefined;
 
@@ -765,14 +767,15 @@ export function useCowOrder() {
       queryClient.invalidateQueries({ queryKey: ["cow-orders"] });
       return true;
 
-    } catch (error: any) {
+    } catch (error) {
       if (notificationId) notification.remove(notificationId);
-      
-      const message = error?.shortMessage || error?.message || "Failed to cancel order";
+
+      const err = error as { shortMessage?: string; message?: string };
+      const message = err?.shortMessage || err?.message || "Failed to cancel order";
       notification.error(
         <TransactionToast step="failed" message={message} />
       );
-      
+
       logger.error("[useCowOrder] Cancel order failed:", error);
       return false;
 

@@ -40,7 +40,9 @@ function generateRandomSegment(): string {
  * where X is an uppercase alphanumeric character.
  */
 export function isValidReferralCode(code: string): boolean {
-  if (!code || typeof code !== "string") return false;
+  if (!code || typeof code !== "string") {
+    return false;
+  }
 
   // Check format: KAP-XXXX-XXXX (exact pattern)
   const pattern = /^KAP-[A-Z2-9]{4}-[A-Z2-9]{4}$/;

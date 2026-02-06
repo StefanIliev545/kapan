@@ -9,7 +9,7 @@
  * All hooks use React Query for caching and automatic deduplication.
  */
 
-import { useQuery, useQueries, type UseQueryResult } from "@tanstack/react-query";
+import { useQuery, useQueries, keepPreviousData, type UseQueryResult } from "@tanstack/react-query";
 import { formatUnits } from "viem";
 
 // -----------------------------------------------------------------------------
@@ -181,6 +181,8 @@ export function useTokenPrices(
     enabled,
     staleTime: PRICE_STALE_TIME,
     gcTime: PRICE_CACHE_TIME,
+    // Keep showing previous prices while fetching new ones to avoid UI flicker
+    placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: 1000,
   });

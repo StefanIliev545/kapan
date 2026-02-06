@@ -207,12 +207,19 @@ export function useWalletTokens(chainId?: number) {
             if (balance === 0n) continue;
 
             const balanceFormatted = parseFloat(formatUnits(balance, token.decimals));
-            // Use Morpho price if available, otherwise use fetched price
-            const price = token.price || fetchedPrices[token.symbol.toLowerCase()] || 0;
-            const usdValue = balanceFormatted * price;
 
-            // Look up external yield data
+            // Look up external yield data (do this first to get Pendle prices for PT tokens)
             const externalYield = findYield(token.address, token.symbol);
+
+            // Use price sources in order of preference:
+            // 1. Pendle PT price (for PT tokens - ensures consistency with displayed APY)
+            // 2. Morpho price (from market data)
+            // 3. CoinGecko price (fallback)
+            let price = token.price || fetchedPrices[token.symbol.toLowerCase()] || 0;
+            if (externalYield?.source === "pendle" && externalYield.metadata?.ptPriceUsd) {
+              price = externalYield.metadata.ptPriceUsd;
+            }
+            const usdValue = balanceFormatted * price;
 
             results.push({
               address: token.address,

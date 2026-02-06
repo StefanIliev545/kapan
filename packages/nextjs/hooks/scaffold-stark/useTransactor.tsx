@@ -1,5 +1,5 @@
 import { useTargetNetwork } from "./useTargetNetwork";
-import { AccountInterface, InvokeFunctionResponse } from "starknet";
+import type { AccountInterface, InvokeFunctionResponse } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import providerFactory from "~~/services/web3/provider";
@@ -110,26 +110,27 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("txCompleted"));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (notificationId) {
         notification.remove(notificationId);
       }
 
       // Check for user rejection
-      const errorMessage = error?.message || "";
+      const errorObj = error as Error & { code?: number | string };
+      const errorMessage = errorObj?.message || "";
       const lowerMessage = errorMessage.toLowerCase();
-      const isRejection = 
+      const isRejection =
         lowerMessage.includes("user rejected") ||
         lowerMessage.includes("user denied") ||
         lowerMessage.includes("user cancelled") ||
         lowerMessage.includes("rejected") ||
         lowerMessage.includes("denied") ||
         lowerMessage.includes("cancelled") ||
-        error?.code === 4001 ||
-        error?.code === "ACTION_REJECTED" ||
-        error?.code === "USER_REJECTED";
+        errorObj?.code === 4001 ||
+        errorObj?.code === "ACTION_REJECTED" ||
+        errorObj?.code === "USER_REJECTED";
 
-      const message = isRejection 
+      const message = isRejection
         ? "User rejected the request"
         : (() => {
             const errorPattern = /Contract (.*?)"}/;

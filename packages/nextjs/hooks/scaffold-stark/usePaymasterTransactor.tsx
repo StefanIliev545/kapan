@@ -1,5 +1,5 @@
 import { useTargetNetwork } from "./useTargetNetwork";
-import { AccountInterface, InvokeFunctionResponse, Call } from "starknet";
+import type { AccountInterface, InvokeFunctionResponse, Call } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
@@ -35,7 +35,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
   const STRK_ADDRESS = universalStrkAddress.toLowerCase();
   const { data: paymasterTokens } = usePaymasterGasTokens();
   const isSelectedStrk = selectedAddr === STRK_ADDRESS || (selectedToken?.symbol?.toUpperCase?.() === "STRK");
-  const isSupportedPaymasterToken = !!selectedAddr && !!paymasterTokens?.some((t: any) => (t?.token_address || "")?.toLowerCase() === selectedAddr);
+  const isSupportedPaymasterToken = !!selectedAddr && !!paymasterTokens?.some((t: { token_address?: string }) => (t?.token_address || "")?.toLowerCase() === selectedAddr);
   const shouldUsePaymaster = !isSelectedStrk && isSupportedPaymasterToken;
 
   // Setup paymaster transaction hook
@@ -169,14 +169,15 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("txCompleted"));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (notificationId) {
         notification.remove(notificationId);
       }
 
       const errorPattern = /Contract (.*?)"}/;
-      const match = errorPattern.exec(error.message);
-      const message = match ? match[1] : error.message;
+      const errorObj = error as Error;
+      const match = errorPattern.exec(errorObj.message);
+      const message = match ? match[1] : errorObj.message;
 
       console.error("⚡️ ~ file: usePaymasterTransactor.tsx ~ error", message);
 

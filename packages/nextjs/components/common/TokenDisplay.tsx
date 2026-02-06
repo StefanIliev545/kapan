@@ -1,4 +1,5 @@
-import { FC, ReactNode, useCallback, useMemo } from "react";
+import type { FC, ReactNode } from "react";
+import { useCallback, useMemo } from "react";
 import Image from "next/image";
 import clsx from "clsx";
 import { formatUnits } from "viem";
@@ -68,19 +69,19 @@ export const TokenIcon: FC<TokenIconProps> = ({
 
   const sizeConfig = TOKEN_SIZE_MAP[size];
 
+  const roundedClassMap: Record<string, string> = {
+    full: "rounded-full",
+    lg: "rounded-lg",
+    xl: "rounded-xl",
+  };
   const roundedClass = rounded === true
     ? "rounded-full"
-    : rounded === "full"
-      ? "rounded-full"
-      : rounded === "lg"
-        ? "rounded-lg"
-        : rounded === "xl"
-          ? "rounded-xl"
-          : "";
+    : (typeof rounded === "string" && roundedClassMap[rounded]) || "";
 
-  const containerStyle = customSize
-    ? { width: customSize, height: customSize }
-    : undefined;
+  const containerStyle = useMemo(
+    () => customSize ? { width: customSize, height: customSize } : undefined,
+    [customSize]
+  );
 
   const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const target = e.target as HTMLImageElement;
@@ -230,7 +231,7 @@ export const TokenBalance: FC<TokenBalanceProps> = ({
     : BigInt(balance || 0);
 
   const formatted = formatUnits(balanceBigInt, decimals);
-  const numValue = parseFloat(formatted);
+  const numValue = Number.parseFloat(formatted);
 
   const displayValue = numValue.toLocaleString("en-US", {
     maximumFractionDigits: maxDecimals,
@@ -485,15 +486,13 @@ export const TokenPair: FC<TokenPairProps> = ({
   size = "sm",
   separator,
   className,
-}) => {
-  return (
-    <div className={clsx("flex items-center gap-2", className)}>
-      <TokenIcon icon={fromIcon} symbol={fromSymbol} size={size} />
-      {separator || <span className="text-base-content/40">→</span>}
-      <TokenIcon icon={toIcon} symbol={toSymbol} size={size} />
-    </div>
-  );
-};
+}) => (
+  <div className={clsx("flex items-center gap-2", className)}>
+    <TokenIcon icon={fromIcon} symbol={fromSymbol} size={size} />
+    {separator || <span className="text-base-content/40">→</span>}
+    <TokenIcon icon={toIcon} symbol={toSymbol} size={size} />
+  </div>
+);
 
 // Default export for convenient import
 export default TokenDisplay;

@@ -2,10 +2,26 @@
  * Helper functions for CloseWithCollateralEvmModal to reduce cognitive complexity.
  * Extracted from CloseWithCollateralEvmModal.tsx to improve maintainability.
  */
-import { formatUnits, Address } from "viem";
+import type { Address, WalletClient, PublicClient } from "viem";
+import { formatUnits } from "viem";
 import { track } from "@vercel/analytics";
+import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
+import { TransactionToast } from "~~/components/TransactionToast";
+import type { CowQuoteResponse } from "~~/hooks/useCowQuote";
+import { getCowQuoteSellAmount } from "~~/hooks/useCowQuote";
 import {
-    ProtocolInstruction,
+    CompletionType,
+    getPreferredFlashLoanLender,
+    calculateFlashLoanFee,
+    getCowExplorerAddressUrl,
+    checkOrderInOrderbook,
+} from "~~/utils/cow";
+import { saveOrderNote, createClosePositionNote } from "~~/utils/orderNotes";
+import { notification } from "~~/utils/scaffold-stark/notification";
+import type { TransactionCall } from "~~/utils/transactionSimulation";
+import { executeSequentialTransactions } from "~~/utils/transactionSimulation";
+import type { ProtocolInstruction } from "~~/utils/v2/instructionHelpers";
+import {
     createRouterInstruction,
     createProtocolInstruction,
     encodeApprove,
@@ -16,28 +32,13 @@ import {
     LendingOp,
     normalizeProtocolName,
 } from "~~/utils/v2/instructionHelpers";
-import {
-    CompletionType,
-    getPreferredFlashLoanLender,
-    calculateFlashLoanFee,
-    getCowExplorerAddressUrl,
-    checkOrderInOrderbook,
-} from "~~/utils/cow";
-import { notification } from "~~/utils/scaffold-stark/notification";
-import { TransactionToast } from "~~/components/TransactionToast";
-import { saveOrderNote, createClosePositionNote } from "~~/utils/orderNotes";
-import { getCowQuoteSellAmount, type CowQuoteResponse } from "~~/hooks/useCowQuote";
-import { executeSequentialTransactions, type TransactionCall } from "~~/utils/transactionSimulation";
+import type { SwapAsset } from "./SwapModalShell";
+// Shared types for CoW swap operations
+import type { FlashLoanInfo, CowChunkParams, LimitOrderBuildResult } from "./common/swapTypes";
+export type { FlashLoanInfo, CowChunkParams, LimitOrderBuildResult };
 
 // TODO: Migrate to new conditional order system - ChunkInstructions defined locally
-type ChunkInstructions = { preInstructions: ProtocolInstruction[]; postInstructions: ProtocolInstruction[]; flashLoanRepaymentUtxoIndex?: number };
-
-import type { SwapAsset } from "./SwapModalShell";
-import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
-import type { WalletClient, PublicClient } from "viem";
-// Shared types for CoW swap operations
-import { type FlashLoanInfo, type CowChunkParams, type LimitOrderBuildResult } from "./common/swapTypes";
-export type { FlashLoanInfo, CowChunkParams, LimitOrderBuildResult };
+interface ChunkInstructions { preInstructions: ProtocolInstruction[]; postInstructions: ProtocolInstruction[]; flashLoanRepaymentUtxoIndex?: number }
 
 // ============ Types ============
 
@@ -238,7 +239,7 @@ export function buildCowChunkInstructions(params: CowChunkParams): ChunkInstruct
     });
 
     // Return N identical chunks - each processes per-chunk amounts
-    return Array(numChunks).fill(null).map(() => ({
+    return Array.from({ length: numChunks }, () => ({
         preInstructions,
         postInstructions,
         flashLoanRepaymentUtxoIndex: 6, // UTXO[6] = X (flash loan amount to repay)
@@ -387,7 +388,9 @@ export function saveLimitOrderNote(
     debtName: string,
     chainId: number
 ): void {
-    if (!salt) return;
+    if (!salt) {
+        return;
+    }
 
     saveOrderNote(createClosePositionNote(
         salt,
@@ -503,7 +506,9 @@ export async function executeSequentialLimitOrder(params: {
         {
             simulateFirst: true,
             onProgress: (step, total, phase) => {
-                if (notificationId !== undefined) notification.remove(notificationId as string | number);
+                if (notificationId !== undefined) {
+                    notification.remove(notificationId as string | number);
+                }
                 const message = getProgressMessage(step, total, phase);
                 notificationId = notification.loading(
                     <TransactionToast step="pending" message={message} />
@@ -514,7 +519,9 @@ export async function executeSequentialLimitOrder(params: {
             },
             onError: (step, error) => {
                 console.error(`[Limit Order] Step ${step} FAILED:`, error);
-                if (notificationId !== undefined) notification.remove(notificationId as string | number);
+                if (notificationId !== undefined) {
+                    notification.remove(notificationId as string | number);
+                }
                 notification.error(`Step ${step} would fail: ${error}`);
             },
         }
@@ -578,8 +585,8 @@ function scheduleOrderbookCheck(chainId: number, orderManagerAddress: string, ap
                 console.warn("[Limit Order] Order NOT found in CoW orderbook yet.", checkResult.error || "");
                 console.warn("[Limit Order] WatchTower may need time to pick up the order, or there may be an issue.");
             }
-        } catch (e) {
-            console.error("[Limit Order] Failed to check orderbook:", e);
+        } catch (error) {
+            console.error("[Limit Order] Failed to check orderbook:", error);
         }
     }, 5000); // Check after 5 seconds
 }
@@ -657,7 +664,7 @@ export function calculateRequiredCollateral(params: {
 
     // Apply slippage buffer from UI (e.g., 3% slippage -> multiply by 1.03)
     const slippageBps = BigInt(Math.round(slippage * 100)); // 3% -> 300 bps
-    const required = (base * (10000n + slippageBps)) / 10000n;
+    const required = (base * (10_000n + slippageBps)) / 10_000n;
 
     return {
         requiredCollateral: required,
@@ -685,16 +692,20 @@ export function calculateLimitOrderCollateral(
     selectedTo: SwapAsset | null,
     slippage: number
 ): bigint {
-    if (!cowQuote || !selectedTo) return 0n;
+    if (!cowQuote || !selectedTo) {
+        return 0n;
+    }
 
     // Get the sellAmount from CoW quote (how much collateral needed for exact buyAmount)
     const baseSellAmount = getCowQuoteSellAmount(cowQuote);
-    if (baseSellAmount === 0n) return 0n;
+    if (baseSellAmount === 0n) {
+        return 0n;
+    }
 
     // Apply slippage buffer (e.g., 3% -> multiply by 1.03)
     // For KIND_BUY, higher sellAmount = more willing to pay = better chance to fill
     const slippageBps = BigInt(Math.round(slippage * 100));
-    const withSlippage = (baseSellAmount * (10000n + slippageBps)) / 10000n;
+    const withSlippage = (baseSellAmount * (10_000n + slippageBps)) / 10_000n;
 
     return withSlippage;
 }

@@ -465,6 +465,16 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
   const expectedOutput = swapQuote ? formatUnits(BigInt(swapQuote.dstAmount), debtFromDecimals) : "0";
   const outputCoversRepay = swapQuote ? BigInt(swapQuote.dstAmount) >= repayAmountRaw : false;
 
+  // Calculate the actual minAmountOut that matches 1inch/Kyber's slippage protection
+  // This ensures our check matches what the aggregator's calldata enforces
+  const swapMinAmountOut = useMemo(() => {
+    if (!swapQuote) return repayAmountRaw;
+    const dstAmount = BigInt(swapQuote.dstAmount);
+    // Apply same slippage tolerance as the aggregator (slippage is in %, e.g., 1 = 1%)
+    const slippageBps = BigInt(Math.round(slippage * 100));
+    return (dstAmount * (10000n - slippageBps)) / 10000n;
+  }, [swapQuote, slippage, repayAmountRaw]);
+
   // ============ CoW Quote for Limit Orders ============
   const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
     sellToken: selectedTo?.address || "",
@@ -553,10 +563,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
 
     // Debt swap is a BUY order: we want exact old debt amount (buyAmount) for repayment
     // totalSellAmount = max new debt we're willing to sell, totalBuyAmount = exact old debt to buy
-    // IMPORTANT: Add slippage buffer to totalSellAmount! The trigger calculates sellAmount with slippage,
-    // then caps it to totalSellAmount. Without buffer, the slippage would be negated by the cap.
-    const totalSellAmountWithSlippage = (effectiveLimitOrderNewDebt * BigInt(10000 + Math.round(slippage * 100))) / 10000n;
-
+    // For limit orders, user sets exact price - no slippage buffer needed
     return encodeLimitPriceTriggerParams({
       protocolId: getProtocolId(protocolName),
       protocolContext: triggerContext,
@@ -566,10 +573,10 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       buyDecimals: debtFromDecimals,
       limitPrice,
       triggerAbovePrice: false,
-      totalSellAmount: totalSellAmountWithSlippage, // Max willing to sell (with slippage buffer)
+      totalSellAmount: effectiveLimitOrderNewDebt, // Exact amount user is willing to sell
       totalBuyAmount: limitOrderBuyAmount, // Exact amount to buy (old debt for repayment)
       numChunks,
-      maxSlippageBps: Math.round(slippage * 100),
+      maxSlippageBps: 0, // No slippage for limit orders - price is exact
       isKindBuy: true, // BUY order: exact buyAmount, max sellAmount
     });
   }, [selectedTo, limitPriceTriggerAddress, effectiveLimitOrderNewDebt, limitOrderBuyAmount, debtFromDecimals, protocolName, context, debtFromToken, numChunks, slippage, isMorpho, oldMorphoContextEncoded, isEuler, oldEulerContextEncoded]);
@@ -862,7 +869,8 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
 
     // Morpho flow
     if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && collateralTokenAddress && collateralBalance) {
-      const minAmountOutBigInt = repayAmountRaw;
+      // Use swapMinAmountOut which matches the aggregator's slippage tolerance
+      const minAmountOutBigInt = swapMinAmountOut;
       const swapContext = encodeAbiParameters(
         [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
         [debtFromToken as Address, minAmountOutBigInt, swapQuote.tx.data as `0x${string}`]
@@ -886,7 +894,8 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
 
     // Euler flow
     if (isEuler && oldEulerContextEncoded && newEulerContextEncoded && eulerCollaterals?.length) {
-      const minAmountOutBigInt = bufferedRepayAmount;
+      // Use swapMinAmountOut which matches the aggregator's slippage tolerance
+      const minAmountOutBigInt = swapMinAmountOut;
       const swapContext = encodeAbiParameters(
         [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
         [debtFromToken as Address, minAmountOutBigInt, swapQuote.tx.data as `0x${string}`]
@@ -953,12 +962,12 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       return instructions;
     }
 
-    // Standard flow
+    // Standard flow - use swapMinAmountOut which matches aggregator's slippage tolerance
     return buildDebtSwapFlow(
       protocolName,
       debtFromToken,
       selectedTo.address,
-      repayAmountRaw,
+      swapMinAmountOut,
       requiredNewDebt,
       swapQuote.tx.data,
       providerEnum,
@@ -966,7 +975,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       isMax,
       swapProtocol,
     );
-  }, [swapQuote, selectedTo, hasAdapter, requiredNewDebt, selectedProvider, swapRouter, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, repayAmountRaw, debtFromToken, userAddress, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, bufferedRepayAmount, buildDebtSwapFlow, protocolName, context, isMax]);
+  }, [swapQuote, selectedTo, hasAdapter, requiredNewDebt, selectedProvider, swapRouter, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, swapMinAmountOut, debtFromToken, userAddress, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, buildDebtSwapFlow, protocolName, context, isMax]);
 
   // ============ Transaction Flow ============
   const { handleConfirm: handleSwap, batchingPreference } = useEvmTransactionFlow({
@@ -1039,9 +1048,8 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
         flashLoan: {
           lender: cowFlashLoanInfo.lender as Address,
           token: selectedTo.address as Address,
-          // Include slippage buffer to match trigger's totalSellAmount calculation
-          // Trigger adds slippage to sellAmount and caps to totalSellAmount, so flash loan must cover the max
-          amount: (effectiveLimitOrderNewDebt * BigInt(10000 + Math.round(slippage * 100))) / 10000n / BigInt(numChunks),
+          // For limit orders, use exact amount per chunk - no slippage buffer
+          amount: effectiveLimitOrderNewDebt / BigInt(numChunks),
         },
         sellTokenRefundAddress: getKapanCowAdapter(chainId) as Address, // KapanCowAdapter for flash loan repayment
         operationType: "debt-swap",

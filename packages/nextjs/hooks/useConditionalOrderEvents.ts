@@ -48,9 +48,9 @@ export function useConditionalOrderEvents() {
   const queryClient = useQueryClient();
 
   const { data: contractInfo } = useDeployedContractInfo({
-    contractName: "KapanConditionalOrderManager",
+    contractName: "KapanConditionalOrderManager" as "KapanRouter",
     chainId,
-  } as any);
+  });
 
   const contractAddress = contractInfo?.address as Address | undefined;
   const isEnabled = !!contractAddress && !!publicClient && !!userAddress;

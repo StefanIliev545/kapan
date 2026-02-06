@@ -1,19 +1,21 @@
 import { useTargetNetwork } from "./useTargetNetwork";
 import { useSmartTransactor } from "./useSmartTransactor";
-import { Abi, useNetwork, useSendTransaction } from "@starknet-react/core";
-import { Call, InvocationsDetails, Contract as StarknetJsContract } from "starknet";
-import {
+import type { Abi } from "@starknet-react/core";
+import { useNetwork, useSendTransaction } from "@starknet-react/core";
+import type { Call, InvocationsDetails } from "starknet";
+import { Contract as StarknetJsContract } from "starknet";
+import type {
   Contract,
   ContractAbi,
   ContractName,
   ExtractAbiFunctionNamesScaffold,
   UseScaffoldArgsParam,
   UseScaffoldWriteConfig,
-  contracts,
 } from "~~/utils/scaffold-stark/contract";
+import { contracts } from "~~/utils/scaffold-stark/contract";
 
-function isRawCall(value: Call | any): value is Call {
-  return "entrypoint" in value;
+function isRawCall(value: Call | unknown): value is Call {
+  return typeof value === "object" && value !== null && "entrypoint" in value;
 }
 
 export const useScaffoldMultiWriteContract = <
@@ -46,43 +48,38 @@ export const useScaffoldMultiWriteContract = <
       return;
     }
 
-    try {
-      // we just parse calldata here so that it will only parse on demand.
-      // use IIFE pattern
-      const parsedCalls = (() => {
-        if (calls) {
-          console.log("calls", calls);
-          return calls.map(call => {
-            if (isRawCall(call)) {
-              return call;
-            }
-            const functionName = call.functionName;
-            const contractName = call.contractName;
-            const unParsedArgs = call.args as any[];
-            const contract = contracts?.[targetNetwork.network]?.[
-              contractName as ContractName
-            ] as Contract<TContractName>;
-            // we convert to starknetjs contract instance here since deployed data may be undefined if contract is not deployed
-            const contractInstance = new StarknetJsContract({
-              abi: contract.abi,
-              address: contract.address,
-            });
-
-            console.log("unparsed args", unParsedArgs);
-            return contractInstance.populate(functionName, unParsedArgs as any[]);
+    // We just parse calldata here so that it will only parse on demand.
+    // Use IIFE pattern
+    const parsedCalls = (() => {
+      if (calls) {
+        console.log("calls", calls);
+        return calls.map(call => {
+          if (isRawCall(call)) {
+            return call;
+          }
+          const functionName = call.functionName;
+          const contractName = call.contractName;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const unParsedArgs = call.args as any[];
+          const contract = contracts?.[targetNetwork.network]?.[
+            contractName as ContractName
+          ] as Contract<TContractName>;
+          // We convert to starknetjs contract instance here since deployed data may be undefined if contract is not deployed
+          const contractInstance = new StarknetJsContract({
+            abi: contract.abi,
+            address: contract.address,
           });
-        } else {
-          return [];
-        }
-      })();
 
-      // setIsMining(true);
-      return await sendTxnWrapper(parsedCalls as any);
-    } catch (e: any) {
-      throw e;
-    } finally {
-      // setIsMining(false);
-    }
+          console.log("unparsed args", unParsedArgs);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return contractInstance.populate(functionName, unParsedArgs as any[]);
+        });
+      } else {
+        return [];
+      }
+    })();
+
+    return await sendTxnWrapper(parsedCalls as Call[]);
   };
 
   return {

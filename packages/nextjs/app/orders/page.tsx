@@ -82,11 +82,11 @@ function decodeLimitPriceTriggerParams(data: `0x${string}`): DecodedLimitPricePa
 // ============ Protocol ID to Name Mapping ============
 
 function getProtocolNameFromId(protocolId: `0x${string}`): KapanProtocol | undefined {
-  if (protocolId === PROTOCOL_IDS.AAVE_V3) return "aave";
-  if (protocolId === PROTOCOL_IDS.COMPOUND_V3) return "compound";
-  if (protocolId === PROTOCOL_IDS.MORPHO_BLUE) return "morpho";
-  if (protocolId === PROTOCOL_IDS.EULER_V2) return "euler";
-  if (protocolId === PROTOCOL_IDS.VENUS) return "venus";
+  if (protocolId === PROTOCOL_IDS.AAVE_V3) { return "aave"; }
+  if (protocolId === PROTOCOL_IDS.COMPOUND_V3) { return "compound"; }
+  if (protocolId === PROTOCOL_IDS.MORPHO_BLUE) { return "morpho"; }
+  if (protocolId === PROTOCOL_IDS.EULER_V2) { return "euler"; }
+  if (protocolId === PROTOCOL_IDS.VENUS) { return "venus"; }
   return undefined;
 }
 

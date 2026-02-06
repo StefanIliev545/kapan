@@ -148,7 +148,9 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 
   // Extract markets where user has positions for fast refresh
   const marketsWithPositions = useMemo(() => {
-    if (!apiRows.length) return [];
+    if (apiRows.length === 0) {
+      return [];
+    }
     return apiRows.map(row => row.market);
   }, [apiRows]);
 
@@ -189,7 +191,9 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
   useEffect(() => {
-    if (!hasLoadedOnce) return;
+    if (!hasLoadedOnce) {
+      return;
+    }
 
     const totalSupplied = rows.reduce((sum, row) => sum + row.collateralBalanceUsd, 0);
     const totalBorrowed = rows.reduce((sum, row) => sum + row.borrowBalanceUsd, 0);
@@ -201,7 +205,10 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 
   // Auto-expand when positions are found, stay collapsed when empty
   useEffect(() => {
-    if (!hasLoadedOnce) return; // Wait for initial load to complete
+    // Wait for initial load to complete
+    if (!hasLoadedOnce) {
+      return;
+    }
 
     if (hasPositions) {
       setIsCollapsed(false); // Expand when positions exist

@@ -74,7 +74,9 @@ const VesuPositionRowItem: FC<VesuPositionRowItemProps> = ({
 
   const handleBorrowFromSupply = useCallback((event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    if (!canInitiateBorrow || !row.borrowContext) return;
+    if (!canInitiateBorrow || !row.borrowContext) {
+      return;
+    }
     onBorrowRequest({
       tokens: availableBorrowTokens,
       collateralAddress: row.supply.tokenAddress,
@@ -210,7 +212,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   const closeModal = useModalWithData<CloseParams>();
 
   const openCloseForRow = useCallback((row: VesuPositionRow) => {
-    if (!row.borrow || !row.borrowContext) return;
+    if (!row.borrow || !row.borrowContext) {
+      return;
+    }
     closeModal.openWithData({
       collateral: {
         name: row.supply.name,
@@ -246,16 +250,22 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   };
 
   const selectedSymbolStr = useMemo(() => {
-    if (!selectedTarget) return "";
-    const sym: any = (selectedTarget as any).symbol;
+    if (!selectedTarget) {
+      return "";
+    }
+    const sym = (selectedTarget as { symbol?: string | bigint }).symbol;
     const raw = typeof sym === "bigint" ? feltToString(sym) : String(sym ?? "");
-    if (raw && raw.trim().length > 0) return raw;
+    if (raw && raw.trim().length > 0) {
+      return raw;
+    }
     const addr = `0x${selectedTarget.address.toString(16).padStart(64, "0")}`;
     return getTokenNameFallback(addr) ?? raw;
   }, [selectedTarget]);
 
   const openSwapSelector = useCallback((type: "debt" | "collateral", row: VesuPositionRow) => {
-    if (!row.borrowContext) return;
+    if (!row.borrowContext) {
+      return;
+    }
     setSwapType(type);
     setSwapRow(row);
     setSelectedTarget(null);
@@ -263,20 +273,30 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   }, [swapSelectModal]);
 
   const swapCandidateTokens = useMemo(() => {
-    if (!swapRow) return [] as AssetWithRates[];
+    if (!swapRow) {
+      return [] as AssetWithRates[];
+    }
     const currentCollateralHex = swapRow.supply.tokenAddress;
     const currentDebtHex = swapRow.borrow?.tokenAddress;
     return assetsWithRates.filter(asset => {
       const addrHex = `0x${asset.address.toString(16).padStart(64, "0")}`;
       if (swapType === "debt") {
         // Exclude current debt and collateral
-        if (addrHex === currentDebtHex) return false;
-        if (addrHex === currentCollateralHex) return false;
+        if (addrHex === currentDebtHex) {
+          return false;
+        }
+        if (addrHex === currentCollateralHex) {
+          return false;
+        }
         return true;
       }
-      // collateral: exclude current collateral and debt
-      if (addrHex === currentCollateralHex) return false;
-      if (addrHex === currentDebtHex) return false;
+      // Collateral: exclude current collateral and debt
+      if (addrHex === currentCollateralHex) {
+        return false;
+      }
+      if (addrHex === currentDebtHex) {
+        return false;
+      }
       return true;
     });
   }, [assetsWithRates, swapRow, swapType]);
@@ -284,7 +304,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   const handleSelectSwapTarget = useCallback((token: TokenWithRates) => {
     setSelectedTarget(token);
     swapSelectModal.close();
-    if (!swapRow || !swapType) return;
+    if (!swapRow || !swapType) {
+      return;
+    }
     if (swapType === "debt") {
       switchDebtModal.open();
     } else {
@@ -297,7 +319,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
   const defaultExpandedKey = useMemo(() => {
-    if (rows.length === 0) return null;
+    if (rows.length === 0) {
+      return null;
+    }
 
     const isV1Protocol = protocolName?.toLowerCase() === "vesu";
     if (isV1Protocol) {
@@ -310,7 +334,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
   useEffect(() => {
     if (rows.length === 0) {
-      if (Object.keys(expandedRows).length === 0) return;
+      if (Object.keys(expandedRows).length === 0) {
+        return;
+      }
       setExpandedRows({});
       return;
     }
@@ -323,12 +349,18 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     }
 
     const hasExpandedVisibleRow = rows.some(row => expandedRows[row.key]);
-    if (hasExpandedVisibleRow) return;
+    if (hasExpandedVisibleRow) {
+      return;
+    }
 
-    if (!defaultExpandedKey) return;
+    if (!defaultExpandedKey) {
+      return;
+    }
 
     setExpandedRows(prev => {
-      if (prev[defaultExpandedKey]) return prev;
+      if (prev[defaultExpandedKey]) {
+        return prev;
+      }
       return { ...prev, [defaultExpandedKey]: true };
     });
   }, [rows, expandedRows, defaultExpandedKey, hasUserInteracted]);
@@ -340,9 +372,13 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
   // Memoized props for SwitchTokenSelectModalStark
   const switchTokenCurrentToken = useMemo(() => {
-    if (!swapRow || !swapType) return null;
+    if (!swapRow || !swapType) {
+      return null;
+    }
     // For debt swaps, borrow must exist
-    if (swapType === "debt" && !swapRow.borrow) return null;
+    if (swapType === "debt" && !swapRow.borrow) {
+      return null;
+    }
     const borrowData = swapRow.borrow;
     return {
       address: swapType === "debt" && borrowData ? borrowData.tokenAddress : swapRow.supply.tokenAddress,
@@ -368,7 +404,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
   const handleSwitchTokenSelect = useCallback((opt: { address: string }) => {
     const match = swapCandidateTokens.find(a => `0x${a.address.toString(16).padStart(64, "0")}` === opt.address);
-    if (!match) return;
+    if (!match) {
+      return;
+    }
     handleSelectSwapTarget({
       address: match.address,
       symbol: feltToString(match.symbol),
@@ -388,13 +426,17 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   }, [swapCandidateTokens]);
 
   const tokenSelectPosition = useMemo(() => {
-    if (!swapRow) return null;
+    if (!swapRow) {
+      return null;
+    }
     return PositionManager.fromPositions([swapRow.supply], swapRow.borrow ? [swapRow.borrow] : []);
   }, [swapRow]);
 
   // Memoized props for SwitchDebtModalStark
   const switchDebtCollateral = useMemo(() => {
-    if (!swapRow) return null;
+    if (!swapRow) {
+      return null;
+    }
     return {
       name: swapRow.supply.name,
       address: swapRow.supply.tokenAddress,
@@ -404,7 +446,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   }, [swapRow]);
 
   const switchDebtCurrentDebt = useMemo(() => {
-    if (!swapRow?.borrow) return null;
+    if (!swapRow?.borrow) {
+      return null;
+    }
     return {
       name: swapRow.borrow.name,
       address: swapRow.borrow.tokenAddress,
@@ -414,7 +458,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   }, [swapRow]);
 
   const switchDebtTargetDebt = useMemo(() => {
-    if (!selectedTarget) return null;
+    if (!selectedTarget) {
+      return null;
+    }
     return {
       name: selectedSymbolStr,
       address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
@@ -425,7 +471,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
 
   // Memoized props for SwitchCollateralModalStark
   const switchCollateralCurrentCollateral = useMemo(() => {
-    if (!swapRow) return null;
+    if (!swapRow) {
+      return null;
+    }
     return {
       name: swapRow.supply.name,
       address: swapRow.supply.tokenAddress,
@@ -435,7 +483,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   }, [swapRow]);
 
   const switchCollateralTargetCollateral = useMemo(() => {
-    if (!selectedTarget) return null;
+    if (!selectedTarget) {
+      return null;
+    }
     return {
       name: selectedSymbolStr,
       address: `0x${selectedTarget.address.toString(16).padStart(64, "0")}`,
@@ -445,7 +495,9 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   }, [selectedTarget, selectedSymbolStr]);
 
   const switchCollateralDebtToken = useMemo(() => {
-    if (!swapRow) return null;
+    if (!swapRow) {
+      return null;
+    }
     return {
       name: swapRow.borrow?.name || "",
       address: swapRow.borrow?.tokenAddress || "0x0",

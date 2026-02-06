@@ -28,8 +28,12 @@ export function truncateAddress(
   startChars = 6,
   endChars = 4
 ): string {
-  if (!address) return "";
-  if (address.length <= startChars + endChars) return address;
+  if (!address) {
+    return "";
+  }
+  if (address.length <= startChars + endChars) {
+    return address;
+  }
   return `${address.slice(0, startChars)}...${address.slice(-endChars)}`;
 }
 
@@ -59,8 +63,12 @@ export function formatAddressForDisplay(
   displayName?: string | null,
   format: "short" | "full" = "short"
 ): string {
-  if (displayName) return displayName;
-  if (!address) return "";
+  if (displayName) {
+    return displayName;
+  }
+  if (!address) {
+    return "";
+  }
   return format === "full" ? address : truncateAddress(address);
 }
 

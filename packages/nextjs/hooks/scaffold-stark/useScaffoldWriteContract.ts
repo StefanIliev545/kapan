@@ -1,9 +1,10 @@
 import { useCallback } from "react";
 import { useTargetNetwork } from "./useTargetNetwork";
-import { Abi, useNetwork } from "@starknet-react/core";
+import type { Abi } from "@starknet-react/core";
+import { useNetwork } from "@starknet-react/core";
 import { Contract as StarknetJsContract } from "starknet";
 import { useDeployedContractInfo, useSmartTransactor } from "~~/hooks/scaffold-stark";
-import {
+import type {
   ContractAbi,
   ContractName,
   ExtractAbiFunctionNamesScaffold,
@@ -51,17 +52,11 @@ export const useScaffoldWriteContract = <
         address: deployedContractData.address,
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const newCalls = deployedContractData ? [contractInstance.populate(functionName, newArgs as any[])] : [];
 
-      try {
-        // setIsMining(true);
-        // Route directly through smart/paymaster transactor with the prepared calls
-        return await sendTxnWrapper(newCalls as any[]);
-      } catch (e: any) {
-        throw e;
-      } finally {
-        // setIsMining(false);
-      }
+      // Route directly through smart/paymaster transactor with the prepared calls
+      return await sendTxnWrapper(newCalls);
     },
     [args, chain?.id, deployedContractData, functionName, sendTxnWrapper, targetNetwork.id],
   );

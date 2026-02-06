@@ -1,4 +1,5 @@
-import { FC, memo, useCallback, useMemo } from "react";
+import type { FC } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import { ProtocolLogo } from "./ProtocolLogo";
 import { ProtocolDropdownItem } from "./ProtocolDropdownItem";
@@ -136,13 +137,16 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
   );
 
   // Get the rate to display based on rateType
-  const getRate = useCallback((protocol: ProtocolOption) => {
-    return rateType === "supply" ? protocol.supplyRate : protocol.borrowRate;
-  }, [rateType]);
+  const getRate = useCallback(
+    (protocol: ProtocolOption) => rateType === "supply" ? protocol.supplyRate : protocol.borrowRate,
+    [rateType]
+  );
 
   // Calculate rate difference for badges
   const getRateDifference = useCallback((rate?: number) => {
-    if (rate === undefined || currentRate === undefined) return undefined;
+    if (rate === undefined || currentRate === undefined) {
+      return;
+    }
     return rate - currentRate;
   }, [currentRate]);
 
@@ -159,16 +163,14 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
   }), [gridCols]);
 
   // Create memoized click handlers for protocols (for dropdown and grid variants)
-  const protocolClickHandlers = useMemo(() => {
-    return protocols.reduce<Record<string, () => void>>((acc, protocol) => {
-      acc[protocol.name] = () => {
-        if (!protocol.disabled) {
-          handleSelect(protocol.name);
-        }
-      };
-      return acc;
-    }, {});
-  }, [protocols, handleSelect]);
+  const protocolClickHandlers = useMemo(() => protocols.reduce<Record<string, () => void>>((acc, protocol) => {
+    acc[protocol.name] = () => {
+      if (!protocol.disabled) {
+        handleSelect(protocol.name);
+      }
+    };
+    return acc;
+  }, {}), [protocols, handleSelect]);
 
   // Render loading state
   if (isLoading) {
@@ -387,7 +389,9 @@ interface RateBadgeProps {
 }
 
 const RateBadge: FC<RateBadgeProps> = memo(({ selectedRate, currentRate, rateType }) => {
-  if (selectedRate === undefined) return null;
+  if (selectedRate === undefined) {
+    return null;
+  }
 
   const diff = selectedRate - currentRate;
   // For supply: higher is better; for borrow: lower is better

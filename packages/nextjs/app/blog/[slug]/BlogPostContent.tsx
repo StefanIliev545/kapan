@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowLeftIcon, CalendarIcon, ClockIcon, ShareIcon } from "@heroicons/react/24/outline";
-import { BlogPost } from "~~/utils/blog";
+import type { BlogPost } from "~~/utils/blog";
 
 // Animation constants - extracted to avoid inline object creation
 const FADE_IN_INITIAL = { opacity: 0, y: 20 };
@@ -74,9 +74,9 @@ const RelatedPosts = ({ relatedPosts }: { relatedPosts: BlogPost[] }) => {
   return (
     <div className="mt-16">
       <div className="mb-8 flex items-center">
-        <div className="from-primary dark:from-accent h-1 flex-grow bg-gradient-to-r to-transparent"></div>
+        <div className="from-primary dark:from-accent h-1 flex-grow bg-gradient-to-r to-transparent" />
         <h2 className="px-4 text-xl font-bold">Related Articles</h2>
-        <div className="from-primary dark:from-accent h-1 flex-grow bg-gradient-to-l to-transparent"></div>
+        <div className="from-primary dark:from-accent h-1 flex-grow bg-gradient-to-l to-transparent" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -98,7 +98,7 @@ export default function BlogPostContent({ post, relatedPosts, content }: BlogPos
   return (
     <div className="min-h-screen">
       {/* Gradient background */}
-      <div className="from-base-300/20 dark:from-base-300/10 pointer-events-none absolute inset-0 bg-gradient-to-b to-transparent"></div>
+      <div className="from-base-300/20 dark:from-base-300/10 pointer-events-none absolute inset-0 bg-gradient-to-b to-transparent" />
 
       {/* Hero section with cover image */}
       <div className="relative">
@@ -111,7 +111,7 @@ export default function BlogPostContent({ post, relatedPosts, content }: BlogPos
             className="object-cover"
             sizes="100vw"
           />
-          <div className="from-base-100 via-base-100/60 absolute inset-0 bg-gradient-to-t to-transparent"></div>
+          <div className="from-base-100 via-base-100/60 absolute inset-0 bg-gradient-to-t to-transparent" />
         </div>
 
         <div className="container relative mx-auto -mt-40 px-4 md:-mt-56">

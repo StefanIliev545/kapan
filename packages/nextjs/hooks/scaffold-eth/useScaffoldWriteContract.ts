@@ -5,8 +5,7 @@ import { getPublicClient } from "@wagmi/core";
 import { Config, UseWriteContractParameters, useAccount, useWriteContract } from "wagmi";
 import { WriteContractErrorType, WriteContractReturnType } from "wagmi/actions";
 import { WriteContractVariables } from "wagmi/query";
-import { useSelectedNetwork } from "~~/hooks/scaffold-eth";
-import { useDeployedContractInfo, useTransactor } from "~~/hooks/scaffold-eth";
+import { useDeployedContractInfo, useSelectedNetwork, useTransactor } from "~~/hooks/scaffold-eth";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { AllowedChainIds, notification } from "~~/utils/scaffold-eth";
 
@@ -128,9 +127,9 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
             // Add 20% buffer to the estimate
             gasOverride = { gas: (gasEstimate * 120n) / 100n };
           }
-        } catch (e) {
+        } catch (error) {
           // If estimation fails, let MetaMask try anyway
-          console.warn("Gas estimation failed, falling back to MetaMask:", e);
+          console.warn("Gas estimation failed, falling back to MetaMask:", error);
         }
       }
 
@@ -141,12 +140,12 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
             address: deployedContractData.address,
             ...variables,
             ...gasOverride,
-          } as WriteContractVariables<Abi, string, any[], Config, number>,
+          } as WriteContractVariables<Abi, string, unknown[], Config, number>,
           mutateOptions as
             | MutateOptions<
                 WriteContractReturnType,
                 WriteContractErrorType,
-                WriteContractVariables<Abi, string, any[], Config, number>,
+                WriteContractVariables<Abi, string, unknown[], Config, number>,
                 unknown
               >
             | undefined,
@@ -185,12 +184,12 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
         abi: deployedContractData.abi as Abi,
         address: deployedContractData.address,
         ...variables,
-      } as WriteContractVariables<Abi, string, any[], Config, number>,
+      } as WriteContractVariables<Abi, string, unknown[], Config, number>,
       options as
         | MutateOptions<
             WriteContractReturnType,
             WriteContractErrorType,
-            WriteContractVariables<Abi, string, any[], Config, number>,
+            WriteContractVariables<Abi, string, unknown[], Config, number>,
             unknown
           >
         | undefined,

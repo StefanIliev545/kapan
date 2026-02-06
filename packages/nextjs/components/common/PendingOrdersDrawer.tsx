@@ -83,11 +83,21 @@ function decodeLimitPriceTriggerParams(data: `0x${string}`): DecodedLimitPricePa
 // ============ Protocol ID to Name Mapping ============
 
 function getProtocolNameFromId(protocolId: `0x${string}`): KapanProtocol | undefined {
-  if (protocolId === PROTOCOL_IDS.AAVE_V3) return "aave";
-  if (protocolId === PROTOCOL_IDS.COMPOUND_V3) return "compound";
-  if (protocolId === PROTOCOL_IDS.MORPHO_BLUE) return "morpho";
-  if (protocolId === PROTOCOL_IDS.EULER_V2) return "euler";
-  if (protocolId === PROTOCOL_IDS.VENUS) return "venus";
+  if (protocolId === PROTOCOL_IDS.AAVE_V3) {
+    return "aave";
+  }
+  if (protocolId === PROTOCOL_IDS.COMPOUND_V3) {
+    return "compound";
+  }
+  if (protocolId === PROTOCOL_IDS.MORPHO_BLUE) {
+    return "morpho";
+  }
+  if (protocolId === PROTOCOL_IDS.EULER_V2) {
+    return "euler";
+  }
+  if (protocolId === PROTOCOL_IDS.VENUS) {
+    return "venus";
+  }
   return undefined;
 }
 
@@ -155,7 +165,9 @@ export function PendingOrdersDrawer() {
     return conditionalOrders
       .filter(o => {
         // Always show active orders
-        if (o.context.status === ConditionalOrderStatus.Active) return true;
+        if (o.context.status === ConditionalOrderStatus.Active) {
+          return true;
+        }
         // Only show recent completed/cancelled orders
         return now - Number(o.context.createdAt) < SEVEN_DAYS_SECONDS;
       })
@@ -184,14 +196,18 @@ export function PendingOrdersDrawer() {
     const protocols = new Set<KapanProtocol>();
     for (const order of recentOrders) {
       const protocol = getOrderProtocol(order);
-      if (protocol) protocols.add(protocol);
+      if (protocol) {
+        protocols.add(protocol);
+      }
     }
-    return Array.from(protocols).sort();
+    return [...protocols].sort();
   }, [recentOrders, getOrderProtocol]);
 
   // Filter orders by selected protocol
   const filteredOrders = useMemo(() => {
-    if (!selectedProtocol) return recentOrders;
+    if (!selectedProtocol) {
+      return recentOrders;
+    }
     return recentOrders.filter(order => getOrderProtocol(order) === selectedProtocol);
   }, [recentOrders, selectedProtocol, getOrderProtocol]);
 
@@ -251,7 +267,7 @@ export function PendingOrdersDrawer() {
       addresses.add(o.context.params.sellToken as Address);
       addresses.add(o.context.params.buyToken as Address);
     });
-    return Array.from(addresses);
+    return [...addresses];
   }, [conditionalOrders]);
 
   const tokenInfoMap = useTokenInfo(tokenAddresses, chainId);
@@ -262,7 +278,9 @@ export function PendingOrdersDrawer() {
   }, [tokenInfoMap]);
 
   // Don't render anything if not connected or no contract available
-  if (!isAvailable || !userAddress) return null;
+  if (!isAvailable || !userAddress) {
+    return null;
+  }
 
   // Show button if we have orders OR if a new order was just created
   const showButton = conditionalOrders.length > 0 || hasPendingNew;
@@ -422,9 +440,13 @@ export function PendingOrdersDrawer() {
                     {filteredCompletedOrders.slice(0, 3).map((order) => {
                       const triggerAddr = order.context.params.trigger.toLowerCase();
                       let type: "adl" | "autoLeverage" | "limit" | "unknown" = "unknown";
-                      if (autoLeverageTriggerAddress && triggerAddr === autoLeverageTriggerAddress) type = "autoLeverage";
-                      else if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) type = "limit";
-                      else if (ltvTriggerAddress && triggerAddr === ltvTriggerAddress) type = "adl";
+                      if (autoLeverageTriggerAddress && triggerAddr === autoLeverageTriggerAddress) {
+                        type = "autoLeverage";
+                      } else if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) {
+                        type = "limit";
+                      } else if (ltvTriggerAddress && triggerAddr === ltvTriggerAddress) {
+                        type = "adl";
+                      }
                       return renderOrderItem(order, type);
                     })}
                     {filteredCompletedOrders.length > 3 && (
@@ -535,7 +557,7 @@ export function PendingOrdersDrawer() {
           <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
             isActive ? 'bg-success/20 text-success' : 'bg-base-300 text-base-content/50'
           }`}>
-            {isActive ? 'Active' : status === ConditionalOrderStatus.Completed ? 'Done' : 'Cancelled'}
+            {isActive ? 'Active' : (status === ConditionalOrderStatus.Completed ? 'Done' : 'Cancelled')}
           </span>
         </div>
 

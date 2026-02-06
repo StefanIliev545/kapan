@@ -17,6 +17,7 @@ export interface PendleMarket {
     symbol: string;
     name: string;
     decimals: number;
+    price?: { usd: number };
   };
   yt: {
     address: string;
@@ -30,6 +31,7 @@ export interface PendleMarket {
     address: string;
     symbol: string;
     name: string;
+    price?: { usd: number };
   };
   impliedApy: number; // The fixed APY for holding PT to maturity
   underlyingApy: number;
@@ -46,8 +48,38 @@ export interface PTYield {
   expiry: Date;
   daysToExpiry: number;
   underlyingSymbol: string;
+  underlyingAddress: string;
   marketAddress: string;
   liquidity: number;
+  /** PT price in USD from Pendle API */
+  ptPriceUsd: number;
+  /** Underlying asset price in USD from Pendle API */
+  underlyingPriceUsd: number;
+}
+
+/**
+ * Calculate fixed APY from PT and underlying prices.
+ * Use this to calculate APY consistent with displayed balance values.
+ *
+ * @param ptPriceUsd - Current PT price in USD
+ * @param underlyingPriceUsd - Current underlying asset price in USD
+ * @param daysToMaturity - Days until PT matures
+ * @returns Annualized APY as percentage (e.g., 15.5 for 15.5%)
+ */
+export function calculateFixedApy(
+  ptPriceUsd: number,
+  underlyingPriceUsd: number,
+  daysToMaturity: number
+): number {
+  if (ptPriceUsd <= 0 || underlyingPriceUsd <= 0 || daysToMaturity <= 0) {
+    return 0;
+  }
+  // At maturity, 1 PT = 1 underlying
+  // Return = (underlying / pt) - 1
+  // Annualized = return * (365 / days)
+  const returnToMaturity = (underlyingPriceUsd / ptPriceUsd) - 1;
+  const annualizedReturn = returnToMaturity * (365 / daysToMaturity);
+  return annualizedReturn * 100; // As percentage
 }
 
 // Map chain IDs to Pendle API chain names
@@ -330,17 +362,22 @@ export function usePendlePTYields(
         .map(m => {
           const expiry = new Date(m.expiry);
           const daysToExpiry = Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+          const ptPriceUsd = m.pt.price?.usd || 0;
+          const underlyingPriceUsd = m.underlyingAsset?.price?.usd || 0;
 
           return {
             address: m.pt.address.toLowerCase() as Address,
             symbol: m.pt.symbol,
             name: m.pt.name,
-            fixedApy: m.impliedApy * 100, // Convert to percentage
+            fixedApy: m.impliedApy * 100, // Convert to percentage (from Pendle API)
             expiry,
             daysToExpiry,
             underlyingSymbol: m.underlyingAsset?.symbol || "",
+            underlyingAddress: m.underlyingAsset?.address?.toLowerCase() || "",
             marketAddress: m.address,
             liquidity: m.liquidity?.usd || 0,
+            ptPriceUsd,
+            underlyingPriceUsd,
           };
         })
         .filter(y => {

@@ -738,14 +738,21 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
   }, [enrichedPositionGroups]);
 
   // Fetch token prices
-  const { pricesRaw } = useTokenPrices(tokenSymbols, {
+  const { pricesRaw, isLoading: isPricesLoading, isSuccess: hasPricesLoaded } = useTokenPrices(tokenSymbols, {
     enabled: tokenSymbols.length > 0,
   });
 
+  // Check if we have meaningful price data (at least one non-zero price)
+  const hasPrices = hasPricesLoaded && Object.keys(pricesRaw).length > 0;
+
   // Compute metrics from enriched position groups using balances and prices
   // This handles both positions with debt (have liquidity data) and supply-only positions
+  // Note: We still calculate metrics even while prices are loading to avoid UI flicker,
+  // but keepPreviousData in useTokenPrices ensures we show stale prices rather than $0
   const metrics = useMemo((): PositionMetrics => {
     if (!enrichedPositionGroups.length) return EMPTY_METRICS;
+    // If prices are still loading on initial load (no previous data), show null metrics
+    if (isPricesLoading && !hasPrices) return EMPTY_METRICS;
 
     let totalCollateralValueUsd = 0;
     let totalDebtValueUsd = 0;
@@ -786,7 +793,7 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
       netApyPercent: null, // Would need APY data
       positionsWithDebt,
     };
-  }, [enrichedPositionGroups, pricesRaw]);
+  }, [enrichedPositionGroups, pricesRaw, isPricesLoading, hasPrices]);
 
   // Compute all used sub-account indices (for debt swap to find next available)
   const usedSubAccountIndices = useMemo(() => {
@@ -802,6 +809,8 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
 
   useEffect(() => {
     if (!hasLoadedOnce) return;
+    // Don't report $0 totals while prices are loading for the first time
+    if (isPricesLoading && !hasPrices) return;
 
     // Calculate totals from balances and prices (same logic as metrics)
     let totalSupplied = 0;
@@ -832,7 +841,7 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     }
 
     setProtocolTotals("Euler", totalSupplied, totalBorrowed);
-  }, [hasLoadedOnce, enrichedPositionGroups, pricesRaw, setProtocolTotals, effectiveChainId]);
+  }, [hasLoadedOnce, enrichedPositionGroups, pricesRaw, setProtocolTotals, effectiveChainId, isPricesLoading, hasPrices]);
 
   // Use enrichedPositionGroups for hasPositions check - this comes from subgraph data
   // and ensures auto-expand works even before balance fetching completes

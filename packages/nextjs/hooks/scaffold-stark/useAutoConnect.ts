@@ -24,7 +24,7 @@ export const useAutoConnect = (): void => {
 
     try {
       setSavedConnector(JSON.parse(raw));
-    } catch (_) {
+    } catch {
       // Value is not JSON encoded, use it as-is.
       setSavedConnector(raw);
     }

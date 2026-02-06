@@ -11,6 +11,7 @@ import { composeEventFilterKeys } from "~~/utils/scaffold-stark/eventKeyFilter";
 import { parseEventData } from "~~/utils/scaffold-stark/eventsData";
 
 const MAX_KEYS_COUNT = 16;
+
 /**
  * Reads events from a deployed contract
  * @param config - The config settings
@@ -42,6 +43,8 @@ export const useScaffoldEventHistory = <
   format = true,
   enabled = true,
 }: UseScaffoldEventHistoryConfig<TContractName, TEventName, TBlockData, TTransactionData, TReceiptData>) => {
+  // Events have dynamic structure based on contract ABI - using any[] for flexibility
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [events, setEvents] = useState<any[]>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>();
@@ -133,10 +136,10 @@ export const useScaffoldEventHistory = <
         }
         setError(undefined);
       }
-    } catch (e: any) {
-      console.error(e);
+    } catch (error: unknown) {
+      console.error(error);
       setEvents(undefined);
-      setError(e);
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }

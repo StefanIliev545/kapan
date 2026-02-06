@@ -14,7 +14,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { useDebounceValue } from "usehooks-ts";
 import { track } from "@vercel/analytics";
-import { formatUnits, parseUnits, Address, encodeAbiParameters } from "viem";
+import { formatUnits, parseUnits, type Address, encodeAbiParameters } from "viem";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@radix-ui/themes";
@@ -42,7 +42,7 @@ import { useSaveOrder } from "~~/hooks/useOrderHistory";
 import { parseAmount } from "~~/utils/validation";
 import {
     FlashLoanProvider,
-    ProtocolInstruction,
+    type ProtocolInstruction,
     createRouterInstruction,
     createProtocolInstruction,
     encodeApprove,
@@ -161,7 +161,9 @@ function findBestQuote(
         quotes.push({ source: "CoW", amount: BigInt(cowQuote.quote.buyAmount) });
     }
 
-    if (quotes.length === 0) return null;
+    if (quotes.length === 0) {
+        return null;
+    }
     return quotes.reduce((best, current) => current.amount > best.amount ? current : best);
 }
 
@@ -205,8 +207,8 @@ function calculateQuotesPriceImpact(
     }
 
     if ((swapRouter === "1inch" || swapRouter === "kyber") && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
-        const srcUSD = parseFloat(oneInchQuote.srcUSD);
-        const dstUSD = parseFloat(oneInchQuote.dstUSD);
+        const srcUSD = Number.parseFloat(oneInchQuote.srcUSD);
+        const dstUSD = Number.parseFloat(oneInchQuote.dstUSD);
         if (srcUSD > 0) {
             return Math.max(0, ((srcUSD - dstUSD) / srcUSD) * 100);
         }
@@ -285,17 +287,23 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
     }, [isMorpho, morphoTargetMarkets, selectedMorphoMarket]);
 
     const newMorphoContext = useMemo(() => {
-        if (!selectedMorphoMarket) return null;
+        if (!selectedMorphoMarket) {
+            return null;
+        }
         return marketToContext(selectedMorphoMarket);
     }, [selectedMorphoMarket]);
 
     const oldMorphoContextEncoded = useMemo(() => {
-        if (!morphoContext) return undefined;
+        if (!morphoContext) {
+            return undefined;
+        }
         return encodeMorphoContext(morphoContext as MorphoMarketContextForEncoding);
     }, [morphoContext]);
 
     const newMorphoContextEncoded = useMemo(() => {
-        if (!newMorphoContext) return undefined;
+        if (!newMorphoContext) {
+            return undefined;
+        }
         return encodeMorphoContext(newMorphoContext);
     }, [newMorphoContext]);
 
@@ -308,7 +316,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
     });
 
     const oldEulerContextEncoded = useMemo(() => {
-        if (!isEuler || !eulerBorrowVault || !eulerCollateralVault) return undefined;
+        if (!isEuler || !eulerBorrowVault || !eulerCollateralVault) {
+            return undefined;
+        }
         return encodeEulerContext({
             borrowVault: eulerBorrowVault as Address,
             collateralVault: eulerCollateralVault as Address,
@@ -399,7 +409,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
             return morphoTargetMarkets
                 .filter(m => {
                     const addr = m.collateralAsset?.address?.toLowerCase();
-                    if (!addr || seenAddresses.has(addr)) return false;
+                    if (!addr || seenAddresses.has(addr)) {
+                        return false;
+                    }
                     seenAddresses.add(addr);
                     return true;
                 })
@@ -436,7 +448,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // Sync selectedMorphoMarket when user selects a "to" asset
     useEffect(() => {
-        if (!isMorpho || !selectedTo) return;
+        if (!isMorpho || !selectedTo) {
+            return;
+        }
         const matchingMarket = morphoTargetMarkets.find(
             m => m.collateralAsset?.address?.toLowerCase() === selectedTo.address.toLowerCase()
         );
@@ -447,7 +461,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // Euler: new context
     const newEulerContextEncoded = useMemo(() => {
-        if (!isEuler || !eulerBorrowVault || !selectedTo) return undefined;
+        if (!isEuler || !eulerBorrowVault || !selectedTo) {
+            return undefined;
+        }
         const eulerVaultFromAsset = (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault;
         if (eulerVaultFromAsset) {
             return encodeEulerContext({
@@ -458,7 +474,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         }
         const tokenAddr = selectedTo.address.toLowerCase();
         const targetVault = eulerTargetVaults[tokenAddr];
-        if (!targetVault) return undefined;
+        if (!targetVault) {
+            return undefined;
+        }
         return encodeEulerContext({
             borrowVault: eulerBorrowVault as Address,
             collateralVault: targetVault.vaultAddress as Address,
@@ -477,7 +495,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // ============ Flash Loan Selection ============
     const amountInBigInt = useMemo(() => {
-        if (!selectedFrom) return 0n;
+        if (!selectedFrom) {
+            return 0n;
+        }
         const result = parseAmount(amountIn || "0", selectedFrom.decimals);
         return result.value ?? 0n;
     }, [amountIn, selectedFrom]);
@@ -503,7 +523,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         amount: quoteAmount,
         from: activeAdapter?.address || "",
         slippage: slippage,
-        enabled: (kyberAvailable || oneInchAvailable) && (swapRouter === "kyber" || swapRouter === "1inch") && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!activeAdapter,
+        enabled: (kyberAvailable || oneInchAvailable) && (swapRouter === "kyber" || swapRouter === "1inch") && !!amountIn && Number.parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!activeAdapter,
         preferredRouter: swapRouter === "kyber" ? "kyber" : "1inch",
     });
 
@@ -514,7 +534,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         tokensOut: selectedTo?.address as Address,
         amountsIn: quoteAmount,
         slippage: slippage / 100,
-        enabled: pendleAvailable && swapRouter === "pendle" && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!pendleAdapter,
+        enabled: pendleAvailable && swapRouter === "pendle" && !!amountIn && Number.parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!pendleAdapter,
     });
 
     const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
@@ -522,7 +542,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         buyToken: selectedTo?.address || "",
         sellAmount: quoteAmount,
         from: userAddress || "",
-        enabled: cowAvailable && executionType === "limit" && !!amountIn && parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!userAddress,
+        enabled: cowAvailable && executionType === "limit" && !!amountIn && Number.parseFloat(amountIn) > 0 && !!selectedFrom && !!selectedTo && !!userAddress,
     });
 
     const isQuoteLoading = (executionType === "limit"
@@ -547,10 +567,14 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
     }, [executionType, bestQuote, swapRouter, oneInchQuote, pendleQuote, selectedTo?.decimals, useCustomBuyAmount, customBuyAmount]);
 
     const marketRate = useMemo(() => {
-        if (!bestQuote || !selectedFrom || amountInBigInt === 0n) return null;
+        if (!bestQuote || !selectedFrom || amountInBigInt === 0n) {
+            return null;
+        }
         const sellAmountFloat = Number(formatUnits(amountInBigInt, selectedFrom.decimals));
         const buyAmountFloat = Number(formatUnits(bestQuote.amount, selectedTo?.decimals ?? 18));
-        if (sellAmountFloat === 0) return null;
+        if (sellAmountFloat === 0) {
+            return null;
+        }
         return buyAmountFloat / sellAmountFloat;
     }, [bestQuote, selectedFrom, selectedTo, amountInBigInt]);
 
@@ -561,16 +585,24 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // Auto-estimate slippage
     useEffect(() => {
-        if (executionType !== "market" || hasAutoSetMarketSlippage) return;
-        if (quotesPriceImpact === null) return;
+        if (executionType !== "market" || hasAutoSetMarketSlippage) {
+            return;
+        }
+        if (quotesPriceImpact === null) {
+            return;
+        }
         const suggested = calculateSuggestedSlippage(quotesPriceImpact);
         setSlippage(suggested);
         setHasAutoSetMarketSlippage(true);
     }, [executionType, quotesPriceImpact, hasAutoSetMarketSlippage]);
 
     useEffect(() => {
-        if (executionType !== "limit" || hasAutoSetLimitSlippage) return;
-        if (quotesPriceImpact === null) return;
+        if (executionType !== "limit" || hasAutoSetLimitSlippage) {
+            return;
+        }
+        if (quotesPriceImpact === null) {
+            return;
+        }
         const suggested = calculateSuggestedSlippage(quotesPriceImpact);
         setLimitSlippage(suggested);
         setHasAutoSetLimitSlippage(true);
@@ -585,16 +617,24 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // USD fallbacks for price impact
     const srcUsdFallback = useMemo(() => {
-        if (!selectedFrom?.price || !amountIn) return undefined;
-        const parsed = parseFloat(amountIn);
-        if (isNaN(parsed) || parsed <= 0) return undefined;
+        if (!selectedFrom?.price || !amountIn) {
+            return undefined;
+        }
+        const parsed = Number.parseFloat(amountIn);
+        if (Number.isNaN(parsed) || parsed <= 0) {
+            return undefined;
+        }
         return parsed * Number(formatUnits(selectedFrom.price, 8));
     }, [selectedFrom?.price, amountIn]);
 
     const dstUsdFallback = useMemo(() => {
-        if (!selectedTo?.price || !amountOut) return undefined;
-        const parsed = parseFloat(amountOut);
-        if (isNaN(parsed) || parsed <= 0) return undefined;
+        if (!selectedTo?.price || !amountOut) {
+            return undefined;
+        }
+        const parsed = Number.parseFloat(amountOut);
+        if (Number.isNaN(parsed) || parsed <= 0) {
+            return undefined;
+        }
         return parsed * Number(formatUnits(selectedTo.price, 8));
     }, [selectedTo?.price, amountOut]);
 
@@ -611,17 +651,21 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // Min buy amount
     const minBuyAmount = useMemo(() => {
-        if (!selectedTo) return { raw: 0n, formatted: "0" };
+        if (!selectedTo) {
+            return { raw: 0n, formatted: "0" };
+        }
 
         if (executionType === "limit" && useCustomBuyAmount && customBuyAmount) {
-            const customParsed = parseFloat(customBuyAmount);
-            if (!isNaN(customParsed) && customParsed > 0) {
+            const customParsed = Number.parseFloat(customBuyAmount);
+            if (!Number.isNaN(customParsed) && customParsed > 0) {
                 const rawCustom = BigInt(Math.floor(customParsed * (10 ** selectedTo.decimals)));
                 return { raw: rawCustom, formatted: customBuyAmount };
             }
         }
 
-        if (!bestQuote) return { raw: 0n, formatted: "0" };
+        if (!bestQuote) {
+            return { raw: 0n, formatted: "0" };
+        }
 
         const slippageToUse = executionType === "limit" ? limitSlippage : slippage;
         const bufferBps = BigInt(Math.round(slippageToUse * 100));
@@ -631,10 +675,14 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // Flash loan info for CoW
     const cowFlashLoanInfo = useMemo((): FlashLoanInfo | null => {
-        if (executionType !== "limit" || !selectedFrom) return null;
+        if (executionType !== "limit" || !selectedFrom) {
+            return null;
+        }
         const providerType = selectedProvider?.name as "morpho" | "balancerV2" | "balancerV3" | "aaveV3" | undefined;
         const lenderInfo = getPreferredFlashLoanLender(chainId, providerType);
-        if (!lenderInfo) return null;
+        if (!lenderInfo) {
+            return null;
+        }
         const fee = calculateFlashLoanFee(amountInBigInt, lenderInfo.provider);
         return {
             lender: lenderInfo.address as Address,
@@ -650,9 +698,13 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         if (!isMorpho || !currentDebtBalance || !selectedFrom?.rawBalance || selectedFrom.rawBalance === 0n) {
             return undefined;
         }
-        if (isMax) return undefined;
+        if (isMax) {
+            return undefined;
+        }
         const amount = parseUnits(amountIn || "0", selectedFrom.decimals);
-        if (amount === 0n) return undefined;
+        if (amount === 0n) {
+            return undefined;
+        }
         return (currentDebtBalance * amount) / selectedFrom.rawBalance;
     }, [isMorpho, currentDebtBalance, selectedFrom?.rawBalance, selectedFrom?.decimals, amountIn, isMax]);
 
@@ -972,17 +1024,23 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // ============ Market Order Flow Builder ============
     const buildFlow = useCallback(() => {
-        if (!selectedFrom || !selectedTo || !userAddress) return [];
+        if (!selectedFrom || !selectedTo || !userAddress) {
+            return [];
+        }
 
         let swapData: string;
         let minOut: string;
 
         if (swapRouter === "1inch" || swapRouter === "kyber") {
-            if (!oneInchQuote || !activeAdapter) return [];
+            if (!oneInchQuote || !activeAdapter) {
+                return [];
+            }
             swapData = oneInchQuote.tx.data;
             minOut = "1";
         } else {
-            if (!pendleQuote || !pendleAdapter) return [];
+            if (!pendleQuote || !pendleAdapter) {
+                return [];
+            }
             swapData = pendleQuote.transaction.data;
             minOut = "1";
         }
@@ -1303,10 +1361,10 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
     const hasAdapter = swapRouter === "pendle" ? !!pendleAdapter : !!activeAdapter;
 
     // Only block if Morpho debt info hasn't loaded yet (undefined), not if debt is 0
-    const morphoDebtInfoNotLoaded = isMorpho && !isMax && parseFloat(amountIn) > 0 && currentDebtBalance === undefined;
+    const morphoDebtInfoNotLoaded = isMorpho && !isMax && Number.parseFloat(amountIn) > 0 && currentDebtBalance === undefined;
 
-    const canSubmitMarket = hasQuote && hasAdapter && parseFloat(amountIn) > 0 && !morphoDebtInfoNotLoaded;
-    const canSubmitLimit = !!selectedFrom && !!selectedTo && parseFloat(amountIn) > 0 && conditionalOrderReady && !!cowFlashLoanInfo && !!limitPriceTriggerAddress && !!conditionalOrderTriggerParams && !morphoDebtInfoNotLoaded;
+    const canSubmitMarket = hasQuote && hasAdapter && Number.parseFloat(amountIn) > 0 && !morphoDebtInfoNotLoaded;
+    const canSubmitLimit = !!selectedFrom && !!selectedTo && Number.parseFloat(amountIn) > 0 && conditionalOrderReady && !!cowFlashLoanInfo && !!limitPriceTriggerAddress && !!conditionalOrderTriggerParams && !morphoDebtInfoNotLoaded;
     const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
 
     // Prefer Morpho for limit orders
@@ -1341,7 +1399,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
                         <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">1</div>
-                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
+                        <div className="bg-base-300 my-1 h-full w-0.5" />
                     </div>
                     <div className="pb-4">
                         <h4 className="text-sm font-medium">Flash Loan</h4>
@@ -1355,7 +1413,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
                         <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">2</div>
-                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
+                        <div className="bg-base-300 my-1 h-full w-0.5" />
                     </div>
                     <div className="pb-4">
                         <h4 className="text-sm font-medium">Swap</h4>
@@ -1371,7 +1429,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                 <div className="flex gap-3">
                     <div className="flex flex-col items-center">
                         <div className="bg-primary/20 text-primary flex size-6 items-center justify-center rounded-full text-xs font-bold">3</div>
-                        <div className="bg-base-300 my-1 h-full w-0.5"></div>
+                        <div className="bg-base-300 my-1 h-full w-0.5" />
                     </div>
                     <div className="pb-4">
                         <h4 className="text-sm font-medium">Deposit & Withdraw</h4>
@@ -1447,7 +1505,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                                 <select
                                     className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
                                     value={slippage}
-                                    onChange={(e) => setSlippage(parseFloat(e.target.value))}
+                                    onChange={(e) => setSlippage(Number.parseFloat(e.target.value))}
                                 >
                                     {(swapRouter === "pendle"
                                         ? [0.1, 0.5, 1, 2, 3, 5, 7, 10, 15, 20]
@@ -1478,7 +1536,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                                         value={selectedProvider?.name || ""}
                                         onChange={(e) => {
                                             const p = flashLoanProviders.find(provider => provider.name === e.target.value);
-                                            if (p) setSelectedProvider(p);
+                                            if (p) {
+                                                setSelectedProvider(p);
+                                            }
                                         }}
                                     >
                                         {flashLoanProviders.map(p => {
@@ -1503,11 +1563,11 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                                     </span>
                                 </div>
                             )}
-                            {amountOut && parseFloat(amountOut) > 0 && (
+                            {amountOut && Number.parseFloat(amountOut) > 0 && (
                                 <div className="flex items-center justify-between">
                                     <span className="text-base-content/50">Min Output</span>
                                     <span className="text-base-content/80">
-                                        {(parseFloat(amountOut) * (1 - slippage / 100)).toFixed(4)} {selectedTo?.symbol}
+                                        {(Number.parseFloat(amountOut) * (1 - slippage / 100)).toFixed(4)} {selectedTo?.symbol}
                                     </span>
                                 </div>
                             )}
@@ -1535,7 +1595,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                                     value={selectedProvider?.name || ""}
                                     onChange={(e) => {
                                         const provider = flashLoanProviders.find(p => p.name === e.target.value);
-                                        if (provider) setSelectedProvider(provider);
+                                        if (provider) {
+                                            setSelectedProvider(provider);
+                                        }
                                     }}
                                 >
                                     {flashLoanProviders.map(p => (
@@ -1563,7 +1625,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                                         const pctDiff = ((limitRate - marketRate) / marketRate) * 100;
                                         const isAbove = pctDiff > 0;
                                         const absDiff = Math.abs(pctDiff);
-                                        if (absDiff < 0.01) return <span className="text-base-content/40">at market price</span>;
+                                        if (absDiff < 0.01) {
+                                            return <span className="text-base-content/40">at market price</span>;
+                                        }
                                         return (
                                             <span className={isAbove ? "text-success" : "text-warning"}>
                                                 {absDiff.toFixed(2)}% {isAbove ? "above" : "below"} market
@@ -1585,7 +1649,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                                         className="border-base-300 bg-base-200 text-base-content/80 w-14 rounded border px-2 py-0.5 text-right text-xs font-medium"
                                         value={numChunks}
                                         onChange={(e) => {
-                                            const val = parseInt(e.target.value) || 1;
+                                            const val = Number.parseInt(e.target.value) || 1;
                                             setNumChunks(Math.max(1, Math.min(100, val)));
                                         }}
                                     />
@@ -1611,21 +1675,29 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // Limit price buttons
     const limitPriceButtons: ReactNode = useMemo(() => {
-        if (executionType !== "limit") return null;
+        if (executionType !== "limit") {
+            return null;
+        }
 
         const adjustByPercent = (delta: number) => {
-            if (!bestQuote || !selectedTo) return;
+            if (!bestQuote || !selectedTo) {
+                return;
+            }
             const currentAmount = useCustomBuyAmount && customBuyAmount
-                ? parseFloat(customBuyAmount)
+                ? Number.parseFloat(customBuyAmount)
                 : Number(formatUnits(bestQuote.amount, selectedTo.decimals));
-            if (isNaN(currentAmount)) return;
+            if (Number.isNaN(currentAmount)) {
+                return;
+            }
             const newAmount = currentAmount * (1 + delta / 100);
             setCustomBuyAmount(newAmount.toFixed(6));
             setUseCustomBuyAmount(true);
         };
 
         const resetToMarket = () => {
-            if (!bestQuote || !selectedTo) return;
+            if (!bestQuote || !selectedTo) {
+                return;
+            }
             const marketAmount = formatUnits(bestQuote.amount, selectedTo.decimals);
             setCustomBuyAmount(marketAmount);
             setUseCustomBuyAmount(true);

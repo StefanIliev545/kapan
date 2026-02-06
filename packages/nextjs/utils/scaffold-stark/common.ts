@@ -1,9 +1,11 @@
 // To be used in JSON.stringify when a field might be bigint
 // https://wagmi.sh/react/faq#bigint-serialization
-import { Address } from "@starknet-react/chains";
+import type { Address } from "@starknet-react/chains";
 
 export const replacer = (_key: string, value: unknown) => {
-  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
   return value;
 };
 
@@ -21,7 +23,7 @@ export function isJsonString(str: string) {
   try {
     JSON.parse(str);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }

@@ -39,16 +39,27 @@ const price8 = (addr: string, tokenToPrices: PriceMap) =>
   tokenToPrices[addrKey(addr)] ?? 0n;
 
 const toUsdFromP8 = (humanAmount: number, p8: bigint): number => {
-  if (!p8 || p8 === 0n || !isFinite(humanAmount) || humanAmount <= 0) return 0;
+  if (!p8 || p8 === 0n || !Number.isFinite(humanAmount) || humanAmount <= 0) {
+    return 0;
+  }
   return humanAmount * Number(formatUnits(p8, 8));
 };
 
 const toUsdRaw = (amountRaw: bigint, decimals: number, p8: bigint): number => {
-  if (!amountRaw || !p8) return 0;
+  if (!amountRaw || !p8) {
+    return 0;
+  }
   return Number(formatUnits(amountRaw, decimals)) * Number(formatUnits(p8, 8));
 };
 
-const getLtBps = (c: any): number => {
+interface CollateralWithLt {
+  liquidationThresholdBps?: number | bigint;
+  collateralFactorBps?: number | bigint;
+  ltBps?: number | bigint;
+  ltvBps?: number | bigint;
+}
+
+const getLtBps = (c: CollateralWithLt | null | undefined): number => {
   const v = Number(
     c?.liquidationThresholdBps ??
     c?.collateralFactorBps ??
@@ -56,7 +67,7 @@ const getLtBps = (c: any): number => {
     c?.ltvBps ??
     8273
   );
-  return Math.max(0, Math.min(10000, v));
+  return Math.max(0, Math.min(10_000, v));
 };
 
 /* --------------------------- Price Probe ----------------------------- */
@@ -77,12 +88,18 @@ const CollatPriceProbe: FC<{
   const lower = addrKey(address);
 
   useEffect(() => {
-    if (!enabled || !sym) return;
-    const ok = isSuccess && typeof price === "number" && isFinite(price) && price > 0;
-    if (!ok) return;
+    if (!enabled || !sym) {
+      return;
+    }
+    const ok = isSuccess && typeof price === "number" && Number.isFinite(price) && price > 0;
+    if (!ok) {
+      return;
+    }
 
     const p8 = BigInt(Math.round(price * 1e8));
-    if (lastReported.current === p8) return;
+    if (lastReported.current === p8) {
+      return;
+    }
 
     lastReported.current = p8;
     onPrice(lower, p8);
@@ -144,15 +161,21 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   const [mergedPrices, setMergedPrices] = useState<PriceMap>({});
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     setMergedPrices(prev => {
       let changed = false;
       let next = prev;
       for (const [k, v] of Object.entries(seedPrices || {})) {
-        if (!v || v <= 0n) continue;
+        if (!v || v <= 0n) {
+          continue;
+        }
         const key = addrKey(k);
         if (prev[key] !== v) {
-          if (next === prev) next = { ...prev };
+          if (next === prev) {
+            next = { ...prev };
+          }
           next[key] = v;
           changed = true;
         }
@@ -162,7 +185,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   }, [isOpen, seedPrices]);
 
   const reportPrice = useCallback((lower: string, p8: bigint) => {
-    if (!p8 || p8 <= 0n) return;
+    if (!p8 || p8 <= 0n) {
+      return;
+    }
     setMergedPrices(prev => (prev[lower] === p8 ? prev : { ...prev, [lower]: p8 }));
   }, []);
 
@@ -283,9 +308,13 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   // Get markets for the currently selected collateral (for Morpho)
   const morphoMarketsForSelectedCollateral = useMemo(() => {
-    if (!isMorphoSelected) return [];
+    if (!isMorphoSelected) {
+      return [];
+    }
     const selectedCollateralAddr = Object.keys(addedCollaterals)[0]?.toLowerCase();
-    if (!selectedCollateralAddr) return [];
+    if (!selectedCollateralAddr) {
+      return [];
+    }
     return morphoMarketsByCollateral[selectedCollateralAddr] || [];
   }, [isMorphoSelected, addedCollaterals, morphoMarketsByCollateral]);
 
@@ -313,9 +342,13 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   // Get vaults for the currently selected collateral (for Euler)
   const eulerVaultsForSelectedCollateral = useMemo(() => {
-    if (!isEulerSelected) return [];
+    if (!isEulerSelected) {
+      return [];
+    }
     const selectedCollateralAddr = Object.keys(addedCollaterals)[0]?.toLowerCase();
-    if (!selectedCollateralAddr) return [];
+    if (!selectedCollateralAddr) {
+      return [];
+    }
     return eulerVaultsByCollateral[selectedCollateralAddr] || [];
   }, [isEulerSelected, addedCollaterals, eulerVaultsByCollateral]);
 
@@ -417,8 +450,12 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   // Auto pick a destination once, based on support + balances
   useEffect(() => {
-    if (!isOpen || autoSelectedDest) return;
-    if (!destinationProtocols.length) return;
+    if (!isOpen || autoSelectedDest) {
+      return;
+    }
+    if (!destinationProtocols.length) {
+      return;
+    }
 
     const supportedMap = effectiveSupportedMap;
     const hasSupportedNonZero = collaterals.some(c => {
@@ -430,8 +467,10 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       setAutoSelectedDest(true);
       return;
     }
-    const alt = destinationProtocols.find(p => p.name !== selectedProtocol);
-    if (alt && alt.name !== selectedProtocol) setSelectedProtocol(alt.name);
+    const alt = destinationProtocols.find(protocol => protocol.name !== selectedProtocol);
+    if (alt && alt.name !== selectedProtocol) {
+      setSelectedProtocol(alt.name);
+    }
     setAutoSelectedDest(true);
   }, [
     isOpen,
@@ -448,7 +487,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   const { createMoveBuilder, executeFlowBatchedIfPossible, canDoAtomicBatch, simulateInstructions } = useKapanRouterV2();
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     const next = Boolean(canDoAtomicBatch);
     setPreferBatching(prev => (prev === next ? prev : next));
   }, [isOpen, canDoAtomicBatch, setPreferBatching]);
@@ -493,16 +534,24 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     const isVesu = selectedProtocol === "Vesu" || selectedProtocol === "VesuV2";
-    if (!isVesu || !evmVesuPools) return;
+    if (!isVesu || !evmVesuPools) {
+      return;
+    }
 
     if (selectedVersion === "v1") {
       const first = evmVesuPools.v1Pools[0]?.name || "";
-      if (first && selectedPool !== first) setSelectedPool(first);
+      if (first && selectedPool !== first) {
+        setSelectedPool(first);
+      }
     } else {
       const first = evmVesuPools.v2Pools[0]?.name || "";
-      if (first && selectedPool !== first) setSelectedPool(first);
+      if (first && selectedPool !== first) {
+        setSelectedPool(first);
+      }
     }
   }, [isOpen, selectedProtocol, selectedVersion, evmVesuPools, selectedPool]);
 
@@ -517,18 +566,26 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   const debtPrice8 = mergedPrices[addrKey(position.tokenAddress)] ?? 0n;
 
   const debtUsd = useMemo(() => {
-    if (!debtConfirmed) return 0;
-    const parsed = parseFloat(debtAmount || "0");
-    if (Number.isNaN(parsed) || parsed <= 0) return 0;
+    if (!debtConfirmed) {
+      return 0;
+    }
+    const parsed = Number.parseFloat(debtAmount || "0");
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      return 0;
+    }
     return toUsdFromP8(parsed, debtPrice8);
   }, [debtAmount, debtConfirmed, debtPrice8]);
 
   const getUsdValue = useCallback(
     (address: string, humanAmount: string): number => {
       const p8 = price8(address, mergedPrices);
-      if (!p8 || p8 === 0n) return 0;
-      const amt = parseFloat(humanAmount || "0");
-      if (Number.isNaN(amt) || amt <= 0) return 0;
+      if (!p8 || p8 === 0n) {
+        return 0;
+      }
+      const amt = Number.parseFloat(humanAmount || "0");
+      if (Number.isNaN(amt) || amt <= 0) {
+        return 0;
+      }
       return toUsdFromP8(amt, p8);
     },
     [mergedPrices]
@@ -543,17 +600,26 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   }, [addedCollaterals, getUsdValue]);
 
   const ltv = useMemo(() => {
-    if (!totalCollateralUsd) return "0.0";
+    if (!totalCollateralUsd) {
+      return "0.0";
+    }
     return ((debtUsd / totalCollateralUsd) * 100).toFixed(1);
   }, [debtUsd, totalCollateralUsd]);
 
-  const HF_SAFE = 2.0;
+  const HF_SAFE = 2;
   const HF_RISK = 1.5;
   const HF_DANGER = 1.1;
 
+  interface CollateralForHF extends CollateralWithLt {
+    address?: string;
+    token?: string;
+    rawBalance?: bigint;
+    decimals?: number;
+  }
+
   const computeHF = useCallback(
     (
-      all: any[],
+      all: CollateralForHF[],
       moved: { address?: string; amount: bigint; decimals: number }[],
       tokenPrices: PriceMap,
       totalDebtUsd: number
@@ -561,7 +627,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       const movedByAddr = new Map<string, bigint>();
       for (const m of moved) {
         const key = addrKey(m.address || "");
-        if (!key) continue;
+        if (!key) {
+          continue;
+        }
         movedByAddr.set(key, (movedByAddr.get(key) ?? 0n) + (m.amount ?? 0n));
       }
 
@@ -569,25 +637,35 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
       for (const c of all) {
         const key = addrKey(c.address || c.token || "");
-        if (!key) continue;
+        if (!key) {
+          continue;
+        }
 
         const rawBal: bigint = c.rawBalance ?? 0n;
         const decs: number = c.decimals ?? 18;
         const lt = getLtBps(c) / 1e4;
-        if (lt <= 0) continue;
+        if (lt <= 0) {
+          continue;
+        }
 
         const movedAmt = movedByAddr.get(key) ?? 0n;
         const remaining = rawBal - movedAmt;
-        if (remaining <= 0n) continue;
+        if (remaining <= 0n) {
+          continue;
+        }
 
         const p8 = price8(key, tokenPrices);
-        if (p8 === 0n) continue;
+        if (p8 === 0n) {
+          continue;
+        }
 
         const usd = toUsdRaw(remaining, decs, p8);
         weightedCollUsd += usd * lt;
       }
 
-      if (!isFinite(totalDebtUsd) || totalDebtUsd <= 0) return 999;
+      if (!Number.isFinite(totalDebtUsd) || totalDebtUsd <= 0) {
+        return 999;
+      }
       return weightedCollUsd / totalDebtUsd;
     },
     []
@@ -597,7 +675,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     const out: { address: string; amount: bigint; decimals: number }[] = [];
     for (const [addr, amt] of Object.entries(addedCollaterals)) {
       const col = collaterals.find(c => addrKey(c.address) === addrKey(addr));
-      if (!col) continue;
+      if (!col) {
+        continue;
+      }
       out.push({
         address: addrKey(addr),
         amount: parseUnits(amt || "0", col.decimals),
@@ -607,14 +687,21 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     return out;
   }, [addedCollaterals, collaterals]);
 
-  const refiHF = useMemo(() => {
-    return computeHF(collaterals, movedList, mergedPrices, debtUsd);
-  }, [collaterals, movedList, mergedPrices, debtUsd, computeHF]);
+  const refiHF = useMemo(
+    () => computeHF(collaterals as CollateralForHF[], movedList, mergedPrices, debtUsd),
+    [collaterals, movedList, mergedPrices, debtUsd, computeHF]
+  );
 
   const hfTone = (hf: number) => {
-    if (hf >= HF_SAFE) return { tone: "text-success", badge: "badge-success" };
-    if (hf >= HF_RISK) return { tone: "text-warning", badge: "badge-warning" };
-    if (hf >= HF_DANGER) return { tone: "text-error", badge: "badge-error" };
+    if (hf >= HF_SAFE) {
+      return { tone: "text-success", badge: "badge-success" };
+    }
+    if (hf >= HF_RISK) {
+      return { tone: "text-warning", badge: "badge-warning" };
+    }
+    if (hf >= HF_DANGER) {
+      return { tone: "text-error", badge: "badge-error" };
+    }
     return { tone: "text-error", badge: "badge-error" };
   };
   const hfColor = hfTone(refiHF);
@@ -627,7 +714,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     !mergedPrices[addrKey(position.tokenAddress)];
 
   const apiProbes = useMemo(() => {
-    if (!isOpen) return null;
+    if (!isOpen) {
+      return null;
+    }
 
     const probes: React.ReactNode[] = [];
 
@@ -645,7 +734,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
     for (const c of collaterals) {
       const a = addrKey(c.address);
-      if (!a || !c.symbol) continue;
+      if (!a || !c.symbol) {
+        continue;
+      }
       if (!mergedPrices[a]) {
         probes.push(
           <CollatPriceProbe
@@ -700,7 +791,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   }, [debtConfirmed, selectedProtocol, addedCollaterals, isMorphoSelected, selectedMorphoMarket, morphoSupportedCollaterals, isEulerSelected, eulerContext, eulerSupportedCollaterals, effectiveSupportedMap, selectedEulerVault, eulerContextsByCollateral]);
 
   const handleExecuteMove = useCallback(async () => {
-    if (!debtConfirmed || !selectedProtocol) return;
+    if (!debtConfirmed || !selectedProtocol) {
+      return;
+    }
 
     let batchingUsed = false;
 
@@ -776,7 +869,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         debtDecimals: position.decimals,
         fromContext: defaultSourceContext,
         flash: {
-          version: providerVersion as any,
+          version: providerVersion as "aave" | "v2" | "v3",
           premiumBps: 9,
           bufferBps: 10,
         },
@@ -796,7 +889,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
       Object.entries(addedCollaterals).forEach(([addr, amt]) => {
         const meta = collaterals.find(c => addrKey(c.address) === addrKey(addr));
-        if (!meta) return;
+        if (!meta) {
+          return;
+        }
         const isMax = collateralIsMaxMap[addr] === true;
 
         // For Euler destination, each collateral needs its own context with the correct collateralVault
@@ -865,13 +960,14 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       try {
         await simulateInstructions(flow, { skipWhenAuthCallsExist: false });
         console.log("[Refinance] Pre-simulation passed");
-      } catch (simError: any) {
+      } catch (simError: unknown) {
         console.error("[Refinance] Pre-simulation FAILED:", simError);
         // Log detailed error for debugging
+        const errorObj = simError as { message?: string; cause?: unknown; data?: unknown } | null;
         console.error("[Refinance] Simulation error details:", {
-          message: simError?.message,
-          cause: simError?.cause,
-          data: simError?.data,
+          message: errorObj?.message,
+          cause: errorObj?.cause,
+          data: errorObj?.data,
         });
         // Re-throw to show error to user
         throw simError;
@@ -896,13 +992,19 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         status: "success",
       };
 
-      if (chainId !== undefined) txCompleteProps.chainId = chainId;
-      if (selectedProvider) txCompleteProps.selectedProvider = selectedProvider;
-      if (selectedPool) txCompleteProps.selectedPool = selectedPool;
+      if (chainId !== undefined) {
+        txCompleteProps.chainId = chainId;
+      }
+      if (selectedProvider) {
+        txCompleteProps.selectedProvider = selectedProvider;
+      }
+      if (selectedPool) {
+        txCompleteProps.selectedPool = selectedPool;
+      }
 
       track("refinance_tx_complete", txCompleteProps);
-    } catch (e: any) {
-      console.error("Refinance flow error:", e);
+    } catch (error) {
+      console.error("Refinance flow error:", error);
       const txCompleteProps: Record<string, string | number | boolean> = {
         network: "evm",
         fromProtocol,
@@ -913,12 +1015,18 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         preferBatching: Boolean(preferBatching),
         batchingUsed,
         status: "error",
-        error: e instanceof Error ? e.message : String(e),
+        error: error instanceof Error ? error.message : String(error),
       };
 
-      if (chainId !== undefined) txCompleteProps.chainId = chainId;
-      if (selectedProvider) txCompleteProps.selectedProvider = selectedProvider;
-      if (selectedPool) txCompleteProps.selectedPool = selectedPool;
+      if (chainId !== undefined) {
+        txCompleteProps.chainId = chainId;
+      }
+      if (selectedProvider) {
+        txCompleteProps.selectedProvider = selectedProvider;
+      }
+      if (selectedPool) {
+        txCompleteProps.selectedPool = selectedPool;
+      }
 
       track("refinance_tx_complete", txCompleteProps);
     } finally {
@@ -949,10 +1057,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   ]);
 
   // Determine source pool name
-  const sourcePoolName = useMemo(() => {
-    // For EVM, we don't need to exclude source pool by name
-    return null;
-  }, []);
+  // For EVM, we don't need to exclude source pool by name
+  const sourcePoolName = useMemo(() => null, []);
 
   const handleDebtAmountChange = useCallback((value: string) => {
     setDebtAmount(value);

@@ -12,8 +12,9 @@ type ReadContractConfig<T extends NetworkType, TContractName extends ContractNam
   networkType: T;
   contractName: TContractName;
   functionName: TFunctionName;
-  args?: any[];
-  [key: string]: any;
+  args?: unknown[];
+  query?: Record<string, unknown>;
+  [key: string]: unknown;
 };
 
 export const useNetworkAwareReadContract = <
@@ -34,8 +35,8 @@ export const useNetworkAwareReadContract = <
   // Call EVM hook only when network type is EVM
   const evmResult = useScaffoldReadContractEth({
     contractName: contractName as ContractName,
-    functionName: functionName as any,
-    args: args as any,
+    functionName: functionName as string & keyof ContractAbiEth,
+    args: args as unknown[],
     ...readConfig,
     query: {
       // Shorter staleTime for protocol queries (10-30 seconds per docs)
@@ -49,8 +50,8 @@ export const useNetworkAwareReadContract = <
   // Call Starknet hook only when network type is Starknet
   const starkResult = useScaffoldReadContractStark({
     contractName: contractName as ContractNameStark,
-    functionName: functionName as any,
-    args: args as any,
+    functionName: functionName as string & keyof ContractAbiStark,
+    args: args as unknown[],
     ...readConfig,
     enabled: networkType === "starknet",
   });

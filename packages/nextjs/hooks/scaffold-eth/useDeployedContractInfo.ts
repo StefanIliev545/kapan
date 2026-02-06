@@ -38,7 +38,7 @@ export function useDeployedContractInfo<TContractName extends ContractName>(
   const isMounted = useIsMounted();
 
   const finalConfig: UseDeployedContractConfig<TContractName> =
-    typeof configOrName === "string" ? { contractName: configOrName } : (configOrName as any);
+    typeof configOrName === "string" ? { contractName: configOrName } : configOrName;
 
   useEffect(() => {
     if (typeof configOrName === "string") {
@@ -79,8 +79,8 @@ export function useDeployedContractInfo<TContractName extends ContractName>(
         const newStatus = code === "0x" ? ContractCodeStatus.NOT_FOUND : ContractCodeStatus.DEPLOYED;
         deploymentStatusCache.set(cacheKey, newStatus);
         setStatus(newStatus);
-      } catch (e) {
-        console.error(e);
+      } catch (error) {
+        console.error(error);
         // Don't cache network errors - they might be temporary
         // Only update local state, allowing retry on next render
         setStatus(ContractCodeStatus.NOT_FOUND);

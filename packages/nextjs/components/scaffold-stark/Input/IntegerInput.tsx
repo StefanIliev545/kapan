@@ -38,7 +38,9 @@ export const IntegerInput = ({
     setInputError(!isIntValid);
     if (onError) {
       onError(null);
-      if (!isIntValid) onError("Invalid number input");
+      if (!isIntValid) {
+        onError("Invalid number input");
+      }
     }
   }, [value, variant, onError]);
 
@@ -53,6 +55,7 @@ export const IntegerInput = ({
         data-tip="Multiply by 10^18 (wei)"
       >
         <button
+          type="button"
           className="text-accent cursor-pointer px-4 font-semibold"
           onClick={multiplyBy1e18}
           disabled={disabled}

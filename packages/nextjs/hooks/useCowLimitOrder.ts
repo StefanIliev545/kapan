@@ -527,7 +527,7 @@ export function useCowLimitOrder() {
         data: encodeFunctionData({
           abi: orderManagerContract?.abi ?? ORDER_MANAGER_ABI,
           functionName: "createOrder",
-          args: [orderParams as any, salt as `0x${string}`, seedAmount],
+          args: [orderParams as Parameters<typeof encodeFunctionData>["args"], salt as `0x${string}`, seedAmount],
         }) as Hex,
       });
 

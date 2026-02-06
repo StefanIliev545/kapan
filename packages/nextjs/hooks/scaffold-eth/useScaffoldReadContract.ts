@@ -3,8 +3,7 @@ import { QueryObserverResult, RefetchOptions } from "@tanstack/react-query";
 import type { ExtractAbiFunctionNames } from "abitype";
 import { ReadContractErrorType } from "viem";
 import { useReadContract } from "wagmi";
-import { useSelectedNetwork, useBlockNumberContext } from "~~/hooks/scaffold-eth";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { useBlockNumberContext, useDeployedContractInfo, useSelectedNetwork } from "~~/hooks/scaffold-eth";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
 import { replacer } from "~~/utils/scaffold-eth/common";
 import {
@@ -45,7 +44,7 @@ export const useScaffoldReadContract = <
     blockNumber: blockNumberConfig,
     blockTag,
     ...restConfig
-  } = readConfig as any;
+  } = readConfig as Record<string, unknown>;
   const defaultWatch = watch ?? false;
 
   const sanitizedBlockNumber =
@@ -63,7 +62,7 @@ export const useScaffoldReadContract = <
     args: serializedArgs as typeof args,
     blockNumber: sanitizedBlockNumber,
     blockTag: sanitizedBlockTag,
-    ...(restConfig as any),
+    ...(restConfig as Record<string, unknown>),
     query: {
       enabled: !Array.isArray(args) || !args.some(arg => arg === undefined),
       ...queryOptions,
