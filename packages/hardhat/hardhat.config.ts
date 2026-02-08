@@ -161,7 +161,7 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
     },
     mainnet: {
-      url: `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`,
+      url: `https://eth-mainnet.g.alchemy.com/v2/${providerApiKey}`,
       accounts: [deployerPrivateKey],
     },
     sepolia: {

@@ -1,0 +1,520 @@
+{
+  "address": "0x6d4739D6b6640533D3abEa573eF5bF5069A587Ff",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_viewRouter",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidTriggerParams",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        }
+      ],
+      "name": "UnsupportedProtocol",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AAVE_V3",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "COMPOUND_V3",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "EULER_V2",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MORPHO_BLUE",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VENUS",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "staticData",
+          "type": "bytes"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "calculateExecution",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "sellAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "minBuyAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "staticData",
+          "type": "bytes"
+        }
+      ],
+      "name": "decodeTriggerParams",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes4",
+              "name": "protocolId",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "bytes",
+              "name": "protocolContext",
+              "type": "bytes"
+            },
+            {
+              "internalType": "uint256",
+              "name": "triggerLtvBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "targetLtvBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "debtToken",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "collateralDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "debtDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxSlippageBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "numChunks",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct LtvTrigger.TriggerParams",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes4",
+              "name": "protocolId",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "bytes",
+              "name": "protocolContext",
+              "type": "bytes"
+            },
+            {
+              "internalType": "uint256",
+              "name": "triggerLtvBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "targetLtvBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "debtToken",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "collateralDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "debtDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxSlippageBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "numChunks",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct LtvTrigger.TriggerParams",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "name": "encodeTriggerParams",
+      "outputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "context",
+          "type": "bytes"
+        }
+      ],
+      "name": "getCurrentLtv",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "ltvBps",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "isComplete",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "staticData",
+          "type": "bytes"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "shouldExecute",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        },
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "triggerName",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "viewRouter",
+      "outputs": [
+        {
+          "internalType": "contract IKapanViewRouter",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x4051ee66f27dc95c04958d5aa7ad578a3188a77b75430ecb0efcaff10dff2b8d",
+  "receipt": {
+    "to": "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+    "from": "0x0BE61223F99E57b8b8B7033a77B54Adc7f7cF027",
+    "contractAddress": null,
+    "transactionIndex": 1,
+    "gasUsed": "827102",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0xeadbc68564e0274142ce8900702de5e10d80bf1da818c5ab51e4382f59c0c69a",
+    "transactionHash": "0x4051ee66f27dc95c04958d5aa7ad578a3188a77b75430ecb0efcaff10dff2b8d",
+    "logs": [],
+    "blockNumber": 13646447,
+    "cumulativeGasUsed": "848102",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0x7E83287F7d63Bfa5C60B57E8A4b796dC07A3c665"
+  ],
+  "numDeployments": 1,
+  "solcInputHash": "0fea5cc4d237037126c3fb60329d2945",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_viewRouter\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"InvalidTriggerParams\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"}],\"name\":\"UnsupportedProtocol\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"AAVE_V3\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"COMPOUND_V3\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"EULER_V2\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MORPHO_BLUE\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"VENUS\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"staticData\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"calculateExecution\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"sellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"minBuyAmount\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"staticData\",\"type\":\"bytes\"}],\"name\":\"decodeTriggerParams\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"bytes\",\"name\":\"protocolContext\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"triggerLtvBps\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"targetLtvBps\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"debtToken\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"collateralDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"debtDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"maxSlippageBps\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"numChunks\",\"type\":\"uint8\"}],\"internalType\":\"struct LtvTrigger.TriggerParams\",\"name\":\"params\",\"type\":\"tuple\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"bytes\",\"name\":\"protocolContext\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"triggerLtvBps\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"targetLtvBps\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"debtToken\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"collateralDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"debtDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"maxSlippageBps\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"numChunks\",\"type\":\"uint8\"}],\"internalType\":\"struct LtvTrigger.TriggerParams\",\"name\":\"params\",\"type\":\"tuple\"}],\"name\":\"encodeTriggerParams\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"context\",\"type\":\"bytes\"}],\"name\":\"getCurrentLtv\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"ltvBps\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"isComplete\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"staticData\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"shouldExecute\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"},{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"triggerName\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"viewRouter\",\"outputs\":[{\"internalType\":\"contract IKapanViewRouter\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Calculates deleverage amount to reach target LTV and minimum buy with slippage\",\"kind\":\"dev\",\"methods\":{\"calculateExecution(bytes,address,uint256)\":{\"details\":\"Only called when shouldExecute returns true\",\"params\":{\"iterationCount\":\"Number of executions completed so far (for chunked orders)\",\"owner\":\"The order owner\",\"staticData\":\"ABI-encoded trigger-specific parameters\"},\"returns\":{\"minBuyAmount\":\"Minimum amount to receive (includes slippage protection)\",\"sellAmount\":\"Amount of sell token to trade in this execution\"}},\"decodeTriggerParams(bytes)\":{\"params\":{\"staticData\":\"ABI-encoded TriggerParams\"},\"returns\":{\"params\":\"Decoded trigger parameters\"}},\"encodeTriggerParams((bytes4,bytes,uint256,uint256,address,address,uint8,uint8,uint256,uint8))\":{\"params\":{\"params\":\"Trigger parameters\"},\"returns\":{\"_0\":\"staticData ABI-encoded data\"}},\"getCurrentLtv(bytes4,address,bytes)\":{\"params\":{\"context\":\"Protocol-specific context\",\"owner\":\"User address\",\"protocolId\":\"Protocol identifier\"},\"returns\":{\"ltvBps\":\"Current LTV in basis points\"}},\"isComplete(bytes,address,uint256)\":{\"details\":\"ADL orders are continuous - they never auto-complete. The order remains active and will re-trigger whenever LTV rises above the trigger threshold, up to maxIterations or until user cancels. This provides ongoing liquidation protection rather than one-shot execution.\",\"params\":{\"iterationCount\":\"Number of executions completed so far\",\"owner\":\"The order owner\",\"staticData\":\"ABI-encoded trigger-specific parameters\"},\"returns\":{\"_0\":\"True if the order goal has been reached\"}},\"shouldExecute(bytes,address)\":{\"params\":{\"owner\":\"The order owner (user whose position is being monitored)\",\"staticData\":\"ABI-encoded trigger-specific parameters\"},\"returns\":{\"_0\":\"True if the trigger condition is met\",\"_1\":\"Human-readable reason for the result (for debugging/logging)\"}},\"triggerName()\":{\"returns\":{\"_0\":\"Trigger name (e.g., \\\"LTV\\\", \\\"Price\\\", \\\"HealthFactor\\\")\"}}},\"title\":\"LtvTrigger\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"AAVE_V3()\":{\"notice\":\"Protocol identifiers\"},\"calculateExecution(bytes,address,uint256)\":{\"notice\":\"Calculate the execution amounts when the trigger fires\"},\"decodeTriggerParams(bytes)\":{\"notice\":\"Decode trigger params from static data\"},\"encodeTriggerParams((bytes4,bytes,uint256,uint256,address,address,uint8,uint8,uint256,uint8))\":{\"notice\":\"Encode trigger params to static data\"},\"getCurrentLtv(bytes4,address,bytes)\":{\"notice\":\"Get current LTV for a user position\"},\"isComplete(bytes,address,uint256)\":{\"notice\":\"Check if the order is complete and should stop executing\"},\"shouldExecute(bytes,address)\":{\"notice\":\"Check if the order should execute based on current conditions\"},\"triggerName()\":{\"notice\":\"Get human-readable name of the trigger type\"},\"viewRouter()\":{\"notice\":\"The KapanViewRouter for LTV and price queries\"}},\"notice\":\"Triggers order execution when position LTV exceeds a threshold (ADL)\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/v2/triggers/LtvTrigger.sol\":\"LtvTrigger\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":10},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/v2/interfaces/IOrderTrigger.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\n/// @title IOrderTrigger\\n/// @notice Interface for pluggable order triggers in the Kapan conditional order system\\n/// @dev Triggers determine when an order should execute and how much to trade\\ninterface IOrderTrigger {\\n    /// @notice Check if the order should execute based on current conditions\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner (user whose position is being monitored)\\n    /// @return shouldExecute True if the trigger condition is met\\n    /// @return reason Human-readable reason for the result (for debugging/logging)\\n    function shouldExecute(\\n        bytes calldata staticData,\\n        address owner\\n    ) external view returns (bool shouldExecute, string memory reason);\\n\\n    /// @notice Calculate the execution amounts when the trigger fires\\n    /// @dev Only called when shouldExecute returns true\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner\\n    /// @param iterationCount Number of executions completed so far (for chunked orders)\\n    /// @return sellAmount Amount of sell token to trade in this execution\\n    /// @return minBuyAmount Minimum amount to receive (includes slippage protection)\\n    function calculateExecution(\\n        bytes calldata staticData,\\n        address owner,\\n        uint256 iterationCount\\n    ) external view returns (uint256 sellAmount, uint256 minBuyAmount);\\n\\n    /// @notice Check if the order is complete and should stop executing\\n    /// @dev Called after each execution to determine if order should be marked complete\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner\\n    /// @param iterationCount Number of executions completed so far\\n    /// @return complete True if the order goal has been reached\\n    function isComplete(\\n        bytes calldata staticData,\\n        address owner,\\n        uint256 iterationCount\\n    ) external view returns (bool complete);\\n\\n    /// @notice Get human-readable name of the trigger type\\n    /// @return name Trigger name (e.g., \\\"LTV\\\", \\\"Price\\\", \\\"HealthFactor\\\")\\n    function triggerName() external pure returns (string memory name);\\n}\\n\",\"keccak256\":\"0x852a502f0d40f6547adddd882bdbe33f2993af371d691abd211cb372ff646c35\",\"license\":\"MIT\"},\"contracts/v2/triggers/LtvTrigger.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport { IOrderTrigger } from \\\"../interfaces/IOrderTrigger.sol\\\";\\n\\n/// @title KapanViewRouter Interface\\n/// @dev Minimal interface for LtvTrigger - uses unified functions with context\\ninterface IKapanViewRouter {\\n    /// @notice Get current LTV for any protocol\\n    /// @param protocolId Protocol identifier (AAVE_V3, COMPOUND_V3, etc.)\\n    /// @param user User address\\n    /// @param context Protocol-specific context (encoded)\\n    /// @return ltvBps Current LTV in basis points\\n    function getCurrentLtv(\\n        bytes4 protocolId,\\n        address user,\\n        bytes calldata context\\n    ) external view returns (uint256 ltvBps);\\n\\n    /// @notice Get position value for any protocol\\n    /// @param protocolId Protocol identifier\\n    /// @param user User address\\n    /// @param context Protocol-specific context (encoded)\\n    /// @return collateralValueUsd Total collateral in 8 decimals USD\\n    /// @return debtValueUsd Total debt in 8 decimals USD\\n    function getPositionValue(\\n        bytes4 protocolId,\\n        address user,\\n        bytes calldata context\\n    ) external view returns (uint256 collateralValueUsd, uint256 debtValueUsd);\\n\\n    /// @notice Get collateral price for any protocol\\n    /// @param protocolId Protocol identifier\\n    /// @param collateralToken Collateral token address\\n    /// @param context Protocol-specific context (encoded)\\n    /// @return price Price in 8 decimals USD\\n    function getCollateralPrice(\\n        bytes4 protocolId,\\n        address collateralToken,\\n        bytes calldata context\\n    ) external view returns (uint256 price);\\n\\n    /// @notice Get debt price for any protocol\\n    /// @param protocolId Protocol identifier\\n    /// @param debtToken Debt token address\\n    /// @param context Protocol-specific context (encoded)\\n    /// @return price Price in 8 decimals USD\\n    function getDebtPrice(\\n        bytes4 protocolId,\\n        address debtToken,\\n        bytes calldata context\\n    ) external view returns (uint256 price);\\n\\n    /// @notice Calculate minimum buy amount with slippage\\n    /// @param protocolId Protocol identifier\\n    /// @param sellAmount Amount to sell\\n    /// @param maxSlippageBps Maximum slippage in basis points\\n    /// @param collateralToken Collateral token\\n    /// @param debtToken Debt token\\n    /// @param collateralDecimals Collateral token decimals\\n    /// @param debtDecimals Debt token decimals\\n    /// @param context Protocol-specific context\\n    /// @return minBuyAmount Minimum acceptable buy amount\\n    function calculateMinBuy(\\n        bytes4 protocolId,\\n        uint256 sellAmount,\\n        uint256 maxSlippageBps,\\n        address collateralToken,\\n        address debtToken,\\n        uint8 collateralDecimals,\\n        uint8 debtDecimals,\\n        bytes calldata context\\n    ) external view returns (uint256 minBuyAmount);\\n}\\n\\n/// @title LtvTrigger\\n/// @notice Triggers order execution when position LTV exceeds a threshold (ADL)\\n/// @dev Calculates deleverage amount to reach target LTV and minimum buy with slippage\\ncontract LtvTrigger is IOrderTrigger {\\n    // ============ Errors ============\\n\\n    error UnsupportedProtocol(bytes4 protocolId);\\n    error InvalidTriggerParams();\\n\\n    // ============ Constants ============\\n\\n    /// @notice Protocol identifiers\\n    bytes4 public constant AAVE_V3 = bytes4(keccak256(\\\"aave-v3\\\"));\\n    bytes4 public constant COMPOUND_V3 = bytes4(keccak256(\\\"compound-v3\\\"));\\n    bytes4 public constant MORPHO_BLUE = bytes4(keccak256(\\\"morpho-blue\\\"));\\n    bytes4 public constant EULER_V2 = bytes4(keccak256(\\\"euler-v2\\\"));\\n    bytes4 public constant VENUS = bytes4(keccak256(\\\"venus\\\"));\\n\\n    // ============ Immutables ============\\n\\n    /// @notice The KapanViewRouter for LTV and price queries\\n    IKapanViewRouter public immutable viewRouter;\\n\\n    // ============ Structs ============\\n\\n    /// @notice Trigger parameters for LTV-based ADL\\n    struct TriggerParams {\\n        bytes4 protocolId; // Protocol identifier (AAVE_V3, COMPOUND_V3, etc.)\\n        bytes protocolContext; // Protocol-specific data (market params, sub-account, etc.)\\n        uint256 triggerLtvBps; // LTV threshold to trigger (e.g., 8000 = 80%)\\n        uint256 targetLtvBps; // Target LTV after deleverage (e.g., 6000 = 60%)\\n        address collateralToken; // Token to sell (withdraw from position)\\n        address debtToken; // Token to buy (repay debt)\\n        uint8 collateralDecimals; // Decimals of collateral token\\n        uint8 debtDecimals; // Decimals of debt token\\n        uint256 maxSlippageBps; // Maximum slippage tolerance\\n        uint8 numChunks; // Number of chunks to split deleverage (1 = full amount, 0 treated as 1)\\n    }\\n\\n    // ============ Constructor ============\\n\\n    constructor(address _viewRouter) {\\n        if (_viewRouter == address(0)) revert InvalidTriggerParams();\\n        viewRouter = IKapanViewRouter(_viewRouter);\\n    }\\n\\n    // ============ IOrderTrigger Implementation ============\\n\\n    /// @inheritdoc IOrderTrigger\\n    function shouldExecute(\\n        bytes calldata staticData,\\n        address owner\\n    ) external view override returns (bool, string memory) {\\n        TriggerParams memory params = abi.decode(staticData, (TriggerParams));\\n\\n        uint256 currentLtv = _getCurrentLtv(params.protocolId, owner, params.protocolContext);\\n\\n        if (currentLtv == 0) {\\n            return (false, \\\"No position\\\");\\n        }\\n\\n        if (currentLtv > params.triggerLtvBps) {\\n            return (true, \\\"LTV threshold exceeded\\\");\\n        }\\n\\n        return (false, \\\"LTV below threshold\\\");\\n    }\\n\\n    /// @inheritdoc IOrderTrigger\\n    function calculateExecution(\\n        bytes calldata staticData,\\n        address owner,\\n        uint256 /* iterationCount */\\n    ) external view override returns (uint256 sellAmount, uint256 minBuyAmount) {\\n        TriggerParams memory params = abi.decode(staticData, (TriggerParams));\\n\\n        // 1. Get current position value in USD (or unit of account)\\n        (uint256 collateralValueUsd, uint256 debtValueUsd) = _getPositionValue(\\n            params.protocolId,\\n            owner,\\n            params.protocolContext,\\n            params.collateralToken,\\n            params.debtToken\\n        );\\n\\n        if (collateralValueUsd == 0 || debtValueUsd == 0) {\\n            return (0, 0);\\n        }\\n\\n        // 2. Calculate deleverage amount to reach target LTV\\n        // Formula: X = (debt - targetLtv * collateral) / (1 - targetLtv)\\n        // Where X is the amount in USD to sell and repay\\n        uint256 deleverageUsd = _calculateDeleverageAmount(collateralValueUsd, debtValueUsd, params.targetLtvBps);\\n\\n        if (deleverageUsd == 0) {\\n            return (0, 0);\\n        }\\n\\n        // 3. Convert USD to collateral token amount\\n        uint256 collateralPrice = _getCollateralPrice(\\n            params.protocolId,\\n            params.collateralToken,\\n            params.protocolContext\\n        );\\n\\n        if (collateralPrice == 0) {\\n            return (0, 0);\\n        }\\n\\n        // sellAmount in collateral token units\\n        // deleverageUsd is in 8 decimals (protocol oracle standard)\\n        // collateralPrice is in 8 decimals\\n        // sellAmount = deleverageUsd * 10^collateralDecimals / collateralPrice\\n        sellAmount = (deleverageUsd * (10 ** params.collateralDecimals)) / collateralPrice;\\n\\n        // 4. Apply chunking - divide by numChunks to spread deleverage across multiple executions\\n        // numChunks of 0 or 1 means full amount in single execution\\n        if (params.numChunks > 1) {\\n            sellAmount = sellAmount / params.numChunks;\\n        }\\n\\n        if (sellAmount == 0) {\\n            return (0, 0);\\n        }\\n\\n        // 5. Truncate precision to prevent order spam from interest accrual\\n        // Interest-bearing tokens (aTokens, wstETH, etc.) change balance every block.\\n        // Without truncation, each poll returns slightly different amounts \\u2192 different order hash \\u2192 spam.\\n        // We truncate to ~0.01% precision (4 significant decimal places) which absorbs interest fluctuations.\\n        sellAmount = _truncatePrecision(sellAmount, params.collateralDecimals);\\n\\n        if (sellAmount == 0) {\\n            return (0, 0);\\n        }\\n\\n        // 6. Calculate expected buy amount WITHOUT slippage first\\n        // ViewRouter.calculateMinBuy uses Aave/Chainlink prices for fair market rates\\n        uint256 expectedBuyAmount = _calculateMinBuy(\\n            params.protocolId,\\n            sellAmount,\\n            0, // No slippage - we apply it after truncation\\n            params.collateralToken,\\n            params.debtToken,\\n            params.collateralDecimals,\\n            params.debtDecimals,\\n            params.protocolContext\\n        );\\n\\n        // 7. Truncate expectedBuyAmount to prevent spam from price fluctuations\\n        // Must truncate BEFORE applying slippage to preserve full slippage protection\\n        expectedBuyAmount = _truncatePrecision(expectedBuyAmount, params.debtDecimals);\\n\\n        // 8. Apply slippage AFTER truncation\\n        minBuyAmount = (expectedBuyAmount * (10000 - params.maxSlippageBps)) / 10000;\\n    }\\n\\n    /// @inheritdoc IOrderTrigger\\n    /// @dev ADL orders are continuous - they never auto-complete.\\n    /// The order remains active and will re-trigger whenever LTV rises above\\n    /// the trigger threshold, up to maxIterations or until user cancels.\\n    /// This provides ongoing liquidation protection rather than one-shot execution.\\n    function isComplete(\\n        bytes calldata /* staticData */,\\n        address /* owner */,\\n        uint256 /* iterationCount */\\n    ) external pure override returns (bool) {\\n        // Never auto-complete - rely on maxIterations for termination\\n        return false;\\n    }\\n\\n    /// @inheritdoc IOrderTrigger\\n    function triggerName() external pure override returns (string memory) {\\n        return \\\"LTV\\\";\\n    }\\n\\n    // ============ View Functions ============\\n\\n    /// @notice Get current LTV for a user position\\n    /// @param protocolId Protocol identifier\\n    /// @param owner User address\\n    /// @param context Protocol-specific context\\n    /// @return ltvBps Current LTV in basis points\\n    function getCurrentLtv(\\n        bytes4 protocolId,\\n        address owner,\\n        bytes memory context\\n    ) external view returns (uint256 ltvBps) {\\n        return _getCurrentLtv(protocolId, owner, context);\\n    }\\n\\n    /// @notice Decode trigger params from static data\\n    /// @param staticData ABI-encoded TriggerParams\\n    /// @return params Decoded trigger parameters\\n    function decodeTriggerParams(bytes calldata staticData) external pure returns (TriggerParams memory params) {\\n        return abi.decode(staticData, (TriggerParams));\\n    }\\n\\n    /// @notice Encode trigger params to static data\\n    /// @param params Trigger parameters\\n    /// @return staticData ABI-encoded data\\n    function encodeTriggerParams(TriggerParams calldata params) external pure returns (bytes memory) {\\n        return abi.encode(params);\\n    }\\n\\n    // ============ Internal Functions ============\\n\\n    /// @dev Get current LTV from the ViewRouter (protocol-agnostic)\\n    function _getCurrentLtv(bytes4 protocolId, address owner, bytes memory context) internal view returns (uint256) {\\n        return viewRouter.getCurrentLtv(protocolId, owner, context);\\n    }\\n\\n    /// @dev Get position value in USD (8 decimals) from the ViewRouter (protocol-agnostic)\\n    /// @param protocolId Protocol identifier\\n    /// @param owner User address\\n    /// @param context Protocol-specific context (market params, base token, etc.)\\n    /// @return collateralValueUsd Total collateral value in USD (8 decimals)\\n    /// @return debtValueUsd Total debt value in USD (8 decimals)\\n    function _getPositionValue(\\n        bytes4 protocolId,\\n        address owner,\\n        bytes memory context,\\n        address /* collateralToken */,\\n        address /* debtToken */\\n    ) internal view returns (uint256 collateralValueUsd, uint256 debtValueUsd) {\\n        return viewRouter.getPositionValue(protocolId, owner, context);\\n    }\\n\\n    /// @dev Calculate deleverage amount in USD\\n    /// Formula: X = (debt - targetLtv * collateral) / (1 - targetLtv)\\n    function _calculateDeleverageAmount(\\n        uint256 collateralValueUsd,\\n        uint256 debtValueUsd,\\n        uint256 targetLtvBps\\n    ) internal pure returns (uint256) {\\n        // Defensive checks\\n        if (collateralValueUsd == 0) {\\n            return 0; // No collateral, nothing to deleverage\\n        }\\n        if (targetLtvBps >= 10000) {\\n            return 0; // Invalid target (>= 100%)\\n        }\\n\\n        // Check if already at or below target\\n        uint256 currentLtvBps = (debtValueUsd * 10000) / collateralValueUsd;\\n        if (currentLtvBps <= targetLtvBps) {\\n            return 0;\\n        }\\n\\n        // X = (debt - targetLtv * collateral) / (1 - targetLtv)\\n        // All in 8 decimals, targetLtv in basis points\\n        uint256 targetDebt = (collateralValueUsd * targetLtvBps) / 10000;\\n        uint256 numerator = debtValueUsd - targetDebt;\\n        uint256 denominator = 10000 - targetLtvBps;\\n\\n        return (numerator * 10000) / denominator;\\n    }\\n\\n    /// @dev Get collateral price in USD (8 decimals) from the ViewRouter (protocol-agnostic)\\n    function _getCollateralPrice(\\n        bytes4 protocolId,\\n        address collateralToken,\\n        bytes memory context\\n    ) internal view returns (uint256) {\\n        return viewRouter.getCollateralPrice(protocolId, collateralToken, context);\\n    }\\n\\n    /// @dev Get debt price in USD (8 decimals) from the ViewRouter (protocol-agnostic)\\n    function _getDebtPrice(bytes4 protocolId, address debtToken, bytes memory context) internal view returns (uint256) {\\n        return viewRouter.getDebtPrice(protocolId, debtToken, context);\\n    }\\n\\n    /// @dev Calculate minimum buy amount with slippage from the ViewRouter (protocol-agnostic)\\n    function _calculateMinBuy(\\n        bytes4 protocolId,\\n        uint256 sellAmount,\\n        uint256 maxSlippageBps,\\n        address collateralToken,\\n        address debtToken,\\n        uint8 collateralDecimals,\\n        uint8 debtDecimals,\\n        bytes memory context\\n    ) internal view returns (uint256) {\\n        return\\n            viewRouter.calculateMinBuy(\\n                protocolId,\\n                sellAmount,\\n                maxSlippageBps,\\n                collateralToken,\\n                debtToken,\\n                collateralDecimals,\\n                debtDecimals,\\n                context\\n            );\\n    }\\n\\n    /// @dev Truncate precision to prevent order spam from interest accrual\\n    /// - 18 decimals (ETH): keep 5 \\u2192 0.00001 (~$0.03)\\n    /// - 8 decimals (WBTC): keep 6 \\u2192 0.000001 (~$0.10)\\n    /// - 6 decimals (USDC): keep 4 \\u2192 $0.0001\\n    function _truncatePrecision(uint256 amount, uint8 decimals) internal pure returns (uint256) {\\n        if (decimals <= 4) return amount;\\n        uint256 keep;\\n        if (decimals > 12) keep = 5;      // ETH-like\\n        else if (decimals > 6) keep = 6;  // WBTC-like\\n        else keep = 4;                     // USDC-like\\n        uint256 precision = 10 ** (decimals - keep);\\n        return (amount / precision) * precision;\\n    }\\n\\n}\\n\",\"keccak256\":\"0x9dd9a9d7e00df5d64acc304b549df32beddc8e29f99f81a5d83bb4ed62d7647a\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x60a03461008f57601f610e9438819003918201601f19168301916001600160401b038311848410176100935780849260209460405283398101031261008f57516001600160a01b0381169081900361008f57801561008057608052604051610dec90816100a882396080518181816104cc0152818161092c0152610c6e0152f35b63f77479dd60e01b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe6080806040526004361015610012575f80fd5b5f3560e01c9081631a78ccc11461055b575080633131489f14610539578063321394961461051757806343fc0865146104fb5780634f1cb291146104b7578063632224a714610457578063676e75511461033357806368c4be251461030d57806390359bcc146102eb57806399fec7a0146102c95780639de7308514610267578063b030ddb3146100f85763dd90a891146100ab575f80fd5b346100f4575f3660031901126100f4576100f06040516100cc604082610680565b6003815262262a2b60e91b6020820152604051918291602083526020830190610617565b0390f35b5f80fd5b346100f45760203660031901126100f4576004356001600160401b0381116100f4578036036101406003198201126100f457604051602080820152906001600160e01b03196101496004850161063b565b166040830152602483013590602219018112156100f45782016004810135906024016001600160401b0382116100f45781360381136100f457828260ff6102346101246100f098610253976101a097610140606089015281610180890152888801375f86860188015260448101356080870152606481013560a08701526001600160a01b036101da608483016105bd565b1660c08701526001600160a01b036101f460a483016105bd565b1660e08701528361020760c483016106f8565b166101008701528361021b60e483016106f8565b16610120870152610104810135610140870152016106f8565b16610160830152601f801991011681010301601f198101835282610680565b604051918291602083526020830190610617565b346100f45760603660031901126100f4576004356001600160e01b0319811681036100f4576102946105a7565b90604435906001600160401b0382116100f4576020926102bb6102c19336906004016106a3565b91610c48565b604051908152f35b346100f4575f3660031901126100f457604051633028125760e01b8152602090f35b346100f4575f3660031901126100f457604051633c724fef60e11b8152602090f35b346100f4576040610327610320366105d1565b5091610905565b82519182526020820152f35b346100f45760203660031901126100f4576004356001600160401b0381116100f4576103666103b591369060040161057a565b5f61012060405161037681610650565b828152606060208201528260408201528260608201528260808201528260a08201528260c08201528260e0820152826101008201520152810190610706565b60405180916020825263ffffffff60e01b815116602083015260ff6101206103ee60208401516101406040870152610160860190610617565b92604081015160608601526060810151608086015260018060a01b0360808201511660a086015260018060a01b0360a08201511660c08601528260c08201511660e08601528260e082015116610100860152610100810151828601520151166101408301520390f35b346100f45760403660031901126100f4576004356001600160401b0381116100f45761048a61049891369060040161057a565b6104926105a7565b916107e3565b906100f060405192839215158352604060208401526040830190610617565b346100f4575f3660031901126100f4576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346100f457610509366105d1565b5050505060206040515f8152f35b346100f4575f3660031901126100f45760405163bbbf88eb60e01b8152602090f35b346100f4575f3660031901126100f457604051633af167ff60e01b8152602090f35b346100f4575f3660031901126100f4576308ee5f0360e31b8152602090f35b9181601f840112156100f4578235916001600160401b0383116100f457602083818601950101116100f457565b602435906001600160a01b03821682036100f457565b35906001600160a01b03821682036100f457565b60606003198201126100f457600435906001600160401b0382116100f4576105fb9160040161057a565b90916024356001600160a01b03811681036100f4579060443590565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b35906001600160e01b0319821682036100f457565b61014081019081106001600160401b0382111761066c57604052565b634e487b7160e01b5f52604160045260245ffd5b601f909101601f19168101906001600160401b0382119082101761066c57604052565b81601f820112156100f4578035906001600160401b03821161066c57604051926106d7601f8401601f191660200185610680565b828452602083830101116100f457815f926020809301838601378301015290565b359060ff821682036100f457565b6020818303126100f4578035906001600160401b0382116100f45701610140818303126100f4576040519161073a83610650565b6107438261063b565b83526020820135916001600160401b0383116100f45761076b610120926107da9483016106a3565b60208501526040810135604085015260608101356060850152610790608082016105bd565b60808501526107a160a082016105bd565b60a08501526107b260c082016106f8565b60c08501526107c360e082016106f8565b60e0850152610100810135610100850152016106f8565b61012082015290565b6107f39061080c92810190610706565b805160208201519193906001600160e01b031916610c48565b90811561088657604001511061084f575f9060405161082c604082610680565b60138152721315158818995b1bddc81d1a1c995cda1bdb19606a1b602082015290565b600190604051610860604082610680565b6016815275131515881d1a1c995cda1bdb1908195e18d95959195960521b602082015290565b50505f90604051610898604082610680565b600b81526a2737903837b9b4ba34b7b760a91b602082015290565b818102929181159184041417156108c657565b634e487b7160e01b5f52601160045260245ffd5b81156108e4570490565b634e487b7160e01b5f52601260045260245ffd5b919082039182116108c657565b61091491939293810190610706565b8051602082018051604080516326a9d0f960e21b81527f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316979394608087019491938492839261097b9291906001600160e01b03191660048501610c12565b0381895afa8015610b6a575f915f91610bd9575b5081158015610bd1575b610b7557906109ad91606086015191610cd8565b908115610bc557835181518451604051630794e50360e01b81529492602092869283926109f1926001600160a01b0316906001600160e01b03191660048501610c12565b03818a5afa928315610b6a575f93610b91575b508215610b755760c085019260ff845116604d81116108c657610a3392610a2e91600a0a906108b3565b6108da565b60ff6101208601511660018111610b82575b508015610b7557610a5b9060ff84511690610d58565b958615610b75578451915160a0860151935160e087018051965160405163755b0ea960e01b81526001600160e01b0319969096166004870152602486018b90525f60448701526001600160a01b03938416606487015295909216608485015260ff90811660a48501529490941660c483015261010060e48301529091602091839182908190610aef90610104830190610617565b03915afa908115610b6a575f91610b36575b50610b149060ff61010093511690610d58565b910151612710039061271082116108c65761271091610b32916108b3565b0490565b90506020813d602011610b62575b81610b5160209383610680565b810103126100f45751610100610b01565b3d9150610b44565b6040513d5f823e3d90fd5b505050505090505f905f90565b610b8b916108da565b5f610a45565b9092506020813d602011610bbd575b81610bad60209383610680565b810103126100f45751915f610a04565b3d9150610ba0565b5050505090505f905f90565b508015610999565b9150506040813d604011610c0a575b81610bf560409383610680565b810103126100f457602081519101515f61098f565b3d9150610be8565b6001600160e01b031990911681526001600160a01b039091166020820152606060408201819052610c4592910190610617565b90565b90602091610c6a6040519485938493639de7308560e01b855260048501610c12565b03817f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165afa908115610b6a575f91610ca9575090565b90506020813d602011610cd0575b81610cc460209383610680565b810103126100f4575190565b3d9150610cb7565b908115610d5157612710831015610d5157612710810281810461271014821517156108c657610d088385926108da565b1115610d5157612710610d1e84610d25946108b3565b04906108f8565b906127100361271081116108c65761271082029180830461271014901517156108c657610c45916108da565b5050505f90565b9060ff166004811115610db257610d7a90600c811115610d99576005906108f8565b90604d82116108c657610d94610c4592600a0a80926108da565b6108b3565b6006811115610daa576006906108f8565b6004906108f8565b509056fea264697066735822122068ceb37445d2c00690ffc63f08ff546591145be75c25743d4c02595a88aaf3cf64736f6c634300081e0033",
+  "deployedBytecode": "0x6080806040526004361015610012575f80fd5b5f3560e01c9081631a78ccc11461055b575080633131489f14610539578063321394961461051757806343fc0865146104fb5780634f1cb291146104b7578063632224a714610457578063676e75511461033357806368c4be251461030d57806390359bcc146102eb57806399fec7a0146102c95780639de7308514610267578063b030ddb3146100f85763dd90a891146100ab575f80fd5b346100f4575f3660031901126100f4576100f06040516100cc604082610680565b6003815262262a2b60e91b6020820152604051918291602083526020830190610617565b0390f35b5f80fd5b346100f45760203660031901126100f4576004356001600160401b0381116100f4578036036101406003198201126100f457604051602080820152906001600160e01b03196101496004850161063b565b166040830152602483013590602219018112156100f45782016004810135906024016001600160401b0382116100f45781360381136100f457828260ff6102346101246100f098610253976101a097610140606089015281610180890152888801375f86860188015260448101356080870152606481013560a08701526001600160a01b036101da608483016105bd565b1660c08701526001600160a01b036101f460a483016105bd565b1660e08701528361020760c483016106f8565b166101008701528361021b60e483016106f8565b16610120870152610104810135610140870152016106f8565b16610160830152601f801991011681010301601f198101835282610680565b604051918291602083526020830190610617565b346100f45760603660031901126100f4576004356001600160e01b0319811681036100f4576102946105a7565b90604435906001600160401b0382116100f4576020926102bb6102c19336906004016106a3565b91610c48565b604051908152f35b346100f4575f3660031901126100f457604051633028125760e01b8152602090f35b346100f4575f3660031901126100f457604051633c724fef60e11b8152602090f35b346100f4576040610327610320366105d1565b5091610905565b82519182526020820152f35b346100f45760203660031901126100f4576004356001600160401b0381116100f4576103666103b591369060040161057a565b5f61012060405161037681610650565b828152606060208201528260408201528260608201528260808201528260a08201528260c08201528260e0820152826101008201520152810190610706565b60405180916020825263ffffffff60e01b815116602083015260ff6101206103ee60208401516101406040870152610160860190610617565b92604081015160608601526060810151608086015260018060a01b0360808201511660a086015260018060a01b0360a08201511660c08601528260c08201511660e08601528260e082015116610100860152610100810151828601520151166101408301520390f35b346100f45760403660031901126100f4576004356001600160401b0381116100f45761048a61049891369060040161057a565b6104926105a7565b916107e3565b906100f060405192839215158352604060208401526040830190610617565b346100f4575f3660031901126100f4576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346100f457610509366105d1565b5050505060206040515f8152f35b346100f4575f3660031901126100f45760405163bbbf88eb60e01b8152602090f35b346100f4575f3660031901126100f457604051633af167ff60e01b8152602090f35b346100f4575f3660031901126100f4576308ee5f0360e31b8152602090f35b9181601f840112156100f4578235916001600160401b0383116100f457602083818601950101116100f457565b602435906001600160a01b03821682036100f457565b35906001600160a01b03821682036100f457565b60606003198201126100f457600435906001600160401b0382116100f4576105fb9160040161057a565b90916024356001600160a01b03811681036100f4579060443590565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b35906001600160e01b0319821682036100f457565b61014081019081106001600160401b0382111761066c57604052565b634e487b7160e01b5f52604160045260245ffd5b601f909101601f19168101906001600160401b0382119082101761066c57604052565b81601f820112156100f4578035906001600160401b03821161066c57604051926106d7601f8401601f191660200185610680565b828452602083830101116100f457815f926020809301838601378301015290565b359060ff821682036100f457565b6020818303126100f4578035906001600160401b0382116100f45701610140818303126100f4576040519161073a83610650565b6107438261063b565b83526020820135916001600160401b0383116100f45761076b610120926107da9483016106a3565b60208501526040810135604085015260608101356060850152610790608082016105bd565b60808501526107a160a082016105bd565b60a08501526107b260c082016106f8565b60c08501526107c360e082016106f8565b60e0850152610100810135610100850152016106f8565b61012082015290565b6107f39061080c92810190610706565b805160208201519193906001600160e01b031916610c48565b90811561088657604001511061084f575f9060405161082c604082610680565b60138152721315158818995b1bddc81d1a1c995cda1bdb19606a1b602082015290565b600190604051610860604082610680565b6016815275131515881d1a1c995cda1bdb1908195e18d95959195960521b602082015290565b50505f90604051610898604082610680565b600b81526a2737903837b9b4ba34b7b760a91b602082015290565b818102929181159184041417156108c657565b634e487b7160e01b5f52601160045260245ffd5b81156108e4570490565b634e487b7160e01b5f52601260045260245ffd5b919082039182116108c657565b61091491939293810190610706565b8051602082018051604080516326a9d0f960e21b81527f00000000000000000000000000000000000000000000000000000000000000006001600160a01b0316979394608087019491938492839261097b9291906001600160e01b03191660048501610c12565b0381895afa8015610b6a575f915f91610bd9575b5081158015610bd1575b610b7557906109ad91606086015191610cd8565b908115610bc557835181518451604051630794e50360e01b81529492602092869283926109f1926001600160a01b0316906001600160e01b03191660048501610c12565b03818a5afa928315610b6a575f93610b91575b508215610b755760c085019260ff845116604d81116108c657610a3392610a2e91600a0a906108b3565b6108da565b60ff6101208601511660018111610b82575b508015610b7557610a5b9060ff84511690610d58565b958615610b75578451915160a0860151935160e087018051965160405163755b0ea960e01b81526001600160e01b0319969096166004870152602486018b90525f60448701526001600160a01b03938416606487015295909216608485015260ff90811660a48501529490941660c483015261010060e48301529091602091839182908190610aef90610104830190610617565b03915afa908115610b6a575f91610b36575b50610b149060ff61010093511690610d58565b910151612710039061271082116108c65761271091610b32916108b3565b0490565b90506020813d602011610b62575b81610b5160209383610680565b810103126100f45751610100610b01565b3d9150610b44565b6040513d5f823e3d90fd5b505050505090505f905f90565b610b8b916108da565b5f610a45565b9092506020813d602011610bbd575b81610bad60209383610680565b810103126100f45751915f610a04565b3d9150610ba0565b5050505090505f905f90565b508015610999565b9150506040813d604011610c0a575b81610bf560409383610680565b810103126100f457602081519101515f61098f565b3d9150610be8565b6001600160e01b031990911681526001600160a01b039091166020820152606060408201819052610c4592910190610617565b90565b90602091610c6a6040519485938493639de7308560e01b855260048501610c12565b03817f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165afa908115610b6a575f91610ca9575090565b90506020813d602011610cd0575b81610cc460209383610680565b810103126100f4575190565b3d9150610cb7565b908115610d5157612710831015610d5157612710810281810461271014821517156108c657610d088385926108da565b1115610d5157612710610d1e84610d25946108b3565b04906108f8565b906127100361271081116108c65761271082029180830461271014901517156108c657610c45916108da565b5050505f90565b9060ff166004811115610db257610d7a90600c811115610d99576005906108f8565b90604d82116108c657610d94610c4592600a0a80926108da565b6108b3565b6006811115610daa576006906108f8565b6004906108f8565b509056fea264697066735822122068ceb37445d2c00690ffc63f08ff546591145be75c25743d4c02595a88aaf3cf64736f6c634300081e0033",
+  "devdoc": {
+    "details": "Calculates deleverage amount to reach target LTV and minimum buy with slippage",
+    "kind": "dev",
+    "methods": {
+      "calculateExecution(bytes,address,uint256)": {
+        "details": "Only called when shouldExecute returns true",
+        "params": {
+          "iterationCount": "Number of executions completed so far (for chunked orders)",
+          "owner": "The order owner",
+          "staticData": "ABI-encoded trigger-specific parameters"
+        },
+        "returns": {
+          "minBuyAmount": "Minimum amount to receive (includes slippage protection)",
+          "sellAmount": "Amount of sell token to trade in this execution"
+        }
+      },
+      "decodeTriggerParams(bytes)": {
+        "params": {
+          "staticData": "ABI-encoded TriggerParams"
+        },
+        "returns": {
+          "params": "Decoded trigger parameters"
+        }
+      },
+      "encodeTriggerParams((bytes4,bytes,uint256,uint256,address,address,uint8,uint8,uint256,uint8))": {
+        "params": {
+          "params": "Trigger parameters"
+        },
+        "returns": {
+          "_0": "staticData ABI-encoded data"
+        }
+      },
+      "getCurrentLtv(bytes4,address,bytes)": {
+        "params": {
+          "context": "Protocol-specific context",
+          "owner": "User address",
+          "protocolId": "Protocol identifier"
+        },
+        "returns": {
+          "ltvBps": "Current LTV in basis points"
+        }
+      },
+      "isComplete(bytes,address,uint256)": {
+        "details": "ADL orders are continuous - they never auto-complete. The order remains active and will re-trigger whenever LTV rises above the trigger threshold, up to maxIterations or until user cancels. This provides ongoing liquidation protection rather than one-shot execution.",
+        "params": {
+          "iterationCount": "Number of executions completed so far",
+          "owner": "The order owner",
+          "staticData": "ABI-encoded trigger-specific parameters"
+        },
+        "returns": {
+          "_0": "True if the order goal has been reached"
+        }
+      },
+      "shouldExecute(bytes,address)": {
+        "params": {
+          "owner": "The order owner (user whose position is being monitored)",
+          "staticData": "ABI-encoded trigger-specific parameters"
+        },
+        "returns": {
+          "_0": "True if the trigger condition is met",
+          "_1": "Human-readable reason for the result (for debugging/logging)"
+        }
+      },
+      "triggerName()": {
+        "returns": {
+          "_0": "Trigger name (e.g., \"LTV\", \"Price\", \"HealthFactor\")"
+        }
+      }
+    },
+    "title": "LtvTrigger",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "AAVE_V3()": {
+        "notice": "Protocol identifiers"
+      },
+      "calculateExecution(bytes,address,uint256)": {
+        "notice": "Calculate the execution amounts when the trigger fires"
+      },
+      "decodeTriggerParams(bytes)": {
+        "notice": "Decode trigger params from static data"
+      },
+      "encodeTriggerParams((bytes4,bytes,uint256,uint256,address,address,uint8,uint8,uint256,uint8))": {
+        "notice": "Encode trigger params to static data"
+      },
+      "getCurrentLtv(bytes4,address,bytes)": {
+        "notice": "Get current LTV for a user position"
+      },
+      "isComplete(bytes,address,uint256)": {
+        "notice": "Check if the order is complete and should stop executing"
+      },
+      "shouldExecute(bytes,address)": {
+        "notice": "Check if the order should execute based on current conditions"
+      },
+      "triggerName()": {
+        "notice": "Get human-readable name of the trigger type"
+      },
+      "viewRouter()": {
+        "notice": "The KapanViewRouter for LTV and price queries"
+      }
+    },
+    "notice": "Triggers order execution when position LTV exceeds a threshold (ADL)",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}

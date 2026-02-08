@@ -8,7 +8,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const contracts = {
   1: {
     AaveGatewayView: {
-      address: "0xf737bbc14635f499d0817c1E081E9f47E0D4B696",
+      address: "0x1f18FD06BE6F0adb9dbf1Bd2dF85760E8856e0AE",
       abi: [
         {
           inputs: [
@@ -218,6 +218,44 @@ const contracts = {
               name: "token",
               type: "address",
             },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAssetPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "user",
@@ -308,6 +346,30 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getEModes",
           outputs: [
@@ -352,6 +414,30 @@ const contracts = {
               internalType: "struct AaveGatewayView.EModeInfo[]",
               name: "emodes",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -745,7 +831,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x01b0c1ef3BF088Fb6362E2231f5688e3064Aa48c",
+      address: "0xEBaCd3da5105995400885C09f58508dB7Cc3764f",
       abi: [
         {
           inputs: [
@@ -1153,8 +1239,318 @@ const contracts = {
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
       },
     },
+    AutoLeverageTrigger: {
+      address: "0xa855baDe1Ac3FEe3E75870ADdfb680138D5636c8",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct AutoLeverageTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     CompoundGatewayView: {
-      address: "0x1C2dadD60e226145BDa2c91fCd376453660DD0fB",
+      address: "0x84313Edb788Fcd70630C4853C2C515F3550bbA9E",
       abi: [
         {
           inputs: [
@@ -1615,6 +2011,30 @@ const contracts = {
             },
             {
               internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
               name: "account",
               type: "address",
             },
@@ -1635,6 +2055,30 @@ const contracts = {
               internalType: "string[]",
               name: "displayNames",
               type: "string[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -1682,6 +2126,35 @@ const contracts = {
             {
               internalType: "uint256",
               name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
               type: "uint256",
             },
           ],
@@ -2049,7 +2522,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x504A27C7E6599cBf377DADbE6D5649cDcfa6421F",
+      address: "0xf2c38fAD6757BDEfEef6e9f15701D0aE4C67813f",
       abi: [
         {
           inputs: [
@@ -2573,8 +3046,970 @@ const contracts = {
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
+    EulerGatewayView: {
+      address: "0x514F0F8f0BAF8988A59Bc377788b5BDbADb59604",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "evc_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "evc",
+          outputs: [
+            {
+              internalType: "contract IEVC",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getAcceptedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getBorrowLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCollateralBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "borrowLTV",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "liquidationLTV",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralToDebtRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBpsSimple",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getDebtBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "quoteToken",
+              type: "address",
+            },
+          ],
+          name: "getExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getHealthFactor",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMainSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultAsset",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultSymbol",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "isHealthy",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
+    EulerGatewayWrite: {
+      address: "0x6E83c059132D75751F5dC20F2A42B5C33f2963a3",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "router",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "owner_",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "evc_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidContext",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "UnsupportedOperation",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "ROUTER",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "caller",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+          ],
+          name: "authorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "produced",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "caller",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "",
+              type: "tuple[]",
+            },
+          ],
+          name: "deauthorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "evc",
+          outputs: [
+            {
+              internalType: "contract IEVC",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "processLendingInstruction",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        authorize: "contracts/v2/interfaces/IGateway.sol",
+        deauthorize: "contracts/v2/interfaces/IGateway.sol",
+        processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
+        ROUTER: "contracts/gateways/ProtocolGateway.sol",
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
+    },
     KapanAuthorizationHelper: {
-      address: "0xcE78a7213c9B3DF7EF20c84e0E012228EeeBD413",
+      address: "0xf8AB67deaf7aBc4d5912C4cd0755490C5E359C3c",
       abi: [
         {
           inputs: [
@@ -2810,8 +4245,1589 @@ const contracts = {
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
+    KapanConditionalOrderHandler: {
+      address: "0xf178Df40bd1731fE38DCf6b6369904E261F43736",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_manager",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "OrderNotValid",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "PollNever",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "PollTryNextBlock",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes",
+              name: "staticInput",
+              type: "bytes",
+            },
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          name: "getTradeableOrder",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "contract IERC20",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "contract IERC20",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "receiver",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "sellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "buyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint32",
+                  name: "validTo",
+                  type: "uint32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appData",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "feeAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "kind",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bool",
+                  name: "partiallyFillable",
+                  type: "bool",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "sellTokenBalance",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "buyTokenBalance",
+                  type: "bytes32",
+                },
+              ],
+              internalType: "struct GPv2Order.Data",
+              name: "order",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "manager",
+          outputs: [
+            {
+              internalType: "contract IKapanConditionalOrderManager",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "interfaceId",
+              type: "bytes4",
+            },
+          ],
+          name: "supportsInterface",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes",
+              name: "staticInput",
+              type: "bytes",
+            },
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              components: [
+                {
+                  internalType: "contract IERC20",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "contract IERC20",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "receiver",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "sellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "buyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint32",
+                  name: "validTo",
+                  type: "uint32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appData",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "feeAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "kind",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bool",
+                  name: "partiallyFillable",
+                  type: "bool",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "sellTokenBalance",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "buyTokenBalance",
+                  type: "bytes32",
+                },
+              ],
+              internalType: "struct GPv2Order.Data",
+              name: "order",
+              type: "tuple",
+            },
+          ],
+          name: "verify",
+          outputs: [],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        supportsInterface:
+          "@openzeppelin/contracts/utils/introspection/IERC165.sol",
+      },
+    },
+    KapanConditionalOrderManager: {
+      address: "0x08d73Ed00906909DF53C873D436e89182B6B27b1",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_owner",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_router",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_composableCoW",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_settlement",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_hooksTrampoline",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "CannotCancelMidExecution",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "expected",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "actual",
+              type: "address",
+            },
+          ],
+          name: "InstructionUserMismatch",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidChunkWindow",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidOrderState",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidTokens",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidTrigger",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "MaxOrdersExceeded",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "NoTokensReceived",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "NotHooksTrampoline",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "OrderAlreadyExists",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "OrderNotFound",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PreHookAlreadyExecuted",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PreHookNotExecuted",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "SaltAlreadyUsed",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "TriggerNotMet",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "Unauthorized",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ValidToOverflow",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "oldWindow",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "newWindow",
+              type: "uint256",
+            },
+          ],
+          name: "ChunkWindowUpdated",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "ConditionalOrderCancelled",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iterations",
+              type: "uint256",
+            },
+          ],
+          name: "ConditionalOrderCompleted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "trigger",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "sellToken",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "buyToken",
+              type: "address",
+            },
+          ],
+          name: "ConditionalOrderCreated",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "oldHandler",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newHandler",
+              type: "address",
+            },
+          ],
+          name: "OrderHandlerUpdated",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iteration",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "receivedAmount",
+              type: "uint256",
+            },
+          ],
+          name: "PostHookExecuted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iteration",
+              type: "uint256",
+            },
+          ],
+          name: "PreHookExecuted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "StuckOrderReset",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "TokensRecovered",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iteration",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "buyAmount",
+              type: "uint256",
+            },
+          ],
+          name: "TriggerExecuted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "vaultRelayer",
+              type: "address",
+            },
+          ],
+          name: "VaultRelayerApproved",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "DEFAULT_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MAX_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MAX_ORDERS_PER_USER",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MIN_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "approveVaultRelayer",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "cancelOrder",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "chunkWindow",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "composableCoW",
+          outputs: [
+            {
+              internalType: "contract IComposableCoW",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "trigger",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "triggerStaticData",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes",
+                  name: "preInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "postInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appDataHash",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxIterations",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "sellTokenRefundAddress",
+                  type: "address",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType:
+                "struct KapanConditionalOrderManager.KapanOrderParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "bytes32",
+              name: "salt",
+              type: "bytes32",
+            },
+          ],
+          name: "createOrder",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "executePostHook",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "salt",
+              type: "bytes32",
+            },
+          ],
+          name: "executePostHookBySalt",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "executePreHook",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "salt",
+              type: "bytes32",
+            },
+          ],
+          name: "executePreHookBySalt",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "getExecutionAmounts",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "getOrder",
+          outputs: [
+            {
+              components: [
+                {
+                  components: [
+                    {
+                      internalType: "address",
+                      name: "user",
+                      type: "address",
+                    },
+                    {
+                      internalType: "address",
+                      name: "trigger",
+                      type: "address",
+                    },
+                    {
+                      internalType: "bytes",
+                      name: "triggerStaticData",
+                      type: "bytes",
+                    },
+                    {
+                      internalType: "bytes",
+                      name: "preInstructions",
+                      type: "bytes",
+                    },
+                    {
+                      internalType: "address",
+                      name: "sellToken",
+                      type: "address",
+                    },
+                    {
+                      internalType: "address",
+                      name: "buyToken",
+                      type: "address",
+                    },
+                    {
+                      internalType: "bytes",
+                      name: "postInstructions",
+                      type: "bytes",
+                    },
+                    {
+                      internalType: "bytes32",
+                      name: "appDataHash",
+                      type: "bytes32",
+                    },
+                    {
+                      internalType: "uint256",
+                      name: "maxIterations",
+                      type: "uint256",
+                    },
+                    {
+                      internalType: "address",
+                      name: "sellTokenRefundAddress",
+                      type: "address",
+                    },
+                    {
+                      internalType: "bool",
+                      name: "isKindBuy",
+                      type: "bool",
+                    },
+                  ],
+                  internalType:
+                    "struct KapanConditionalOrderManager.KapanOrderParams",
+                  name: "params",
+                  type: "tuple",
+                },
+                {
+                  internalType: "enum KapanConditionalOrderManager.OrderStatus",
+                  name: "status",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "iterationCount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "createdAt",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct KapanConditionalOrderManager.OrderContext",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getUserOrders",
+          outputs: [
+            {
+              internalType: "bytes32[]",
+              name: "",
+              type: "bytes32[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "hooksTrampoline",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "isTriggerMet",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "shouldExecute",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "_hash",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes",
+              name: "_signature",
+              type: "bytes",
+            },
+          ],
+          name: "isValidSignature",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "orderHandler",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "orderSalts",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "orders",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "trigger",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "triggerStaticData",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes",
+                  name: "preInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "postInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appDataHash",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxIterations",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "sellTokenRefundAddress",
+                  type: "address",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType:
+                "struct KapanConditionalOrderManager.KapanOrderParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "enum KapanConditionalOrderManager.OrderStatus",
+              name: "status",
+              type: "uint8",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "createdAt",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookBuyBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookExecutedForIteration",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookSellBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "resetStuckOrder",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "router",
+          outputs: [
+            {
+              internalType: "contract IKapanRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_chunkWindow",
+              type: "uint256",
+            },
+          ],
+          name: "setChunkWindow",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_orderHandler",
+              type: "address",
+            },
+          ],
+          name: "setOrderHandler",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "settlement",
+          outputs: [
+            {
+              internalType: "contract IGPv2Settlement",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "userOrders",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "userSaltToOrderHash",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        isValidSignature: "contracts/v2/interfaces/cow/IERC1271.sol",
+      },
+    },
     KapanCowAdapter: {
-      address: "0x81c2F199AF1D3f903693f64e81d7E53bE3EF08fB",
+      address: "0x7B3ef1Fe26783E6DE9d94B7ED89417B4265cF1fF",
       abi: [
         {
           inputs: [
@@ -2868,32 +5884,12 @@ const contracts = {
         },
         {
           inputs: [],
-          name: "OnlyOrderManager",
-          type: "error",
-        },
-        {
-          inputs: [],
           name: "OnlyRouter",
           type: "error",
         },
         {
           inputs: [],
           name: "OnlySettlement",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderAlreadyInitialized",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderMismatch",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderNotFound",
           type: "error",
         },
         {
@@ -2916,11 +5912,6 @@ const contracts = {
             },
           ],
           name: "OwnableUnauthorizedAccount",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "PreHookNotDone",
           type: "error",
         },
         {
@@ -3000,8 +5991,14 @@ const contracts = {
           inputs: [
             {
               indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: true,
               internalType: "bytes32",
-              name: "orderHash",
+              name: "salt",
               type: "bytes32",
             },
             {
@@ -3011,7 +6008,7 @@ const contracts = {
               type: "address",
             },
             {
-              indexed: true,
+              indexed: false,
               internalType: "address",
               name: "recipient",
               type: "address",
@@ -3024,25 +6021,6 @@ const contracts = {
             },
           ],
           name: "OrderFunded",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "oldManager",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newManager",
-              type: "address",
-            },
-          ],
-          name: "OrderManagerUpdated",
           type: "event",
         },
         {
@@ -3176,34 +6154,6 @@ const contracts = {
         {
           inputs: [
             {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "recipient",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "fundOrder",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
               internalType: "address",
               name: "user",
               type: "address",
@@ -3235,16 +6185,31 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "getExpectedOrderHash",
-          outputs: [
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
             {
               internalType: "bytes32",
-              name: "",
+              name: "salt",
               type: "bytes32",
             },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "recipient",
+              type: "address",
+            },
           ],
-          stateMutability: "view",
+          name: "fundOrderWithBalance",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -3306,19 +6271,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "isPreHookDone",
-          outputs: [
-            {
-              internalType: "bool",
-              name: "",
-              type: "bool",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
           inputs: [
             {
               internalType: "address",
@@ -3353,45 +6305,6 @@ const contracts = {
           name: "onMorphoFlashLoan",
           outputs: [],
           stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-          ],
-          name: "onPostHook",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-          ],
-          name: "onPreHook",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [],
-          name: "orderManager",
-          outputs: [
-            {
-              internalType: "address",
-              name: "",
-              type: "address",
-            },
-          ],
-          stateMutability: "view",
           type: "function",
         },
         {
@@ -3577,19 +6490,6 @@ const contracts = {
             },
           ],
           name: "setMorphoLender",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_orderManager",
-              type: "address",
-            },
-          ],
-          name: "setOrderManager",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -5275,7 +8175,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x1f40073be3E16ce0E1214b66ab28E6D59fc09D53",
+      address: "0xD6024Fab223daDf72aF7f2a820FD10EdBC77448d",
       abi: [
         {
           inputs: [
@@ -6219,8 +9119,2687 @@ const contracts = {
           "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
+    KapanViewRouter: {
+      address: "0xeE0DE5F53F018f3e8827913dB3743dc1ACE0BB34",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_owner",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "GatewayNotSet",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocolId",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "GatewayUpdated",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "collateralDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "debtDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "calculateMinBuy",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyFromRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "morphoOraclePrice",
+              type: "uint256",
+            },
+          ],
+          name: "calculateMorphoMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          name: "gateways",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAavePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAavePrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "availableBorrowsBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "currentLiquidationThreshold",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "ltv",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "healthFactor",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCollateralPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getDebtPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getEulerExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getEulerLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getEulerLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getEulerPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoOraclePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getVenusPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isAaveAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "atRisk",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isCompoundAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isMorphoAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string[]",
+              name: "protocolNames",
+              type: "string[]",
+            },
+            {
+              internalType: "address[]",
+              name: "gatewayAddresses",
+              type: "address[]",
+            },
+          ],
+          name: "setGateways",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+          ],
+          name: "usdPricesToExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
+    KyberAdapter: {
+      address: "0xc4a051c6DC4c61A84fB8FfDFB48Ad19F3817caB1",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_gateway",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_router",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "KYBER_ROUTER",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "tokenIn",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "tokenOut",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amountIn",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minAmountOut",
+              type: "uint256",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "executeSwap",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "amountReceived",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "amountRefunded",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "kapanGateway",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
+    },
+    KyberGateway: {
+      address: "0xa00E64Ed51C2a114FF4c8ceF7ea11bd58E086f91",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "router",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "owner_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "ROUTER",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "adapter",
+          outputs: [
+            {
+              internalType: "contract KyberAdapter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+          ],
+          name: "authorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "produced",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "",
+              type: "tuple[]",
+            },
+          ],
+          name: "deauthorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "processLendingInstruction",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "outputs",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_adapter",
+              type: "address",
+            },
+          ],
+          name: "setAdapter",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        authorize: "contracts/v2/interfaces/IGateway.sol",
+        deauthorize: "contracts/v2/interfaces/IGateway.sol",
+        processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
+        ROUTER: "contracts/gateways/ProtocolGateway.sol",
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
+    },
+    LimitPriceTrigger: {
+      address: "0xd9f90676128C341967Dc3183F55f30c5cC488e2e",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
+    LtvTrigger: {
+      address: "0x5502Dd3ef7378531Cd7a27238cDd467F4B096255",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     MorphoBlueGatewayView: {
-      address: "0x36A2b207f0eb3c337FDb3a22Be12782a130E7B01",
+      address: "0xa71738bd624cA89659711BDDF795D6FFdC3bC747",
       abi: [
         {
           inputs: [
@@ -6753,6 +12332,103 @@ const contracts = {
                   type: "uint256",
                 },
               ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
               internalType: "struct MarketParams[]",
               name: "paramsList",
               type: "tuple[]",
@@ -7220,6 +12896,62 @@ const contracts = {
                   type: "uint256",
                 },
               ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
               internalType: "struct MarketParams[]",
               name: "paramsList",
               type: "tuple[]",
@@ -7603,7 +13335,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayWrite: {
-      address: "0x0a5E200EB046f087fCac95c2a328697B17D23d37",
+      address: "0xbE368DB348e6F251e007cC2aaAc010385E92A666",
       abi: [
         {
           inputs: [
@@ -8261,7 +13993,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0x5FaEFF00a6A79220386799E885f0E57aa83EC68A",
+      address: "0xaB4dbD2271637Cff4F760826c39918f65f60F25a",
       abi: [
         {
           inputs: [
@@ -8505,7 +14237,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x657002F0B1B361671A0Ae341cD4dbD9C728c7f04",
+      address: "0x0eEF234D109902f383462e009243e638C44791ed",
       abi: [
         {
           inputs: [
@@ -8926,7 +14658,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0xbef97F11BC74256A5e41c95c45B5A461B0Dc0604",
+      address: "0x47dd54D42C3e633be5C49df452dB3C2100107b8A",
       abi: [
         {
           inputs: [
@@ -9170,7 +14902,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x14dB7cD598aE2e46E04De87DEF44350fe5Cdd4d8",
+      address: "0x352D3d0b35E47b5468313CdDf33AD7d5424c9f41",
       abi: [
         {
           inputs: [
@@ -9591,7 +15323,7 @@ const contracts = {
       },
     },
     SparkGatewayView: {
-      address: "0xAeBdC3Bfe16D7Ec1ffCF37340eF88BE4987ed055",
+      address: "0xE97Ba0440c1767DAF9A44330c443EaA8e562D0ac",
       abi: [
         {
           inputs: [
@@ -9801,6 +15533,44 @@ const contracts = {
               name: "token",
               type: "address",
             },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAssetPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "user",
@@ -9891,6 +15661,30 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getEModes",
           outputs: [
@@ -9935,6 +15729,30 @@ const contracts = {
               internalType: "struct AaveGatewayViewBase.EModeInfo[]",
               name: "emodes",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -10315,7 +16133,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     SparkGatewayWrite: {
-      address: "0xe4257ad43345c598C84bb881140C81dbdA016667",
+      address: "0x79cF85d3E574b7b52BBe11E0D2c221e627C36327",
       abi: [
         {
           inputs: [
@@ -10719,7 +16537,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     UiHelper: {
-      address: "0x262496342AcfA522aA58a9B3E14bF054DB7BcC4B",
+      address: "0x125504D2199Ba433F3366c08512e60424D728c3b",
       abi: [
         {
           inputs: [
@@ -10744,7 +16562,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x554aB56ffAf9389A0F80af959a8741B1C5FA0a11",
+      address: "0x72a25D6b7a5b963B478dfF72bBDBdc917b00647F",
       abi: [
         {
           inputs: [
@@ -10929,6 +16747,44 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice8",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "account",
               type: "address",
             },
@@ -11082,6 +16938,54 @@ const contracts = {
               internalType: "bool[]",
               name: "isCollateral",
               type: "bool[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -11299,6 +17203,30 @@ const contracts = {
         {
           inputs: [
             {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
               internalType: "address[]",
               name: "vTokens",
               type: "address[]",
@@ -11448,7 +17376,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x35C1fC32EEc3913ED63957aE819F52BD8b3FD2F8",
+      address: "0x933D7f0A67435C161f1dA136252573CA33553ecE",
       abi: [
         {
           inputs: [
@@ -11802,7 +17730,7 @@ const contracts = {
       },
     },
     ZeroLendGatewayView: {
-      address: "0x70fC62653B41aEE47F4f88491F960A233B7E5Ae2",
+      address: "0xE778AeFAe5fd9909Cf4B5F183d149da0DE0C1891",
       abi: [
         {
           inputs: [
@@ -12012,6 +17940,44 @@ const contracts = {
               name: "token",
               type: "address",
             },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAssetPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "user",
@@ -12102,6 +18068,30 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getEModes",
           outputs: [
@@ -12146,6 +18136,30 @@ const contracts = {
               internalType: "struct AaveGatewayViewBase.EModeInfo[]",
               name: "emodes",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -12526,7 +18540,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0xF691De69dD4E3B130C178f56A097264228Fb825b",
+      address: "0x8Fc91B4afFC674361a8e22794E9D4aD35d182B25",
       abi: [
         {
           inputs: [
@@ -12932,7 +18946,7 @@ const contracts = {
   },
   10: {
     AaveGatewayView: {
-      address: "0x293513aBFf80EAEaE4B6b637b75c138F3897B069",
+      address: "0xA26626a94fb95239a16D108b8f40b58F0E3110a2",
       abi: [
         {
           inputs: [
@@ -13142,6 +19156,44 @@ const contracts = {
               name: "token",
               type: "address",
             },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAssetPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "user",
@@ -13232,6 +19284,30 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getEModes",
           outputs: [
@@ -13276,6 +19352,30 @@ const contracts = {
               internalType: "struct AaveGatewayView.EModeInfo[]",
               name: "emodes",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -13669,7 +19769,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0xB6694F849A9F7c217555bcee853CB12dfB779b89",
+      address: "0x00d2024c12ebC4DeF28A426DFc6Aaaf50b16E581",
       abi: [
         {
           inputs: [
@@ -14077,8 +20177,318 @@ const contracts = {
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
       },
     },
+    AutoLeverageTrigger: {
+      address: "0x6010995f1a2718b9F087b2a5aE563D0EFE8FcfeF",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct AutoLeverageTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     CompoundGatewayView: {
-      address: "0x0aF7FC16218923c4C7653530dDF21D37d5FeAa66",
+      address: "0xB642dFc9dAa5D6Ebef3F44C2a1822D85bCee7041",
       abi: [
         {
           inputs: [
@@ -14539,6 +20949,30 @@ const contracts = {
             },
             {
               internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
               name: "account",
               type: "address",
             },
@@ -14559,6 +20993,30 @@ const contracts = {
               internalType: "string[]",
               name: "displayNames",
               type: "string[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -14606,6 +21064,35 @@ const contracts = {
             {
               internalType: "uint256",
               name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
               type: "uint256",
             },
           ],
@@ -14973,7 +21460,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xc8A7CF40e887Deb3C28F614804be98E0077B6D11",
+      address: "0xD34A95a6d649A4672Ed3817B1297Bbe6FBc20608",
       abi: [
         {
           inputs: [
@@ -15497,8 +21984,519 @@ const contracts = {
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
+    EulerGatewayView: {
+      address: "0xe91B863245a3abF16131BE70F9ed854E0CC57a05",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "evc_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "evc",
+          outputs: [
+            {
+              internalType: "contract IEVC",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getAcceptedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getBorrowLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCollateralBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "borrowLTV",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "liquidationLTV",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralToDebtRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBpsSimple",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getDebtBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "quoteToken",
+              type: "address",
+            },
+          ],
+          name: "getExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getHealthFactor",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMainSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultAsset",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultSymbol",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "isHealthy",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
     EulerGatewayWrite: {
-      address: "0x2bF4cDF6ffC14818bD3100f5c4cEa0Ff4aC6F2ca",
+      address: "0xA497baF560bC6092aa706a01A9A31bcBD8Ffb156",
       abi: [
         {
           inputs: [
@@ -15949,7 +22947,7 @@ const contracts = {
       },
     },
     KapanAuthorizationHelper: {
-      address: "0xFEeE0f6D32Aea45617773139112BA615340Da207",
+      address: "0x65c19c39cEDbA083f7C13FE0062B605Ccfb6FC43",
       abi: [
         {
           inputs: [
@@ -18261,7 +25259,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0x8014e86bC702A7743578Fc8C3DDdBBe8095CC00b",
+      address: "0x3f5cFa01Ad22E536aA972046a71d93bC2e224Ca4",
       abi: [
         {
           inputs: [
@@ -19205,8 +26203,2687 @@ const contracts = {
           "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
+    KapanViewRouter: {
+      address: "0x1dBDce425aae695981A3629edb2089aec1823BAb",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_owner",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "GatewayNotSet",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocolId",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "GatewayUpdated",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "collateralDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "debtDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "calculateMinBuy",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyFromRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "morphoOraclePrice",
+              type: "uint256",
+            },
+          ],
+          name: "calculateMorphoMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          name: "gateways",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAavePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAavePrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "availableBorrowsBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "currentLiquidationThreshold",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "ltv",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "healthFactor",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCollateralPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getDebtPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getEulerExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getEulerLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getEulerLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getEulerPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoOraclePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getVenusPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isAaveAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "atRisk",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isCompoundAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isMorphoAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string[]",
+              name: "protocolNames",
+              type: "string[]",
+            },
+            {
+              internalType: "address[]",
+              name: "gatewayAddresses",
+              type: "address[]",
+            },
+          ],
+          name: "setGateways",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+          ],
+          name: "usdPricesToExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
+    KyberAdapter: {
+      address: "0xb84071eB9879d1394c100818646A055919B63054",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_gateway",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_router",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "KYBER_ROUTER",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "tokenIn",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "tokenOut",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amountIn",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minAmountOut",
+              type: "uint256",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "executeSwap",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "amountReceived",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "amountRefunded",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "kapanGateway",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
+    },
+    KyberGateway: {
+      address: "0xfdF928Ef33DD5f4EeA1e357E40bC39717406E4b8",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "router",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "owner_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "ROUTER",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "adapter",
+          outputs: [
+            {
+              internalType: "contract KyberAdapter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+          ],
+          name: "authorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "produced",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "",
+              type: "tuple[]",
+            },
+          ],
+          name: "deauthorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "processLendingInstruction",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "outputs",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_adapter",
+              type: "address",
+            },
+          ],
+          name: "setAdapter",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        authorize: "contracts/v2/interfaces/IGateway.sol",
+        deauthorize: "contracts/v2/interfaces/IGateway.sol",
+        processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
+        ROUTER: "contracts/gateways/ProtocolGateway.sol",
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
+    },
+    LimitPriceTrigger: {
+      address: "0xbd15E52d37871d3f24FfB60ccD1bc262CEaBbbe7",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
+    LtvTrigger: {
+      address: "0xE4AEa17FB6A7b4cD44895417e9dbB0e12DeF825c",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     MorphoBlueGatewayView: {
-      address: "0xf0dbB1EB5B0c8D6fa88B60e11aE09ca66bDf9375",
+      address: "0x6aB60A32Bf3640c22DaB5378feE6Ef5E8258C813",
       abi: [
         {
           inputs: [
@@ -19739,6 +29416,103 @@ const contracts = {
                   type: "uint256",
                 },
               ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
               internalType: "struct MarketParams[]",
               name: "paramsList",
               type: "tuple[]",
@@ -20206,6 +29980,62 @@ const contracts = {
                   type: "uint256",
                 },
               ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
               internalType: "struct MarketParams[]",
               name: "paramsList",
               type: "tuple[]",
@@ -20589,7 +30419,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayWrite: {
-      address: "0xFE1E3C893A401EC4e0cdc13F0982c61D0Ec4b6c0",
+      address: "0x8e0d2EEe6cD6d7D2B4f76055EA04Dba33F327773",
       abi: [
         {
           inputs: [
@@ -21247,7 +31077,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0x66221429b97ba0d6f78aA33c63923b24d7F125e1",
+      address: "0xC9FD0e277C9B95DD3f6aeef0C48877681e1C084C",
       abi: [
         {
           inputs: [
@@ -21491,7 +31321,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x491Eb8Bd03cc56b29e2e1fC507b731eDae4E05da",
+      address: "0x823697Fe30627D83132874243b5c367C21dFBf1b",
       abi: [
         {
           inputs: [
@@ -22332,7 +32162,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0xFf7c506d137059e597bd2ffD416C95Cb73bce7e1",
+      address: "0x90eB786e1F5311815d291E50De4651B4a479885f",
       abi: [
         {
           inputs: [
@@ -22576,7 +32406,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x0f33d5f1177164C32b23426956c9B46498465CEF",
+      address: "0x68DD33999A2cdbaF4076E8F994aB893Bd144633E",
       abi: [
         {
           inputs: [
@@ -22997,7 +32827,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0xcE60C01a99c075fbf1ae50d1e540a6a7Cc198f45",
+      address: "0x567B11fcA15E644ecC9B73a37Ac3C186dbAAe7A1",
       abi: [
         {
           inputs: [
@@ -23023,8 +32853,318 @@ const contracts = {
     },
   },
   130: {
+    AutoLeverageTrigger: {
+      address: "0x1256b142701F2D2E04A37f30b06d69223614E62A",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct AutoLeverageTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     CompoundGatewayView: {
-      address: "0x24ee5F00252e27bA5F61A19F0AC3071c679f730d",
+      address: "0x238aB806aD5667889081e85616aF6b077F1A5D7E",
       abi: [
         {
           inputs: [
@@ -23485,6 +33625,30 @@ const contracts = {
             },
             {
               internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
               name: "account",
               type: "address",
             },
@@ -23505,6 +33669,30 @@ const contracts = {
               internalType: "string[]",
               name: "displayNames",
               type: "string[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -23552,6 +33740,35 @@ const contracts = {
             {
               internalType: "uint256",
               name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
               type: "uint256",
             },
           ],
@@ -23919,7 +34136,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x964D6D171DBB386397806fCeECc3357f9e386524",
+      address: "0x63d40e2678141B267603668e74E4AAE378C41768",
       abi: [
         {
           inputs: [
@@ -24443,8 +34660,519 @@ const contracts = {
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
+    EulerGatewayView: {
+      address: "0x99ed8283F1c16A287d9f9d8c9297fCf172Fc7612",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "evc_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "evc",
+          outputs: [
+            {
+              internalType: "contract IEVC",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getAcceptedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getBorrowLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCollateralBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "borrowLTV",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "liquidationLTV",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralToDebtRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBpsSimple",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getDebtBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "quoteToken",
+              type: "address",
+            },
+          ],
+          name: "getExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getHealthFactor",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMainSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultAsset",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultSymbol",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "isHealthy",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
     EulerGatewayWrite: {
-      address: "0xe1F9c9F27F8E7b16FB6E0De189CD8e349505038B",
+      address: "0xafE618953FFdf652493453404B784bD557d03e99",
       abi: [
         {
           inputs: [
@@ -24895,7 +35623,7 @@ const contracts = {
       },
     },
     KapanAuthorizationHelper: {
-      address: "0xe582D8E8618C145983f96328113bBF219DFdBb03",
+      address: "0x750DD6beefBa421187ffB289aA17D84157A9ec56",
       abi: [
         {
           inputs: [
@@ -25132,7 +35860,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xc72c46b27Ffbe8ed0a920378Ae91e4F6B6CF38DA",
+      address: "0xD9e8Eb2B3cc44ebF326d2b9772FBe2B28cdba65f",
       abi: [
         {
           inputs: [
@@ -26076,8 +36804,2022 @@ const contracts = {
           "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
+    KapanViewRouter: {
+      address: "0x74acDAAFb21d0959e576893b00F350b4e12fc768",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_owner",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "GatewayNotSet",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocolId",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "GatewayUpdated",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "collateralDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "debtDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "calculateMinBuy",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyFromRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "morphoOraclePrice",
+              type: "uint256",
+            },
+          ],
+          name: "calculateMorphoMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          name: "gateways",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAavePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAavePrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "availableBorrowsBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "currentLiquidationThreshold",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "ltv",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "healthFactor",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCollateralPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getDebtPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getEulerExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getEulerLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getEulerLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getEulerPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoOraclePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getVenusPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isAaveAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "atRisk",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isCompoundAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isMorphoAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string[]",
+              name: "protocolNames",
+              type: "string[]",
+            },
+            {
+              internalType: "address[]",
+              name: "gatewayAddresses",
+              type: "address[]",
+            },
+          ],
+          name: "setGateways",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+          ],
+          name: "usdPricesToExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
+    LimitPriceTrigger: {
+      address: "0x7AE7e43e2cBC685B175270928a6116C68F1A05f4",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
+    LtvTrigger: {
+      address: "0xB87104F4b4C2D969893Bc2C29835497095563C6B",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     MorphoBlueGatewayView: {
-      address: "0x00186EEC83eb4e3F8058c6dd009188E791F4Cf19",
+      address: "0x09999602ef8CB5CA41160bed15076eA25483e7A8",
       abi: [
         {
           inputs: [
@@ -26610,6 +39352,103 @@ const contracts = {
                   type: "uint256",
                 },
               ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
               internalType: "struct MarketParams[]",
               name: "paramsList",
               type: "tuple[]",
@@ -27077,6 +39916,62 @@ const contracts = {
                   type: "uint256",
                 },
               ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
               internalType: "struct MarketParams[]",
               name: "paramsList",
               type: "tuple[]",
@@ -27460,7 +40355,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayWrite: {
-      address: "0xab08ccD7B6ba560E41fBbd6C41cD6d32615A0273",
+      address: "0xA5B2248e8C1128C55D4fDC27a6ADEaE634c4DD5f",
       abi: [
         {
           inputs: [
@@ -28118,7 +41013,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0xB1eb8f17d141dbd07cd9Be4Bc80Ece393b633070",
+      address: "0xb126bD7e8f013ded975422af7c9b10A179a22E10",
       abi: [
         {
           inputs: [
@@ -28362,7 +41257,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x8a9F796062D44c1a851FD5E05356CA937339384A",
+      address: "0x9bfa59494A3B2B33C3974333a1bD922225b5D7F5",
       abi: [
         {
           inputs: [
@@ -28783,7 +41678,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0x13A67AF2c48a7E07e6251db6c43E8daBcA6Ed4c2",
+      address: "0x3221F36029A99f9562b61E46e4589021D3740e2E",
       abi: [
         {
           inputs: [
@@ -29027,7 +41922,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0xFd3f85489c9A69aC3c75CD9ff60F90ED96cDD36e",
+      address: "0x6a1685c1c0315B3D55B435e2df3f53332e8d7A5B",
       abi: [
         {
           inputs: [
@@ -29448,7 +42343,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x6bDD5521b2908AD893429A7494dBE43081B1c31D",
+      address: "0x25c42641768f08022FE0136C71713875f0975b94",
       abi: [
         {
           inputs: [
@@ -29473,7 +42368,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0xBA05cb90c99B01E0aeebe178c1a0CF9A0A3c3A09",
+      address: "0x49068bC83AB413d4399f0D0a9331Db42C8062416",
       abi: [
         {
           inputs: [
@@ -29658,6 +42553,44 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice8",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "account",
               type: "address",
             },
@@ -29811,6 +42744,54 @@ const contracts = {
               internalType: "bool[]",
               name: "isCollateral",
               type: "bool[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -30028,6 +43009,30 @@ const contracts = {
         {
           inputs: [
             {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
               internalType: "address[]",
               name: "vTokens",
               type: "address[]",
@@ -30177,7 +43182,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x9288E9f53e868F10652c45B0B490f4E475aAE76B",
+      address: "0x9964acBBa956Fb53a325049c1B0c9d81ce2BC253",
       abi: [
         {
           inputs: [
@@ -30533,7 +43538,7 @@ const contracts = {
   },
   8453: {
     AaveGatewayView: {
-      address: "0xE4b4eC82B3A4BD597274eBc77f7D24946E13CdFe",
+      address: "0x83DeDae6aD36686cCa758923B8D341fA551fE2a0",
       abi: [
         {
           inputs: [
@@ -30743,6 +43748,44 @@ const contracts = {
               name: "token",
               type: "address",
             },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAssetPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "user",
@@ -30833,6 +43876,30 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getEModes",
           outputs: [
@@ -30877,6 +43944,30 @@ const contracts = {
               internalType: "struct AaveGatewayViewBase.EModeInfo[]",
               name: "emodes",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -31257,7 +44348,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x1f914038633C714D30c117DbCD6b897828256046",
+      address: "0x9720818327698801D48F49d17a89a04bcD7C4741",
       abi: [
         {
           inputs: [
@@ -31665,8 +44756,318 @@ const contracts = {
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
       },
     },
+    AutoLeverageTrigger: {
+      address: "0xc31B2Ec5491Fe69f666d7BEFb4Af62214F158411",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct AutoLeverageTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     CompoundGatewayView: {
-      address: "0x55E65Bea5E4bf53bB776eADe56415ef0A09B0d8c",
+      address: "0x8cd08b0E3953B32C15a12A4aE6eF95a8D0914013",
       abi: [
         {
           inputs: [
@@ -32127,6 +45528,30 @@ const contracts = {
             },
             {
               internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
               name: "account",
               type: "address",
             },
@@ -32147,6 +45572,30 @@ const contracts = {
               internalType: "string[]",
               name: "displayNames",
               type: "string[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -32194,6 +45643,35 @@ const contracts = {
             {
               internalType: "uint256",
               name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
               type: "uint256",
             },
           ],
@@ -32561,7 +46039,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x2796f06f694E5523fAbD0bD234D4F66949d236Ee",
+      address: "0x0F029c744D2791A379F538051Be961621567E92e",
       abi: [
         {
           inputs: [
@@ -33085,8 +46563,519 @@ const contracts = {
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
+    EulerGatewayView: {
+      address: "0xfA48f1F57CDF3814E9849c9F958De10DfB20f930",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "evc_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "evc",
+          outputs: [
+            {
+              internalType: "contract IEVC",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getAcceptedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getBorrowLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCollateralBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "borrowLTV",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "liquidationLTV",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralToDebtRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBpsSimple",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getDebtBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "quoteToken",
+              type: "address",
+            },
+          ],
+          name: "getExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getHealthFactor",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMainSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultAsset",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultSymbol",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "isHealthy",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
     EulerGatewayWrite: {
-      address: "0x8C792b890b8E8D4C059ecD294d75608d6b18A352",
+      address: "0x15f22E0272b7546FD2fB807B3DF1f93c882E284d",
       abi: [
         {
           inputs: [
@@ -33537,7 +47526,7 @@ const contracts = {
       },
     },
     KapanAuthorizationHelper: {
-      address: "0xc2Ef16E5FC89dDa84b258EFc2f91BC86075F49B2",
+      address: "0xcd4f3B2Dd1eeAd543D6C165EC26B6890e11dae82",
       abi: [
         {
           inputs: [
@@ -33773,8 +47762,1589 @@ const contracts = {
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
+    KapanConditionalOrderHandler: {
+      address: "0x4768A53023b6c4a2038cd13435B672fF867B9775",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_manager",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "OrderNotValid",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "PollNever",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "PollTryNextBlock",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes",
+              name: "staticInput",
+              type: "bytes",
+            },
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          name: "getTradeableOrder",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "contract IERC20",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "contract IERC20",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "receiver",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "sellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "buyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint32",
+                  name: "validTo",
+                  type: "uint32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appData",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "feeAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "kind",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bool",
+                  name: "partiallyFillable",
+                  type: "bool",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "sellTokenBalance",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "buyTokenBalance",
+                  type: "bytes32",
+                },
+              ],
+              internalType: "struct GPv2Order.Data",
+              name: "order",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "manager",
+          outputs: [
+            {
+              internalType: "contract IKapanConditionalOrderManager",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "interfaceId",
+              type: "bytes4",
+            },
+          ],
+          name: "supportsInterface",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes",
+              name: "staticInput",
+              type: "bytes",
+            },
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              components: [
+                {
+                  internalType: "contract IERC20",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "contract IERC20",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "receiver",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "sellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "buyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint32",
+                  name: "validTo",
+                  type: "uint32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appData",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "feeAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "kind",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bool",
+                  name: "partiallyFillable",
+                  type: "bool",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "sellTokenBalance",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "buyTokenBalance",
+                  type: "bytes32",
+                },
+              ],
+              internalType: "struct GPv2Order.Data",
+              name: "order",
+              type: "tuple",
+            },
+          ],
+          name: "verify",
+          outputs: [],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        supportsInterface:
+          "@openzeppelin/contracts/utils/introspection/IERC165.sol",
+      },
+    },
+    KapanConditionalOrderManager: {
+      address: "0xEbB747299bAcBa2Ad53F8769eB259db04169E48d",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_owner",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_router",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_composableCoW",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_settlement",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_hooksTrampoline",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "CannotCancelMidExecution",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "expected",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "actual",
+              type: "address",
+            },
+          ],
+          name: "InstructionUserMismatch",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidChunkWindow",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidOrderState",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidTokens",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidTrigger",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "MaxOrdersExceeded",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "NoTokensReceived",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "NotHooksTrampoline",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "OrderAlreadyExists",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "OrderNotFound",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PreHookAlreadyExecuted",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PreHookNotExecuted",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "SaltAlreadyUsed",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "TriggerNotMet",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "Unauthorized",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ValidToOverflow",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "oldWindow",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "newWindow",
+              type: "uint256",
+            },
+          ],
+          name: "ChunkWindowUpdated",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "ConditionalOrderCancelled",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iterations",
+              type: "uint256",
+            },
+          ],
+          name: "ConditionalOrderCompleted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "trigger",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "sellToken",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "buyToken",
+              type: "address",
+            },
+          ],
+          name: "ConditionalOrderCreated",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "oldHandler",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newHandler",
+              type: "address",
+            },
+          ],
+          name: "OrderHandlerUpdated",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iteration",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "receivedAmount",
+              type: "uint256",
+            },
+          ],
+          name: "PostHookExecuted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iteration",
+              type: "uint256",
+            },
+          ],
+          name: "PreHookExecuted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "StuckOrderReset",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "TokensRecovered",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iteration",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "buyAmount",
+              type: "uint256",
+            },
+          ],
+          name: "TriggerExecuted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "vaultRelayer",
+              type: "address",
+            },
+          ],
+          name: "VaultRelayerApproved",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "DEFAULT_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MAX_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MAX_ORDERS_PER_USER",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MIN_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "approveVaultRelayer",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "cancelOrder",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "chunkWindow",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "composableCoW",
+          outputs: [
+            {
+              internalType: "contract IComposableCoW",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "trigger",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "triggerStaticData",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes",
+                  name: "preInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "postInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appDataHash",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxIterations",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "sellTokenRefundAddress",
+                  type: "address",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType:
+                "struct KapanConditionalOrderManager.KapanOrderParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "bytes32",
+              name: "salt",
+              type: "bytes32",
+            },
+          ],
+          name: "createOrder",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "executePostHook",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "salt",
+              type: "bytes32",
+            },
+          ],
+          name: "executePostHookBySalt",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "executePreHook",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "salt",
+              type: "bytes32",
+            },
+          ],
+          name: "executePreHookBySalt",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "getExecutionAmounts",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "getOrder",
+          outputs: [
+            {
+              components: [
+                {
+                  components: [
+                    {
+                      internalType: "address",
+                      name: "user",
+                      type: "address",
+                    },
+                    {
+                      internalType: "address",
+                      name: "trigger",
+                      type: "address",
+                    },
+                    {
+                      internalType: "bytes",
+                      name: "triggerStaticData",
+                      type: "bytes",
+                    },
+                    {
+                      internalType: "bytes",
+                      name: "preInstructions",
+                      type: "bytes",
+                    },
+                    {
+                      internalType: "address",
+                      name: "sellToken",
+                      type: "address",
+                    },
+                    {
+                      internalType: "address",
+                      name: "buyToken",
+                      type: "address",
+                    },
+                    {
+                      internalType: "bytes",
+                      name: "postInstructions",
+                      type: "bytes",
+                    },
+                    {
+                      internalType: "bytes32",
+                      name: "appDataHash",
+                      type: "bytes32",
+                    },
+                    {
+                      internalType: "uint256",
+                      name: "maxIterations",
+                      type: "uint256",
+                    },
+                    {
+                      internalType: "address",
+                      name: "sellTokenRefundAddress",
+                      type: "address",
+                    },
+                    {
+                      internalType: "bool",
+                      name: "isKindBuy",
+                      type: "bool",
+                    },
+                  ],
+                  internalType:
+                    "struct KapanConditionalOrderManager.KapanOrderParams",
+                  name: "params",
+                  type: "tuple",
+                },
+                {
+                  internalType: "enum KapanConditionalOrderManager.OrderStatus",
+                  name: "status",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "iterationCount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "createdAt",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct KapanConditionalOrderManager.OrderContext",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getUserOrders",
+          outputs: [
+            {
+              internalType: "bytes32[]",
+              name: "",
+              type: "bytes32[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "hooksTrampoline",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "isTriggerMet",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "shouldExecute",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "_hash",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes",
+              name: "_signature",
+              type: "bytes",
+            },
+          ],
+          name: "isValidSignature",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "orderHandler",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "orderSalts",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "orders",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "trigger",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "triggerStaticData",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes",
+                  name: "preInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "postInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appDataHash",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxIterations",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "sellTokenRefundAddress",
+                  type: "address",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType:
+                "struct KapanConditionalOrderManager.KapanOrderParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "enum KapanConditionalOrderManager.OrderStatus",
+              name: "status",
+              type: "uint8",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "createdAt",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookBuyBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookExecutedForIteration",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookSellBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "resetStuckOrder",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "router",
+          outputs: [
+            {
+              internalType: "contract IKapanRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_chunkWindow",
+              type: "uint256",
+            },
+          ],
+          name: "setChunkWindow",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_orderHandler",
+              type: "address",
+            },
+          ],
+          name: "setOrderHandler",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "settlement",
+          outputs: [
+            {
+              internalType: "contract IGPv2Settlement",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "userOrders",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "userSaltToOrderHash",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        isValidSignature: "contracts/v2/interfaces/cow/IERC1271.sol",
+      },
+    },
     KapanCowAdapter: {
-      address: "0x22ff1b601daF5642aad2266f5e255D4E164c3042",
+      address: "0x3fC2B29c4bB41EEF354fd70fC7967cD7cC271D32",
       abi: [
         {
           inputs: [
@@ -33831,32 +49401,12 @@ const contracts = {
         },
         {
           inputs: [],
-          name: "OnlyOrderManager",
-          type: "error",
-        },
-        {
-          inputs: [],
           name: "OnlyRouter",
           type: "error",
         },
         {
           inputs: [],
           name: "OnlySettlement",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderAlreadyInitialized",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderMismatch",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderNotFound",
           type: "error",
         },
         {
@@ -33879,11 +49429,6 @@ const contracts = {
             },
           ],
           name: "OwnableUnauthorizedAccount",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "PreHookNotDone",
           type: "error",
         },
         {
@@ -33963,8 +49508,14 @@ const contracts = {
           inputs: [
             {
               indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: true,
               internalType: "bytes32",
-              name: "orderHash",
+              name: "salt",
               type: "bytes32",
             },
             {
@@ -33974,7 +49525,7 @@ const contracts = {
               type: "address",
             },
             {
-              indexed: true,
+              indexed: false,
               internalType: "address",
               name: "recipient",
               type: "address",
@@ -33987,25 +49538,6 @@ const contracts = {
             },
           ],
           name: "OrderFunded",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "oldManager",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newManager",
-              type: "address",
-            },
-          ],
-          name: "OrderManagerUpdated",
           type: "event",
         },
         {
@@ -34139,34 +49671,6 @@ const contracts = {
         {
           inputs: [
             {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "recipient",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "fundOrder",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
               internalType: "address",
               name: "user",
               type: "address",
@@ -34198,16 +49702,31 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "getExpectedOrderHash",
-          outputs: [
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
             {
               internalType: "bytes32",
-              name: "",
+              name: "salt",
               type: "bytes32",
             },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "recipient",
+              type: "address",
+            },
           ],
-          stateMutability: "view",
+          name: "fundOrderWithBalance",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -34269,19 +49788,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "isPreHookDone",
-          outputs: [
-            {
-              internalType: "bool",
-              name: "",
-              type: "bool",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
           inputs: [
             {
               internalType: "address",
@@ -34316,45 +49822,6 @@ const contracts = {
           name: "onMorphoFlashLoan",
           outputs: [],
           stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-          ],
-          name: "onPostHook",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-          ],
-          name: "onPreHook",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [],
-          name: "orderManager",
-          outputs: [
-            {
-              internalType: "address",
-              name: "",
-              type: "address",
-            },
-          ],
-          stateMutability: "view",
           type: "function",
         },
         {
@@ -34540,19 +50007,6 @@ const contracts = {
             },
           ],
           name: "setMorphoLender",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_orderManager",
-              type: "address",
-            },
-          ],
-          name: "setOrderManager",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -36238,7 +51692,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xc2137E0D9f4FD102C5eB045194329646Bac70FBE",
+      address: "0xf9163B136fa93051F81d30D68FE33E6239391325",
       abi: [
         {
           inputs: [
@@ -37182,8 +52636,2687 @@ const contracts = {
           "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
+    KapanViewRouter: {
+      address: "0x08d443bCC82b219f84f181dbAb7Abd5f83387188",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_owner",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "GatewayNotSet",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocolId",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "GatewayUpdated",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "collateralDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "debtDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "calculateMinBuy",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyFromRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "morphoOraclePrice",
+              type: "uint256",
+            },
+          ],
+          name: "calculateMorphoMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          name: "gateways",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAavePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAavePrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "availableBorrowsBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "currentLiquidationThreshold",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "ltv",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "healthFactor",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCollateralPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getDebtPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getEulerExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getEulerLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getEulerLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getEulerPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoOraclePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getVenusPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isAaveAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "atRisk",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isCompoundAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isMorphoAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string[]",
+              name: "protocolNames",
+              type: "string[]",
+            },
+            {
+              internalType: "address[]",
+              name: "gatewayAddresses",
+              type: "address[]",
+            },
+          ],
+          name: "setGateways",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+          ],
+          name: "usdPricesToExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
+    KyberAdapter: {
+      address: "0xf68112efe6fBe07eFd7a114983f80917755E46E1",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_gateway",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_router",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "KYBER_ROUTER",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "tokenIn",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "tokenOut",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amountIn",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minAmountOut",
+              type: "uint256",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "executeSwap",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "amountReceived",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "amountRefunded",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "kapanGateway",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
+    },
+    KyberGateway: {
+      address: "0x5F2517eAB21012bE32C0D7F456824E09233b0e67",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "router",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "owner_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "ROUTER",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "adapter",
+          outputs: [
+            {
+              internalType: "contract KyberAdapter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+          ],
+          name: "authorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "produced",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "",
+              type: "tuple[]",
+            },
+          ],
+          name: "deauthorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "processLendingInstruction",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "outputs",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_adapter",
+              type: "address",
+            },
+          ],
+          name: "setAdapter",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        authorize: "contracts/v2/interfaces/IGateway.sol",
+        deauthorize: "contracts/v2/interfaces/IGateway.sol",
+        processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
+        ROUTER: "contracts/gateways/ProtocolGateway.sol",
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
+    },
+    LimitPriceTrigger: {
+      address: "0x2773EF73d838ba5C7fF70e1b58a3FfA79799f093",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
+    LtvTrigger: {
+      address: "0x8659F794fbAC7D649130fe6B3d73d128A074066B",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     MorphoBlueGatewayView: {
-      address: "0x3E0c4218E0C48d12D51b12D1056Fbceb9f843431",
+      address: "0x6508412007FC7148966970cD0AB65C7a3D412851",
       abi: [
         {
           inputs: [
@@ -37716,6 +55849,103 @@ const contracts = {
                   type: "uint256",
                 },
               ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
               internalType: "struct MarketParams[]",
               name: "paramsList",
               type: "tuple[]",
@@ -38183,6 +56413,62 @@ const contracts = {
                   type: "uint256",
                 },
               ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
               internalType: "struct MarketParams[]",
               name: "paramsList",
               type: "tuple[]",
@@ -38566,7 +56852,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayWrite: {
-      address: "0x20536d9BaECb1903f79A2Cc2726ADfe2294a2057",
+      address: "0x793d7B55664A694Cbe3786CCbc5Fc08d33ee0993",
       abi: [
         {
           inputs: [
@@ -39224,7 +57510,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0x761a7bee79D96961BcbE73B14ED87778B6B018bD",
+      address: "0xC46C18A6D1e684d4D1DEA8Bc77375a4394f55F16",
       abi: [
         {
           inputs: [
@@ -39468,7 +57754,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x372eD0bAcBDeE5a3C5Bc37404BB8Dc3f05a1b874",
+      address: "0x1E30eb17B72e3dD0238735CaEF2857655EFE25A3",
       abi: [
         {
           inputs: [
@@ -40309,7 +58595,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0xbfe2cA285d4dDA82cD35B7ddDB623a3462B150bf",
+      address: "0x041609812CfDbaB616B91166E4F0b8d69c593763",
       abi: [
         {
           inputs: [
@@ -40553,7 +58839,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x5654a21d073898F49EbE3e1D08BFe5f55Bce879A",
+      address: "0x49dd9E4dA44fE266382130dcFf01f3aCA8422018",
       abi: [
         {
           inputs: [
@@ -40974,7 +59260,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x5003F0B8DEF3A2cDBAca715Fe2c434Dd0e03E39C",
+      address: "0xDfc9420104621d36337d90F603362F8444de49E8",
       abi: [
         {
           inputs: [
@@ -40999,7 +59285,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x902dFC53c6F9fC7B1830D7D1c16eF23132AB7C79",
+      address: "0x32A9211419BA81De594B3f57E4723f4b3C383cb2",
       abi: [
         {
           inputs: [
@@ -41184,6 +59470,44 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice8",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "account",
               type: "address",
             },
@@ -41337,6 +59661,54 @@ const contracts = {
               internalType: "bool[]",
               name: "isCollateral",
               type: "bool[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -41554,6 +59926,30 @@ const contracts = {
         {
           inputs: [
             {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
               internalType: "address[]",
               name: "vTokens",
               type: "address[]",
@@ -41703,7 +60099,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x52f3F1e310525C8EB0b3b2E3f2589Ce1c458DAec",
+      address: "0x53A4539f2DE0d302bC5f3cb5465855e3721365F3",
       abi: [
         {
           inputs: [
@@ -42057,7 +60453,7 @@ const contracts = {
       },
     },
     ZeroLendGatewayView: {
-      address: "0x4C4d6b0f5C570Cb09C0fCB98E7cF4f74A1ED65e7",
+      address: "0xfFF1e86B5367A9f8858b583A21Ff734d872e4e46",
       abi: [
         {
           inputs: [
@@ -42267,6 +60663,44 @@ const contracts = {
               name: "token",
               type: "address",
             },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAssetPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "user",
@@ -42357,6 +60791,30 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getEModes",
           outputs: [
@@ -42401,6 +60859,30 @@ const contracts = {
               internalType: "struct AaveGatewayViewBase.EModeInfo[]",
               name: "emodes",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -42781,7 +61263,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0x5a3d8D046057A338A3F8718fDCBBBbEC927c0E56",
+      address: "0x659Bc04Ef437751112566c93E05ca79DD644D9C1",
       abi: [
         {
           inputs: [
@@ -43187,7 +61669,7 @@ const contracts = {
   },
   9745: {
     AaveGatewayView: {
-      address: "0x9be0B3a272864fc687F6B1172Bba821dA74a6C9e",
+      address: "0x6bb8899c80e3cD7ac150Bf2f9Fa5745Ade782558",
       abi: [
         {
           inputs: [
@@ -43397,6 +61879,44 @@ const contracts = {
               name: "token",
               type: "address",
             },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAssetPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "user",
@@ -43487,6 +62007,30 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getEModes",
           outputs: [
@@ -43531,6 +62075,30 @@ const contracts = {
               internalType: "struct AaveGatewayView.EModeInfo[]",
               name: "emodes",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -43924,7 +62492,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x3a3436F6a5fDf6cDd76648443BA29E2814EbcbD5",
+      address: "0x322B9c5c52ECfC7C258739f8dB9C0E1DB4077490",
       abi: [
         {
           inputs: [
@@ -44332,8 +62900,829 @@ const contracts = {
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
       },
     },
+    AutoLeverageTrigger: {
+      address: "0x09EF5575941b09BBF06C0184a856c23C353df531",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct AutoLeverageTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
+    EulerGatewayView: {
+      address: "0xAeB27500024a953577124725134E96376697dC3E",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "evc_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "evc",
+          outputs: [
+            {
+              internalType: "contract IEVC",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getAcceptedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getBorrowLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCollateralBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "borrowLTV",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "liquidationLTV",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralToDebtRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBpsSimple",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getDebtBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "quoteToken",
+              type: "address",
+            },
+          ],
+          name: "getExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getHealthFactor",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMainSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultAsset",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultSymbol",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "isHealthy",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
     EulerGatewayWrite: {
-      address: "0x62E73e8700d33019332521Cc917589768DB4f7Ca",
+      address: "0x997bDC97B7362F1f9d5d15f275b747FCb830A01E",
       abi: [
         {
           inputs: [
@@ -44784,7 +64173,7 @@ const contracts = {
       },
     },
     KapanAuthorizationHelper: {
-      address: "0x95903408e24B70edD6601eDeAE7e53DBEAFFCd45",
+      address: "0xEdEf80e54eF8820426FCF7fDEe0238c98b6F9b92",
       abi: [
         {
           inputs: [
@@ -45021,7 +64410,7 @@ const contracts = {
       },
     },
     KapanCowAdapter: {
-      address: "0x5E1d6779d735119F3a7F3F87e837e93C355541C5",
+      address: "0x47D03d3A32859Ce768072e5D52f00eb2E4bAd5c2",
       abi: [
         {
           inputs: [
@@ -45078,32 +64467,12 @@ const contracts = {
         },
         {
           inputs: [],
-          name: "OnlyOrderManager",
-          type: "error",
-        },
-        {
-          inputs: [],
           name: "OnlyRouter",
           type: "error",
         },
         {
           inputs: [],
           name: "OnlySettlement",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderAlreadyInitialized",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderMismatch",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderNotFound",
           type: "error",
         },
         {
@@ -45126,11 +64495,6 @@ const contracts = {
             },
           ],
           name: "OwnableUnauthorizedAccount",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "PreHookNotDone",
           type: "error",
         },
         {
@@ -45210,8 +64574,14 @@ const contracts = {
           inputs: [
             {
               indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: true,
               internalType: "bytes32",
-              name: "orderHash",
+              name: "salt",
               type: "bytes32",
             },
             {
@@ -45221,7 +64591,7 @@ const contracts = {
               type: "address",
             },
             {
-              indexed: true,
+              indexed: false,
               internalType: "address",
               name: "recipient",
               type: "address",
@@ -45234,25 +64604,6 @@ const contracts = {
             },
           ],
           name: "OrderFunded",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "oldManager",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newManager",
-              type: "address",
-            },
-          ],
-          name: "OrderManagerUpdated",
           type: "event",
         },
         {
@@ -45386,34 +64737,6 @@ const contracts = {
         {
           inputs: [
             {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "recipient",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "fundOrder",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
               internalType: "address",
               name: "user",
               type: "address",
@@ -45445,16 +64768,31 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "getExpectedOrderHash",
-          outputs: [
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
             {
               internalType: "bytes32",
-              name: "",
+              name: "salt",
               type: "bytes32",
             },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "recipient",
+              type: "address",
+            },
           ],
-          stateMutability: "view",
+          name: "fundOrderWithBalance",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -45516,19 +64854,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "isPreHookDone",
-          outputs: [
-            {
-              internalType: "bool",
-              name: "",
-              type: "bool",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
           inputs: [
             {
               internalType: "address",
@@ -45563,45 +64888,6 @@ const contracts = {
           name: "onMorphoFlashLoan",
           outputs: [],
           stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-          ],
-          name: "onPostHook",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-          ],
-          name: "onPreHook",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [],
-          name: "orderManager",
-          outputs: [
-            {
-              internalType: "address",
-              name: "",
-              type: "address",
-            },
-          ],
-          stateMutability: "view",
           type: "function",
         },
         {
@@ -45787,19 +65073,6 @@ const contracts = {
             },
           ],
           name: "setMorphoLender",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_orderManager",
-              type: "address",
-            },
-          ],
-          name: "setOrderManager",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -47485,7 +66758,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xeFfc2D2ABA6899787a57B2e47136F00c63AA5822",
+      address: "0x80B90261A827B39D88deF1120Dd177B00979abF7",
       abi: [
         {
           inputs: [
@@ -48429,8 +67702,2022 @@ const contracts = {
           "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
+    KapanViewRouter: {
+      address: "0x7E83287F7d63Bfa5C60B57E8A4b796dC07A3c665",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_owner",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "GatewayNotSet",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocolId",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "GatewayUpdated",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "collateralDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "debtDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "calculateMinBuy",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyFromRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "morphoOraclePrice",
+              type: "uint256",
+            },
+          ],
+          name: "calculateMorphoMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          name: "gateways",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAavePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAavePrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "availableBorrowsBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "currentLiquidationThreshold",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "ltv",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "healthFactor",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCollateralPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getDebtPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getEulerExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getEulerLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getEulerLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getEulerPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoOraclePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getVenusPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isAaveAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "atRisk",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isCompoundAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isMorphoAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string[]",
+              name: "protocolNames",
+              type: "string[]",
+            },
+            {
+              internalType: "address[]",
+              name: "gatewayAddresses",
+              type: "address[]",
+            },
+          ],
+          name: "setGateways",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+          ],
+          name: "usdPricesToExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
+    LimitPriceTrigger: {
+      address: "0x942EEeE6a070428c5496646f370D6A65Fb2897F3",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
+    LtvTrigger: {
+      address: "0x6d4739D6b6640533D3abEa573eF5bF5069A587Ff",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     PendleAdapter: {
-      address: "0x2A75B9cc4fCF8Fa7fF195D283B5bdF24C5B57bc1",
+      address: "0x1a9eaa3C52B1E633CD4e5C736aa179C15123Bb70",
       abi: [
         {
           inputs: [
@@ -48674,7 +69961,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x99E399E414AAd5076a874bFE1c8B89b3563a5a4c",
+      address: "0x1941503F3d143e917E7775E7039C2cd95AA97A4e",
       abi: [
         {
           inputs: [
@@ -49095,7 +70382,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x7BAB5A4b88B2E2c61065a5619706D4Da9c2738B9",
+      address: "0xAb5588B327968DdACCD688FEb275f25Ad828EcCA",
       abi: [
         {
           inputs: [
@@ -65934,7 +87221,7 @@ const contracts = {
   },
   59144: {
     AaveGatewayView: {
-      address: "0x03456DAEcCFC34280637c81c245D81D839A50cF6",
+      address: "0x728CcD950f84B0cb7FDaf7C39a86813C4a6097e8",
       abi: [
         {
           inputs: [
@@ -66144,6 +87431,44 @@ const contracts = {
               name: "token",
               type: "address",
             },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAssetPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "user",
@@ -66234,6 +87559,30 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getEModes",
           outputs: [
@@ -66278,6 +87627,30 @@ const contracts = {
               internalType: "struct AaveGatewayView.EModeInfo[]",
               name: "emodes",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -66671,7 +88044,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x7ee7E606dba3d1Bb99270AbCCa8979631BBE841b",
+      address: "0x50e68267a2f87C06942746529E34721B640bd78B",
       abi: [
         {
           inputs: [
@@ -67079,8 +88452,318 @@ const contracts = {
         ROUTER: "contracts/gateways/ProtocolGateway.sol",
       },
     },
+    AutoLeverageTrigger: {
+      address: "0x23Ee31134b2082dbD505893E06615b70dedfC7B2",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct AutoLeverageTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     CompoundGatewayView: {
-      address: "0xE7a5B56c67F5BF601A078677915F3b5e6666378b",
+      address: "0x65b6F2bf05E42533Ed5111d729B2DBec1B6b0F17",
       abi: [
         {
           inputs: [
@@ -67541,6 +89224,30 @@ const contracts = {
             },
             {
               internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
               name: "account",
               type: "address",
             },
@@ -67561,6 +89268,30 @@ const contracts = {
               internalType: "string[]",
               name: "displayNames",
               type: "string[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -67608,6 +89339,35 @@ const contracts = {
             {
               internalType: "uint256",
               name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
               type: "uint256",
             },
           ],
@@ -67975,7 +89735,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0x61D932620e533519afcE90302864c03D8b1f1C58",
+      address: "0xA46Eb9B526005B125fc755aB357c7FD0e75C4425",
       abi: [
         {
           inputs: [
@@ -68499,8 +90259,519 @@ const contracts = {
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
+    EulerGatewayView: {
+      address: "0x6d37Cdf3214DbcDA7Bfdcd07d65361f23142812b",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "evc_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "evc",
+          outputs: [
+            {
+              internalType: "contract IEVC",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getAcceptedCollaterals",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getBorrowLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCollateralBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "borrowLTV",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "liquidationLTV",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getCollateralToDebtRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getCurrentLtvBpsSimple",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getDebtBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "quoteToken",
+              type: "address",
+            },
+          ],
+          name: "getExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "rate",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getHealthFactor",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMainSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "",
+              type: "uint8",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getSubAccount",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultAsset",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getVaultSymbol",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "isHealthy",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
     EulerGatewayWrite: {
-      address: "0xE8d4317BA3Ba00E7C69d9966637b37E9607fbEab",
+      address: "0x66F4Aac80b15010522a4Cbb4cf00f592c22801C2",
       abi: [
         {
           inputs: [
@@ -68951,7 +91222,7 @@ const contracts = {
       },
     },
     KapanAuthorizationHelper: {
-      address: "0x37F397F680aC92dF21CA6601796419FD179ac41A",
+      address: "0xAe3299936a1CE3134A400713139c84DAD7747a8d",
       abi: [
         {
           inputs: [
@@ -69187,8 +91458,1589 @@ const contracts = {
         transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
       },
     },
+    KapanConditionalOrderHandler: {
+      address: "0x8A9e3e974058b688D97DD29A3507DF56AaBb7f15",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_manager",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "OrderNotValid",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "PollNever",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          name: "PollTryNextBlock",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes",
+              name: "staticInput",
+              type: "bytes",
+            },
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          name: "getTradeableOrder",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "contract IERC20",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "contract IERC20",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "receiver",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "sellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "buyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint32",
+                  name: "validTo",
+                  type: "uint32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appData",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "feeAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "kind",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bool",
+                  name: "partiallyFillable",
+                  type: "bool",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "sellTokenBalance",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "buyTokenBalance",
+                  type: "bytes32",
+                },
+              ],
+              internalType: "struct GPv2Order.Data",
+              name: "order",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "manager",
+          outputs: [
+            {
+              internalType: "contract IKapanConditionalOrderManager",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "interfaceId",
+              type: "bytes4",
+            },
+          ],
+          name: "supportsInterface",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes",
+              name: "staticInput",
+              type: "bytes",
+            },
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              components: [
+                {
+                  internalType: "contract IERC20",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "contract IERC20",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "receiver",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "sellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "buyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint32",
+                  name: "validTo",
+                  type: "uint32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appData",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "feeAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "kind",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bool",
+                  name: "partiallyFillable",
+                  type: "bool",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "sellTokenBalance",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "buyTokenBalance",
+                  type: "bytes32",
+                },
+              ],
+              internalType: "struct GPv2Order.Data",
+              name: "order",
+              type: "tuple",
+            },
+          ],
+          name: "verify",
+          outputs: [],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        supportsInterface:
+          "@openzeppelin/contracts/utils/introspection/IERC165.sol",
+      },
+    },
+    KapanConditionalOrderManager: {
+      address: "0x2cfFd26F32cDEc0bC2853a5344144845eCF9D435",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_owner",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_router",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_composableCoW",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_settlement",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_hooksTrampoline",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "CannotCancelMidExecution",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "expected",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "actual",
+              type: "address",
+            },
+          ],
+          name: "InstructionUserMismatch",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidChunkWindow",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidOrderState",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidTokens",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "InvalidTrigger",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "MaxOrdersExceeded",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "NoTokensReceived",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "NotHooksTrampoline",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "OrderAlreadyExists",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "OrderNotFound",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PreHookAlreadyExecuted",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PreHookNotExecuted",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "SaltAlreadyUsed",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "TriggerNotMet",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "Unauthorized",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ValidToOverflow",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "oldWindow",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "newWindow",
+              type: "uint256",
+            },
+          ],
+          name: "ChunkWindowUpdated",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "ConditionalOrderCancelled",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iterations",
+              type: "uint256",
+            },
+          ],
+          name: "ConditionalOrderCompleted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "trigger",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "sellToken",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "buyToken",
+              type: "address",
+            },
+          ],
+          name: "ConditionalOrderCreated",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "oldHandler",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newHandler",
+              type: "address",
+            },
+          ],
+          name: "OrderHandlerUpdated",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iteration",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "receivedAmount",
+              type: "uint256",
+            },
+          ],
+          name: "PostHookExecuted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iteration",
+              type: "uint256",
+            },
+          ],
+          name: "PreHookExecuted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "StuckOrderReset",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "TokensRecovered",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "iteration",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "buyAmount",
+              type: "uint256",
+            },
+          ],
+          name: "TriggerExecuted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "vaultRelayer",
+              type: "address",
+            },
+          ],
+          name: "VaultRelayerApproved",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "DEFAULT_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MAX_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MAX_ORDERS_PER_USER",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MIN_CHUNK_WINDOW",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "approveVaultRelayer",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "cancelOrder",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "chunkWindow",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "composableCoW",
+          outputs: [
+            {
+              internalType: "contract IComposableCoW",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "trigger",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "triggerStaticData",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes",
+                  name: "preInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "postInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appDataHash",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxIterations",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "sellTokenRefundAddress",
+                  type: "address",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType:
+                "struct KapanConditionalOrderManager.KapanOrderParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "bytes32",
+              name: "salt",
+              type: "bytes32",
+            },
+          ],
+          name: "createOrder",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "executePostHook",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "salt",
+              type: "bytes32",
+            },
+          ],
+          name: "executePostHookBySalt",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "executePreHook",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "salt",
+              type: "bytes32",
+            },
+          ],
+          name: "executePreHookBySalt",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "getExecutionAmounts",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "getOrder",
+          outputs: [
+            {
+              components: [
+                {
+                  components: [
+                    {
+                      internalType: "address",
+                      name: "user",
+                      type: "address",
+                    },
+                    {
+                      internalType: "address",
+                      name: "trigger",
+                      type: "address",
+                    },
+                    {
+                      internalType: "bytes",
+                      name: "triggerStaticData",
+                      type: "bytes",
+                    },
+                    {
+                      internalType: "bytes",
+                      name: "preInstructions",
+                      type: "bytes",
+                    },
+                    {
+                      internalType: "address",
+                      name: "sellToken",
+                      type: "address",
+                    },
+                    {
+                      internalType: "address",
+                      name: "buyToken",
+                      type: "address",
+                    },
+                    {
+                      internalType: "bytes",
+                      name: "postInstructions",
+                      type: "bytes",
+                    },
+                    {
+                      internalType: "bytes32",
+                      name: "appDataHash",
+                      type: "bytes32",
+                    },
+                    {
+                      internalType: "uint256",
+                      name: "maxIterations",
+                      type: "uint256",
+                    },
+                    {
+                      internalType: "address",
+                      name: "sellTokenRefundAddress",
+                      type: "address",
+                    },
+                    {
+                      internalType: "bool",
+                      name: "isKindBuy",
+                      type: "bool",
+                    },
+                  ],
+                  internalType:
+                    "struct KapanConditionalOrderManager.KapanOrderParams",
+                  name: "params",
+                  type: "tuple",
+                },
+                {
+                  internalType: "enum KapanConditionalOrderManager.OrderStatus",
+                  name: "status",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "iterationCount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "createdAt",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct KapanConditionalOrderManager.OrderContext",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getUserOrders",
+          outputs: [
+            {
+              internalType: "bytes32[]",
+              name: "",
+              type: "bytes32[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "hooksTrampoline",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "isTriggerMet",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "shouldExecute",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "reason",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "_hash",
+              type: "bytes32",
+            },
+            {
+              internalType: "bytes",
+              name: "_signature",
+              type: "bytes",
+            },
+          ],
+          name: "isValidSignature",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "orderHandler",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "orderSalts",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "orders",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "trigger",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "triggerStaticData",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes",
+                  name: "preInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "bytes",
+                  name: "postInstructions",
+                  type: "bytes",
+                },
+                {
+                  internalType: "bytes32",
+                  name: "appDataHash",
+                  type: "bytes32",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxIterations",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "sellTokenRefundAddress",
+                  type: "address",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType:
+                "struct KapanConditionalOrderManager.KapanOrderParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "enum KapanConditionalOrderManager.OrderStatus",
+              name: "status",
+              type: "uint8",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "createdAt",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookBuyBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookExecutedForIteration",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "preHookSellBalance",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes32",
+              name: "orderHash",
+              type: "bytes32",
+            },
+          ],
+          name: "resetStuckOrder",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "router",
+          outputs: [
+            {
+              internalType: "contract IKapanRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_chunkWindow",
+              type: "uint256",
+            },
+          ],
+          name: "setChunkWindow",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_orderHandler",
+              type: "address",
+            },
+          ],
+          name: "setOrderHandler",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "settlement",
+          outputs: [
+            {
+              internalType: "contract IGPv2Settlement",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "userOrders",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          name: "userSaltToOrderHash",
+          outputs: [
+            {
+              internalType: "bytes32",
+              name: "",
+              type: "bytes32",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        isValidSignature: "contracts/v2/interfaces/cow/IERC1271.sol",
+      },
+    },
     KapanCowAdapter: {
-      address: "0x8Bf74E28AE91a84E43592394377158d3b58818Fc",
+      address: "0x7758136FaA0098FdccB0C32Ff757cfc147346a29",
       abi: [
         {
           inputs: [
@@ -69245,32 +93097,12 @@ const contracts = {
         },
         {
           inputs: [],
-          name: "OnlyOrderManager",
-          type: "error",
-        },
-        {
-          inputs: [],
           name: "OnlyRouter",
           type: "error",
         },
         {
           inputs: [],
           name: "OnlySettlement",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderAlreadyInitialized",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderMismatch",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "OrderNotFound",
           type: "error",
         },
         {
@@ -69293,11 +93125,6 @@ const contracts = {
             },
           ],
           name: "OwnableUnauthorizedAccount",
-          type: "error",
-        },
-        {
-          inputs: [],
-          name: "PreHookNotDone",
           type: "error",
         },
         {
@@ -69377,8 +93204,14 @@ const contracts = {
           inputs: [
             {
               indexed: true,
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              indexed: true,
               internalType: "bytes32",
-              name: "orderHash",
+              name: "salt",
               type: "bytes32",
             },
             {
@@ -69388,7 +93221,7 @@ const contracts = {
               type: "address",
             },
             {
-              indexed: true,
+              indexed: false,
               internalType: "address",
               name: "recipient",
               type: "address",
@@ -69401,25 +93234,6 @@ const contracts = {
             },
           ],
           name: "OrderFunded",
-          type: "event",
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: "address",
-              name: "oldManager",
-              type: "address",
-            },
-            {
-              indexed: true,
-              internalType: "address",
-              name: "newManager",
-              type: "address",
-            },
-          ],
-          name: "OrderManagerUpdated",
           type: "event",
         },
         {
@@ -69553,34 +93367,6 @@ const contracts = {
         {
           inputs: [
             {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-            {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "recipient",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
-            },
-          ],
-          name: "fundOrder",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
               internalType: "address",
               name: "user",
               type: "address",
@@ -69612,16 +93398,31 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "getExpectedOrderHash",
-          outputs: [
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
             {
               internalType: "bytes32",
-              name: "",
+              name: "salt",
               type: "bytes32",
             },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "recipient",
+              type: "address",
+            },
           ],
-          stateMutability: "view",
+          name: "fundOrderWithBalance",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {
@@ -69683,19 +93484,6 @@ const contracts = {
           type: "function",
         },
         {
-          inputs: [],
-          name: "isPreHookDone",
-          outputs: [
-            {
-              internalType: "bool",
-              name: "",
-              type: "bool",
-            },
-          ],
-          stateMutability: "view",
-          type: "function",
-        },
-        {
           inputs: [
             {
               internalType: "address",
@@ -69730,45 +93518,6 @@ const contracts = {
           name: "onMorphoFlashLoan",
           outputs: [],
           stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-          ],
-          name: "onPostHook",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "bytes32",
-              name: "orderHash",
-              type: "bytes32",
-            },
-          ],
-          name: "onPreHook",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [],
-          name: "orderManager",
-          outputs: [
-            {
-              internalType: "address",
-              name: "",
-              type: "address",
-            },
-          ],
-          stateMutability: "view",
           type: "function",
         },
         {
@@ -69954,19 +93703,6 @@ const contracts = {
             },
           ],
           name: "setMorphoLender",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [
-            {
-              internalType: "address",
-              name: "_orderManager",
-              type: "address",
-            },
-          ],
-          name: "setOrderManager",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -71652,7 +95388,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xafB0df06940169093Da5d3F8ebD940b7d36485b8",
+      address: "0xFd9A498633Bb1bbE8656360B4cf950B22acC9a76",
       abi: [
         {
           inputs: [
@@ -72596,8 +96332,2687 @@ const contracts = {
           "contracts/v2/flashloans/FlashLoanConsumerBase.sol",
       },
     },
+    KapanViewRouter: {
+      address: "0xA3c42bb0D4aFE902E8F1bF4924A6A9D763d2762e",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_owner",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "GatewayNotSet",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocolId",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ZeroAddress",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "GatewayUpdated",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "collateralDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "debtDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "calculateMinBuy",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+            {
+              internalType: "uint8",
+              name: "sellDecimals",
+              type: "uint8",
+            },
+            {
+              internalType: "uint8",
+              name: "buyDecimals",
+              type: "uint8",
+            },
+          ],
+          name: "calculateMinBuyFromRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "maxSlippageBps",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "morphoOraclePrice",
+              type: "uint256",
+            },
+          ],
+          name: "calculateMorphoMinBuyAmount",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          name: "gateways",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getAavePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAavePrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getAaveUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "availableBorrowsBase",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "currentLiquidationThreshold",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "ltv",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "healthFactor",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "collateralToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCollateralPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "asset",
+              type: "address",
+            },
+          ],
+          name: "getCompoundPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "debtToken",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getDebtPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "borrowVault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "collateralVault",
+              type: "address",
+            },
+          ],
+          name: "getEulerExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+          ],
+          name: "getEulerLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint8",
+              name: "subAccountIndex",
+              type: "uint8",
+            },
+          ],
+          name: "getEulerLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "vault",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "getEulerPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "getMorphoOraclePrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getMorphoPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "underlyingToken",
+              type: "address",
+            },
+          ],
+          name: "getVenusPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getVenusUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isAaveAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "atRisk",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "baseToken",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isCompoundAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "loanToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "oracle",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "irm",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "lltv",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct MarketParams",
+              name: "params",
+              type: "tuple",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "bufferBps",
+              type: "uint256",
+            },
+          ],
+          name: "isMorphoAtRisk",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "protocolName",
+              type: "string",
+            },
+            {
+              internalType: "address",
+              name: "gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string[]",
+              name: "protocolNames",
+              type: "string[]",
+            },
+            {
+              internalType: "address[]",
+              name: "gatewayAddresses",
+              type: "address[]",
+            },
+          ],
+          name: "setGateways",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "sellPriceUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyPriceUsd",
+              type: "uint256",
+            },
+          ],
+          name: "usdPricesToExchangeRate",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "exchangeRate18",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {},
+    },
+    KyberAdapter: {
+      address: "0x5FDD4c2F50d3D54ccDf6eA4e9f6BB213242716A5",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_gateway",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "_router",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "KYBER_ROUTER",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "tokenIn",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "tokenOut",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amountIn",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minAmountOut",
+              type: "uint256",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "executeSwap",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "amountReceived",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "amountRefunded",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "kapanGateway",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "recoverTokens",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_gateway",
+              type: "address",
+            },
+          ],
+          name: "setGateway",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
+    },
+    KyberGateway: {
+      address: "0x42a2495471792645f720b863A39535Ef2AdA8871",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "router",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "owner_",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "target",
+              type: "address",
+            },
+          ],
+          name: "AddressEmptyCode",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "AddressInsufficientBalance",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "FailedInnerCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "OwnableInvalidOwner",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "account",
+              type: "address",
+            },
+          ],
+          name: "OwnableUnauthorizedAccount",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "ReentrancyGuardReentrantCall",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+          ],
+          name: "SafeERC20FailedOperation",
+          type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "previousOwner",
+              type: "address",
+            },
+            {
+              indexed: true,
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "OwnershipTransferred",
+          type: "event",
+        },
+        {
+          inputs: [],
+          name: "ROUTER",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "adapter",
+          outputs: [
+            {
+              internalType: "contract KyberAdapter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+          ],
+          name: "authorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "produced",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "enum ProtocolTypes.LendingOp",
+                  name: "op",
+                  type: "uint8",
+                },
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "user",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bytes",
+                  name: "context",
+                  type: "bytes",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "index",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct ProtocolTypes.InputPtr",
+                  name: "input",
+                  type: "tuple",
+                },
+              ],
+              internalType: "struct ProtocolTypes.LendingInstruction[]",
+              name: "instrs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "",
+              type: "tuple[]",
+            },
+          ],
+          name: "deauthorize",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "targets",
+              type: "address[]",
+            },
+            {
+              internalType: "bytes[]",
+              name: "data",
+              type: "bytes[]",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "owner",
+          outputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "inputs",
+              type: "tuple[]",
+            },
+            {
+              internalType: "bytes",
+              name: "data",
+              type: "bytes",
+            },
+          ],
+          name: "processLendingInstruction",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "token",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "amount",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct ProtocolTypes.Output[]",
+              name: "outputs",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "renounceOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_adapter",
+              type: "address",
+            },
+          ],
+          name: "setAdapter",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "newOwner",
+              type: "address",
+            },
+          ],
+          name: "transferOwnership",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        authorize: "contracts/v2/interfaces/IGateway.sol",
+        deauthorize: "contracts/v2/interfaces/IGateway.sol",
+        processLendingInstruction: "contracts/v2/interfaces/IGateway.sol",
+        ROUTER: "contracts/gateways/ProtocolGateway.sol",
+        owner: "@openzeppelin/contracts/access/Ownable.sol",
+        renounceOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+        transferOwnership: "@openzeppelin/contracts/access/Ownable.sol",
+      },
+    },
+    LimitPriceTrigger: {
+      address: "0x795c3C03CF765e867B67545C023749F24baE7671",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "buyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "address",
+                  name: "sellToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "buyToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "sellDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "buyDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "limitPrice",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "triggerAbovePrice",
+                  type: "bool",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalSellAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "totalBuyAmount",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "bool",
+                  name: "isKindBuy",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct LimitPriceTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "iterationCount",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
+    LtvTrigger: {
+      address: "0x502ed1135F90706d3d81aB4dE810913cA81f9594",
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_viewRouter",
+              type: "address",
+            },
+          ],
+          stateMutability: "nonpayable",
+          type: "constructor",
+        },
+        {
+          inputs: [],
+          name: "InvalidTriggerParams",
+          type: "error",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+          ],
+          name: "UnsupportedProtocol",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "AAVE_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "COMPOUND_V3",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "EULER_V2",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "calculateExecution",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "sellAmount",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "minBuyAmount",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+          ],
+          name: "decodeTriggerParams",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              components: [
+                {
+                  internalType: "bytes4",
+                  name: "protocolId",
+                  type: "bytes4",
+                },
+                {
+                  internalType: "bytes",
+                  name: "protocolContext",
+                  type: "bytes",
+                },
+                {
+                  internalType: "uint256",
+                  name: "triggerLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "targetLtvBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address",
+                  name: "collateralToken",
+                  type: "address",
+                },
+                {
+                  internalType: "address",
+                  name: "debtToken",
+                  type: "address",
+                },
+                {
+                  internalType: "uint8",
+                  name: "collateralDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint8",
+                  name: "debtDecimals",
+                  type: "uint8",
+                },
+                {
+                  internalType: "uint256",
+                  name: "maxSlippageBps",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint8",
+                  name: "numChunks",
+                  type: "uint8",
+                },
+              ],
+              internalType: "struct LtvTrigger.TriggerParams",
+              name: "params",
+              type: "tuple",
+            },
+          ],
+          name: "encodeTriggerParams",
+          outputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes4",
+              name: "protocolId",
+              type: "bytes4",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+            {
+              internalType: "bytes",
+              name: "context",
+              type: "bytes",
+            },
+          ],
+          name: "getCurrentLtv",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "ltvBps",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "isComplete",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "bytes",
+              name: "staticData",
+              type: "bytes",
+            },
+            {
+              internalType: "address",
+              name: "owner",
+              type: "address",
+            },
+          ],
+          name: "shouldExecute",
+          outputs: [
+            {
+              internalType: "bool",
+              name: "",
+              type: "bool",
+            },
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "triggerName",
+          outputs: [
+            {
+              internalType: "string",
+              name: "",
+              type: "string",
+            },
+          ],
+          stateMutability: "pure",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "viewRouter",
+          outputs: [
+            {
+              internalType: "contract IKapanViewRouter",
+              name: "",
+              type: "address",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+      ],
+      inheritedFunctions: {
+        calculateExecution: "contracts/v2/interfaces/IOrderTrigger.sol",
+        isComplete: "contracts/v2/interfaces/IOrderTrigger.sol",
+        shouldExecute: "contracts/v2/interfaces/IOrderTrigger.sol",
+        triggerName: "contracts/v2/interfaces/IOrderTrigger.sol",
+      },
+    },
     OneInchAdapter: {
-      address: "0x956C128beC16F6C1b9f6102A0694C95D785CAA8C",
+      address: "0xEe8876490bC280863048b5e6De562514A5063864",
       abi: [
         {
           inputs: [
@@ -72841,7 +99256,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x9d2A9BCCCF130a2f3EBeDBdcE98f13aA7CdC9A2f",
+      address: "0x0069a3d9ea24c128655e4151b65b0e03EEaE3608",
       abi: [
         {
           inputs: [
@@ -73682,7 +100097,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0xA6a6328A67dE570E1A18c08a2e40be77681A2d16",
+      address: "0x359eC66567c54a97c7f3a1cd8A5C14487f1825a9",
       abi: [
         {
           inputs: [
@@ -73707,7 +100122,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayView: {
-      address: "0x2AD05c65011FBaD3a1383b0D0FdDA46d8e951443",
+      address: "0xFe4A045bb1b7FAcDA88935d65b95e7EDa11b3EC5",
       abi: [
         {
           inputs: [
@@ -73917,6 +100332,44 @@ const contracts = {
               name: "token",
               type: "address",
             },
+          ],
+          name: "getAssetPrice",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "price",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address[]",
+              name: "tokens",
+              type: "address[]",
+            },
+          ],
+          name: "getAssetPrices",
+          outputs: [
+            {
+              internalType: "uint256[]",
+              name: "prices",
+              type: "uint256[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
             {
               internalType: "address",
               name: "user",
@@ -74007,6 +100460,30 @@ const contracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getCurrentLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
           name: "getEModes",
           outputs: [
@@ -74051,6 +100528,30 @@ const contracts = {
               internalType: "struct AaveGatewayViewBase.EModeInfo[]",
               name: "emodes",
               type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getLiquidationLtvBps",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -74431,7 +100932,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     ZeroLendGatewayWrite: {
-      address: "0x78108a6c6b69c60EcA67920737AEf3207D69a9C2",
+      address: "0xFc27735C475fe7EDb856b97b9Af23f96ED45e2a4",
       abi: [
         {
           inputs: [

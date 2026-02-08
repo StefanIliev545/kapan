@@ -52,9 +52,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   
   // Also ensure OrderManager has OrderHandler set (if both are deployed)
   try {
-    const orderManagerDeployment = await get("KapanOrderManager");
-    const orderHandlerDeployment = await get("KapanOrderHandler");
-    const orderManager = await ethers.getContractAt("KapanOrderManager", orderManagerDeployment.address);
+    const orderManagerDeployment = await get("KapanConditionalOrderManager");
+    const orderHandlerDeployment = await get("KapanConditionalOrderHandler");
+    const orderManager = await ethers.getContractAt("KapanConditionalOrderManager", orderManagerDeployment.address);
     const currentHandler = await orderManager.orderHandler();
     
     if (currentHandler.toLowerCase() !== orderHandlerDeployment.address.toLowerCase()) {
@@ -106,10 +106,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       const currentAddr = await helper.gateways(name);
 
       if (currentAddr.toLowerCase() !== gateway.address.toLowerCase()) {
+        // Wait for pending txs before sending to avoid nonce conflicts
+        await waitForPendingTxs(hre, deployer, 15000);
         console.log(`Syncing ${name}: ${currentAddr} -> ${gateway.address}`);
         const tx = await helper.syncGateway(name, gateway.address);
         console.log(`  tx: ${tx.hash}`);
-        // Wait for 2 confirmations to be safe
         await tx.wait(2);
         console.log(`  confirmed`);
         syncedCount++;
@@ -118,7 +119,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         skippedCount++;
       }
     } catch (e: any) {
-      // Gateway not deployed or sync failed
       if (e.message?.includes("No deployment found")) {
         console.log(`${name}: not deployed on this chain, skipping`);
         skippedCount++;
@@ -126,6 +126,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         const msg = e.message?.substring(0, 150) || String(e);
         console.log(`${name}: FAILED - ${msg}`);
         failedCount++;
+        // Wait for pending txs to clear after failure to prevent nonce cascade
+        await waitForPendingTxs(hre, deployer, 15000);
       }
     }
   }
@@ -174,6 +176,6 @@ func.dependencies = [
   "MorphoBlueGateway",
   "EulerGateway",
   "UiHelper",
-  "KapanOrderManager",  // Fixed: was CowOrderManager
-  "KapanOrderHandler",  // Fixed: was CowOrderHandler
+  "KapanConditionalOrderManager",
+  "KapanConditionalOrderHandler",
 ];
