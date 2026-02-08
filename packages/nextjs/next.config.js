@@ -21,6 +21,10 @@ const commonConfig = {
     ignoreDuringBuilds: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
   },
 
+  experimental: {
+    // Reduce webpack memory usage during builds (v15+)
+    webpackMemoryOptimizations: true,
+  },
   webpack: (config) => {
     config.resolve.fallback = { fs: false, net: false, tls: false };
     config.externals.push("pino-pretty", "lokijs", "encoding");
