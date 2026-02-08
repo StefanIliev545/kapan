@@ -8,6 +8,7 @@ import { AaveForkProtocolView, AaveForkProtocolConfig } from "../common/AaveFork
 const AAVE_CONFIG: AaveForkProtocolConfig = {
   protocolName: "Aave V3",
   protocolIcon: "/logos/aave.svg",
+  protocolUrl: "https://app.aave.com",
   viewContractName: "AaveGatewayView",
   writeContractName: "AaveGatewayWrite",
 };

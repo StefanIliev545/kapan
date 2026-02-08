@@ -71,6 +71,7 @@ import {
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { extractOrderHash } from "~~/utils/orderHashExtractor";
+import { dispatchOrderCreated } from "~~/utils/orderNotes";
 
 import {
   trackModalOpen,
@@ -84,7 +85,8 @@ import {
 
 import type { SwapAsset, SwapRouter } from "../SwapModalShell";
 import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
-import type { SwapOperationConfig, UseClosePositionConfigProps, ExecutionType } from "./swapConfigTypes";
+import type { SwapOperationConfig, UseClosePositionConfigProps, ExecutionType, SwapQuoteResult } from "./swapConfigTypes";
+import type { FlashLoanProviderOption } from "~~/utils/flashLoan";
 import { hasEnoughCollateral as checkCollateralSufficiency } from "./useClosePositionQuote";
 import { ExecutionTypeToggle } from "./ExecutionTypeToggle";
 
@@ -102,6 +104,9 @@ const FALLBACK_BORROW_RATE_APY = 10; // 10% APY as conservative fallback
 // Default slippage for swaps
 const DEFAULT_SLIPPAGE = 0.5; // 0.5%
 
+// Empty instructions sentinel used when conditional order data is not ready
+const EMPTY_INSTRUCTIONS: ConditionalOrderInstructions[] = [{ preInstructions: [], postInstructions: [] }];
+
 /**
  * Calculate interest buffer in basis points based on actual borrow rate and time
  * @param borrowRateApy - Annual percentage yield (e.g., 5.5 for 5.5%)
@@ -115,6 +120,272 @@ function calculateInterestBufferBps(borrowRateApy: number, minutes: number): big
   const bufferPercent = (borrowRateApy * minutes) / minutesPerYear;
   const bufferBps = Math.ceil(bufferPercent * 100); // Round up to be safe
   return BigInt(Math.max(1, bufferBps)); // Minimum 1 bp
+}
+
+/**
+ * Resolve the best available swap router when the current one is unavailable.
+ * Returns the fallback router name, or the current one if it is available.
+ */
+function resolveSwapRouterFallback(
+  current: SwapRouter,
+  kyber: boolean,
+  oneInch: boolean,
+  pendle: boolean
+): SwapRouter {
+  const fallbackOrder: Record<SwapRouter, SwapRouter[]> = {
+    kyber: ["1inch", "pendle", "kyber"],
+    "1inch": ["kyber", "pendle", "1inch"],
+    pendle: ["kyber", "1inch", "pendle"],
+  };
+  const available: Record<SwapRouter, boolean> = { kyber, "1inch": oneInch, pendle };
+
+  if (available[current]) {
+    return current;
+  }
+
+  const candidates = fallbackOrder[current];
+  return candidates.find(r => available[r]) ?? current;
+}
+
+/** Map UI swap router name to internal protocol name used in instruction encoding. */
+function resolveSwapProtocolName(router: SwapRouter): "oneinch" | "kyber" | "pendle" {
+  if (router === "1inch") return "oneinch";
+  if (router === "kyber") return "kyber";
+  return "pendle";
+}
+
+/**
+ * Build post-instructions for a single conditional order chunk.
+ * This logic is shared between Euler and standard protocol paths -
+ * the only difference is the context bytes passed to lending instructions.
+ */
+function buildConditionalOrderChunkPostInstructions(params: {
+  normalizedProtocol: string;
+  debtToken: Address;
+  userAddress: Address;
+  collateralAddress: Address;
+  contextBytes: Hex;
+  managerAddress: Address;
+  includeRefund: boolean;
+}): { postInstructions: ProtocolInstruction[]; withdrawUtxo: number } {
+  const { normalizedProtocol, debtToken, userAddress, collateralAddress, contextBytes, managerAddress, includeRefund } = params;
+  const postInstructions: ProtocolInstruction[] = [];
+  // UTXO layout after manager injects:
+  // [0] = actualSellAmount (collateral sold)
+  // [1] = actualBuyAmount (debt received) - already in router, no PullToken needed
+  let utxoIndex = 2;
+
+  // Approve UTXO[1] (debt tokens already in router) for repayment
+  postInstructions.push(createRouterInstruction(encodeApprove(1, normalizedProtocol)));
+  utxoIndex++;
+
+  // Repay debt using UTXO[1]
+  postInstructions.push(
+    createProtocolInstruction(
+      normalizedProtocol,
+      encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, contextBytes, 1)
+    )
+  );
+  const repayRefundUtxo = utxoIndex++;
+
+  // Withdraw collateral using UTXO[0] (actualSellAmount)
+  postInstructions.push(
+    createProtocolInstruction(
+      normalizedProtocol,
+      encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralAddress, userAddress, 0n, contextBytes, 0)
+    )
+  );
+  const withdrawUtxo = utxoIndex++;
+
+  // Push withdrawn collateral to manager for flash loan repayment
+  postInstructions.push(createRouterInstruction(encodePushToken(withdrawUtxo, managerAddress)));
+
+  // Return repay refund to user (if closing entire position)
+  if (includeRefund) {
+    postInstructions.push(createRouterInstruction(encodePushToken(repayRefundUtxo, userAddress)));
+  }
+
+  return { postInstructions, withdrawUtxo };
+}
+
+/**
+ * Build Euler-specific market order instructions.
+ * Extracted from buildFlow to reduce cognitive complexity of the main hook.
+ */
+function buildEulerMarketFlow(params: {
+  requiredCollateral: bigint;
+  collateralAddress: Address;
+  debtToken: Address;
+  userAddress: Address;
+  providerEnum: number;
+  swapProtocol: "oneinch" | "kyber" | "pendle";
+  swapMinAmountOut: bigint;
+  swapData: Hex;
+  eulerContext: Hex;
+  protocolName: string;
+}): ProtocolInstruction[] {
+  const {
+    requiredCollateral, collateralAddress, debtToken, userAddress,
+    providerEnum, swapProtocol, swapMinAmountOut, swapData,
+    eulerContext, protocolName,
+  } = params;
+
+  const swapContext = encodeAbiParameters(
+    [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+    [debtToken, swapMinAmountOut, swapData]
+  );
+
+  const normalizedProtocol = normalizeProtocolName(protocolName);
+  const instructions: ProtocolInstruction[] = [];
+
+  instructions.push(createRouterInstruction(encodeToOutput(requiredCollateral, collateralAddress)));
+  instructions.push(createRouterInstruction(encodeFlashLoan(providerEnum, 0)));
+  instructions.push(createRouterInstruction(encodeApprove(1, swapProtocol)));
+  instructions.push(
+    createProtocolInstruction(
+      swapProtocol,
+      encodeLendingInstruction(LendingOp.Swap, collateralAddress, userAddress, 0n, swapContext, 1)
+    )
+  );
+  instructions.push(createRouterInstruction(encodeApprove(3, normalizedProtocol)));
+  instructions.push(
+    createProtocolInstruction(
+      normalizedProtocol,
+      encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, eulerContext, 3)
+    )
+  );
+  instructions.push(
+    createProtocolInstruction(
+      normalizedProtocol,
+      encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralAddress, userAddress, 0n, eulerContext, 0)
+    )
+  );
+  instructions.push(createRouterInstruction(encodePushToken(6, userAddress)));
+  instructions.push(createRouterInstruction(encodePushToken(4, userAddress)));
+
+  return instructions;
+}
+
+/**
+ * Resolve Euler collateral vault from selectedTo asset or fallback list.
+ */
+function resolveEulerCollateralVault(
+  selectedTo: SwapAsset,
+  eulerCollateralVaults: string[] | undefined
+): string | undefined {
+  return (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault
+    || eulerCollateralVaults?.[0];
+}
+
+/**
+ * Build conditional order instructions for Euler protocol.
+ * Returns null if the required collateral vault is missing.
+ */
+function buildEulerConditionalInstructions(params: {
+  numChunks: number;
+  normalizedProtocol: string;
+  debtToken: Address;
+  userAddress: Address;
+  selectedTo: SwapAsset;
+  eulerContextEncoded: Hex;
+  eulerCollateralVaults: string[] | undefined;
+  managerAddress: Address;
+  isMax: boolean;
+}): ConditionalOrderInstructions[] | null {
+  const { numChunks, selectedTo, eulerCollateralVaults } = params;
+
+  const selectedCollateralVault = resolveEulerCollateralVault(selectedTo, eulerCollateralVaults);
+  if (!selectedCollateralVault) {
+    console.error("[Euler Limit Order] No collateral vault found");
+    return null;
+  }
+
+  return Array(numChunks)
+    .fill(null)
+    .map(() => {
+      const { postInstructions, withdrawUtxo } = buildConditionalOrderChunkPostInstructions({
+        normalizedProtocol: params.normalizedProtocol,
+        debtToken: params.debtToken,
+        userAddress: params.userAddress,
+        collateralAddress: selectedTo.address as Address,
+        contextBytes: params.eulerContextEncoded,
+        managerAddress: params.managerAddress,
+        includeRefund: params.isMax,
+      });
+      return {
+        preInstructions: [],
+        postInstructions,
+        flashLoanRepaymentUtxoIndex: withdrawUtxo,
+      };
+    });
+}
+
+/**
+ * Build conditional order instructions for standard protocols (Aave, Compound, Venus, Morpho).
+ */
+function buildStandardConditionalInstructions(params: {
+  numChunks: number;
+  normalizedProtocol: string;
+  debtToken: Address;
+  userAddress: Address;
+  selectedTo: SwapAsset;
+  context: string | undefined;
+  managerAddress: Address;
+  isMax: boolean;
+}): ConditionalOrderInstructions[] {
+  return Array(params.numChunks)
+    .fill(null)
+    .map(() => {
+      const { postInstructions, withdrawUtxo } = buildConditionalOrderChunkPostInstructions({
+        normalizedProtocol: params.normalizedProtocol,
+        debtToken: params.debtToken,
+        userAddress: params.userAddress,
+        collateralAddress: params.selectedTo.address as Address,
+        contextBytes: (params.context as Hex) || "0x",
+        managerAddress: params.managerAddress,
+        includeRefund: params.isMax,
+      });
+      return {
+        preInstructions: [],
+        postInstructions,
+        flashLoanRepaymentUtxoIndex: withdrawUtxo,
+      };
+    });
+}
+
+/**
+ * Execute the sequential transaction calls for a conditional order and
+ * handle notifications for each step. Returns collected receipts.
+ */
+async function executeConditionalOrderCalls(
+  calls: Array<{ to: Address; data: Hex }>,
+  walletClient: NonNullable<ReturnType<typeof useWalletClient>["data"]>,
+  publicClient: NonNullable<ReturnType<typeof usePublicClient>>,
+  userAddress: Address,
+): Promise<TransactionReceipt[]> {
+  const receipts: TransactionReceipt[] = [];
+
+  for (let i = 0; i < calls.length; i++) {
+    const call = calls[i];
+    const stepNotificationId = notification.loading(
+      <TransactionToast step="pending" message={`Executing step ${i + 1}/${calls.length}...`} />
+    );
+
+    // Cast walletClient to any to bypass type checking - walletClient.sendTransaction exists at runtime
+    // The useWalletClient return type doesn't properly expose sendTransaction in the type definition
+    const txHash = await (walletClient as any).sendTransaction({
+      account: userAddress,
+      to: call.to,
+      data: call.data,
+      chain: null,
+    });
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    receipts.push(receipt);
+    notification.remove(stepNotificationId as string);
+  }
+
+  return receipts;
 }
 
 /**
@@ -245,9 +516,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
     if (!isEuler || !eulerBorrowVault || !selectedTo) {
       return undefined;
     }
-    const selectedCollateralVault =
-      (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault ||
-      eulerCollateralVaults?.[0];
+    const selectedCollateralVault = resolveEulerCollateralVault(selectedTo, eulerCollateralVaults);
     if (!selectedCollateralVault) {
       return undefined;
     }
@@ -261,12 +530,9 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   // ============ Effects ============
   // Update swap router when chain changes
   useEffect(() => {
-    if (swapRouter === "kyber" && !kyberAvailable) {
-      setSwapRouter(oneInchAvailable ? "1inch" : pendleAvailable ? "pendle" : "kyber");
-    } else if (swapRouter === "1inch" && !oneInchAvailable) {
-      setSwapRouter(kyberAvailable ? "kyber" : pendleAvailable ? "pendle" : "1inch");
-    } else if (swapRouter === "pendle" && !pendleAvailable) {
-      setSwapRouter(kyberAvailable ? "kyber" : oneInchAvailable ? "1inch" : "pendle");
+    const resolved = resolveSwapRouterFallback(swapRouter, kyberAvailable, oneInchAvailable, pendleAvailable);
+    if (resolved !== swapRouter) {
+      setSwapRouter(resolved);
     }
   }, [chainId, oneInchAvailable, kyberAvailable, pendleAvailable, swapRouter]);
 
@@ -622,118 +888,39 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   // UTXO layout: [0] = actualSellAmount, [1] = actualBuyAmount
   const buildConditionalOrderInstructionsData = useMemo((): ConditionalOrderInstructions[] => {
     if (!selectedTo || !selectedTo.address || !debtToken || !userAddress || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
-      return [{ preInstructions: [], postInstructions: [] }];
+      return EMPTY_INSTRUCTIONS;
     }
 
     const numChunksVal = limitOrderConfig?.numChunks ?? 1;
-
-    // Normalize protocol name
     const normalizedProtocol = normalizeProtocolName(protocolName);
 
     // Euler-specific handling
     if (isEuler && eulerContextEncoded && eulerBorrowVault) {
-      const selectedCollateralVault =
-        (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault ||
-        eulerCollateralVaults?.[0];
-
-      if (!selectedCollateralVault) {
-        console.error("[Euler Limit Order] No collateral vault found");
-        return [{ preInstructions: [], postInstructions: [] }];
-      }
-
-      return Array(numChunksVal)
-        .fill(null)
-        .map(() => {
-          const postInstructions: ProtocolInstruction[] = [];
-          // UTXO layout after manager injects:
-          // [0] = actualSellAmount (collateral sold)
-          // [1] = actualBuyAmount (debt received) - already in router, no PullToken needed
-          let utxoIndex = 2;
-
-          // [0] Approve UTXO[1] (debt tokens already in router) for repayment
-          postInstructions.push(createRouterInstruction(encodeApprove(1, normalizedProtocol)));
-          utxoIndex++; // = 2
-
-          // [1] Repay debt using UTXO[1]
-          postInstructions.push(
-            createProtocolInstruction(
-              normalizedProtocol,
-              encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, eulerContextEncoded, 1)
-            )
-          );
-          const repayRefundUtxo = utxoIndex++; // = 3
-
-          // [2] Withdraw collateral using UTXO[0] (actualSellAmount)
-          postInstructions.push(
-            createProtocolInstruction(
-              normalizedProtocol,
-              encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedTo.address, userAddress, 0n, eulerContextEncoded, 0)
-            )
-          );
-          const withdrawUtxo = utxoIndex++; // = 4
-
-          // [3] Push withdrawn collateral to manager for flash loan repayment
-          postInstructions.push(createRouterInstruction(encodePushToken(withdrawUtxo, conditionalOrderManagerAddress)));
-
-          // [4] Return repay refund to user (if closing entire position)
-          if (isMax) {
-            postInstructions.push(createRouterInstruction(encodePushToken(repayRefundUtxo, userAddress)));
-          }
-
-          return {
-            preInstructions: [],
-            postInstructions,
-            flashLoanRepaymentUtxoIndex: withdrawUtxo,
-          };
-        });
+      const result = buildEulerConditionalInstructions({
+        numChunks: numChunksVal,
+        normalizedProtocol,
+        debtToken,
+        userAddress,
+        selectedTo,
+        eulerContextEncoded: eulerContextEncoded as `0x${string}`,
+        eulerCollateralVaults,
+        managerAddress: conditionalOrderManagerAddress as `0x${string}`,
+        isMax,
+      });
+      return result ?? EMPTY_INSTRUCTIONS;
     }
 
     // Standard flow for other protocols (Aave, Compound, Venus, Morpho)
-    return Array(numChunksVal)
-      .fill(null)
-      .map(() => {
-        const postInstructions: ProtocolInstruction[] = [];
-        // UTXO layout after manager injects:
-        // [0] = actualSellAmount (collateral sold)
-        // [1] = actualBuyAmount (debt received) - already in router, no PullToken needed
-        let utxoIndex = 2;
-
-        // [0] Approve UTXO[1] (debt tokens already in router) for repayment
-        postInstructions.push(createRouterInstruction(encodeApprove(1, normalizedProtocol)));
-        utxoIndex++; // = 2
-
-        // [1] Repay debt using UTXO[1]
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, context as Hex || "0x", 1)
-          )
-        );
-        const repayRefundUtxo = utxoIndex++; // = 3
-
-        // [2] Withdraw collateral using UTXO[0] (actualSellAmount)
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedTo.address, userAddress, 0n, context as Hex || "0x", 0)
-          )
-        );
-        const withdrawUtxo = utxoIndex++; // = 4
-
-        // [3] Push withdrawn collateral to manager for flash loan repayment
-        postInstructions.push(createRouterInstruction(encodePushToken(withdrawUtxo, conditionalOrderManagerAddress)));
-
-        // [4] Return repay refund to user (if closing entire position)
-        if (isMax) {
-          postInstructions.push(createRouterInstruction(encodePushToken(repayRefundUtxo, userAddress)));
-        }
-
-        return {
-          preInstructions: [],
-          postInstructions,
-          flashLoanRepaymentUtxoIndex: withdrawUtxo,
-        };
-      });
+    return buildStandardConditionalInstructions({
+      numChunks: numChunksVal,
+      normalizedProtocol,
+      debtToken,
+      userAddress,
+      selectedTo,
+      context,
+      managerAddress: conditionalOrderManagerAddress,
+      isMax,
+    });
   }, [
     selectedTo,
     userAddress,
@@ -761,44 +948,22 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
     const swapMinAmountOut = isAave
       ? repayAmountRaw + (repayAmountRaw * AAVE_FLASH_LOAN_FEE_BPS) / 10000n
       : repayAmountRaw;
+    const swapProtocol = resolveSwapProtocolName(swapRouter);
 
     // Euler custom flow
     if (isEuler && eulerContextEncoded && userAddress) {
-      const swapProtocol = swapRouter === "1inch" ? "oneinch" : swapRouter === "kyber" ? "kyber" : "pendle";
-      const swapContext = encodeAbiParameters(
-        [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
-        [debtToken as Address, swapMinAmountOut, swapQuote.tx.data as Hex]
-      );
-
-      const instructions: ProtocolInstruction[] = [];
-
-      instructions.push(createRouterInstruction(encodeToOutput(requiredCollateral, selectedTo.address)));
-      instructions.push(createRouterInstruction(encodeFlashLoan(providerEnum, 0)));
-      instructions.push(createRouterInstruction(encodeApprove(1, swapProtocol)));
-      instructions.push(
-        createProtocolInstruction(
-          swapProtocol,
-          encodeLendingInstruction(LendingOp.Swap, selectedTo.address, userAddress, 0n, swapContext, 1)
-        )
-      );
-      const normalizedProtocol = normalizeProtocolName(protocolName);
-      instructions.push(createRouterInstruction(encodeApprove(3, normalizedProtocol)));
-      instructions.push(
-        createProtocolInstruction(
-          normalizedProtocol,
-          encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, eulerContextEncoded, 3)
-        )
-      );
-      instructions.push(
-        createProtocolInstruction(
-          normalizedProtocol,
-          encodeLendingInstruction(LendingOp.WithdrawCollateral, selectedTo.address, userAddress, 0n, eulerContextEncoded, 0)
-        )
-      );
-      instructions.push(createRouterInstruction(encodePushToken(6, userAddress)));
-      instructions.push(createRouterInstruction(encodePushToken(4, userAddress)));
-
-      return instructions;
+      return buildEulerMarketFlow({
+        requiredCollateral,
+        collateralAddress: selectedTo.address as Address,
+        debtToken,
+        userAddress,
+        providerEnum,
+        swapProtocol,
+        swapMinAmountOut,
+        swapData: swapQuote.tx.data as `0x${string}`,
+        eulerContext: eulerContextEncoded as `0x${string}`,
+        protocolName,
+      });
     }
 
     // Standard flow
@@ -812,7 +977,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       providerEnum,
       context,
       isMax,
-      swapRouter === "1inch" ? "oneinch" : swapRouter === "kyber" ? "kyber" : "pendle"
+      swapProtocol
     );
   }, [
     swapQuote,
@@ -968,30 +1133,11 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
         saveLimitOrderNote(result.salt, protocolName, selectedTo.symbol, debtName, chainId);
       }
 
-      const notificationId = notification.loading(
+      notification.loading(
         <TransactionToast step="pending" message={`Creating conditional order (${result.calls.length} operations)...`} />
       );
 
-      const receipts: TransactionReceipt[] = [];
-      for (let i = 0; i < result.calls.length; i++) {
-        const call = result.calls[i];
-        notification.remove(notificationId as string);
-
-        const stepNotificationId = notification.loading(
-          <TransactionToast step="pending" message={`Executing step ${i + 1}/${result.calls.length}...`} />
-        );
-
-        const txHash = await walletClient.sendTransaction({
-          account: userAddress,
-          to: call.to,
-          data: call.data,
-          chain: null,
-        });
-
-        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-        receipts.push(receipt);
-        notification.remove(stepNotificationId as string);
-      }
+      const receipts = await executeConditionalOrderCalls(result.calls, walletClient, publicClient, userAddress);
 
       const explorerUrl = getCowExplorerAddressUrl(chainId, userAddress);
       notification.success(
@@ -1028,6 +1174,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       }
 
       track("close_with_collateral_conditional_order_complete", { ...analyticsProps, status: "success" });
+      dispatchOrderCreated();
       onClose();
     } catch (e) {
       track("close_with_collateral_conditional_order_complete", {
@@ -1161,166 +1308,35 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
         />
 
         {executionType === "market" && (
-          <div className="space-y-2 text-xs">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/50">Slippage</span>
-                <select
-                  className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
-                  value={slippage}
-                  onChange={e => setSlippage(Number.parseFloat(e.target.value))}
-                >
-                  {[0.1, 0.3, 0.5, 1, 3].map(s => (
-                    <option key={s} value={s}>
-                      {s}%
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {flashLoanProviders && flashLoanProviders.length > 1 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-base-content/50">Flash Loan</span>
-                  <select
-                    className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
-                    value={selectedProvider?.name || ""}
-                    onChange={e => {
-                      const p = flashLoanProviders.find(provider => provider.name === e.target.value);
-                      if (p) {
-                        setSelectedProvider(p);
-                      }
-                    }}
-                  >
-                    {flashLoanProviders.map(p => (
-                      <option key={p.name} value={p.name}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="border-base-300/30 space-y-1 border-t pt-2">
-              {priceImpact !== undefined && priceImpact !== null && (
-                <div className="flex items-center justify-between">
-                  <span className="text-base-content/50">Price Impact</span>
-                  <span className={priceImpact > 1 ? "text-warning" : priceImpact > 3 ? "text-error" : "text-base-content/80"}>
-                    {formattedPriceImpact || `${priceImpact.toFixed(2)}%`}
-                  </span>
-                </div>
-              )}
-              {exchangeRate && (
-                <div className="flex items-center justify-between">
-                  <span className="text-base-content/50">Rate</span>
-                  <span className="text-base-content/80">1:{Number.parseFloat(exchangeRate).toFixed(2)}</span>
-                </div>
-              )}
-              {swapQuote && expectedOutput && (
-                <div className="flex items-center justify-between">
-                  <span className="text-base-content/50">Output</span>
-                  <span
-                    className={
-                      outputCoversRepay === false
-                        ? "text-warning"
-                        : outputCoversRepay === true
-                        ? "text-success"
-                        : "text-base-content/80"
-                    }
-                  >
-                    {Number.parseFloat(expectedOutput).toFixed(4)} {debtName}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+          <MarketOrderRightPanel
+            slippage={slippage}
+            setSlippage={setSlippage}
+            flashLoanProviders={flashLoanProviders}
+            selectedProvider={selectedProvider}
+            setSelectedProvider={setSelectedProvider}
+            priceImpact={priceImpact}
+            formattedPriceImpact={formattedPriceImpact}
+            exchangeRate={exchangeRate}
+            swapQuote={swapQuote}
+            expectedOutput={expectedOutput}
+            outputCoversRepay={outputCoversRepay}
+            debtName={debtName}
+          />
         )}
 
         {executionType === "limit" && selectedTo && (
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/50">Order Type</span>
-              <Tooltip
-                content="You are buying debt tokens to repay your position. The collateral amount you specify is the maximum you're willing to sell. If the market moves in your favor, you may sell less and keep the surplus."
-                delayDuration={100}
-              >
-                <span className="text-info flex cursor-help items-center gap-1 font-medium">
-                  Buy Order
-                  <InformationCircleIcon className="size-3" />
-                </span>
-              </Tooltip>
-            </div>
-
-            {limitOrderConfig?.selectedProvider && (
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/50">Flash Loan</span>
-                <span className="text-base-content/80 font-medium">{limitOrderConfig.selectedProvider.provider}</span>
-              </div>
-            )}
-
-            {selectedTo && limitOrderCollateral > 0n && repayAmountRaw > 0n && (
-              <div className="bg-base-200/50 space-y-1 rounded p-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-base-content/50">Limit Price</span>
-                  <span className="text-base-content/80 font-medium">
-                    {isCowQuoteLoading ? (
-                      <span className="loading loading-dots loading-xs" />
-                    ) : (
-                      `1 ${debtName} = ${(
-                        Number(formatUnits(limitOrderCollateral, selectedTo.decimals)) /
-                        Number(formatUnits(repayAmountRaw, debtDecimals))
-                      ).toFixed(4)} ${selectedTo.symbol}`
-                    )}
-                  </span>
-                </div>
-                {exchangeRate && (
-                  <div className="text-center text-[10px]">
-                    {(() => {
-                      const limitRate =
-                        Number(formatUnits(limitOrderCollateral, selectedTo.decimals)) /
-                        Number(formatUnits(repayAmountRaw, debtDecimals));
-                      const marketRate = Number.parseFloat(exchangeRate);
-                      const pctDiff = ((limitRate - marketRate) / marketRate) * 100;
-                      const isAbove = pctDiff > 0;
-                      const absDiff = Math.abs(pctDiff);
-                      if (absDiff < 0.01) {
-                        return <span className="text-base-content/40">at market price</span>;
-                      }
-                      return (
-                        <span className={isAbove ? "text-warning" : "text-success"}>
-                          {absDiff.toFixed(2)}% {isAbove ? "above" : "below"} market
-                        </span>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {selectedTo && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-base-content/50">Chunks</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    className="border-base-300 bg-base-200 text-base-content/80 w-14 rounded border px-2 py-0.5 text-right text-xs font-medium"
-                    value={numChunks}
-                    onChange={e => {
-                      const val = Number.parseInt(e.target.value) || 1;
-                      setNumChunks(Math.max(1, Math.min(100, val)));
-                    }}
-                  />
-                </div>
-                {numChunks > 1 && limitOrderCollateral > 0n && (
-                  <div className="text-base-content/50 text-[10px]">
-                    Max {formatUnits(limitOrderCollateral / BigInt(numChunks), selectedTo.decimals).slice(0, 8)}{" "}
-                    {selectedTo.symbol} per chunk
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <LimitOrderRightPanel
+            limitOrderConfig={limitOrderConfig}
+            selectedTo={selectedTo}
+            limitOrderCollateral={limitOrderCollateral}
+            repayAmountRaw={repayAmountRaw}
+            debtName={debtName}
+            debtDecimals={debtDecimals}
+            isCowQuoteLoading={isCowQuoteLoading}
+            exchangeRate={exchangeRate}
+            numChunks={numChunks}
+            setNumChunks={setNumChunks}
+          />
         )}
       </div>
     ),
@@ -1388,43 +1404,23 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   );
 
   const warnings: ReactNode = useMemo(() => {
-    const showInsufficientCollateralWarning = !hasEnoughCollateral && requiredCollateral > 0n && selectedTo;
-    const showFromMismatchWarning =
-      (swapRouter === "1inch" || swapRouter === "kyber") &&
-      swapQuote &&
-      activeAdapter &&
-      "from" in swapQuote.tx &&
-      swapQuote.tx.from?.toLowerCase() !== activeAdapter.address.toLowerCase();
-    const showNoAdapterWarning = !hasAdapter && isOpen;
-    // Quote shortfall: swap output doesn't cover debt - need higher slippage
-    const showQuoteShortfallWarning = !!quoteShortfall && executionType === "market";
-    const hasAnyWarning = showInsufficientCollateralWarning || showFromMismatchWarning || showNoAdapterWarning || showQuoteShortfallWarning;
-
     return (
-      <div className="min-h-[24px]">
-        {hasAnyWarning && (
-          <div className="text-warning/90 flex items-start gap-1.5 text-xs">
-            <ExclamationTriangleIcon className="mt-0.5 size-3.5 flex-shrink-0" />
-            <span>
-              {showQuoteShortfallWarning && quoteShortfall && (
-                <>
-                  Quote output ({formatUnits(quoteShortfall.received, debtDecimals).slice(0, 8)} {debtName}) is less than debt.
-                  Increase slippage to {Math.ceil(slippage + (quoteShortfall.ratio - 1) * 100 + 0.5)}% or higher.
-                </>
-              )}
-              {showInsufficientCollateralWarning && !showQuoteShortfallWarning && (
-                <>
-                  Need ~{requiredCollateralFormatted} {selectedTo.symbol}, have{" "}
-                  {Number(formatUnits(selectedTo.rawBalance, selectedTo.decimals)).toFixed(4)}
-                </>
-              )}
-              {showFromMismatchWarning && !showQuoteShortfallWarning && "Quote address mismatch"}
-              {showNoAdapterWarning && !showQuoteShortfallWarning &&
-                `${swapRouter === "kyber" ? "Kyber" : swapRouter === "1inch" ? "1inch" : "Pendle"} adapter unavailable`}
-            </span>
-          </div>
-        )}
-      </div>
+      <WarningsPanel
+        hasEnoughCollateral={hasEnoughCollateral}
+        requiredCollateral={requiredCollateral}
+        requiredCollateralFormatted={requiredCollateralFormatted}
+        selectedTo={selectedTo}
+        swapRouter={swapRouter}
+        swapQuote={swapQuote}
+        activeAdapter={activeAdapter}
+        hasAdapter={hasAdapter}
+        isOpen={isOpen}
+        quoteShortfall={quoteShortfall}
+        executionType={executionType}
+        debtDecimals={debtDecimals}
+        debtName={debtName}
+        slippage={slippage}
+      />
     );
   }, [
     hasEnoughCollateral,
@@ -1587,5 +1583,333 @@ const InfoStep: React.FC<InfoStepProps> = ({ step, title, isLast, children }) =>
     </div>
   </div>
 );
+
+// ============ Extracted Panel Components ============
+// These reduce cognitive complexity of the main hook by moving
+// conditional rendering logic into dedicated components.
+
+interface MarketOrderRightPanelProps {
+  slippage: number;
+  setSlippage: (s: number) => void;
+  flashLoanProviders: FlashLoanProviderOption[] | undefined;
+  selectedProvider: FlashLoanProviderOption | undefined;
+  setSelectedProvider: (p: FlashLoanProviderOption) => void;
+  priceImpact: number | null | undefined;
+  formattedPriceImpact: string | null | undefined;
+  exchangeRate: string | null;
+  swapQuote: { dstAmount: string } | null | undefined;
+  expectedOutput: string;
+  outputCoversRepay: boolean;
+  debtName: string;
+}
+
+/** Right panel content for market order mode: slippage, flash loan, price impact, rate, output. */
+function MarketOrderRightPanel({
+  slippage, setSlippage, flashLoanProviders, selectedProvider, setSelectedProvider,
+  priceImpact, formattedPriceImpact, exchangeRate, swapQuote, expectedOutput, outputCoversRepay, debtName,
+}: MarketOrderRightPanelProps) {
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-base-content/50">Slippage</span>
+          <select
+            className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+            value={slippage}
+            onChange={e => setSlippage(Number.parseFloat(e.target.value))}
+          >
+            {[0.1, 0.3, 0.5, 1, 3].map(s => (
+              <option key={s} value={s}>
+                {s}%
+              </option>
+            ))}
+          </select>
+        </div>
+        {flashLoanProviders && flashLoanProviders.length > 1 && (
+          <div className="flex items-center justify-between">
+            <span className="text-base-content/50">Flash Loan</span>
+            <select
+              className="select select-xs select-ghost text-base-content/80 h-auto min-h-0 py-0.5 text-right font-medium"
+              value={selectedProvider?.name || ""}
+              onChange={e => {
+                const p = flashLoanProviders.find(provider => provider.name === e.target.value);
+                if (p) {
+                  setSelectedProvider(p);
+                }
+              }}
+            >
+              {flashLoanProviders.map(p => (
+                <option key={p.name} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="border-base-300/30 space-y-1 border-t pt-2">
+        {priceImpact !== undefined && priceImpact !== null && (
+          <div className="flex items-center justify-between">
+            <span className="text-base-content/50">Price Impact</span>
+            <span className={priceImpact > 1 ? "text-warning" : priceImpact > 3 ? "text-error" : "text-base-content/80"}>
+              {formattedPriceImpact || `${priceImpact.toFixed(2)}%`}
+            </span>
+          </div>
+        )}
+        {exchangeRate && (
+          <div className="flex items-center justify-between">
+            <span className="text-base-content/50">Rate</span>
+            <span className="text-base-content/80">1:{Number.parseFloat(exchangeRate).toFixed(2)}</span>
+          </div>
+        )}
+        {swapQuote && expectedOutput && (
+          <div className="flex items-center justify-between">
+            <span className="text-base-content/50">Output</span>
+            <span
+              className={
+                outputCoversRepay === false
+                  ? "text-warning"
+                  : outputCoversRepay === true
+                  ? "text-success"
+                  : "text-base-content/80"
+              }
+            >
+              {Number.parseFloat(expectedOutput).toFixed(4)} {debtName}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface LimitOrderRightPanelProps {
+  limitOrderConfig: LimitOrderResult | null;
+  selectedTo: SwapAsset;
+  limitOrderCollateral: bigint;
+  repayAmountRaw: bigint;
+  debtName: string;
+  debtDecimals: number;
+  isCowQuoteLoading: boolean;
+  exchangeRate: string | null;
+  numChunks: number;
+  setNumChunks: (n: number) => void;
+}
+
+/** Right panel content for limit order mode: order type, flash loan, price, chunks. */
+function LimitOrderRightPanel({
+  limitOrderConfig, selectedTo, limitOrderCollateral, repayAmountRaw,
+  debtName, debtDecimals, isCowQuoteLoading, exchangeRate, numChunks, setNumChunks,
+}: LimitOrderRightPanelProps) {
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="text-base-content/50">Order Type</span>
+        <Tooltip
+          content="You are buying debt tokens to repay your position. The collateral amount you specify is the maximum you're willing to sell. If the market moves in your favor, you may sell less and keep the surplus."
+          delayDuration={100}
+        >
+          <span className="text-info flex cursor-help items-center gap-1 font-medium">
+            Buy Order
+            <InformationCircleIcon className="size-3" />
+          </span>
+        </Tooltip>
+      </div>
+
+      {limitOrderConfig?.selectedProvider && (
+        <div className="flex items-center justify-between">
+          <span className="text-base-content/50">Flash Loan</span>
+          <span className="text-base-content/80 font-medium">{limitOrderConfig.selectedProvider.provider}</span>
+        </div>
+      )}
+
+      {limitOrderCollateral > 0n && repayAmountRaw > 0n && (
+        <LimitPriceDisplay
+          selectedTo={selectedTo}
+          limitOrderCollateral={limitOrderCollateral}
+          repayAmountRaw={repayAmountRaw}
+          debtName={debtName}
+          debtDecimals={debtDecimals}
+          isCowQuoteLoading={isCowQuoteLoading}
+          exchangeRate={exchangeRate}
+        />
+      )}
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-base-content/50">Chunks</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            className="border-base-300 bg-base-200 text-base-content/80 w-14 rounded border px-2 py-0.5 text-right text-xs font-medium"
+            value={numChunks}
+            onChange={e => {
+              const val = Number.parseInt(e.target.value) || 1;
+              setNumChunks(Math.max(1, Math.min(100, val)));
+            }}
+          />
+        </div>
+        {numChunks > 1 && limitOrderCollateral > 0n && (
+          <div className="text-base-content/50 text-[10px]">
+            Max {formatUnits(limitOrderCollateral / BigInt(numChunks), selectedTo.decimals).slice(0, 8)}{" "}
+            {selectedTo.symbol} per chunk
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface LimitPriceDisplayProps {
+  selectedTo: SwapAsset;
+  limitOrderCollateral: bigint;
+  repayAmountRaw: bigint;
+  debtName: string;
+  debtDecimals: number;
+  isCowQuoteLoading: boolean;
+  exchangeRate: string | null;
+}
+
+/** Displays the limit price and how it compares to the market rate. */
+function LimitPriceDisplay({
+  selectedTo, limitOrderCollateral, repayAmountRaw, debtName, debtDecimals, isCowQuoteLoading, exchangeRate,
+}: LimitPriceDisplayProps) {
+  const limitRate =
+    Number(formatUnits(limitOrderCollateral, selectedTo.decimals)) /
+    Number(formatUnits(repayAmountRaw, debtDecimals));
+
+  return (
+    <div className="bg-base-200/50 space-y-1 rounded p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-base-content/50">Limit Price</span>
+        <span className="text-base-content/80 font-medium">
+          {isCowQuoteLoading ? (
+            <span className="loading loading-dots loading-xs" />
+          ) : (
+            `1 ${debtName} = ${limitRate.toFixed(4)} ${selectedTo.symbol}`
+          )}
+        </span>
+      </div>
+      {exchangeRate && (
+        <LimitVsMarketLabel limitRate={limitRate} marketRate={Number.parseFloat(exchangeRate)} />
+      )}
+    </div>
+  );
+}
+
+/** Shows a colored label indicating how far the limit price is from market. */
+function LimitVsMarketLabel({ limitRate, marketRate }: { limitRate: number; marketRate: number }) {
+  const pctDiff = ((limitRate - marketRate) / marketRate) * 100;
+  const absDiff = Math.abs(pctDiff);
+
+  if (absDiff < 0.01) {
+    return (
+      <div className="text-center text-[10px]">
+        <span className="text-base-content/40">at market price</span>
+      </div>
+    );
+  }
+
+  const isAbove = pctDiff > 0;
+  return (
+    <div className="text-center text-[10px]">
+      <span className={isAbove ? "text-warning" : "text-success"}>
+        {absDiff.toFixed(2)}% {isAbove ? "above" : "below"} market
+      </span>
+    </div>
+  );
+}
+
+// ============ Warnings Panel ============
+
+interface WarningsPanelProps {
+  hasEnoughCollateral: boolean;
+  requiredCollateral: bigint;
+  requiredCollateralFormatted: string;
+  selectedTo: SwapAsset | null;
+  swapRouter: SwapRouter;
+  swapQuote: SwapQuoteResult | null | undefined;
+  activeAdapter: { address: string } | null | undefined;
+  hasAdapter: boolean;
+  isOpen: boolean;
+  quoteShortfall: { needed: bigint; received: bigint; ratio: number } | null;
+  executionType: ExecutionType;
+  debtDecimals: number;
+  debtName: string;
+  slippage: number;
+}
+
+/** Renders contextual warnings about collateral, quote shortfall, adapter issues. */
+function WarningsPanel({
+  hasEnoughCollateral, requiredCollateral, requiredCollateralFormatted, selectedTo,
+  swapRouter, swapQuote, activeAdapter, hasAdapter, isOpen,
+  quoteShortfall, executionType, debtDecimals, debtName, slippage,
+}: WarningsPanelProps) {
+  const warningMessage = resolveWarningMessage({
+    hasEnoughCollateral, requiredCollateral, requiredCollateralFormatted, selectedTo,
+    swapRouter, swapQuote, activeAdapter, hasAdapter, isOpen,
+    quoteShortfall, executionType, debtDecimals, debtName, slippage,
+  });
+
+  return (
+    <div className="min-h-[24px]">
+      {warningMessage && (
+        <div className="text-warning/90 flex items-start gap-1.5 text-xs">
+          <ExclamationTriangleIcon className="mt-0.5 size-3.5 flex-shrink-0" />
+          <span>{warningMessage}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Determine which warning message (if any) should be displayed.
+ * Returns null when no warning applies. Priority: shortfall > collateral > mismatch > adapter.
+ */
+function resolveWarningMessage(props: WarningsPanelProps): ReactNode {
+  const {
+    hasEnoughCollateral, requiredCollateral, requiredCollateralFormatted, selectedTo,
+    swapRouter, swapQuote, activeAdapter, hasAdapter, isOpen,
+    quoteShortfall, executionType, debtDecimals, debtName, slippage,
+  } = props;
+
+  // Quote shortfall: swap output doesn't cover debt
+  if (quoteShortfall && executionType === "market") {
+    return (
+      <>
+        Quote output ({formatUnits(quoteShortfall.received, debtDecimals).slice(0, 8)} {debtName}) is less than debt.
+        Increase slippage to {Math.ceil(slippage + (quoteShortfall.ratio - 1) * 100 + 0.5)}% or higher.
+      </>
+    );
+  }
+
+  // Insufficient collateral
+  if (!hasEnoughCollateral && requiredCollateral > 0n && selectedTo) {
+    return (
+      <>
+        Need ~{requiredCollateralFormatted} {selectedTo.symbol}, have{" "}
+        {Number(formatUnits(selectedTo.rawBalance, selectedTo.decimals)).toFixed(4)}
+      </>
+    );
+  }
+
+  // From-address mismatch on 1inch/kyber quotes
+  const isSwapQuoteRouter = swapRouter === "1inch" || swapRouter === "kyber";
+  if (isSwapQuoteRouter && swapQuote && activeAdapter && "from" in (swapQuote.tx ?? {})
+    && swapQuote.tx?.from?.toLowerCase() !== activeAdapter.address.toLowerCase()) {
+    return "Quote address mismatch";
+  }
+
+  // Adapter unavailable
+  if (!hasAdapter && isOpen) {
+    const adapterName = swapRouter === "kyber" ? "Kyber" : swapRouter === "1inch" ? "1inch" : "Pendle";
+    return `${adapterName} adapter unavailable`;
+  }
+
+  return null;
+}
 
 export default useClosePositionConfig;

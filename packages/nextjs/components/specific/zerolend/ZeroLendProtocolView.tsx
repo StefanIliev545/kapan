@@ -8,6 +8,7 @@ import { AaveForkProtocolView, AaveForkProtocolConfig } from "../common/AaveFork
 const ZEROLEND_CONFIG: AaveForkProtocolConfig = {
   protocolName: "ZeroLend",
   protocolIcon: "/logos/zerolend.svg",
+  protocolUrl: "https://app.zerolend.xyz",
   viewContractName: "ZeroLendGatewayView",
   writeContractName: "ZeroLendGatewayWrite",
 };

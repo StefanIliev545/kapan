@@ -49122,7 +49122,7 @@ const contracts = {
   },
   42161: {
     AaveGatewayView: {
-      address: "0xCa65b579a6a7E6EDc0b7121a4F61EaCebE28C90f",
+      address: "0x9371Ff7F732Cee1948ee3728439ba59E5185B509",
       abi: [
         {
           inputs: [
@@ -49945,7 +49945,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     AaveGatewayWrite: {
-      address: "0x09fc87Eb7Bc7fe5AdD134481D6b9C68e6041F3a3",
+      address: "0xFD4c8688437EcFD8F07a8aF8e4408e595d592775",
       abi: [
         {
           inputs: [
@@ -50354,7 +50354,7 @@ const contracts = {
       },
     },
     AutoLeverageTrigger: {
-      address: "0x66A4fD394206416e0aB14A0fB41b82Bd3ff05877",
+      address: "0x32c811355F177eA4D017881E69c4bF059b705710",
       abi: [
         {
           inputs: [
@@ -50414,6 +50414,19 @@ const contracts = {
         {
           inputs: [],
           name: "MORPHO_BLUE",
+          outputs: [
+            {
+              internalType: "bytes4",
+              name: "",
+              type: "bytes4",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "VENUS",
           outputs: [
             {
               internalType: "bytes4",
@@ -50651,7 +50664,7 @@ const contracts = {
       },
     },
     CompoundGatewayView: {
-      address: "0x6E3fb10D348f157CF075e468DA5369A132dC05c5",
+      address: "0xa3751E9B1B9e6239f96A1f911dbEF0D252a72C2A",
       abi: [
         {
           inputs: [
@@ -51237,6 +51250,35 @@ const contracts = {
           inputs: [
             {
               internalType: "address",
+              name: "market",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getPositionValue",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "collateralValueUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "debtValueUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
               name: "token",
               type: "address",
             },
@@ -51594,7 +51636,7 @@ const contracts = {
       },
     },
     CompoundGatewayWrite: {
-      address: "0xf37B44E6c621A7Ab0132c289Be25C68276B3a681",
+      address: "0xFD6dDc0A73a0dcbd2DCA216237a7AbACDFd20620",
       abi: [
         {
           inputs: [
@@ -52119,7 +52161,7 @@ const contracts = {
       },
     },
     EulerGatewayView: {
-      address: "0x2A455e1fec7C97aC652eA9fCd632003dD8cfeE45",
+      address: "0x9a39B085a285Ecd06c89C6a24bc0f00c716078A3",
       abi: [
         {
           inputs: [
@@ -52630,7 +52672,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     EulerGatewayWrite: {
-      address: "0x0965329d0Cb6B279fdE1EF0ce327Dc948176f334",
+      address: "0xBFce2Aae5e9C06004A29AdaB552A65Fe84538007",
       abi: [
         {
           inputs: [
@@ -53081,7 +53123,7 @@ const contracts = {
       },
     },
     KapanAuthorizationHelper: {
-      address: "0x985AE0E316AcC97386987391f74eD7E220639d38",
+      address: "0x0b375adB49b8311FD45bD8ede1Fde0BDdA7eCC01",
       abi: [
         {
           inputs: [
@@ -53318,7 +53360,7 @@ const contracts = {
       },
     },
     KapanConditionalOrderHandler: {
-      address: "0xeAE083b421Fa4d35f86Ed9CF7f374C40f39A8644",
+      address: "0x537D18417bb2C94701CdB0D1d3730B3536869D19",
       abi: [
         {
           inputs: [
@@ -53614,7 +53656,7 @@ const contracts = {
       },
     },
     KapanConditionalOrderManager: {
-      address: "0x21DDeBeC1536E376c6d408401728152842080426",
+      address: "0x3B59E55AeE49a369A950E215B1C11e846F9Bd731",
       abi: [
         {
           inputs: [
@@ -54899,7 +54941,7 @@ const contracts = {
       },
     },
     KapanCowAdapter: {
-      address: "0x9bEcb37BcEA3c0DC6093C7927fC8198dCB70e9De",
+      address: "0xD9d2eb6392342d740Ad1C2018995D4Fe9a6c84bD",
       abi: [
         {
           inputs: [
@@ -57129,7 +57171,7 @@ const contracts = {
       },
     },
     KapanRouter: {
-      address: "0xadad575d251395Ecd37Ff87a0b8e3d810683493a",
+      address: "0x4a7E57e9324CCE2c73B520817571bcBFF56846EA",
       abi: [
         {
           inputs: [
@@ -58074,7 +58116,7 @@ const contracts = {
       },
     },
     KapanViewRouter: {
-      address: "0xc19d13Aa6fd4A25d4d9A61a682C4E46b81513B0d",
+      address: "0x879aeb77EDda2A93012Fde8Ca9ac919060e5A97E",
       abi: [
         {
           inputs: [
@@ -59311,7 +59353,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     KyberAdapter: {
-      address: "0x7E5b206eF0d9b2a7e3a64f3A84FeB4Bb9C4Bf980",
+      address: "0x5078d8df7ddB75Aa3a92244DDBBfB68eC4B34eec",
       abi: [
         {
           inputs: [
@@ -59555,7 +59597,7 @@ const contracts = {
       },
     },
     KyberGateway: {
-      address: "0xa602486dfB721290362Dcf9ED7625EBFa448DC89",
+      address: "0x371ECe7aCBfbf7c74D041952Dad0E926A73cd11E",
       abi: [
         {
           inputs: [
@@ -59976,7 +60018,7 @@ const contracts = {
       },
     },
     LimitPriceTrigger: {
-      address: "0xBc827e408092d3D201BD8A464e6FAfE6baee8f55",
+      address: "0x090953Ae50cc095E961152844A08630DD85d88e4",
       abi: [
         {
           inputs: [
@@ -60361,7 +60403,7 @@ const contracts = {
       },
     },
     LtvTrigger: {
-      address: "0x12257A4f57Da71f3bD5EBeD236CfB7067410ff2E",
+      address: "0xE230828F1c06A2508Fc5A2549F0b64DcA45cA367",
       abi: [
         {
           inputs: [
@@ -60753,7 +60795,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayView: {
-      address: "0x63133419aFe7f9b2c617F6E68607021351EAD0f9",
+      address: "0x05264c8935421f93D7fbce40972AD99570612854",
       abi: [
         {
           inputs: [
@@ -62289,7 +62331,7 @@ const contracts = {
       },
     },
     MorphoBlueGatewayWrite: {
-      address: "0x8F7785c9Cf554eC973215f73d6b4638C9a5C0Af1",
+      address: "0xc143Bce4c3529bEcf803D4D2dA8c9Ac0D5e3d152",
       abi: [
         {
           inputs: [
@@ -62947,7 +62989,7 @@ const contracts = {
       },
     },
     OneInchAdapter: {
-      address: "0x7bf228a8313dB81EfEfF1AA1636Cb411a104643C",
+      address: "0x169C8Ba13e98EceEc43E147e8D6EA6CD1E2B7bf7",
       abi: [
         {
           inputs: [
@@ -63191,7 +63233,7 @@ const contracts = {
       },
     },
     OneInchGateway: {
-      address: "0x6cd45AECCC38bdDA1Ce2b3239a327c6B109D61AC",
+      address: "0x70FdeEF157ec38AD9cADD618475E5cBf15f4CC74",
       abi: [
         {
           inputs: [
@@ -64032,7 +64074,7 @@ const contracts = {
       },
     },
     PendleAdapter: {
-      address: "0x16E8C5Fca66cc4eC367cFbf470B3Be9d91d3b6Dd",
+      address: "0x10b1c7aA9a216fffF9bA41d325c66273A4Bb6cba",
       abi: [
         {
           inputs: [
@@ -64276,7 +64318,7 @@ const contracts = {
       },
     },
     PendleGateway: {
-      address: "0x73b83Ea7E094b7BB0BdC10d3201fb66379a92A7e",
+      address: "0xCC3f7521dc95aa464d684e3be9F0456AD8Ce2a93",
       abi: [
         {
           inputs: [
@@ -64697,7 +64739,7 @@ const contracts = {
       },
     },
     UiHelper: {
-      address: "0x0254C7b48f037A83EF7B8d65C87463D73E4da18e",
+      address: "0xB1dD7C0Cb244Ff2EE83a64EB8d526972B2E63b9C",
       abi: [
         {
           inputs: [
@@ -64722,7 +64764,7 @@ const contracts = {
       inheritedFunctions: {},
     },
     VenusGatewayView: {
-      address: "0x9569801781212F6C1A023AD599C03388c473340A",
+      address: "0x2F884d4965523Be2A429ae1841D87FB4a1eF43D0",
       abi: [
         {
           inputs: [
@@ -65363,6 +65405,30 @@ const contracts = {
         {
           inputs: [
             {
+              internalType: "address",
+              name: "user",
+              type: "address",
+            },
+          ],
+          name: "getUserAccountData",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "totalCollateralUsd",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "totalDebtUsd",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
               internalType: "address[]",
               name: "vTokens",
               type: "address[]",
@@ -65512,7 +65578,7 @@ const contracts = {
       },
     },
     VenusGatewayWrite: {
-      address: "0x8a14E542AD07341D9C1cC0af08F299965BD28E77",
+      address: "0x5E144cbd40f7AFCB674Ecb382a1C7220f2f979F9",
       abi: [
         {
           inputs: [

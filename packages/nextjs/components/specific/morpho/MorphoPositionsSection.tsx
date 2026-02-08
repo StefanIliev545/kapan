@@ -26,6 +26,9 @@ import { hasExternalYield, type ExternalYield } from "~~/hooks/useExternalYields
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { formatSignedPercent } from "../utils";
+import { IsolatedPositionLayout } from "~~/components/positions/IsolatedPositionLayout";
+import { useMorphoPositionGroups } from "~~/hooks/adapters/useMorphoPositionGroups";
+import type { PositionGroup } from "~~/types/positions";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
 import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
 import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
@@ -140,9 +143,34 @@ interface ADLModalState {
   debtBalanceUsd: number;
 }
 
+// Shadow glow constants for automation status indicators
+const SHADOW_RED = "shadow-[0_0_6px_rgba(239,68,68,0.25),0_0_12px_rgba(239,68,68,0.15)]";
+const SHADOW_BLUE = "shadow-[0_0_6px_rgba(56,189,248,0.25),0_0_12px_rgba(56,189,248,0.15)]";
+const SHADOW_GREEN = "shadow-[0_0_6px_rgba(74,222,128,0.3),0_0_12px_rgba(74,222,128,0.18)]";
+
+/** Get shadow class based on automation status. Red = ADL trigger met, Blue = auto-lev trigger met, Green = protected */
+function getAutomationShadowClass(
+  hasActiveADL: boolean | undefined,
+  isAboveTrigger: boolean | undefined,
+  hasActiveAutoLev: boolean | undefined,
+  isBelowAutoLevTrigger: boolean | undefined,
+): string {
+  if (hasActiveADL && isAboveTrigger) return SHADOW_RED;
+  if (hasActiveAutoLev && isBelowAutoLevTrigger) return SHADOW_BLUE;
+  if (hasActiveADL || hasActiveAutoLev) return SHADOW_GREEN;
+  return "";
+}
+
+/** Convert a USD price number to 1e8 bigint format */
+function priceToRaw(priceUsd: number | undefined): bigint {
+  return BigInt(Math.floor((priceUsd || 0) * 1e8));
+}
+
 // Memoized position row component to avoid recreating inline objects on each render
 interface MorphoPositionRowProps {
   row: MorphoPositionRow;
+  /** Unified PositionGroup from the adapter hook (drives the layout component) */
+  positionGroup: PositionGroup;
   chainId: number;
   isExpanded: boolean;
   onToggleExpanded: () => void;
@@ -166,6 +194,7 @@ interface MorphoPositionRowProps {
 
 const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function MorphoPositionRowComponent({
   row,
+  positionGroup,
   chainId,
   isExpanded,
   onToggleExpanded,
@@ -205,7 +234,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
     currentRate: collateralRate,
     tokenAddress: row.market.collateralAsset?.address || "",
     tokenDecimals: row.collateralDecimals,
-    tokenPrice: BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8)),
+    tokenPrice: priceToRaw(row.market.collateralAsset?.priceUsd ?? undefined),
     tokenSymbol: row.collateralSymbol,
     protocolContext,
   }), [row.collateralSymbol, row.collateralBalanceUsd, row.collateralBalance, row.collateralDecimals, row.market.collateralAsset, collateralRate, protocolContext]);
@@ -223,7 +252,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
       currentRate: row.borrowApy,
       tokenAddress: row.market.loanAsset.address,
       tokenDecimals: row.borrowDecimals,
-      tokenPrice: BigInt(Math.floor((row.market.loanAsset.priceUsd || 0) * 1e8)),
+      tokenPrice: priceToRaw(row.market.loanAsset.priceUsd ?? undefined),
       tokenSymbol: row.loanSymbol,
       protocolContext,
     };
@@ -261,7 +290,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
     rawBalance: row.collateralBalance,
     balance: row.collateralBalanceUsd,
     icon: tokenNameToLogo(row.collateralSymbol.toLowerCase()),
-    price: BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8)),
+    price: priceToRaw(row.market.collateralAsset?.priceUsd ?? undefined),
   }], [row.collateralSymbol, row.collateralDecimals, row.collateralBalance, row.collateralBalanceUsd, row.market.collateralAsset]);
 
   // Memoized borrow available actions
@@ -286,7 +315,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
       debtTokenDecimals: row.borrowDecimals,
       debtBalance: row.borrowBalance,
       debtBalanceUsd: row.borrowBalanceUsd,
-      debtTokenPrice: BigInt(Math.floor((row.market.loanAsset?.priceUsd || 0) * 1e8)),
+      debtTokenPrice: priceToRaw(row.market.loanAsset?.priceUsd ?? undefined),
       collateralTokenAddress: row.market.collateralAsset?.address || "",
       collateralTokenSymbol: row.collateralSymbol,
       collateralBalance: row.collateralBalance,
@@ -321,7 +350,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
       return;
     }
     // Convert price to 1e8 format for SwapAsset compatibility
-    const priceIn1e8 = BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8));
+    const priceIn1e8 = priceToRaw(row.market.collateralAsset?.priceUsd ?? undefined);
     onSwapRequest({
       isOpen: true,
       morphoContext: row.context,
@@ -342,7 +371,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
     if (!onADLRequest || !row.hasDebt || !row.hasCollateral) {
       return;
     }
-    const priceIn1e8 = BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8));
+    const priceIn1e8 = priceToRaw(row.market.collateralAsset?.priceUsd ?? undefined);
     onADLRequest({
       isOpen: true,
       morphoContext: row.context,
@@ -362,176 +391,159 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
     });
   }, [onADLRequest, row]);
 
-  const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
-
   // Combined automation status for visual indicator
   const hasAnyAutomation = hasActiveADL || hasActiveAutoLev;
 
-  // Shadow styling: subtle glow effect based on automation status
-  // Green = safe/protected, Red = trigger condition met (warning), Blue = auto-leverage active
-  const getShadowClass = () => {
-    if (hasActiveADL && isAboveTrigger) {
-      return "shadow-[0_0_6px_rgba(239,68,68,0.25),0_0_12px_rgba(239,68,68,0.15)]"; // Red glow - ADL trigger met
-    }
-    if (hasActiveAutoLev && isBelowAutoLevTrigger) {
-      return "shadow-[0_0_6px_rgba(56,189,248,0.25),0_0_12px_rgba(56,189,248,0.15)]"; // Blue glow - Auto-lev trigger met
-    }
-    if (hasAnyAutomation) {
-      return "shadow-[0_0_6px_rgba(74,222,128,0.3),0_0_12px_rgba(74,222,128,0.18)]"; // Green glow - protected
-    }
-    return "";
-  };
-  const adlShadowClass = getShadowClass();
+  const adlShadowClass = getAutomationShadowClass(hasActiveADL, isAboveTrigger, hasActiveAutoLev, isBelowAutoLevTrigger);
 
   return (
-    <div
-      key={row.key}
+    <IsolatedPositionLayout
+      group={positionGroup}
       className={`border-base-300 hover:border-base-content/15 relative rounded-md border transition-all duration-200 ${adlShadowClass}`}
-    >
-      {/* Market pair header */}
-      <div
-        className="bg-base-200/50 border-base-300 hover:bg-base-200/70 flex cursor-pointer flex-col gap-2 border-b px-3 py-2 transition-colors sm:flex-row sm:items-center sm:justify-between"
-        onClick={onToggleExpanded}
-      >
-        {/* Market name row */}
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex flex-shrink-0 -space-x-2">
-            <Image
-              src={tokenNameToLogo(row.collateralSymbol.toLowerCase())}
-              alt={row.collateralSymbol}
-              width={20}
-              height={20}
-              className="border-base-100 bg-base-200 rounded-full border"
-              onError={handleImageError}
-            />
-            <Image
-              src={tokenNameToLogo(row.loanSymbol.toLowerCase())}
-              alt={row.loanSymbol}
-              width={20}
-              height={20}
-              className="border-base-100 bg-base-200 rounded-full border"
-              onError={handleImageError}
-            />
-          </div>
-          <span className="truncate text-sm font-medium" title={`${row.collateralSymbol}/${row.loanSymbol}`}>
-            {row.collateralSymbol}/{row.loanSymbol}
-          </span>
-          {morphoUrl && (
-            <a
-              href={morphoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={stopPropagation}
-              className="inline-flex flex-shrink-0 items-center gap-0.5 opacity-50 transition-opacity hover:opacity-100"
-              title="View on Morpho"
-            >
+      gridClassName="divide-base-300 grid grid-cols-1 divide-y md:grid-cols-2 md:divide-x md:divide-y-0"
+      header={
+        <div
+          className="bg-base-200/50 border-base-300 hover:bg-base-200/70 flex cursor-pointer flex-col gap-2 border-b px-3 py-2 transition-colors sm:flex-row sm:items-center sm:justify-between"
+          onClick={onToggleExpanded}
+        >
+          {/* Market name row */}
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex flex-shrink-0 -space-x-2">
               <Image
-                src="/logos/morpho.svg"
-                alt="Morpho"
-                width={14}
-                height={14}
-                className="rounded-sm"
+                src={tokenNameToLogo(row.collateralSymbol.toLowerCase())}
+                alt={row.collateralSymbol}
+                width={20}
+                height={20}
+                className="border-base-100 bg-base-200 rounded-full border"
+                onError={handleImageError}
               />
-              <ExternalLink width={10} height={10} />
-            </a>
-          )}
-        </div>
-        {/* Right side: ADL indicator + Stats */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-          {/* LTV Automation Settings/Status - show before stats */}
-          {isADLSupported && row.hasDebt && row.hasCollateral && (
-            <button
-              onClick={handleADLClick}
-              className={`group relative flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors ${
-                hasAnyAutomation
-                  ? "bg-success/10 text-success hover:bg-success/20"
-                  : "text-base-content/50 hover:bg-base-200 hover:text-base-content"
-              }`}
-            >
-              {hasAnyAutomation ? (
-                <div className="flex items-center gap-2">
-                  {/* ADL badge */}
-                  {hasActiveADL && (
-                    <div className="flex items-center gap-1">
-                      <ShieldCheckIcon className="size-3.5" />
-                      <span className="text-[10px] font-medium">
-                        {formatLtvPercent(adlTriggerLtvBps!)}↓{formatLtvPercent(adlTargetLtvBps!)}
-                      </span>
-                    </div>
-                  )}
-                  {/* Auto-leverage badge */}
-                  {hasActiveAutoLev && (
-                    <div className="text-info flex items-center gap-1">
-                      <ArrowTrendingUpIcon className="size-3.5" />
-                      <span className="text-[10px] font-medium">
-                        {formatLtvPercent(autoLevTriggerLtvBps!)}↑{formatLtvPercent(autoLevTargetLtvBps!)}
-                      </span>
-                    </div>
-                  )}
-                  {/* Hover tooltip */}
-                  <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+              <Image
+                src={tokenNameToLogo(row.loanSymbol.toLowerCase())}
+                alt={row.loanSymbol}
+                width={20}
+                height={20}
+                className="border-base-100 bg-base-200 rounded-full border"
+                onError={handleImageError}
+              />
+            </div>
+            <span className="truncate text-sm font-medium" title={`${row.collateralSymbol}/${row.loanSymbol}`}>
+              {row.collateralSymbol}/{row.loanSymbol}
+            </span>
+            {morphoUrl && (
+              <a
+                href={morphoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={stopPropagation}
+                className="inline-flex flex-shrink-0 items-center gap-0.5 opacity-50 transition-opacity hover:opacity-100"
+                title="View on Morpho"
+              >
+                <Image
+                  src="/logos/morpho.svg"
+                  alt="Morpho"
+                  width={14}
+                  height={14}
+                  className="rounded-sm"
+                />
+                <ExternalLink width={10} height={10} />
+              </a>
+            )}
+          </div>
+          {/* Right side: ADL indicator + Stats */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+            {/* LTV Automation Settings/Status - show before stats */}
+            {isADLSupported && row.hasDebt && row.hasCollateral && (
+              <button
+                onClick={handleADLClick}
+                className={`group relative flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors ${
+                  hasAnyAutomation
+                    ? "bg-success/10 text-success hover:bg-success/20"
+                    : "text-base-content/50 hover:bg-base-200 hover:text-base-content"
+                }`}
+              >
+                {hasAnyAutomation ? (
+                  <div className="flex items-center gap-2">
+                    {/* ADL badge */}
                     {hasActiveADL && (
-                      <>
-                        <span className="text-success">ADL:</span> {formatLtvPercent(adlTriggerLtvBps!)} → {formatLtvPercent(adlTargetLtvBps!)}
-                        {hasActiveAutoLev && <br />}
-                      </>
+                      <div className="flex items-center gap-1">
+                        <ShieldCheckIcon className="size-3.5" />
+                        <span className="text-[10px] font-medium">
+                          {formatLtvPercent(adlTriggerLtvBps!)}↓{formatLtvPercent(adlTargetLtvBps!)}
+                        </span>
+                      </div>
                     )}
+                    {/* Auto-leverage badge */}
                     {hasActiveAutoLev && (
-                      <>
-                        <span className="text-info">Auto-Lev:</span> {formatLtvPercent(autoLevTriggerLtvBps!)} → {formatLtvPercent(autoLevTargetLtvBps!)}
-                      </>
+                      <div className="text-info flex items-center gap-1">
+                        <ArrowTrendingUpIcon className="size-3.5" />
+                        <span className="text-[10px] font-medium">
+                          {formatLtvPercent(autoLevTriggerLtvBps!)}↑{formatLtvPercent(autoLevTargetLtvBps!)}
+                        </span>
+                      </div>
                     )}
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <Cog6ToothIcon className="size-3.5" />
-                  {/* Hover tooltip for inactive */}
-                  <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                    Set up LTV Automation
-                  </span>
-                </>
-              )}
-            </button>
-          )}
-          {/* Net Value */}
-          <span className="text-base-content/60">
-            Net:{" "}
-            <span className={positionYieldMetrics.netBalance >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
-              {formatCurrencyCompact(positionYieldMetrics.netBalance)}
-            </span>
-          </span>
-          {/* Net APY */}
-          <span className="text-base-content/60">
-            APY:{" "}
-            <span className={positionYieldMetrics.netApyPercent == null ? "text-base-content/40" : positionYieldMetrics.netApyPercent >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
-              {positionYieldMetrics.netApyPercent != null ? formatSignedPercent(positionYieldMetrics.netApyPercent) : "—"}
-            </span>
-          </span>
-          {/* LTV - show first on mobile since it's important */}
-          {row.hasDebt && (
+                    {/* Hover tooltip */}
+                    <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                      {hasActiveADL && (
+                        <>
+                          <span className="text-success">ADL:</span> {formatLtvPercent(adlTriggerLtvBps!)} → {formatLtvPercent(adlTargetLtvBps!)}
+                          {hasActiveAutoLev && <br />}
+                        </>
+                      )}
+                      {hasActiveAutoLev && (
+                        <>
+                          <span className="text-info">Auto-Lev:</span> {formatLtvPercent(autoLevTriggerLtvBps!)} → {formatLtvPercent(autoLevTargetLtvBps!)}
+                        </>
+                      )}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <Cog6ToothIcon className="size-3.5" />
+                    <span className="text-[10px]">Automate</span>
+                    {/* Hover tooltip for inactive */}
+                    <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                      Set up LTV Automation
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
+            {/* Net Value */}
             <span className="text-base-content/60">
-              LTV:{" "}
-              <span className={row.currentLtv && row.currentLtv > row.lltv * 0.9 ? TEXT_ERROR : TEXT_SUCCESS}>{ltvDisplayValue}</span>
-              <span className="text-base-content/50">/{row.lltv.toFixed(0)}%</span>
+              Net:{" "}
+              <span className={positionYieldMetrics.netBalance >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
+                {formatCurrencyCompact(positionYieldMetrics.netBalance)}
+              </span>
             </span>
-          )}
-          {/* 30D Yield - hidden on very small screens */}
-          <span className="text-base-content/60 group relative hidden cursor-help min-[400px]:inline">
-            30D:{" "}
-            <span className={positionYieldMetrics.netYield30d >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
-              {formatCurrencyCompact(positionYieldMetrics.netYield30d)}
+            {/* Net APY */}
+            <span className="text-base-content/60">
+              APY:{" "}
+              <span className={positionYieldMetrics.netApyPercent == null ? "text-base-content/40" : positionYieldMetrics.netApyPercent >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
+                {positionYieldMetrics.netApyPercent != null ? formatSignedPercent(positionYieldMetrics.netApyPercent) : "—"}
+              </span>
             </span>
-            <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-              Est. annual: <span className={positionYieldMetrics.netAnnualYield >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>{formatCurrencyCompact(positionYieldMetrics.netAnnualYield)}</span>
+            {/* LTV - show first on mobile since it's important */}
+            {row.hasDebt && (
+              <span className="text-base-content/60">
+                LTV:{" "}
+                <span className={row.currentLtv && row.currentLtv > row.lltv * 0.9 ? TEXT_ERROR : TEXT_SUCCESS}>{ltvDisplayValue}</span>
+                <span className="text-base-content/50">/{row.lltv.toFixed(0)}%</span>
+              </span>
+            )}
+            {/* 30D Yield - hidden on very small screens */}
+            <span className="text-base-content/60 group relative hidden cursor-help min-[400px]:inline">
+              30D:{" "}
+              <span className={positionYieldMetrics.netYield30d >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
+                {formatCurrencyCompact(positionYieldMetrics.netYield30d)}
+              </span>
+              <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                Est. annual: <span className={positionYieldMetrics.netAnnualYield >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>{formatCurrencyCompact(positionYieldMetrics.netAnnualYield)}</span>
+              </span>
             </span>
-          </span>
+          </div>
         </div>
-      </div>
-
-      {/* Side-by-side positions */}
-      <div className={`divide-base-300 grid divide-y md:divide-y-0 ${containerColumns}`}>
-        {/* Left: Collateral (Supply) */}
+      }
+      collateralContent={
         <SupplyPosition
           {...supplyPosition}
           protocolName="morpho-blue"
@@ -548,9 +560,9 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
           onSwap={row.hasCollateral ? handleSwapClick : undefined}
           adlActive={hasAnyAutomation}
         />
-
-        {/* Right: Debt (Borrow) */}
-        {borrowPosition ? (
+      }
+      debtContent={
+        borrowPosition ? (
           <BorrowPosition
             {...borrowPosition}
             protocolName="morpho-blue"
@@ -566,9 +578,9 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function Mor
             onToggleExpanded={onToggleExpanded}
             onSwap={row.hasDebt && row.hasCollateral ? handleDebtSwapClick : undefined}
           />
-        ) : null}
-      </div>
-    </div>
+        ) : null
+      }
+    />
   );
 });
 
@@ -590,6 +602,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
   // ADL modal state
   const [adlModalState, setAdlModalState] = useState<ADLModalState | null>(null);
+
+  // Adapter hook: convert rows to unified PositionGroup[] for topology layout
+  const positionGroups = useMorphoPositionGroups(chainId, rows);
 
   // Check if ADL/Auto-Leverage is supported on this chain
   const { isSupported: isADLSupported, ltvTriggerAddress } = useADLContracts(chainId);
@@ -741,13 +756,14 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
       );
     }
 
-    return rows.map((row) => {
+    return rows.map((row, idx) => {
       const marketId = row.market.uniqueKey?.toLowerCase();
       const adlInfo = marketId ? adlInfoByMarketId.get(marketId) ?? EMPTY_ADL_INFO : EMPTY_ADL_INFO;
       return (
         <MorphoPositionRowComponent
           key={row.key}
           row={row}
+          positionGroup={positionGroups[idx]}
           chainId={chainId}
           isExpanded={!!expandedRows[row.key]}
           onToggleExpanded={() => toggleRowExpanded(row.key)}

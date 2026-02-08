@@ -98,9 +98,9 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
           entrypoint: string;
           calldata?: string[];
         }
-        const calldata = (tx.calls?.find((c: AvnuCall) => c.entrypoint === "swap_exact_token_to")?.calldata) || [];
+        const calldata = ((tx.calls as any)?.find((c: AvnuCall) => c.entrypoint === "swap_exact_token_to")?.calldata) || [];
         if (!cancelled) {
-          setAvnuCalldata(calldata.map((c: string) => BigInt(c.toString())));
+          setAvnuCalldata((calldata as any[]).map((c: any) => BigInt(c.toString())));
         }
       } catch (error) {
         console.error("failed to fetch avnu calldata", error);
@@ -269,11 +269,11 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
     ];
   }, [fetchedAuthorizations, protocolInstructions]);
 
-  const { sendAsync } = useScaffoldMultiWriteContract({ calls });
+  const { sendAsync } = useScaffoldMultiWriteContract({ calls: calls as any });
 
   const handleClosePosition = useCallback(async () => {
     try {
-      await sendAsync();
+      await (sendAsync as any)();
       notification.success("Position closed");
       onClose();
     } catch (error) {

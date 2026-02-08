@@ -292,13 +292,13 @@ export function computeOrderHashPreview(
 interface RawOrderContext {
   params: {
     user: string;
-    preInstructionsPerIteration?: string[];
+    preInstructionsPerIteration?: readonly string[] | string[];
     preTotalAmount: bigint | string | number;
     sellToken: string;
     buyToken: string;
     chunkSize: bigint | string | number;
     minBuyPerChunk: bigint | string | number;
-    postInstructionsPerIteration?: string[];
+    postInstructionsPerIteration?: readonly string[] | string[];
     completion: number;
     targetValue: bigint | string | number;
     minHealthFactor: bigint | string | number;
@@ -319,13 +319,13 @@ export function parseOrderContext(rawContext: RawOrderContext): OrderContext {
   return {
     params: {
       user: rawContext.params.user,
-      preInstructionsPerIteration: rawContext.params.preInstructionsPerIteration || [],
+      preInstructionsPerIteration: rawContext.params.preInstructionsPerIteration ? [...rawContext.params.preInstructionsPerIteration] : [],
       preTotalAmount: BigInt(rawContext.params.preTotalAmount),
       sellToken: rawContext.params.sellToken,
       buyToken: rawContext.params.buyToken,
       chunkSize: BigInt(rawContext.params.chunkSize),
       minBuyPerChunk: BigInt(rawContext.params.minBuyPerChunk),
-      postInstructionsPerIteration: rawContext.params.postInstructionsPerIteration || [],
+      postInstructionsPerIteration: rawContext.params.postInstructionsPerIteration ? [...rawContext.params.postInstructionsPerIteration] : [],
       completion: Number(rawContext.params.completion),
       targetValue: BigInt(rawContext.params.targetValue),
       minHealthFactor: BigInt(rawContext.params.minHealthFactor),

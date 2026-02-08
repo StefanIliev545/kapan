@@ -28,6 +28,7 @@ const GATEWAY_VIEWS: Record<number, Record<string, string>> = {
     COMPOUND_V3: "CompoundGatewayView",
     MORPHO_BLUE: "MorphoBlueGatewayView",
     EULER_V2: "EulerGatewayView",
+    VENUS: "VenusGatewayView",
   },
   // Ethereum Mainnet
   1: {
@@ -35,6 +36,7 @@ const GATEWAY_VIEWS: Record<number, Record<string, string>> = {
     COMPOUND_V3: "CompoundGatewayView",
     MORPHO_BLUE: "MorphoBlueGatewayView",
     // EULER_V2: "EulerGatewayView", // Excluded for now
+    VENUS: "VenusGatewayView",
   },
   // Base
   8453: {
@@ -130,4 +132,5 @@ deployKapanViewRouter.dependencies = [
   "CompoundGatewayView",
   "MorphoBlueGatewayView",
   "EulerGatewayView",
+  "VenusGatewayWrite", // VenusGatewayView is deployed inside VenusGatewayWrite script
 ];

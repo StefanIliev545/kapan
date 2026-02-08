@@ -292,16 +292,29 @@ function generateOrderSalt(): Hex {
 }
 
 /**
- * Flatten instructions for authorization checks.
- * For conditional orders, we need to account for the different UTXO layout.
- *
- * IMPORTANT: Prepends dummy ToOutput instructions to simulate the UTXOs that
- * KapanConditionalOrderManager prepends at execution time:
+ * Prepend dummy ToOutput UTXOs for authorization simulation.
+ * Simulates what KapanConditionalOrderManager prepends at execution time:
  * - UTXO[0] = actualSellAmount (sellToken)
  * - UTXO[1] = actualBuyAmount (buyToken)
- *
- * This ensures inputIndex references resolve correctly during authorization.
- * We use "worst case" amounts (max slippage) so approvals are sufficient.
+ */
+function prependDummyUtxos(
+  flattened: ProtocolInstruction[],
+  sellToken?: Address,
+  buyToken?: Address,
+  sellAmount?: bigint,
+  buyAmount?: bigint
+): void {
+  if (sellToken && sellAmount !== undefined && sellAmount > 0n) {
+    flattened.push(createRouterInstruction(encodeToOutput(sellAmount, sellToken)));
+  }
+  if (buyToken && buyAmount !== undefined && buyAmount > 0n) {
+    flattened.push(createRouterInstruction(encodeToOutput(buyAmount, buyToken)));
+  }
+}
+
+/**
+ * Deduplicate and flatten instructions for authorization checks.
+ * Prepends dummy UTXOs to ensure inputIndex references resolve correctly.
  */
 function flattenInstructions(
   preInstructions: ProtocolInstruction[],
@@ -312,20 +325,9 @@ function flattenInstructions(
   buyAmount?: bigint
 ): ProtocolInstruction[] {
   const flattened: ProtocolInstruction[] = [];
+  prependDummyUtxos(flattened, sellToken, buyToken, sellAmount, buyAmount);
+
   const seen = new Set<string>();
-
-  // Prepend dummy ToOutput instructions matching what OrderManager prepends at execution time.
-  // This ensures inputIndex references resolve correctly during authorization.
-  // Use max amounts (worst case) so approvals are sufficient for any execution.
-  if (sellToken && sellAmount !== undefined && sellAmount > 0n) {
-    // UTXO[0] = actualSellAmount
-    flattened.push(createRouterInstruction(encodeToOutput(sellAmount, sellToken)));
-  }
-  if (buyToken && buyAmount !== undefined && buyAmount > 0n) {
-    // UTXO[1] = actualBuyAmount
-    flattened.push(createRouterInstruction(encodeToOutput(buyAmount, buyToken)));
-  }
-
   for (const inst of [...preInstructions, ...postInstructions]) {
     const key = `${inst.protocolName}:${inst.data}`;
     if (!seen.has(key)) {
@@ -336,6 +338,52 @@ function flattenInstructions(
 
   return flattened;
 }
+
+/** Build appData options, including flash loan config if provided. */
+function buildAppDataOptions(
+  input: CowConditionalOrderInput
+): Parameters<typeof buildAndRegisterAppData>[4] {
+  const options: Parameters<typeof buildAndRegisterAppData>[4] = {
+    operationType: input.operationType,
+    protocol: input.protocolName ? normalizeProtocolForAppCode(input.protocolName) : undefined,
+  };
+  if (input.flashLoan) {
+    options.flashLoan = {
+      lender: input.flashLoan.lender,
+      token: input.flashLoan.token,
+      amount: input.flashLoan.amount,
+      useBalanceTransfer: true,
+    };
+  }
+  return options;
+}
+
+/** Calculate worst-case authorization amounts with 20% buffer. */
+function calcAuthAmounts(flashLoanAmount: bigint, maxIterations: number): { sell: bigint; buy: bigint } {
+  const AUTH_BUFFER_BPS = 2000n;
+  const totalSellAmount = flashLoanAmount * BigInt(maxIterations);
+  const withBuffer = totalSellAmount + (totalSellAmount * AUTH_BUFFER_BPS) / 10000n;
+  return { sell: withBuffer, buy: withBuffer };
+}
+
+/** Deduplicate raw auth calls and return as Call[]. */
+function deduplicateAuthCalls(
+  rawAuthCalls: { target: Address; data: `0x${string}` }[]
+): Call[] {
+  const seen = new Set<string>();
+  const calls: Call[] = [];
+  for (const { target, data } of rawAuthCalls) {
+    if (!target || !data || data.length === 0) continue;
+    const key = `${target.toLowerCase()}:${data.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    calls.push({ to: target as Address, data: data as Hex });
+  }
+  return calls;
+}
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
+const ZERO_SALT = "0x0000000000000000000000000000000000000000000000000000000000000000" as Hex;
 
 /**
  * Hook for creating CoW Protocol conditional orders with trigger-based execution.
@@ -428,68 +476,32 @@ export function useCowConditionalOrder() {
         return undefined;
       }
 
-      // Validate: flash loan orders REQUIRE sellTokenRefundAddress (KapanCowAdapter)
-      // The adapter handles flash loan repayment - without it, tokens get stuck
+      // Flash loan orders REQUIRE sellTokenRefundAddress (KapanCowAdapter) for repayment
       if (input.flashLoan && !input.sellTokenRefundAddress) {
-        logger.error("[useCowConditionalOrder] Flash loan orders require sellTokenRefundAddress (KapanCowAdapter) for repayment");
+        logger.error("[useCowConditionalOrder] Flash loan orders require sellTokenRefundAddress");
         return {
-          success: false,
-          calls: [],
-          salt: "0x0000000000000000000000000000000000000000000000000000000000000000" as Hex,
-          appDataHash: "",
+          success: false, calls: [], salt: ZERO_SALT, appDataHash: "",
           error: "Flash loan orders require KapanCowAdapter for repayment. Adapter not configured for this chain.",
         };
       }
 
-      // 1. Generate salt
+      // 1. Generate salt and register appData
       const salt = generateOrderSalt();
-      logger.debug("[useCowConditionalOrder] Generated salt:", salt);
-
-      // 2. Build and register appData
-      // Uses the same hook pattern as KapanOrderManager
-      const appDataOptions: Parameters<typeof buildAndRegisterAppData>[4] = {
-        operationType: input.operationType,
-        protocol: input.protocolName ? normalizeProtocolForAppCode(input.protocolName) : undefined,
-      };
-      if (input.flashLoan) {
-        appDataOptions.flashLoan = {
-          lender: input.flashLoan.lender,
-          token: input.flashLoan.token,
-          amount: input.flashLoan.amount,
-          // Use balance-based transfer for conditional orders since amounts are dynamic
-          useBalanceTransfer: true,
-        };
-      }
-
       const appDataResult = await buildAndRegisterAppData(
-        chainId,
-        managerAddress,
-        userAddress,
-        salt,
-        appDataOptions
+        chainId, managerAddress, userAddress, salt, buildAppDataOptions(input)
       );
 
       if (!appDataResult.registered) {
         logger.error("[useCowConditionalOrder] AppData registration failed:", appDataResult.error);
         return {
-          success: false,
-          calls: [],
-          salt,
+          success: false, calls: [], salt,
           appDataHash: appDataResult.appDataHash || "",
           error: `AppData registration failed: ${appDataResult.error}`,
         };
       }
 
-      logger.debug("[useCowConditionalOrder] AppData registered:", appDataResult.appDataHash);
-
-      // 3. Prepare post-instructions with flash loan repayment if needed
-      const finalPostInstructions = [...input.postInstructions];
-      if (input.flashLoan && input.sellTokenRefundAddress) {
-        // Flash loan repayment is handled via sellTokenRefundAddress in the manager
-        // No need to add explicit PushToken - manager does it automatically
-      }
-
-      // 4. Build order parameters
+      // 2. Build order parameters
+      // Note: flash loan repayment is handled via sellTokenRefundAddress in the manager
       const orderParams = {
         user: userAddress,
         trigger: input.triggerAddress,
@@ -497,77 +509,49 @@ export function useCowConditionalOrder() {
         preInstructions: encodeInstructions(input.preInstructions),
         sellToken: input.sellToken,
         buyToken: input.buyToken,
-        postInstructions: encodeInstructions(finalPostInstructions),
+        postInstructions: encodeInstructions(input.postInstructions),
         appDataHash: appDataResult.appDataHash as Hex,
         maxIterations: BigInt(input.maxIterations),
-        sellTokenRefundAddress: input.sellTokenRefundAddress || ("0x0000000000000000000000000000000000000000" as Address),
+        sellTokenRefundAddress: input.sellTokenRefundAddress || ZERO_ADDRESS,
         isKindBuy: input.isKindBuy ?? false,
       };
 
-      // 5. Collect all calls in order
+      // 3. Collect all calls in order
       const calls: Call[] = [];
 
-      // 5a. Check delegation and add call if needed
+      // 3a. Delegation call if needed
       const isDelegated = await checkDelegation();
       if (!isDelegated) {
         calls.push({
           to: routerContract.address as Address,
           data: encodeFunctionData({
-            abi: routerContract.abi,
-            functionName: "setDelegate",
-            args: [managerAddress, true],
+            abi: routerContract.abi, functionName: "setDelegate", args: [managerAddress, true],
           }) as Hex,
         });
       }
 
-      // 5b. Get authorization calls for all instructions
-      // Calculate worst-case amounts for authorization (with 20% buffer for interest/slippage)
-      const AUTH_BUFFER_BPS = 2000n; // 20% buffer
-      const perChunkSellAmount = input.flashLoan?.amount ?? 0n;
-      const totalSellAmount = perChunkSellAmount * BigInt(input.maxIterations);
-      const sellAmountWithBuffer = totalSellAmount + (totalSellAmount * AUTH_BUFFER_BPS) / 10000n;
-      // For buyAmount, use same as sellAmount with buffer (conservative 1:1 estimate)
-      // This covers most swap scenarios; gateways typically use max approval anyway
-      const buyAmountWithBuffer = sellAmountWithBuffer;
-
+      // 3b. Authorization calls with worst-case amounts
+      const authAmounts = calcAuthAmounts(input.flashLoan?.amount ?? 0n, input.maxIterations);
       const allInstructions = flattenInstructions(
-        input.preInstructions,
-        finalPostInstructions,
-        input.sellToken,
-        input.buyToken,
-        sellAmountWithBuffer,
-        buyAmountWithBuffer
+        input.preInstructions, input.postInstructions,
+        input.sellToken, input.buyToken, authAmounts.sell, authAmounts.buy
       );
       if (allInstructions.length > 0) {
         const rawAuthCalls = await getAuthorizations(allInstructions);
-        const seenAuthCalls = new Set<string>();
-        for (const { target, data } of rawAuthCalls) {
-          if (target && data && data.length > 0) {
-            const key = `${target.toLowerCase()}:${data.toLowerCase()}`;
-            if (!seenAuthCalls.has(key)) {
-              seenAuthCalls.add(key);
-              calls.push({ to: target as Address, data: data as Hex });
-            }
-          }
-        }
+        calls.push(...deduplicateAuthCalls(rawAuthCalls));
       }
 
-      // 5c. Order creation call
+      // 3c. Order creation call
       calls.push({
         to: managerAddress,
         data: encodeFunctionData({
           abi: conditionalOrderManagerContract?.abi ?? CONDITIONAL_ORDER_MANAGER_ABI,
           functionName: "createOrder",
-          args: [orderParams as Parameters<typeof encodeFunctionData>["args"], salt],
+          args: [orderParams as any, salt],
         }) as Hex,
       });
 
-      return {
-        success: true,
-        calls,
-        salt,
-        appDataHash: appDataResult.appDataHash,
-      };
+      return { success: true, calls, salt, appDataHash: appDataResult.appDataHash };
     },
     [userAddress, managerAddress, conditionalOrderManagerContract, routerContract, chainId, checkDelegation, getAuthorizations]
   );

@@ -14,7 +14,7 @@
  */
 
 import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from "react";
-import { formatUnits, parseUnits, Address, encodeAbiParameters, type TransactionReceipt } from "viem";
+import { formatUnits, parseUnits, Address, type TransactionReceipt } from "viem";
 import { useDebounceValue } from "usehooks-ts";
 import { track } from "@vercel/analytics";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
@@ -44,14 +44,6 @@ import { parseAmount } from "~~/utils/validation";
 import {
   FlashLoanProvider,
   ProtocolInstruction,
-  createRouterInstruction,
-  createProtocolInstruction,
-  encodeApprove,
-  encodeFlashLoan,
-  encodeLendingInstruction,
-  encodePushToken,
-  encodeToOutput,
-  LendingOp,
   normalizeProtocolName,
   encodeMorphoContext,
   encodeEulerContext,
@@ -79,7 +71,19 @@ import {
   calculateLimitOrderNewDebt,
   calculateDustBuffer,
 } from "../debtSwapEvmHelpers";
-import { saveOrderNote, createDebtSwapNote } from "~~/utils/orderNotes";
+import { saveOrderNote, createDebtSwapNote, dispatchOrderCreated } from "~~/utils/orderNotes";
+import {
+  resolveAvailableRouter,
+  getRouterDisplayName,
+  resolveSwapProtocol,
+  resolveTriggerContext,
+  buildMorphoMaxConditionalPost,
+  buildMorphoChunkConditionalPost,
+  buildEulerConditionalPost,
+  buildStandardConditionalPost,
+  buildMorphoMarketFlow,
+  buildEulerMarketFlow,
+} from "./debtSwapHelpers";
 
 // ============================================================================
 // Extended Props with Protocol-Specific Fields
@@ -225,15 +229,11 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
   const activeAdapter = swapRouter === "kyber" ? kyberAdapter : swapRouter === "pendle" ? pendleAdapter : oneInchAdapter;
   const hasAdapter = swapRouter === "kyber" ? !!kyberAdapter : swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
 
-  // Update swap router if chain changes
+  // Update swap router if current one becomes unavailable (e.g., chain change)
   useEffect(() => {
-    if (swapRouter === "kyber" && !kyberAvailable) {
-      setSwapRouter(oneInchAvailable ? "1inch" : pendleAvailable ? "pendle" : "kyber");
-    } else if (swapRouter === "1inch" && !oneInchAvailable) {
-      setSwapRouter(kyberAvailable ? "kyber" : pendleAvailable ? "pendle" : "1inch");
-    } else if (swapRouter === "pendle" && !pendleAvailable) {
-      setSwapRouter(kyberAvailable ? "kyber" : oneInchAvailable ? "1inch" : "pendle");
-    }
+    const avail: Record<string, boolean> = { kyber: kyberAvailable, "1inch": oneInchAvailable, pendle: pendleAvailable };
+    const fallback = resolveAvailableRouter(swapRouter, avail);
+    if (fallback) setSwapRouter(fallback);
   }, [chainId, oneInchAvailable, kyberAvailable, pendleAvailable, swapRouter]);
 
   // ============ State ============
@@ -545,14 +545,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       return null;
     }
 
-    // Determine the proper protocol context for the trigger
-    // For Morpho/Euler, use the encoded context; for others use the generic context
-    let triggerContext: `0x${string}` = (context || "0x") as `0x${string}`;
-    if (isMorpho && oldMorphoContextEncoded) {
-      triggerContext = oldMorphoContextEncoded as `0x${string}`;
-    } else if (isEuler && oldEulerContextEncoded) {
-      triggerContext = oldEulerContextEncoded as `0x${string}`;
-    }
+    const triggerContext = resolveTriggerContext(context, isMorpho, oldMorphoContextEncoded, isEuler, oldEulerContextEncoded);
 
     // For debt swap: selling new debt token to buy old debt token for repayment
     // limitPrice = (buyAmount / sellAmount) * 1e8
@@ -586,268 +579,38 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
   // UTXO[0] = actualSellAmount (new debt we're selling)
   // UTXO[1] = actualBuyAmount (old debt we received from swap)
   const buildConditionalOrderInstructionsData = useMemo((): ConditionalOrderInstructions => {
-    if (!selectedTo || !selectedTo.address || !debtFromToken || !userAddress || effectiveLimitOrderNewDebt === 0n || !conditionalOrderManagerAddress || !cowFlashLoanInfo) {
-      return { preInstructions: [], postInstructions: [] };
-    }
+    const empty: ConditionalOrderInstructions = { preInstructions: [], postInstructions: [] };
+    if (!selectedTo?.address || !debtFromToken || !userAddress) return empty;
+    if (effectiveLimitOrderNewDebt === 0n || !conditionalOrderManagerAddress || !cowFlashLoanInfo) return empty;
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
 
     // Morpho flow - pair-isolated markets require collateral migration
-    // Must: repay old debt → withdraw proportional collateral → deposit to new market → borrow new debt
-    // Collateral is migrated proportionally to maintain LTV
     if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && collateralTokenAddress && collateralBalance) {
-      // Calculate proportional collateral per chunk to maintain LTV
-      const chunkCollateralAmount = collateralBalance / BigInt(numChunks);
-
-      /**
-       * Morpho Pair-Isolated Debt Swap with Proportional Collateral Migration:
-       *
-       * Manager prepends:
-       * - UTXO[0] = ToOutput(actualSellAmount, newDebtToken)
-       * - UTXO[1] = ToOutput(actualBuyAmount, oldDebtToken)
-       *
-       * For isMax (final chunk): Use GetSupplyBalance to withdraw remaining collateral
-       * For regular chunks: Use proportional amount (collateralBalance / numChunks)
-       */
-      const postInstructions: ProtocolInstruction[] = [
-        // [0] Approve UTXO[1] (old debt received) for repayment → UTXO[2]
-        createRouterInstruction(encodeApprove(1, normalizedProtocol)),
-
-        // [1] Repay debt to OLD market using UTXO[1] → UTXO[3]
-        createProtocolInstruction(
-          normalizedProtocol,
-          encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, 0n, oldMorphoContextEncoded, 1)
-        ),
-      ];
-
-      if (isMax) {
-        // For isMax: Get remaining collateral balance and withdraw all
-        // [2] GetSupplyBalance → UTXO[4]
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.GetSupplyBalance, collateralTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 999)
-          )
-        );
-        // [3] WithdrawCollateral using UTXO[4] → UTXO[5]
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralTokenAddress, userAddress, 0n, oldMorphoContextEncoded, 4)
-          )
-        );
-        // [4] Approve UTXO[5] → UTXO[6]
-        postInstructions.push(createRouterInstruction(encodeApprove(5, normalizedProtocol)));
-        // [5] DepositCollateral using UTXO[5] → (no output)
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.DepositCollateral, collateralTokenAddress, userAddress, 0n, newMorphoContextEncoded, 5)
-          )
-        );
-        // [6] Borrow using UTXO[0] → UTXO[7]
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress, 0n, newMorphoContextEncoded, 0)
-          )
-        );
-        // [7] Push borrowed (UTXO[7]) to manager
-        postInstructions.push(createRouterInstruction(encodePushToken(7, conditionalOrderManagerAddress)));
-        // [8] Push repay refund (UTXO[3]) to user
-        postInstructions.push(createRouterInstruction(encodePushToken(3, userAddress)));
-      } else {
-        // For regular chunks: Use proportional collateral amount
-        // [2] WithdrawCollateral with hardcoded proportional amount → UTXO[4]
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralTokenAddress, userAddress, chunkCollateralAmount, oldMorphoContextEncoded, 999)
-          )
-        );
-        // [3] Approve UTXO[4] → UTXO[5]
-        postInstructions.push(createRouterInstruction(encodeApprove(4, normalizedProtocol)));
-        // [4] DepositCollateral using UTXO[4] → (no output)
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.DepositCollateral, collateralTokenAddress, userAddress, 0n, newMorphoContextEncoded, 4)
-          )
-        );
-        // [5] Borrow using UTXO[0] → UTXO[6]
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress, 0n, newMorphoContextEncoded, 0)
-          )
-        );
-        // [6] Push borrowed (UTXO[6]) to manager
-        postInstructions.push(createRouterInstruction(encodePushToken(6, conditionalOrderManagerAddress)));
-      }
-
-      return {
-        preInstructions: [],
-        postInstructions,
-      };
+      const postInstructions = isMax
+        ? buildMorphoMaxConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress)
+        : buildMorphoChunkConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress, collateralBalance / BigInt(numChunks));
+      return { preInstructions: [], postInstructions };
     }
 
-    // Euler flow - sub-account isolation requires collateral migration to new sub-account
-    // Collateral is migrated proportionally to maintain LTV
+    // Euler flow - sub-account isolation requires collateral migration
     if (isEuler && oldEulerContextEncoded && newEulerContextEncoded && eulerCollaterals?.length && eulerBorrowVault) {
       const newBorrowVault = (selectedTo as SwapAsset & { eulerBorrowVault?: string }).eulerBorrowVault;
-      if (!newBorrowVault) {
-        return { preInstructions: [], postInstructions: [] };
-      }
-
-      /**
-       * Euler Debt Swap with Proportional Collateral Migration:
-       *
-       * For isMax: GetSupplyBalance to withdraw all remaining collateral
-       * For regular chunks: Use proportional amount (collateral.balance / numChunks)
-       */
-      const postInstructions: ProtocolInstruction[] = [];
-
-      // [0] Approve UTXO[1] (old debt) for repayment → UTXO[2]
-      postInstructions.push(createRouterInstruction(encodeApprove(1, normalizedProtocol)));
-
-      // [1] Repay old debt using UTXO[1] → UTXO[3]
-      postInstructions.push(
-        createProtocolInstruction(
-          normalizedProtocol,
-          encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, 0n, oldEulerContextEncoded, 1)
-        )
-      );
-
-      // Track UTXO indices for collateral operations
-      let currentUtxo = 4;
-      const collateralWithdrawUtxos: number[] = [];
-
-      // Withdraw collaterals from old sub-account
-      for (const collateral of eulerCollaterals) {
-        const withdrawContext = encodeEulerContext({
-          borrowVault: eulerBorrowVault as Address,
-          collateralVault: collateral.vaultAddress as Address,
-          subAccountIndex: oldSubAccountIndex,
-        });
-
-        if (isMax) {
-          // For isMax: Get remaining balance and withdraw all
-          postInstructions.push(
-            createProtocolInstruction(
-              normalizedProtocol,
-              encodeLendingInstruction(LendingOp.GetSupplyBalance, collateral.tokenAddress, userAddress, 0n, withdrawContext, 999)
-            )
-          );
-          const supplyBalanceUtxo = currentUtxo++;
-
-          postInstructions.push(
-            createProtocolInstruction(
-              normalizedProtocol,
-              encodeLendingInstruction(LendingOp.WithdrawCollateral, collateral.tokenAddress, userAddress, 0n, withdrawContext, supplyBalanceUtxo)
-            )
-          );
-          collateralWithdrawUtxos.push(currentUtxo++);
-        } else {
-          // For regular chunks: Use proportional amount
-          const chunkCollateralAmount = collateral.balance / BigInt(numChunks);
-          postInstructions.push(
-            createProtocolInstruction(
-              normalizedProtocol,
-              encodeLendingInstruction(LendingOp.WithdrawCollateral, collateral.tokenAddress, userAddress, chunkCollateralAmount, withdrawContext, 999)
-            )
-          );
-          collateralWithdrawUtxos.push(currentUtxo++);
-        }
-      }
-
-      // Deposit all collaterals to new sub-account
-      for (let i = 0; i < eulerCollaterals.length; i++) {
-        const collateral = eulerCollaterals[i];
-        const withdrawUtxo = collateralWithdrawUtxos[i];
-
-        const depositContext = encodeEulerContext({
-          borrowVault: newBorrowVault as Address,
-          collateralVault: collateral.vaultAddress as Address,
-          subAccountIndex: newSubAccountIndex,
-        });
-
-        postInstructions.push(createRouterInstruction(encodeApprove(withdrawUtxo, normalizedProtocol)));
-        currentUtxo++;
-
-        postInstructions.push(
-          createProtocolInstruction(
-            normalizedProtocol,
-            encodeLendingInstruction(LendingOp.DepositCollateral, collateral.tokenAddress, userAddress, 0n, depositContext, withdrawUtxo)
-          )
-        );
-      }
-
-      // Borrow new debt from new sub-account
-      const borrowContext = encodeEulerContext({
-        borrowVault: newBorrowVault as Address,
-        collateralVault: eulerCollaterals.map(c => c.vaultAddress as Address),
-        subAccountIndex: newSubAccountIndex,
+      if (!newBorrowVault) return empty;
+      const postInstructions = buildEulerConditionalPost({
+        proto: normalizedProtocol, debt: debtFromToken, user: userAddress, oldCtx: oldEulerContextEncoded,
+        borrowVault: eulerBorrowVault, collaterals: eulerCollaterals as EulerCollateralInfo[],
+        oldSub: oldSubAccountIndex, newSub: newSubAccountIndex, newBorrow: newBorrowVault,
+        to: selectedTo.address, mgr: conditionalOrderManagerAddress, chunks: numChunks, isMax,
       });
-      postInstructions.push(
-        createProtocolInstruction(
-          normalizedProtocol,
-          encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress, 0n, borrowContext, 0)
-        )
-      );
-      const borrowUtxo = currentUtxo++;
-
-      // Push borrowed tokens to manager for flash loan repayment
-      postInstructions.push(
-        createRouterInstruction(encodePushToken(borrowUtxo, conditionalOrderManagerAddress))
-      );
-
-      // For isMax: Push repay refund (UTXO[3]) to user
-      if (isMax) {
-        postInstructions.push(createRouterInstruction(encodePushToken(3, userAddress)));
-      }
-
-      return {
-        preInstructions: [],
-        postInstructions,
-      };
+      return { preInstructions: [], postInstructions };
     }
 
-    // Standard flow (Aave, Compound, Venus) - shared pool model, same context
-    // No collateral migration needed - just repay old debt and borrow new debt
-    //
-    // Manager prepends: UTXO[0] = sellAmount, UTXO[1] = buyAmount
-    // [0] Approve(input=1) → UTXO[2]
-    // [1] Repay(input=1) → UTXO[3]
-    // [2] Borrow(input=0) → UTXO[4] (borrowed tokens go to router)
-    // [3] PushToken(input=4) → sends borrowed tokens from router to OrderManager
-    //     This is CRITICAL: without PushToken, borrowed tokens stay in router and
-    //     the sellTokenRefundAddress can't send them to adapter for flash loan repayment
-    const postInstructions: ProtocolInstruction[] = [
-      // [0] Approve UTXO[1] (old debt received) for repayment → UTXO[2]
-      createRouterInstruction(encodeApprove(1, normalizedProtocol)),
-      // [1] Repay debt using UTXO[1] → UTXO[3]
-      createProtocolInstruction(
-        normalizedProtocol,
-        encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress, 0n, context || "0x", 1)
-      ),
-      // [2] Borrow new debt to repay flash loan - use UTXO[0] (sellAmount) for amount → UTXO[4]
-      createProtocolInstruction(
-        normalizedProtocol,
-        encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress, 0n, context || "0x", 0)
-      ),
-      // [3] Push borrowed tokens (UTXO[4]) from router to OrderManager
-      createRouterInstruction(encodePushToken(4, conditionalOrderManagerAddress)),
-    ];
-
-    // For isMax: Push repay refund (UTXO[3]) to user
-    if (isMax) {
-      postInstructions.push(createRouterInstruction(encodePushToken(3, userAddress)));
-    }
-
-    return {
-      preInstructions: [],
-      postInstructions,
-    };
+    // Standard flow (Aave, Compound, Venus) - no collateral migration needed
+    const postInstructions = buildStandardConditionalPost(
+      normalizedProtocol, debtFromToken, userAddress, context, selectedTo.address, conditionalOrderManagerAddress, isMax,
+    );
+    return { preInstructions: [], postInstructions };
   }, [selectedTo, userAddress, effectiveLimitOrderNewDebt, conditionalOrderManagerAddress, cowFlashLoanInfo, protocolName, debtFromToken, context, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, numChunks, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, isMax]);
 
   // ============ Output Amount ============
@@ -865,115 +628,34 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
     if (!swapQuote || !selectedTo || !hasAdapter || requiredNewDebt === 0n) return [];
 
     const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
-    const swapProtocol = swapRouter === "1inch" ? "oneinch" : swapRouter === "kyber" ? "kyber" : "pendle";
+    const swapProtocol = resolveSwapProtocol(swapRouter);
+    const swapData = swapQuote.tx.data as `0x${string}`;
 
-    // Morpho flow
+    // Morpho flow - pair-isolated markets require collateral migration
     if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && collateralTokenAddress && collateralBalance) {
-      // Use swapMinAmountOut which matches the aggregator's slippage tolerance
-      const minAmountOutBigInt = swapMinAmountOut;
-      const swapContext = encodeAbiParameters(
-        [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
-        [debtFromToken as Address, minAmountOutBigInt, swapQuote.tx.data as `0x${string}`]
+      return buildMorphoMarketFlow(
+        debtFromToken, selectedTo.address, userAddress!, requiredNewDebt, swapMinAmountOut,
+        swapData, providerEnum, swapProtocol, oldMorphoContextEncoded, newMorphoContextEncoded,
+        collateralTokenAddress, collateralBalance,
       );
-
-      const instructions: ProtocolInstruction[] = [];
-      instructions.push(createRouterInstruction(encodeToOutput(requiredNewDebt, selectedTo.address)));
-      instructions.push(createRouterInstruction(encodeFlashLoan(providerEnum, 0)));
-      instructions.push(createRouterInstruction(encodeApprove(1, swapProtocol)));
-      instructions.push(createProtocolInstruction(swapProtocol, encodeLendingInstruction(LendingOp.SwapExactOut, selectedTo.address, userAddress!, 0n, swapContext, 1)));
-      instructions.push(createRouterInstruction(encodeApprove(3, "morpho-blue")));
-      instructions.push(createProtocolInstruction("morpho-blue", encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress!, 0n, oldMorphoContextEncoded, 3)));
-      instructions.push(createProtocolInstruction("morpho-blue", encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralTokenAddress, userAddress!, collateralBalance, oldMorphoContextEncoded, 999)));
-      instructions.push(createRouterInstruction(encodeApprove(7, "morpho-blue")));
-      instructions.push(createProtocolInstruction("morpho-blue", encodeLendingInstruction(LendingOp.DepositCollateral, collateralTokenAddress, userAddress!, 0n, newMorphoContextEncoded, 7)));
-      instructions.push(createProtocolInstruction("morpho-blue", encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress!, 0n, newMorphoContextEncoded, 0)));
-      instructions.push(createRouterInstruction(encodePushToken(6, userAddress!)));
-      instructions.push(createRouterInstruction(encodePushToken(4, userAddress!)));
-      return instructions;
     }
 
-    // Euler flow
+    // Euler flow - sub-account isolation requires collateral migration
     if (isEuler && oldEulerContextEncoded && newEulerContextEncoded && eulerCollaterals?.length) {
-      // Use swapMinAmountOut which matches the aggregator's slippage tolerance
-      const minAmountOutBigInt = swapMinAmountOut;
-      const swapContext = encodeAbiParameters(
-        [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
-        [debtFromToken as Address, minAmountOutBigInt, swapQuote.tx.data as `0x${string}`]
-      );
-
       const newBorrowVault = (selectedTo as SwapAsset & { eulerBorrowVault?: string }).eulerBorrowVault;
       if (!newBorrowVault) return [];
-
-      const instructions: ProtocolInstruction[] = [];
-      let utxoIndex = 0;
-
-      instructions.push(createRouterInstruction(encodeToOutput(requiredNewDebt, selectedTo.address)));
-      const borrowAmountUtxo = utxoIndex++;
-      instructions.push(createRouterInstruction(encodeFlashLoan(providerEnum, borrowAmountUtxo)));
-      const flashLoanUtxo = utxoIndex++;
-      instructions.push(createRouterInstruction(encodeApprove(flashLoanUtxo, swapProtocol)));
-      utxoIndex++;
-      instructions.push(createProtocolInstruction(swapProtocol, encodeLendingInstruction(LendingOp.SwapExactOut, selectedTo.address, userAddress!, 0n, swapContext, flashLoanUtxo)));
-      const oldDebtUtxo = utxoIndex++;
-      const swapRefundUtxo = utxoIndex++;
-      const normalizedProtocol = normalizeProtocolName(protocolName);
-      instructions.push(createRouterInstruction(encodeApprove(oldDebtUtxo, normalizedProtocol)));
-      utxoIndex++;
-      instructions.push(createProtocolInstruction(normalizedProtocol, encodeLendingInstruction(LendingOp.Repay, debtFromToken, userAddress!, 0n, oldEulerContextEncoded, oldDebtUtxo)));
-      const repayRefundUtxo = utxoIndex++;
-
-      const collateralUtxos: number[] = [];
-      for (const collateral of eulerCollaterals) {
-        const withdrawContext = encodeEulerContext({
-          borrowVault: eulerBorrowVault as Address,
-          collateralVault: collateral.vaultAddress as Address,
-          subAccountIndex: oldSubAccountIndex,
-        });
-        instructions.push(createProtocolInstruction(normalizedProtocol, encodeLendingInstruction(LendingOp.GetSupplyBalance, collateral.tokenAddress, userAddress!, 0n, withdrawContext, 999)));
-        const supplyBalanceUtxo = utxoIndex++;
-        instructions.push(createProtocolInstruction(normalizedProtocol, encodeLendingInstruction(LendingOp.WithdrawCollateral, collateral.tokenAddress, userAddress!, 0n, withdrawContext, supplyBalanceUtxo)));
-        collateralUtxos.push(utxoIndex++);
-      }
-
-      for (let i = 0; i < eulerCollaterals.length; i++) {
-        const collateral = eulerCollaterals[i];
-        const collateralUtxo = collateralUtxos[i];
-        const depositContext = encodeEulerContext({
-          borrowVault: newBorrowVault as Address,
-          collateralVault: collateral.vaultAddress as Address,
-          subAccountIndex: newSubAccountIndex,
-        });
-        instructions.push(createRouterInstruction(encodeApprove(collateralUtxo, normalizedProtocol)));
-        utxoIndex++;
-        instructions.push(createProtocolInstruction(normalizedProtocol, encodeLendingInstruction(LendingOp.DepositCollateral, collateral.tokenAddress, userAddress!, 0n, depositContext, collateralUtxo)));
-      }
-
-      const borrowContext = encodeEulerContext({
-        borrowVault: newBorrowVault as Address,
-        collateralVault: eulerCollaterals.map(c => c.vaultAddress as Address),
-        subAccountIndex: newSubAccountIndex,
-      });
-      instructions.push(createProtocolInstruction(normalizedProtocol, encodeLendingInstruction(LendingOp.Borrow, selectedTo.address, userAddress!, 0n, borrowContext, borrowAmountUtxo)));
-      utxoIndex++;
-
-      instructions.push(createRouterInstruction(encodePushToken(repayRefundUtxo, userAddress!)));
-      instructions.push(createRouterInstruction(encodePushToken(swapRefundUtxo, userAddress!)));
-
-      return instructions;
+      return buildEulerMarketFlow(
+        debtFromToken, selectedTo.address, userAddress!, requiredNewDebt, swapMinAmountOut,
+        swapData, providerEnum, swapProtocol, protocolName, oldEulerContextEncoded,
+        eulerCollaterals as EulerCollateralInfo[], eulerBorrowVault as string,
+        oldSubAccountIndex, newSubAccountIndex, newBorrowVault,
+      );
     }
 
-    // Standard flow - use swapMinAmountOut which matches aggregator's slippage tolerance
+    // Standard flow (Aave, Compound, Venus) - no collateral migration needed
     return buildDebtSwapFlow(
-      protocolName,
-      debtFromToken,
-      selectedTo.address,
-      swapMinAmountOut,
-      requiredNewDebt,
-      swapQuote.tx.data,
-      providerEnum,
-      context,
-      isMax,
-      swapProtocol,
+      protocolName as any, debtFromToken, selectedTo.address, swapMinAmountOut,
+      requiredNewDebt, swapQuote.tx.data, providerEnum, context, isMax, swapProtocol,
     );
   }, [swapQuote, selectedTo, hasAdapter, requiredNewDebt, selectedProvider, swapRouter, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, swapMinAmountOut, debtFromToken, userAddress, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, buildDebtSwapFlow, protocolName, context, isMax]);
 
@@ -1130,6 +812,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       }
 
       track("debt_swap_conditional_order_complete", { ...analyticsProps, status: "success" });
+      dispatchOrderCreated();
       onSuccess?.();
       onClose();
     } catch (e) {
@@ -1249,7 +932,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       </div>
       <div className="text-base-content/70 space-y-2 px-2 text-xs">
         <p>1. Flash loan the new debt token</p>
-        <p>2. Swap new debt for current debt via {swapRouter === "kyber" ? "Kyber" : swapRouter === "1inch" ? "1inch" : "Pendle"}</p>
+        <p>2. Swap new debt for current debt via {getRouterDisplayName(swapRouter)}</p>
         <p>3. Repay your current debt</p>
         <p>4. Borrow new debt to repay flash loan</p>
       </div>
@@ -1284,7 +967,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
     if (!hasAdapter && isOpen) {
       return (
         <div className="alert alert-warning text-sm">
-          {swapRouter === "kyber" ? "Kyber" : swapRouter === "1inch" ? "1inch" : "Pendle"} Adapter not found on this network.
+          {getRouterDisplayName(swapRouter)} Adapter not found on this network.
         </div>
       );
     }

@@ -28,9 +28,9 @@ export async function GET(
     kyberParams.set("amountIn", searchParams.get("amountIn") || "");
 
     // Optional params
-    if (searchParams.get("saveGas")) kyberParams.set("saveGas", searchParams.get("saveGas")!);
-    if (searchParams.get("includedSources")) kyberParams.set("includedSources", searchParams.get("includedSources")!);
-    if (searchParams.get("excludedSources")) kyberParams.set("excludedSources", searchParams.get("excludedSources")!);
+    if (searchParams.get("saveGas")) kyberParams.set("saveGas", searchParams.get("saveGas") ?? "");
+    if (searchParams.get("includedSources")) kyberParams.set("includedSources", searchParams.get("includedSources") ?? "");
+    if (searchParams.get("excludedSources")) kyberParams.set("excludedSources", searchParams.get("excludedSources") ?? "");
 
     const url = `https://aggregator-api.kyberswap.com/${kyberChain}/api/v1/routes?${kyberParams.toString()}`;
 

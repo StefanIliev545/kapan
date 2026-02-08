@@ -515,6 +515,33 @@ contract CompoundGatewayView is Ownable {
         }
     }
 
+    /// @notice Get position value for ADL trigger calculation
+    /// @dev Returns collateral and debt values in 8-decimal USD (Comet's priceScale)
+    /// @param market The base token (market identifier)
+    /// @param user The user address
+    /// @return collateralValueUsd Total collateral value in 8-decimal USD
+    /// @return debtValueUsd Total debt value in 8-decimal USD
+    function getPositionValue(address market, address user)
+        external
+        view
+        returns (uint256 collateralValueUsd, uint256 debtValueUsd)
+    {
+        ICompoundComet comet = getComet(market);
+
+        // Collateral value (already in priceScale = 8 decimals)
+        (collateralValueUsd,) = _collateralTotalsWithFactor(comet, user, false);
+
+        // Debt value: borrowBalance * basePrice / baseScale
+        uint256 borrowBalance = comet.borrowBalanceOf(user);
+        if (borrowBalance > 0) {
+            address baseToken = comet.baseToken();
+            address basePriceFeed = comet.baseTokenPriceFeed();
+            uint256 basePrice = comet.getPrice(basePriceFeed);
+            uint256 baseScale = 10 ** IERC20Metadata(baseToken).decimals();
+            debtValueUsd = (borrowBalance * basePrice) / baseScale;
+        }
+    }
+
     function _collateralTotalsWithFactor(ICompoundComet comet, address account, bool useLiquidationFactor)
         internal
         view

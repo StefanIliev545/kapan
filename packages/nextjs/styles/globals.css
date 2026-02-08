@@ -157,8 +157,9 @@ img[src$="/logos/ethereum.svg"] {
 }
 
 /* Card surfaces - consistent card styling */
+/* No rounding on mobile (edge-to-edge), rounded on sm+ */
 .card-surface {
-  @apply card bg-base-200/40 shadow-md rounded-xl border border-base-300/50;
+  @apply card bg-base-200/40 shadow-md rounded-none border border-base-300/50 sm:rounded-xl;
 }
 
 .card-surface-hover {

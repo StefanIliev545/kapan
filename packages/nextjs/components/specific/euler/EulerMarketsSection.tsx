@@ -54,6 +54,8 @@ interface EulerMarketsSectionProps {
   isLoading: boolean;
   chainId: number;
   onSupply?: (vault: EulerVault) => void;
+  /** Called when user clicks "Borrow" on a market row — opens deposit+borrow flow */
+  onBorrow?: (vault: EulerVault) => void;
   pageSize?: number;
 }
 
@@ -92,20 +94,21 @@ function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
       className="bg-base-300 relative inline-flex flex-shrink-0 overflow-hidden rounded-full"
       style={containerStyle}
     >
-      <Image
-        src={src}
-        alt={symbol}
-        width={size}
-        height={size}
-        className="object-cover"
-        onError={handleImageError}
-      />
+      {/* Fallback initials — only visible when the image fails to load */}
       <span
         className="text-base-content/70 absolute inset-0 flex items-center justify-center text-xs font-medium"
         style={fontStyle}
       >
         {symbol.slice(0, 2).toUpperCase()}
       </span>
+      <Image
+        src={src}
+        alt={symbol}
+        width={size}
+        height={size}
+        className="relative z-10 object-cover"
+        onError={handleImageError}
+      />
     </span>
   );
 }
@@ -311,7 +314,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   const dropdownContent = isOpen && position && typeof document !== "undefined" ? (
     <div
       ref={dropdownRef}
-      className="bg-base-100 fixed z-[9999] w-80 rounded-xl shadow-xl ring-1 ring-base-content/5"
+      className="bg-base-100 ring-base-content/5 fixed z-[9999] w-80 rounded-xl shadow-xl ring-1"
       style={dropdownStyle}
       onClick={handleStopPropagation}
     >
@@ -324,7 +327,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
             placeholder={`Search ${placeholder.toLowerCase()}...`}
             value={searchTerm}
             onChange={handleSearchChange}
-            className="input input-sm bg-base-200/30 w-full border-0 pl-9 pr-8 focus:bg-base-200/50 focus:outline-none"
+            className="input input-sm bg-base-200/30 focus:bg-base-200/50 w-full border-0 pl-9 pr-8 focus:outline-none"
           />
           {searchTerm && (
             <button
@@ -342,7 +345,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
             <CategoryButton key={cat} category={cat} isActive={activeCategory === cat} onClick={setActiveCategory} />
           ))}
           <div className="flex-1" />
-          <button onClick={handleClear} className="text-xs text-base-content/50 hover:text-base-content/70 transition-colors">Clear</button>
+          <button onClick={handleClear} className="text-base-content/50 hover:text-base-content/70 text-xs transition-colors">Clear</button>
         </div>
       </div>
       <div className="max-h-72 overflow-y-auto px-2 pb-2">
@@ -370,7 +373,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
       <button
         ref={triggerRef}
         type="button"
-        className="flex min-w-[140px] items-center justify-between gap-2 rounded-lg bg-base-200/40 px-3 py-1.5 text-sm transition-colors hover:bg-base-200/70"
+        className="bg-base-200/40 hover:bg-base-200/70 flex min-w-[140px] items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors"
         onClick={handleToggleOpen}
       >
         <div className="flex items-center gap-2 overflow-hidden">
@@ -458,6 +461,7 @@ interface MobileVaultRowProps {
   usd: Intl.NumberFormat;
   chainId: number;
   onSupply: () => void;
+  onBorrow?: () => void;
 }
 
 // Euler app network names by chain
@@ -474,7 +478,7 @@ function getEulerVaultUrl(chainId: number, vaultAddress: string): string {
   return `https://app.euler.finance/vault/${vaultAddress}?network=${network}`;
 }
 
-function MobileVaultRow({ row, usd, chainId, onSupply }: MobileVaultRowProps) {
+function MobileVaultRow({ row, usd, chainId, onSupply, onBorrow }: MobileVaultRowProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const eulerUrl = getEulerVaultUrl(chainId, row.vault.address);
 
@@ -484,6 +488,10 @@ function MobileVaultRow({ row, usd, chainId, onSupply }: MobileVaultRowProps) {
     e.stopPropagation();
     onSupply();
   }, [onSupply]);
+  const handleBorrowClick = React.useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onBorrow?.();
+  }, [onBorrow]);
 
   return (
     <div
@@ -546,6 +554,11 @@ function MobileVaultRow({ row, usd, chainId, onSupply }: MobileVaultRowProps) {
             <div className="text-base-content/50 flex flex-1 items-center gap-3 text-[10px]">
               <span>Util: <span className="text-base-content/70">{formatPercent(row.utilization01, 0)}</span></span>
             </div>
+            {onBorrow && row.collaterals.length > 0 && (
+              <button className="btn btn-xs btn-outline" onClick={handleBorrowClick}>
+                Borrow
+              </button>
+            )}
             <button className="btn btn-xs btn-primary" onClick={handleSupplyClick}>
               Supply
             </button>
@@ -562,10 +575,12 @@ interface MobileVaultRowItemProps {
   usd: Intl.NumberFormat;
   chainId: number;
   onSupply: (vault: EulerVault) => void;
+  onBorrow?: (vault: EulerVault) => void;
 }
 
-function MobileVaultRowItem({ row, usd, chainId, onSupply }: MobileVaultRowItemProps) {
+function MobileVaultRowItem({ row, usd, chainId, onSupply, onBorrow }: MobileVaultRowItemProps) {
   const handleSupply = React.useCallback(() => onSupply(row.vault), [row.vault, onSupply]);
+  const handleBorrow = React.useCallback(() => onBorrow?.(row.vault), [row.vault, onBorrow]);
 
   return (
     <MobileVaultRow
@@ -573,6 +588,7 @@ function MobileVaultRowItem({ row, usd, chainId, onSupply }: MobileVaultRowItemP
       usd={usd}
       chainId={chainId}
       onSupply={handleSupply}
+      onBorrow={onBorrow ? handleBorrow : undefined}
     />
   );
 }
@@ -582,6 +598,7 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
   isLoading,
   chainId,
   onSupply,
+  onBorrow,
   pageSize = DEFAULT_PAGE_SIZE,
 }) => {
   const [sorting, setSorting] = React.useState<SortingState>([{ id: "tvlUsd", desc: true }]);
@@ -755,15 +772,25 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
       id: "actions",
       header: "",
       cell: info => (
-        <button
-          onClick={() => handleSupplyClick(info.row.original.vault)}
-          className="text-sm font-medium text-base-content hover:text-primary transition-colors"
-        >
-          Supply
-        </button>
+        <div className="flex items-center justify-end gap-3">
+          {onBorrow && info.row.original.collaterals.length > 0 && (
+            <button
+              onClick={() => handleBorrowClick(info.row.original.vault)}
+              className="text-base-content/60 hover:text-primary text-sm font-medium transition-colors"
+            >
+              Borrow
+            </button>
+          )}
+          <button
+            onClick={() => handleSupplyClick(info.row.original.vault)}
+            className="text-base-content hover:text-primary text-sm font-medium transition-colors"
+          >
+            Supply
+          </button>
+        </div>
       ),
     }),
-  ], [chainId, usd]);
+  ], [chainId, usd, onBorrow]);
 
   const table = useReactTable({
     data,
@@ -824,6 +851,17 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
       depositModal.open();
     },
     [onSupply, depositModal, walletAddress, walletChainId, chainId]
+  );
+
+  const handleBorrowClick = React.useCallback(
+    (v: EulerVault) => {
+      if (onBorrow) {
+        onBorrow(v);
+        return;
+      }
+      notification.error("Please connect your wallet to borrow");
+    },
+    [onBorrow],
   );
 
   const handleCloseDepositModal = React.useCallback(() => {
@@ -985,6 +1023,7 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                 usd={usd}
                 chainId={chainId}
                 onSupply={handleSupplyClick}
+                onBorrow={onBorrow ? handleBorrowClick : undefined}
               />
             ))}
           </div>

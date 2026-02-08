@@ -42,6 +42,7 @@ contract AutoLeverageTrigger is IOrderTrigger {
     bytes4 public constant COMPOUND_V3 = bytes4(keccak256("compound-v3"));
     bytes4 public constant MORPHO_BLUE = bytes4(keccak256("morpho-blue"));
     bytes4 public constant EULER_V2 = bytes4(keccak256("euler-v2"));
+    bytes4 public constant VENUS = bytes4(keccak256("venus"));
 
     // ============ Immutables ============
     IKapanViewRouter public immutable viewRouter;

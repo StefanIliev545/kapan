@@ -14,7 +14,7 @@ import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useGlobalState } from "~~/services/store/store";
 import { useExternalYields, hasExternalYield, type ExternalYield } from "~~/hooks/useExternalYields";
-import { HealthStatus, BaseProtocolHeader, type HeaderMetric } from "../common";
+import { BaseProtocolHeader, type HeaderMetric } from "../common";
 import { useTxCompletedListenerDelayed } from "~~/hooks/common";
 import { CollapsibleSection } from "~~/components/common/CollapsibleSection";
 import { MetricColors } from "~~/utils/protocolMetrics";
@@ -24,7 +24,7 @@ interface PositionMetrics {
   netBalance: number;
   netYield30d: number;
   netApyPercent: number | null;
-  avgUtilization: number;
+  positionCount: number;
 }
 
 /** Default metrics when no positions exist */
@@ -32,7 +32,7 @@ const EMPTY_METRICS: PositionMetrics = {
   netBalance: 0,
   netYield30d: 0,
   netApyPercent: null,
-  avgUtilization: 0,
+  positionCount: 0,
 };
 
 /**
@@ -99,15 +99,11 @@ function calculatePositionMetrics(
   const borrowedPositions = buildBorrowedPositions(rows);
   const yieldMetrics = calculateNetYieldMetrics(suppliedPositions, borrowedPositions);
 
-  const avgUtilization = yieldMetrics.totalSupplied > 0
-    ? (yieldMetrics.totalBorrowed / yieldMetrics.totalSupplied) * 100
-    : 0;
-
   return {
     netBalance: yieldMetrics.netBalance,
     netYield30d: yieldMetrics.netYield30d,
     netApyPercent: yieldMetrics.netApyPercent,
-    avgUtilization,
+    positionCount: rows.length,
   };
 }
 
@@ -174,10 +170,11 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   const rows = useMemo(() => {
     // If refresh is enabled and has completed (not loading/fetching), trust on-chain result
     // This ensures that if on-chain shows no position but API does, we show no position
-    if (refreshEnabled && !isRefreshLoading && !isRefreshing) {
+    if (refreshEnabled && !isRefreshLoading && !isRefreshing && refreshedRows.length > 0) {
       return refreshedRows;
     }
-    // Fall back to API data only before on-chain query completes
+    // Fall back to API data before on-chain query completes or if on-chain returned empty
+    // (avoids flash of "no positions" while on-chain data is loading)
     return apiRows;
   }, [refreshedRows, apiRows, isRefreshing, isRefreshLoading, refreshEnabled]);
 
@@ -242,25 +239,24 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     { label: "30D Yield", mobileLabel: "30D", value: metrics.netYield30d, type: "currency" },
     { label: "Net APY", value: metrics.netApyPercent, type: "apy" },
     {
-      label: "Utilization",
-      mobileLabel: "LTV",
-      value: metrics.avgUtilization,
+      label: "Positions",
+      value: metrics.positionCount,
       type: "custom",
-      customRender: (hasData: boolean) =>
-        hasData ? (
-          <HealthStatus utilizationPercentage={metrics.avgUtilization} />
-        ) : (
-          <span className={`font-mono text-xs font-bold tabular-nums ${MetricColors.MUTED}`}>—</span>
-        ),
+      customRender: (hasData: boolean) => (
+        <span className={`font-mono text-xs font-bold tabular-nums ${hasData ? "text-base-content" : MetricColors.MUTED}`}>
+          {hasData ? metrics.positionCount : "\u2014"}
+        </span>
+      ),
     },
   ], [metrics]);
 
   return (
-    <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 p-3'}`}>
+    <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 py-2 sm:p-3'}`}>
       {/* Protocol Header */}
       <BaseProtocolHeader
         protocolName="Morpho Blue"
         protocolIcon="/logos/morpho.svg"
+        protocolUrl="https://app.morpho.org"
         isCollapsed={isCollapsed}
         isMarketsOpen={isMarketsOpen}
         onToggleCollapsed={toggleCollapsed}

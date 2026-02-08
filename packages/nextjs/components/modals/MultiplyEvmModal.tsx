@@ -27,6 +27,7 @@ import {
   encodeMorphoContext,
   calculateLimitPrice,
 } from "~~/utils/v2/instructionHelpers";
+import { type FlashLoanProviderOption } from "~~/utils/flashLoan";
 import { getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, storeOrderQuoteRate, getKapanCowAdapter } from "~~/utils/cow";
 import { calculateSuggestedSlippage, SLIPPAGE_OPTIONS } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
@@ -59,6 +60,19 @@ import {
   getApyColorClass,
   formatApyDisplay,
   formatYield30dDisplay,
+  resolveSwapRouterFallback,
+  calculateLimitOrderRate,
+  applySlippageToRate,
+  normalizeProtocolForCow,
+  createDefaultChunkParams,
+  resolveEffectiveLtvBps,
+  validateLimitOrderPrerequisites,
+  resolveActiveAdapter,
+  resolveSwapDataForFlow,
+  mapSwapRouterToFlowParam,
+  computeMaxLeverage,
+  resolveProviderOptions,
+  computeSubmitFlags,
   type QuoteData,
   type ChunkParamsResult,
 } from "./multiplyEvmHelpers";
@@ -160,12 +174,11 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // ==================== Effects for Router/Token Changes ====================
 
   useEffect(() => {
-    if (swapRouter === "kyber" && !kyberAvailable) {
-      setSwapRouter(oneInchAvailable ? "1inch" : pendleAvailable ? "pendle" : "kyber");
-    } else if (swapRouter === "1inch" && !oneInchAvailable) {
-      setSwapRouter(kyberAvailable ? "kyber" : pendleAvailable ? "pendle" : "1inch");
-    } else if (swapRouter === "pendle" && !pendleAvailable) {
-      setSwapRouter(kyberAvailable ? "kyber" : oneInchAvailable ? "1inch" : "pendle");
+    const fallback = resolveSwapRouterFallback(swapRouter, {
+      kyber: kyberAvailable, oneInch: oneInchAvailable, pendle: pendleAvailable,
+    });
+    if (fallback) {
+      setSwapRouter(fallback as SwapRouter);
     }
   }, [chainId, oneInchAvailable, kyberAvailable, pendleAvailable, swapRouter]);
 
@@ -196,15 +209,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // ==================== Computed Values Using Helpers ====================
 
-  const maxLeverage = useMemo(() => {
-    let baseLeverage: number;
-    if (predictiveMaxLeverage > 1 && (collateralConfig || isEModeActive)) {
-      baseLeverage = predictiveMaxLeverage;
-    } else {
-      baseLeverage = calculateMaxLeverageFromLtv(maxLtvBps, protocolName);
-    }
-    return adjustMaxLeverageForSlippage(baseLeverage, slippage);
-  }, [predictiveMaxLeverage, collateralConfig, isEModeActive, maxLtvBps, protocolName, slippage]);
+  const maxLeverage = useMemo(() =>
+    computeMaxLeverage(
+      predictiveMaxLeverage, collateralConfig, isEModeActive,
+      maxLtvBps, protocolName, slippage,
+      calculateMaxLeverageFromLtv, adjustMaxLeverageForSlippage,
+    ),
+    [predictiveMaxLeverage, collateralConfig, isEModeActive, maxLtvBps, protocolName, slippage]);
 
   const effectiveLltvBps = useMemo(() => {
     if (predictiveLiqThreshold > 0 && (collateralConfig || isEModeActive)) {
@@ -283,7 +294,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const pendleAdapter = getPendleAdapterInfo(chainId);
 
   // Select the correct adapter based on swap router
-  const activeAdapter = swapRouter === "kyber" ? kyberAdapter : swapRouter === "pendle" ? pendleAdapter : oneInchAdapter;
+  const activeAdapter = resolveActiveAdapter(swapRouter, { kyber: kyberAdapter, oneInch: oneInchAdapter, pendle: pendleAdapter });
 
   // ==================== Amount Calculations ====================
 
@@ -330,15 +341,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       : { name: "", tokenAddress: "0x0000000000000000000000000000000000000000", decimals: 18, type: "supply" },
   });
 
-  const providerOptions = useMemo(() => {
-    if (flashLoanProviders?.length) {
-      return flashLoanProviders;
-    }
-    if (defaultFlashLoanProvider) {
-      return [defaultFlashLoanProvider];
-    }
-    return getDefaultFlashLoanProviders(chainId, isAaveV3Supported, isBalancerV2Supported);
-  }, [defaultFlashLoanProvider, flashLoanProviders, chainId]);
+  const providerOptions: FlashLoanProviderOption[] = useMemo(() =>
+    resolveProviderOptions(flashLoanProviders, defaultFlashLoanProvider, chainId, isAaveV3Supported, isBalancerV2Supported, getDefaultFlashLoanProviders),
+    [defaultFlashLoanProvider, flashLoanProviders, chainId]);
 
   const { selectedProvider, setSelectedProvider, liquidityData } = useFlashLoanSelection({
     flashLoanProviders: providerOptions, defaultProvider: defaultFlashLoanProvider ?? providerOptions[0],
@@ -475,45 +480,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // ==================== Min Collateral Calculation ====================
 
   const minCollateralOut = useMemo(() => {
-    // For limit orders, calculate from rate * amount
+    // For limit orders, calculate from rate * amount using extracted helpers
     if (executionType === "limit" && collateral && debt) {
-      // Use custom rate if set, otherwise use market rate
-      let rateToUse: bigint; // This is always "collateral per 1 debt"
-      if (customMinPrice && customMinPrice !== "") {
-        try {
-          if (priceInputInverted) {
-            // User input is "1 COLL = X DEBT", need to invert to "1 DEBT = Y COLL"
-            // Y = 1/X, but we work in raw units
-            const inputRate = parseUnits(customMinPrice, debt.decimals);
-            if (inputRate === 0n) {
-              rateToUse = marketRate?.raw ?? 0n;
-            } else {
-              // Invert: collPerDebt = 10^collDecimals * 10^debtDecimals / inputRate
-              rateToUse = (BigInt(10 ** collateral.decimals) * BigInt(10 ** debt.decimals)) / inputRate;
-            }
-          } else {
-            // User input is "1 DEBT = X COLL" (normal mode)
-            rateToUse = parseUnits(customMinPrice, collateral.decimals);
-          }
-        } catch {
-          rateToUse = marketRate?.raw ?? 0n;
-        }
-      } else {
-        rateToUse = marketRate?.raw ?? 0n;
-      }
-
-      if (rateToUse === 0n || swapQuoteAmount === 0n) {
-        return { raw: 0n, formatted: "0" };
-      }
-
-      // Apply slippage to the rate
-      const slippageBps = BigInt(Math.round(limitSlippage * 100));
-      const rateWithSlippage = (rateToUse * (10000n - slippageBps)) / 10000n;
-
-      // Calculate total: rate * swapAmount / 10^debtDecimals
-      const totalRaw = (rateWithSlippage * swapQuoteAmount) / BigInt(10 ** debt.decimals);
-      const totalFormatted = formatUnits(totalRaw, collateral.decimals);
-      return { raw: totalRaw, formatted: totalFormatted };
+      const rateToUse = calculateLimitOrderRate(
+        customMinPrice, priceInputInverted,
+        collateral.decimals, debt.decimals,
+        marketRate?.raw,
+      );
+      return applySlippageToRate(rateToUse, swapQuoteAmount, limitSlippage, collateral.decimals, debt.decimals);
     }
 
     // For market orders, use the original calculation
@@ -563,46 +537,18 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     }
 
     // Use ref to get latest quote values (avoids stale closure issues)
-    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, activeAdapter: currentActiveAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
-
-    let swapData: string;
-    let minOut: string;
-
-    if (swapRouter === "1inch" || swapRouter === "kyber") {
-      if (!currentOneInchQuote || !currentActiveAdapter) {
-        console.warn("[buildFlow] Swap not ready:", { oneInchQuote: !!currentOneInchQuote, activeAdapter: !!currentActiveAdapter, swapRouter });
-        return [];
-      }
-      swapData = currentOneInchQuote.tx.data;
-      minOut = minCollateralOut.formatted;
-      console.log("[buildFlow] Kyber/1inch swap params:", {
-        swapRouter,
-        adapterAddress: currentActiveAdapter.address,
-        swapDataLength: swapData?.length || 0,
-        swapDataPrefix: swapData?.slice(0, 20) || "empty",
-        minOut,
-        dstAmount: currentOneInchQuote.dstAmount,
-        txTo: currentOneInchQuote.tx?.to,
-        txFrom: currentOneInchQuote.tx?.from,
-      });
-    } else {
-      if (!currentPendleQuote || !currentPendleAdapter) {
-        console.warn("[buildFlow] Pendle not ready:", { pendleQuote: !!currentPendleQuote, pendleAdapter: !!currentPendleAdapter });
-        return [];
-      }
-      swapData = currentPendleQuote.transaction.data;
-      minOut = currentPendleQuote.data.minPtOut || currentPendleQuote.data.minTokenOut || minCollateralOut.formatted;
-    }
+    const swapResult = resolveSwapDataForFlow(swapRouter, quotesRef.current, minCollateralOut.formatted);
+    if (!swapResult) return [];
 
     const flowParams = {
       protocolName, collateralToken: collateral.address as Address, debtToken: debt.address as Address,
       initialCollateral: zapMode ? "0" : (marginAmount || "0"),
       flashLoanAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
-      minCollateralOut: minOut, swapData,
+      minCollateralOut: swapResult.minOut, swapData: swapResult.swapData,
       collateralDecimals: collateral.decimals, debtDecimals: debt.decimals,
       flashLoanProvider: selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2, market,
       morphoContext: morphoContext ? encodeMorphoContext(morphoContext) : undefined,
-      swapRouter: (swapRouter === "1inch" ? "oneinch" : swapRouter === "kyber" ? "kyber" : "pendle") as "oneinch" | "kyber" | "pendle",
+      swapRouter: mapSwapRouterToFlowParam(swapRouter),
       zapMode,
       depositAmount: zapMode ? marginAmount : undefined,
     };
@@ -616,26 +562,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const chunkParams = useMemo((): ChunkParamsResult => {
     if (executionType !== "limit" || !collateral || !debt || flashLoanAmountRaw === 0n || marginAmountRaw === 0n) {
-      return {
-        numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw],
-        needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0,
-        recommendFlashLoan: false, explanation: ""
-      };
+      return createDefaultChunkParams(flashLoanAmountRaw);
     }
-
-    const ltvBps = collateralConfig?.ltv
-      ? Number(collateralConfig.ltv)
-      : (isEModeActive && eMode ? eMode.ltv : Number(maxLtvBps));
 
     const collateralPrice = collateral.price ?? 0n;
     const debtPrice = debt.price ?? 0n;
 
     if (collateralPrice === 0n || debtPrice === 0n) {
-      return {
-        numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw],
-        needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0,
-        recommendFlashLoan: false, explanation: "Missing price data"
-      };
+      return createDefaultChunkParams(flashLoanAmountRaw, "Missing price data");
     }
 
     // Flash loan mode calculation
@@ -656,6 +590,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     }
 
     // Multi-chunk mode calculation
+    const ltvBps = resolveEffectiveLtvBps(
+      collateralConfig ? { ltv: Number(collateralConfig.ltv) } : null,
+      isEModeActive,
+      eMode,
+      maxLtvBps
+    );
+
     const swapRate = bestQuote && swapQuoteAmount > 0n
       ? calculateSwapRate(swapQuoteAmount, debt.decimals, bestQuote.amount, collateral.decimals)
       : 0n;
@@ -684,23 +625,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // Conditional order trigger params for LimitPriceTrigger
   const conditionalOrderTriggerParams = useMemo(() => {
-    if (!collateral || !collateral.address || !debt || !debt.address || !limitPriceTriggerAddress || !userAddress) {
+    if (!collateral?.address || !debt?.address || !limitPriceTriggerAddress || !userAddress) {
       return null;
     }
     if (flashLoanAmountRaw === 0n || minCollateralOut.raw === 0n) {
       return null;
     }
 
-    // Normalize protocol name for getProtocolId
-    const normalizedProtocol = protocolName.toLowerCase().includes("aave")
-      ? "aave"
-      : protocolName.toLowerCase().includes("compound")
-        ? "compound"
-        : protocolName.toLowerCase().includes("venus")
-          ? "venus"
-          : protocolName.toLowerCase().includes("morpho")
-            ? "morpho"
-            : "aave";
+    const normalizedProtocol = normalizeProtocolForCow(protocolName);
 
     // Calculate limit price (8 decimals, like Chainlink)
     // For leverage-up: we sell debt to buy collateral
@@ -854,45 +786,48 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       marginAmount, leverage
     });
 
-    if (!collateral || !debt || !userAddress || !conditionalOrderManagerAddress || !walletClient || !publicClient) {
-      throw new Error("Missing required data for conditional order");
-    }
-    if (!limitPriceTriggerAddress || !conditionalOrderTriggerParams) {
-      console.error("[Conditional Order] Missing config:", {
-        limitPriceTriggerAddress,
-        conditionalOrderTriggerParams: !!conditionalOrderTriggerParams,
-        flashLoanAmountRaw: flashLoanAmountRaw.toString(),
-        minCollateralOut: minCollateralOut.raw.toString(),
-      });
-      throw new Error(`Missing trigger configuration: ${!limitPriceTriggerAddress ? "trigger not deployed" : "params not ready (check amounts)"}`);
-    }
+    // Validate all prerequisites using extracted helper (throws on failure)
+    validateLimitOrderPrerequisites({
+      collateral, debt, userAddress,
+      conditionalOrderManagerAddress, walletClient, publicClient,
+      limitPriceTriggerAddress, conditionalOrderTriggerParams,
+      flashLoanAmountRaw, minCollateralOutRaw: minCollateralOut.raw,
+    });
+
+    // After validation, we can safely assert these are non-null
+    const validCollateral = collateral!;
+    const validDebt = debt!;
+    const validUserAddress = userAddress!;
+    const validManagerAddress = conditionalOrderManagerAddress!;
+    const validWalletClient = walletClient!;
+    const validPublicClient = publicClient!;
 
     const isFlashLoanMode = chunkParams.useFlashLoan === true;
 
     console.log("[Conditional Order] Building order:", {
-      sellToken: debt.address,
-      buyToken: collateral.address,
-      sellAmount: formatUnits(flashLoanAmountRaw / BigInt(flashLoanChunks), debt.decimals),
-      buyAmount: formatUnits(minCollateralOut.raw / BigInt(flashLoanChunks), collateral.decimals),
+      sellToken: validDebt.address,
+      buyToken: validCollateral.address,
+      sellAmount: formatUnits(flashLoanAmountRaw / BigInt(flashLoanChunks), validDebt.decimals),
+      buyAmount: formatUnits(minCollateralOut.raw / BigInt(flashLoanChunks), validCollateral.decimals),
       numChunks: flashLoanChunks,
       isFlashLoanMode,
     });
 
     try {
       const result = await buildConditionalOrderCalls({
-        triggerAddress: limitPriceTriggerAddress,
-        triggerStaticData: conditionalOrderTriggerParams,
-        sellToken: debt.address as Address,
-        buyToken: collateral.address as Address,
+        triggerAddress: limitPriceTriggerAddress!,
+        triggerStaticData: conditionalOrderTriggerParams!,
+        sellToken: validDebt.address as Address,
+        buyToken: validCollateral.address as Address,
         preInstructions: buildConditionalOrderInstructionsData.preInstructions,
         postInstructions: buildConditionalOrderInstructionsData.postInstructions,
         maxIterations: flashLoanChunks,
         flashLoan: isFlashLoanMode && chunkParams.flashLoanLender ? {
           lender: chunkParams.flashLoanLender as Address,
-          token: debt.address as Address,
+          token: validDebt.address as Address,
           amount: chunkParams.chunkSize,
         } : undefined,
-        sellTokenRefundAddress: isFlashLoanMode && chunkParams.flashLoanLender ? getKapanCowAdapter(chainId) as Address : userAddress,
+        sellTokenRefundAddress: isFlashLoanMode && chunkParams.flashLoanLender ? getKapanCowAdapter(chainId) as Address : validUserAddress,
         operationType: "leverage-up",
         protocolName,
         isKindBuy: false, // SELL order: exact sellAmount, min buyAmount
@@ -906,35 +841,34 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
       // Save order note
       if (result.salt) {
-        saveLimitOrderNote(result.salt, debt.symbol, collateral.symbol);
+        saveOrderNote(createLeverageUpNote(result.salt, protocolName, validDebt.symbol, validCollateral.symbol, chainId));
       }
 
-      const notificationId = notification.loading(
+      notification.loading(
         <TransactionToast step="pending" message={`Creating conditional order (${result.calls.length} operations)...`} />
       );
 
+      // Execute all transaction calls sequentially
       const receipts: TransactionReceipt[] = [];
       for (let i = 0; i < result.calls.length; i++) {
         const call = result.calls[i];
-        notification.remove(notificationId as string);
-
         const stepNotificationId = notification.loading(
           <TransactionToast step="pending" message={`Executing step ${i + 1}/${result.calls.length}...`} />
         );
 
-        const txHash = await walletClient.sendTransaction({
-          account: userAddress,
+        const txHash = await validWalletClient.sendTransaction({
+          account: validUserAddress,
           to: call.to,
           data: call.data,
           chain: null,
         });
 
-        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+        const receipt = await validPublicClient.waitForTransactionReceipt({ hash: txHash });
         receipts.push(receipt);
         notification.remove(stepNotificationId as string);
       }
 
-      const explorerUrl = getCowExplorerAddressUrl(chainId, conditionalOrderManagerAddress);
+      const explorerUrl = getCowExplorerAddressUrl(chainId, validManagerAddress);
       notification.success(
         <TransactionToast
           step="confirmed"
@@ -943,22 +877,22 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         />
       );
 
-      const orderHash = extractOrderHash(receipts, conditionalOrderManagerAddress) ?? undefined;
+      const orderHash = extractOrderHash(receipts, validManagerAddress) ?? undefined;
 
       // Save order to database
-      if (result.salt && debt && collateral && userAddress) {
+      if (result.salt) {
         saveOrder.mutate({
           orderUid: result.salt,
           orderHash,
           salt: result.salt,
-          userAddress,
+          userAddress: validUserAddress,
           chainId,
           orderType: "leverage_up",
           protocol: protocolName,
-          sellToken: debt.address,
-          buyToken: collateral.address,
-          sellTokenSymbol: debt.symbol,
-          buyTokenSymbol: collateral.symbol,
+          sellToken: validDebt.address,
+          buyToken: validCollateral.address,
+          sellTokenSymbol: validDebt.symbol,
+          buyTokenSymbol: validCollateral.symbol,
           sellAmount: flashLoanAmountRaw.toString(),
           buyAmount: minCollateralOut.raw.toString(),
         });
@@ -977,14 +911,6 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
         error: e instanceof Error ? e.message : String(e),
       });
       throw e;
-    }
-  };
-
-  // ==================== Helper Functions for Limit Order ====================
-
-  const saveLimitOrderNote = (salt: string, debtSymbol: string, collateralSymbol: string) => {
-    if (salt) {
-      saveOrderNote(createLeverageUpNote(salt, protocolName, debtSymbol, collateralSymbol, chainId));
     }
   };
 
@@ -1021,12 +947,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // ==================== Derived State for UI ====================
 
-  const hasQuote = swapRouter === "pendle" ? !!pendleQuote : !!oneInchQuote;
-  const hasAdapter = swapRouter === "kyber" ? !!kyberAdapter : swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
-
-  const canSubmitMarket = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && hasQuote && hasAdapter && !isSwapQuoteLoading;
-  const canSubmitLimit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && conditionalOrderReady && !!conditionalOrderTriggerParams;
-  const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
+  const { canSubmit } = computeSubmitFlags({
+    swapRouter, pendleQuote, oneInchQuote,
+    kyberAdapter, oneInchAdapter, pendleAdapter,
+    executionType, collateral, debt, marginAmountRaw, leverage,
+    isSwapQuoteLoading, conditionalOrderReady, conditionalOrderTriggerParams,
+  });
 
   const isSubmittingAny = isSubmitting || isCowCreating;
   const marginUsd = depositToken && marginAmount

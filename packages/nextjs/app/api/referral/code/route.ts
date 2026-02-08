@@ -35,6 +35,39 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/** Look up an existing referral code for a wallet. Returns null if none exists. */
+async function findExistingCode(normalizedWallet: string): Promise<string | null> {
+  const [existing] = await db
+    .select({ code: referralCodes.code })
+    .from(referralCodes)
+    .where(eq(referralCodes.walletAddress, normalizedWallet))
+    .limit(1);
+  return existing?.code ?? null;
+}
+
+/** Handle a Postgres unique constraint violation during code insertion.
+ *  Returns a Response if the violation is recoverable, or null to signal retry/re-throw. */
+async function handleInsertConflict(
+  err: unknown,
+  normalizedWallet: string,
+): Promise<Response | null> {
+  const pgError = err as { code?: string; constraint?: string };
+  if (pgError.code !== "23505") return null;
+
+  // Code collision - caller should retry with a new code
+  if (pgError.constraint?.includes("code")) return null;
+
+  // Wallet collision - another request created the code concurrently
+  if (pgError.constraint?.includes("wallet")) {
+    const existingCode = await findExistingCode(normalizedWallet);
+    if (existingCode) {
+      return Response.json({ code: existingCode, created: false }, { status: 200 });
+    }
+  }
+
+  return null;
+}
+
 /**
  * POST /api/referral/code
  * Creates a new referral code for a wallet address.
@@ -49,33 +82,21 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const wallet = body.wallet;
-
-  if (!wallet) {
+  if (!body.wallet) {
     return Response.json({ error: "Missing wallet in request body" }, { status: 400 });
   }
 
-  const normalizedWallet = normalizeAddress(wallet);
+  const normalizedWallet = normalizeAddress(body.wallet);
 
   try {
-    // Check if wallet already has a code
-    const [existing] = await db
-      .select({ code: referralCodes.code })
-      .from(referralCodes)
-      .where(eq(referralCodes.walletAddress, normalizedWallet))
-      .limit(1);
-
-    if (existing) {
-      return Response.json({ code: existing.code, created: false }, { status: 200 });
+    const existingCode = await findExistingCode(normalizedWallet);
+    if (existingCode) {
+      return Response.json({ code: existingCode, created: false }, { status: 200 });
     }
 
-    // Generate a unique code with retry logic
-    let attempts = 0;
     const maxAttempts = 5;
-
-    while (attempts < maxAttempts) {
+    for (let attempts = 0; attempts < maxAttempts; attempts++) {
       const code = generateReferralCode();
-
       try {
         const [inserted] = await db
           .insert(referralCodes)
@@ -84,26 +105,12 @@ export async function POST(req: NextRequest) {
 
         return Response.json({ code: inserted.code, createdAt: inserted.createdAt, created: true }, { status: 201 });
       } catch (err: unknown) {
+        const conflictResponse = await handleInsertConflict(err, normalizedWallet);
+        if (conflictResponse) return conflictResponse;
+
+        // Code collision (pgError.code === "23505" && constraint includes "code") => retry
         const pgError = err as { code?: string; constraint?: string };
-
-        // If unique constraint violation on code, retry with a new code
-        if (pgError.code === "23505" && pgError.constraint?.includes("code")) {
-          attempts++;
-          continue;
-        }
-
-        // If unique constraint violation on wallet, it was created by another request
-        if (pgError.code === "23505" && pgError.constraint?.includes("wallet")) {
-          const [justCreated] = await db
-            .select({ code: referralCodes.code })
-            .from(referralCodes)
-            .where(eq(referralCodes.walletAddress, normalizedWallet))
-            .limit(1);
-
-          if (justCreated) {
-            return Response.json({ code: justCreated.code, created: false }, { status: 200 });
-          }
-        }
+        if (pgError.code === "23505" && pgError.constraint?.includes("code")) continue;
 
         throw err;
       }

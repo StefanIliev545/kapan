@@ -2,7 +2,7 @@
 
 import { FC, ReactNode } from "react";
 import Image from "next/image";
-import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
+import { ChevronDownIcon, ChevronUpIcon, ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import {
   getValueColorClass,
   getApyColorClass,
@@ -42,6 +42,8 @@ export interface BaseProtocolHeaderProps {
   protocolIcon: string;
   /** Alt text for icon */
   iconAlt?: string;
+  /** URL to the protocol's dapp (makes name clickable) */
+  protocolUrl?: string;
 
   /** Whether the header is collapsed */
   isCollapsed: boolean;
@@ -55,7 +57,7 @@ export interface BaseProtocolHeaderProps {
   /** Whether user has positions (affects metric display) */
   hasPositions: boolean;
 
-  /** Array of metrics to display (max 4) */
+  /** Array of metrics to display (exactly 4 recommended for alignment across protocols) */
   metrics: HeaderMetric[];
 
   /** Optional extra content to render in the header (e.g., E-Mode toggle) */
@@ -118,7 +120,7 @@ const DesktopMetric: FC<{
 }> = ({ metric, hasPositions }) => {
   if (metric.customRender) {
     return (
-      <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
+      <div className="hover:bg-base-200/30 group flex min-w-[88px] flex-col items-center gap-0.5 rounded-lg px-3 py-0.5 transition-colors">
         <span className="label-text-xs-semibold">{metric.label}</span>
         {metric.customRender(hasPositions)}
       </div>
@@ -138,9 +140,9 @@ const DesktopMetric: FC<{
       : hasPositions ? String(metric.value ?? "—") : "—";
 
   return (
-    <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
+    <div className="hover:bg-base-200/30 group flex min-w-[88px] flex-col items-center gap-0.5 rounded-lg px-3 py-0.5 transition-colors">
       <span className="label-text-xs-semibold">{metric.label}</span>
-      <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${colorClass}`}>
+      <span className={`font-mono text-[11px] font-bold tabular-nums tracking-tight ${colorClass}`}>
         {formattedValue}
       </span>
     </div>
@@ -176,6 +178,7 @@ export const BaseProtocolHeader: FC<BaseProtocolHeaderProps> = ({
   protocolName,
   protocolIcon,
   iconAlt,
+  protocolUrl,
   isCollapsed,
   isMarketsOpen,
   onToggleCollapsed,
@@ -189,13 +192,13 @@ export const BaseProtocolHeader: FC<BaseProtocolHeaderProps> = ({
 
   return (
     <div
-      className={`card-surface-interactive shadow-lg ${className}`}
+      className={`card-surface-interactive border-t-primary/40 border-t-[3px] shadow-lg sm:border-t-0 sm:border-l-[3px] sm:border-l-primary/40 ${className}`}
       onClick={onToggleCollapsed}
     >
-      <div className="card-body p-3 sm:px-5">
+      <div className="card-body px-3 py-1.5 sm:px-5 sm:py-2">
         {/* Mobile Layout (< sm) */}
-        <div className="space-y-3 sm:hidden">
-          {/* Row 1: Protocol name + Markets + Collapse */}
+        <div className="space-y-1.5 sm:hidden">
+          {/* Row 1: Protocol icon + name (left), Markets + chevron (right) */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="token-icon-wrapper-md">
@@ -208,12 +211,25 @@ export const BaseProtocolHeader: FC<BaseProtocolHeaderProps> = ({
                   onError={handleImageError}
                 />
               </div>
-              <span className="text-sm font-bold tracking-tight">{protocolName}</span>
+              {protocolUrl ? (
+                <a
+                  href={protocolUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group/link flex items-center gap-1 text-sm font-bold tracking-tight hover:text-primary transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {protocolName}
+                  <ArrowTopRightOnSquareIcon className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
+                </a>
+              ) : (
+                <span className="text-sm font-bold tracking-tight">{protocolName}</span>
+              )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {headerExtra}
               <button
-                className="btn btn-xs btn-ghost gap-1"
+                className="btn btn-xs btn-ghost gap-0.5"
                 type="button"
                 onClick={onToggleMarkets}
               >
@@ -225,17 +241,20 @@ export const BaseProtocolHeader: FC<BaseProtocolHeaderProps> = ({
               />
             </div>
           </div>
-          {/* Row 2: Stats in a grid */}
-          <div className={`grid grid-cols-${Math.min(metrics.length, 4)} gap-1`}>
+          {/* Row 2: Stats spread horizontally, centered */}
+          <div className="flex items-center justify-center gap-4 px-2">
             {metrics.slice(0, 4).map((metric, idx) => (
               <MobileMetric key={idx} metric={metric} hasPositions={hasPositions} />
             ))}
           </div>
         </div>
 
-        {/* Desktop Layout (>= sm) */}
-        <div className="hidden flex-wrap items-center gap-x-6 gap-y-4 sm:flex">
-          {/* Protocol name + icon */}
+        {/* Desktop Layout (>= sm) — CSS grid with fixed columns for cross-protocol alignment */}
+        <div
+          className="hidden items-center sm:grid"
+          style={{ gridTemplateColumns: "160px 1px repeat(4, 1fr) auto" }}
+        >
+          {/* Protocol name + icon — fixed-width column */}
           <div className="flex items-center gap-3">
             <div className="token-icon-wrapper-lg">
               <Image
@@ -249,19 +268,38 @@ export const BaseProtocolHeader: FC<BaseProtocolHeaderProps> = ({
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="label-text-xs-semibold">Protocol</span>
-              <span className="text-base font-bold tracking-tight">{protocolName}</span>
+              {protocolUrl ? (
+                <a
+                  href={protocolUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group/link flex items-center gap-1 whitespace-nowrap text-sm font-bold tracking-tight hover:text-primary transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {protocolName}
+                  <ArrowTopRightOnSquareIcon className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
+                </a>
+              ) : (
+                <span className="whitespace-nowrap text-sm font-bold tracking-tight">{protocolName}</span>
+              )}
             </div>
           </div>
 
           {/* Divider */}
           <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
 
-          {/* Stats */}
-          <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
-            {metrics.slice(0, 4).map((metric, idx) => (
-              <DesktopMetric key={idx} metric={metric} hasPositions={hasPositions} />
-            ))}
-          </div>
+          {/* Stats — always 4 grid cells, padded with empty slots if fewer metrics */}
+          {Array.from({ length: 4 }, (_, idx) => {
+            const metric = metrics[idx];
+            if (!metric) {
+              return <div key={idx} />;
+            }
+            return (
+              <div key={idx} className="flex justify-center">
+                <DesktopMetric metric={metric} hasPositions={hasPositions} />
+              </div>
+            );
+          })}
 
           {/* Actions (Markets button + collapse indicator) */}
           <div className="border-base-300/50 flex items-center gap-2.5 border-l pl-2">

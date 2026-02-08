@@ -139,6 +139,58 @@ const CONDITIONAL_ORDER_MANAGER_ABI = [
   },
 ] as const;
 
+// Helper: execute authorization transactions sequentially
+async function executeAuthCalls(
+  authCalls: Array<{ target: string; data: string }>,
+  walletClient: any, publicClient: any, account: Address,
+): Promise<void> {
+  if (authCalls.length === 0) return;
+  notification.info(`Requesting ${authCalls.length} authorization(s)...`);
+  for (const authCall of authCalls) {
+    const hash = await walletClient.sendTransaction({
+      to: authCall.target as Address, data: authCall.data as Hex,
+      chain: walletClient.chain, account,
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+  }
+}
+
+// Helper: extract order hash from receipt logs
+function extractOrderHashFromLogs(
+  logs: Array<{ address: string; topics: string[] }>,
+  managerAddr: string, fallback: string,
+): string {
+  for (const log of logs) {
+    if (log.address.toLowerCase() === managerAddr.toLowerCase() && log.topics.length >= 2 && log.topics[1]) {
+      return log.topics[1];
+    }
+  }
+  return fallback;
+}
+
+// Helper: ensure router delegation for order manager
+async function ensureRouterDelegation(
+  publicClient: any, walletClient: any,
+  routerContract: { address: string; abi: any },
+  userAddress: Address, orderManagerAddress: Address,
+  connectedAddress: Address, orderType: string,
+): Promise<void> {
+  const isDelegated = await publicClient.readContract({
+    address: routerContract.address as Address, abi: routerContract.abi,
+    functionName: "userDelegates", args: [userAddress, orderManagerAddress],
+  }) as boolean;
+  if (!isDelegated) {
+    notification.info(`Setting up router delegation for ${orderType} orders...`);
+    const delegateHash = await walletClient.sendTransaction({
+      to: routerContract.address as Address,
+      data: encodeFunctionData({ abi: routerContract.abi, functionName: "setDelegate", args: [orderManagerAddress, true] }),
+      chain: walletClient.chain, account: connectedAddress,
+    });
+    await publicClient.waitForTransactionReceipt({ hash: delegateHash });
+    notification.success("Router delegation enabled");
+  }
+}
+
 // ============ Hook ============
 
 export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoLeverageOrderReturn {
@@ -221,29 +273,10 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
       if (!routerContract?.address) {
         throw new Error("KapanRouter not deployed on this chain");
       }
-
-      const isDelegated = await publicClient.readContract({
-        address: routerContract.address as Address,
-        abi: routerContract.abi,
-        functionName: "userDelegates",
-        args: [userAddress, validOrderManager],
-      }) as boolean;
-
-      if (!isDelegated) {
-        notification.info("Setting up router delegation for auto-leverage orders...");
-        const delegateHash = await walletClient.sendTransaction({
-          to: routerContract.address as Address,
-          data: encodeFunctionData({
-            abi: routerContract.abi,
-            functionName: "setDelegate",
-            args: [validOrderManager, true],
-          }),
-          chain: walletClient.chain,
-          account: connectedAddress as Address,
-        });
-        await publicClient.waitForTransactionReceipt({ hash: delegateHash });
-        notification.success("Router delegation enabled");
-      }
+      await ensureRouterDelegation(
+        publicClient, walletClient, routerContract, userAddress,
+        validOrderManager, connectedAddress as Address, "auto-leverage"
+      );
 
       // Generate unique salt
       const salt = generateOrderSalt() as `0x${string}`;
@@ -312,8 +345,8 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
         {
           operationType: "leverage-up", // Auto-leverage operation
           protocol,
-          preHookGasLimit: "800000", // Pre-hook: deposit collateral + borrow debt + push
-          postHookGasLimit: "500000", // Post-hook: minimal - just refund handling
+          preHookGasLimit: "500000", // Pre-hook: fund order from adapter + record balances
+          postHookGasLimit: "1500000", // Post-hook: deposit collateral + borrow debt + push (Venus is gas-heavy)
           flashLoan: flashLoanAppDataConfig,
         },
       );
@@ -354,19 +387,7 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
       const notificationId = notification.loading("Creating auto-leverage order...");
 
       try {
-        // Execute authorization transactions first
-        if (authCalls.length > 0) {
-          notification.info(`Requesting ${authCalls.length} authorization(s)...`);
-          for (const authCall of authCalls) {
-            const authHash = await walletClient.sendTransaction({
-              to: authCall.target as Address,
-              data: authCall.data as Hex,
-              chain: walletClient.chain,
-              account: connectedAddress as Address,
-            });
-            await publicClient.waitForTransactionReceipt({ hash: authHash });
-          }
-        }
+        await executeAuthCalls(authCalls, walletClient, publicClient, connectedAddress as Address);
 
         // Send createOrder transaction
         const hash = await walletClient.sendTransaction({
@@ -384,18 +405,7 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
         }
 
         // Extract orderHash from logs
-        let orderHash = salt;
-
-        for (const log of receipt.logs) {
-          if (
-            log.address.toLowerCase() === validOrderManager.toLowerCase() &&
-            log.topics.length >= 2 &&
-            log.topics[1]
-          ) {
-            orderHash = log.topics[1];
-            break;
-          }
-        }
+        const orderHash = extractOrderHashFromLogs(receipt.logs, validOrderManager, salt);
 
         notification.remove(notificationId);
         notification.success("Auto-leverage order created successfully!");

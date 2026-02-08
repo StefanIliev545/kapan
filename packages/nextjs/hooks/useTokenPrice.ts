@@ -52,8 +52,8 @@ export interface TokenPricesResult {
 // Constants
 // -----------------------------------------------------------------------------
 
-const PRICE_STALE_TIME = 15_000; // 15 seconds
-const PRICE_CACHE_TIME = 60_000; // 1 minute
+const PRICE_STALE_TIME = 60_000; // 60 seconds — keep prices fresh for longer to avoid CoinGecko rate limits
+const PRICE_CACHE_TIME = 300_000; // 5 minutes — preserve cached prices longer for keepPreviousData fallback
 
 // Query key factory
 export const tokenPriceKeys = {
@@ -63,6 +63,12 @@ export const tokenPriceKeys = {
     ...tokenPriceKeys.all,
     "batch",
     symbols.map(s => s.toLowerCase()).sort().join(","),
+  ] as const,
+  byAddress: (chainId: number, addresses: string[]) => [
+    ...tokenPriceKeys.all,
+    "byAddress",
+    chainId,
+    addresses.map(a => a.toLowerCase()).sort().join(","),
   ] as const,
 };
 
@@ -97,6 +103,31 @@ async function fetchTokenPrices(symbols: string[]): Promise<Record<string, numbe
 
   const sp = new URLSearchParams();
   sp.set("symbols", validSymbols.join(","));
+
+  const res = await fetch(`/api/tokenPrice?${sp.toString()}`);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  const json = (await res.json()) as { prices?: Record<string, number> };
+  return json?.prices ?? {};
+}
+
+/**
+ * Fetch prices for multiple tokens by contract address + chain ID.
+ * Uses CoinGecko's token_price endpoint — no symbol ambiguity.
+ * Returns Record<lowercaseAddress, usdPrice>.
+ */
+export async function fetchTokenPricesByAddress(
+  chainId: number,
+  addresses: string[],
+): Promise<Record<string, number>> {
+  const valid = addresses.map(a => a.trim()).filter(Boolean);
+  if (valid.length === 0 || !chainId) return {};
+
+  const sp = new URLSearchParams();
+  sp.set("chainId", String(chainId));
+  sp.set("addresses", valid.join(","));
 
   const res = await fetch(`/api/tokenPrice?${sp.toString()}`);
   if (!res.ok) {
@@ -182,6 +213,51 @@ export function useTokenPrices(
     staleTime: PRICE_STALE_TIME,
     gcTime: PRICE_CACHE_TIME,
     // Keep showing previous prices while fetching new ones to avoid UI flicker
+    placeholderData: keepPreviousData,
+    retry: 2,
+    retryDelay: 1000,
+  });
+
+  const prices = query.data ?? {};
+  const pricesRaw: Record<string, bigint> = {};
+
+  for (const [key, value] of Object.entries(prices)) {
+    pricesRaw[key.toLowerCase()] = priceToRaw(value);
+  }
+
+  return {
+    prices,
+    pricesRaw,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    isSuccess: query.isSuccess,
+    refetch: () => { query.refetch(); },
+  };
+}
+
+/**
+ * Hook to fetch token prices by contract address + chain ID.
+ * Uses CoinGecko's token_price endpoint — no symbol ambiguity, single API call.
+ * Returns prices keyed by lowercase address.
+ *
+ * @param chainId - EVM chain ID (1, 42161, 8453, 10, 59144, 56)
+ * @param addresses - Array of token contract addresses
+ * @param options - Optional configuration
+ */
+export function useTokenPricesByAddress(
+  chainId: number,
+  addresses: string[],
+  options?: { enabled?: boolean },
+): TokenPricesResult {
+  const validAddresses = addresses.filter(a => a?.trim());
+  const enabled = options?.enabled !== false && validAddresses.length > 0 && chainId > 0;
+
+  const query = useQuery({
+    queryKey: tokenPriceKeys.byAddress(chainId, validAddresses),
+    queryFn: () => fetchTokenPricesByAddress(chainId, validAddresses),
+    enabled,
+    staleTime: PRICE_STALE_TIME,
+    gcTime: PRICE_CACHE_TIME,
     placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: 1000,

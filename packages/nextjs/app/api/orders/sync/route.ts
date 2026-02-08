@@ -25,162 +25,79 @@ const CHUNK_EXECUTED_EVENT = parseAbiItem(
   "event ChunkExecuted(bytes32 indexed orderHash, uint256 chunkIndex, uint256 sellAmount, uint256 buyAmount)"
 );
 
-/**
- * POST /api/orders/sync
- * Syncs order fill data from blockchain events.
- * Called when user views their orders to ensure fill data is up-to-date.
- */
-export async function POST(req: NextRequest) {
-  let body: { wallet: string; chainId?: number };
+// ============ Helper Functions ============
 
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+/** Resolve chain + rpc + OrderManager address, or null if unsupported */
+function getChainSyncConfig(chainId: number) {
+  const chain = CHAINS[chainId];
+  const rpcUrl = RPC_URLS[chainId];
+  if (!chain || !rpcUrl) return null;
+
+  const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
+  const orderManagerAddress = contracts?.KapanOrderManager?.address;
+  if (!orderManagerAddress) return null;
+
+  return { chain, rpcUrl, orderManagerAddress };
+}
+
+/** Calculate execution price scaled to 18 decimals */
+function computeExecutionPrice(sellAmount: bigint, buyAmount: bigint): string | null {
+  return sellAmount > 0n ? (buyAmount * 10n ** 18n / sellAmount).toString() : null;
+}
+
+/** Check whether this fill was already persisted */
+async function isFillAlreadyRecorded(orderId: string | number, txHash: string): Promise<boolean> {
+  const [existing] = await db
+    .select()
+    .from(orderFills)
+    .where(and(eq(orderFills.orderId, orderId as any), eq(orderFills.txHash, txHash)))
+    .limit(1);
+  return !!existing;
+}
+/** Record a new fill and update the order cumulative totals */
+async function recordFillAndUpdateOrder(
+  matchingOrder: typeof orders.$inferSelect,
+  txHash: string,
+  sellAmount: bigint,
+  buyAmount: bigint,
+): Promise<void> {
+  await db.insert(orderFills).values({
+    orderId: matchingOrder.id,
+    txHash,
+    fillSellAmount: sellAmount.toString(),
+    fillBuyAmount: buyAmount.toString(),
+    executionPrice: computeExecutionPrice(sellAmount, buyAmount),
+  });
+
+  const newFilledSell = BigInt(matchingOrder.filledSellAmount || "0") + sellAmount;
+  const newFilledBuy = BigInt(matchingOrder.filledBuyAmount || "0") + buyAmount;
+  const isFullyFilled = newFilledSell >= BigInt(matchingOrder.sellAmount);
+
+  await db
+    .update(orders)
+    .set({
+      filledSellAmount: newFilledSell.toString(),
+      filledBuyAmount: newFilledBuy.toString(),
+      status: isFullyFilled ? "filled" : "partially_filled",
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, matchingOrder.id));
+}
+async function syncChainOrders(chainId: number, chainOrders: typeof orders.$inferSelect[]): Promise<number> {
+  const config = getChainSyncConfig(chainId);
+  if (!config) { console.log("[Sync] Skip chain:", chainId); return 0; }
+  const client = createPublicClient({ chain: config.chain, transport: http(config.rpcUrl) });
+  const cur = await client.getBlockNumber();
+  const logs = await client.getLogs({ address: config.orderManagerAddress as Address, event: CHUNK_EXECUTED_EVENT, fromBlock: cur - 10000n, toBlock: "latest" });
+  let s = 0;
+  for (const log of logs) {
+    const { orderHash, sellAmount, buyAmount } = log.args;
+    const txHash = log.transactionHash;
+    if (!orderHash || !sellAmount || !buyAmount || !txHash) continue;
+    const mo = chainOrders.find(o => o.orderHash === orderHash);
+    if (!mo || await isFillAlreadyRecorded(String(mo.id), txHash)) continue;
+    await recordFillAndUpdateOrder(mo, txHash, sellAmount, buyAmount);
+    s++;
   }
-
-  if (!body.wallet) {
-    return Response.json({ error: "Missing wallet parameter" }, { status: 400 });
-  }
-
-  const normalizedWallet = body.wallet.toLowerCase();
-
-  try {
-    // Get user's pending/partially filled orders
-    const conditions = [
-      eq(orders.userAddress, normalizedWallet),
-      inArray(orders.status, ["pending", "open", "partially_filled"]),
-    ];
-
-    if (body.chainId) {
-      conditions.push(eq(orders.chainId, body.chainId));
-    }
-
-    const userOrders = await db
-      .select()
-      .from(orders)
-      .where(and(...conditions))
-      .limit(50);
-
-    if (userOrders.length === 0) {
-      return Response.json({ synced: 0 });
-    }
-
-    // Group orders by chain
-    const ordersByChain = userOrders.reduce<Record<number, typeof userOrders>>((acc, order) => {
-      if (!acc[order.chainId]) acc[order.chainId] = [];
-      acc[order.chainId].push(order);
-      return acc;
-    }, {});
-
-    let totalSynced = 0;
-
-    // Process each chain
-    for (const [chainIdStr, chainOrders] of Object.entries(ordersByChain)) {
-      const chainId = parseInt(chainIdStr);
-      const chain = CHAINS[chainId];
-      const rpcUrl = RPC_URLS[chainId];
-
-      if (!chain || !rpcUrl) {
-        console.log("[Sync] Skipping unsupported chain:", chainId);
-        continue;
-      }
-
-      const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
-      const orderManagerAddress = contracts?.KapanOrderManager?.address;
-
-      if (!orderManagerAddress) {
-        console.log("[Sync] No OrderManager for chain:", chainId);
-        continue;
-      }
-
-      const client = createPublicClient({
-        chain,
-        transport: http(rpcUrl),
-      });
-
-      // Get recent ChunkExecuted events (last ~10000 blocks)
-      const currentBlock = await client.getBlockNumber();
-      const fromBlock = currentBlock - 10000n;
-
-      const logs = await client.getLogs({
-        address: orderManagerAddress as Address,
-        event: CHUNK_EXECUTED_EVENT,
-        fromBlock,
-        toBlock: "latest",
-      });
-
-      console.log(`[Sync] Found ${logs.length} ChunkExecuted events on chain ${chainId}`);
-
-      // Process events and match to orders
-      for (const log of logs) {
-        const { orderHash, sellAmount, buyAmount } = log.args;
-        const txHash = log.transactionHash;
-
-        if (!orderHash || !sellAmount || !buyAmount || !txHash) continue;
-
-        // Find matching order by orderHash
-        const matchingOrder = chainOrders.find(o => o.orderHash === orderHash);
-
-        if (!matchingOrder) {
-          // Try matching by salt (orderUid) if orderHash not stored
-          // This is a fallback for orders created before we stored orderHash
-          continue;
-        }
-
-        // Check if fill already recorded
-        const [existingFill] = await db
-          .select()
-          .from(orderFills)
-          .where(
-            and(
-              eq(orderFills.orderId, matchingOrder.id),
-              eq(orderFills.txHash, txHash)
-            )
-          )
-          .limit(1);
-
-        if (existingFill) continue;
-
-        // Record the fill
-        const executionPrice = sellAmount > 0n
-          ? (buyAmount * 10n ** 18n / sellAmount).toString()
-          : null;
-
-        await db.insert(orderFills).values({
-          orderId: matchingOrder.id,
-          txHash,
-          fillSellAmount: sellAmount.toString(),
-          fillBuyAmount: buyAmount.toString(),
-          executionPrice,
-        });
-
-        // Update order totals
-        const currentFilledSell = BigInt(matchingOrder.filledSellAmount || "0");
-        const currentFilledBuy = BigInt(matchingOrder.filledBuyAmount || "0");
-        const newFilledSell = currentFilledSell + sellAmount;
-        const newFilledBuy = currentFilledBuy + buyAmount;
-
-        const totalSellAmount = BigInt(matchingOrder.sellAmount);
-        const isFullyFilled = newFilledSell >= totalSellAmount;
-
-        await db
-          .update(orders)
-          .set({
-            filledSellAmount: newFilledSell.toString(),
-            filledBuyAmount: newFilledBuy.toString(),
-            status: isFullyFilled ? "filled" : "partially_filled",
-            updatedAt: new Date(),
-          })
-          .where(eq(orders.id, matchingOrder.id));
-
-        totalSynced++;
-      }
-    }
-
-    return Response.json({ synced: totalSynced });
-  } catch (error) {
-    console.error("[Sync] Error:", error);
-    return Response.json({ error: "Failed to sync orders" }, { status: 500 });
-  }
+  return s;
 }

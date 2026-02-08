@@ -114,6 +114,232 @@ export const formatProtocolName = (protocolId: string): string => {
  *   showRateBadges
  * />
  */
+
+/** Dropdown variant sub-component - extracted to reduce ProtocolSelector complexity */
+const DropdownVariant: FC<{
+  protocols: ProtocolOption[];
+  selectedProtocol: string;
+  selectedOption?: ProtocolOption;
+  disabled: boolean;
+  compact: boolean;
+  placeholder: string;
+  label?: string;
+  className: string;
+  getRate: (p: ProtocolOption) => number | undefined;
+  getRateDifference: (rate?: number) => number | undefined;
+  protocolClickHandlers: Record<string, () => void>;
+}> = ({ protocols, selectedProtocol, selectedOption, disabled, compact, placeholder, label, className, getRate, getRateDifference, protocolClickHandlers }) => {
+  const selectedRate = selectedOption ? getRate(selectedOption) : undefined;
+
+  return (
+    <div className={className}>
+      {label && (
+        <label className="text-base-content/80 mb-1 block text-sm font-medium">
+          {label}
+        </label>
+      )}
+      <div className="dropdown w-full">
+        <div
+          tabIndex={disabled ? undefined : 0}
+          role="button"
+          className={`
+            border-base-300/60 w-full rounded-xl border
+            ${compact ? "p-2" : "p-3"}
+            flex items-center justify-between
+            ${disabled ? "cursor-not-allowed opacity-50" : "hover:border-primary/40 cursor-pointer"}
+            transition-colors
+          `}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`${compact ? "size-8" : "size-12"} bg-base-200 relative overflow-hidden rounded-full`}>
+              {selectedOption ? (
+                <ProtocolLogo
+                  protocolName={selectedOption.name}
+                  logoUrl={selectedOption.logo}
+                  size={compact ? "md" : "lg"}
+                  rounded="full"
+                />
+              ) : (
+                <div className="text-base-content/50 flex size-full items-center justify-center text-xs">
+                  Pick
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col">
+              <span className={`font-semibold ${compact ? "text-sm" : ""}`}>
+                {selectedOption ? formatProtocolName(selectedOption.name) : placeholder}
+              </span>
+              {selectedRate !== undefined && (
+                <span className="text-base-content/60 text-xs">
+                  {formatRate(selectedRate)} APY
+                </span>
+              )}
+            </div>
+          </div>
+          <ChevronDownIcon className="text-base-content/50 size-5" />
+        </div>
+
+        {!disabled && (
+          <div
+            tabIndex={0}
+            className="dropdown-content menu bg-base-100 border-base-200 z-50 w-full overflow-hidden rounded-2xl border p-0 shadow-xl"
+          >
+            {protocols.length === 0 ? (
+              <div className="text-base-content/50 px-4 py-3">No protocols available</div>
+            ) : (
+              <div className="max-h-[240px] overflow-y-auto">
+                {protocols.map((protocol) => {
+                  const rate = getRate(protocol);
+                  const rateDiff = getRateDifference(rate);
+                  const isRateWorse = rateDiff !== undefined && rateDiff < 0;
+                  const isRateBetter = rateDiff !== undefined && rateDiff > 0;
+
+                  return (
+                    <ProtocolDropdownItem
+                      key={protocol.name}
+                      protocolName={protocol.name}
+                      displayName={formatProtocolName(protocol.name)}
+                      logoUrl={protocol.logo}
+                      rate={rate}
+                      isOptimal={protocol.isOptimal}
+                      isRateWorse={isRateWorse}
+                      isRateBetter={isRateBetter}
+                      isSelected={protocol.name === selectedProtocol}
+                      disabled={protocol.disabled}
+                      disabledReason={protocol.disabledReason}
+                      onClick={protocolClickHandlers[protocol.name]}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+/** Grid variant sub-component - extracted to reduce ProtocolSelector complexity */
+const GridVariant: FC<{
+  protocols: ProtocolOption[];
+  selectedProtocol: string;
+  selectedOption?: ProtocolOption;
+  compact: boolean;
+  label?: string;
+  className: string;
+  showRateBadges: boolean;
+  currentRate?: number;
+  rateType: "supply" | "borrow";
+  gridStyle: React.CSSProperties;
+  getRate: (p: ProtocolOption) => number | undefined;
+  protocolClickHandlers: Record<string, () => void>;
+}> = ({ protocols, selectedProtocol, selectedOption, compact, label, className, showRateBadges, currentRate, rateType, gridStyle, getRate, protocolClickHandlers }) => (
+  <div className={className}>
+    {label && (
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-base-content/80 text-sm font-semibold">{label}</div>
+        {showRateBadges && selectedOption && currentRate !== undefined && (
+          <RateBadge
+            selectedRate={getRate(selectedOption)}
+            currentRate={currentRate}
+            rateType={rateType}
+          />
+        )}
+      </div>
+    )}
+    <div
+      className={`grid gap-2`}
+      style={gridStyle}
+    >
+      {protocols.map((protocol) => {
+        const isSelected = protocol.name === selectedProtocol;
+        const rate = getRate(protocol);
+
+        return (
+          <div
+            key={protocol.name}
+            className={`
+              ${compact ? "p-2" : "p-2 sm:p-3"}
+              cursor-pointer rounded-lg border transition-all
+              ${isSelected ? "border-primary bg-primary/10" : "border-base-300 hover:border-primary/40"}
+              ${protocol.disabled ? "cursor-not-allowed opacity-50" : ""}
+            `}
+            onClick={protocolClickHandlers[protocol.name]}
+            title={protocol.disabled ? protocol.disabledReason : undefined}
+          >
+            <div className="flex items-center gap-2">
+              <ProtocolLogo
+                protocolName={protocol.name}
+                logoUrl={protocol.logo}
+                size={compact ? "xs" : "sm"}
+                rounded="md"
+              />
+              <span className={`${compact ? "text-xs" : "text-sm"} truncate font-medium`}>
+                {formatProtocolName(protocol.name)}
+              </span>
+              {protocol.isOptimal && (
+                <span className="badge badge-success badge-xs ml-auto">Best</span>
+              )}
+            </div>
+            {rate !== undefined && (
+              <div className={`${compact ? "text-[10px]" : "text-xs"} text-base-content/60 mt-1`}>
+                {formatRate(rate)} APY
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+
+/** Tiles variant sub-component - extracted to reduce ProtocolSelector complexity */
+const TilesVariant: FC<{
+  protocols: ProtocolOption[];
+  selectedProtocol: string;
+  label?: string;
+  className: string;
+  protocolClickHandlers: Record<string, () => void>;
+}> = ({ protocols, selectedProtocol, label, className, protocolClickHandlers }) => (
+  <div className={className}>
+    {label && (
+      <label className="text-base-content/80 mb-2 block text-sm font-medium">
+        {label}
+      </label>
+    )}
+    <div className="flex flex-wrap gap-2">
+      {protocols.map((protocol) => {
+        const isSelected = protocol.name === selectedProtocol;
+
+        return (
+          <button
+            key={protocol.name}
+            type="button"
+            className={`
+              btn btn-sm gap-2
+              ${isSelected ? "btn-primary" : "btn-ghost border-base-300 border"}
+              ${protocol.disabled ? "btn-disabled" : ""}
+            `}
+            onClick={protocolClickHandlers[protocol.name]}
+            title={protocol.disabled ? protocol.disabledReason : undefined}
+          >
+            <ProtocolLogo
+              protocolName={protocol.name}
+              logoUrl={protocol.logo}
+              size="xs"
+              rounded="md"
+            />
+            <span>{formatProtocolName(protocol.name)}</span>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
+
 export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
   protocols,
   selectedProtocol,
@@ -184,196 +410,51 @@ export const ProtocolSelector: FC<ProtocolSelectorProps> = memo(({
   // Render dropdown variant
   if (variant === "dropdown") {
     return (
-      <div className={className}>
-        {label && (
-          <label className="text-base-content/80 mb-1 block text-sm font-medium">
-            {label}
-          </label>
-        )}
-        <div className="dropdown w-full">
-          <div
-            tabIndex={disabled ? undefined : 0}
-            role="button"
-            className={`
-              border-base-300/60 w-full rounded-xl border
-              ${compact ? "p-2" : "p-3"}
-              flex items-center justify-between
-              ${disabled ? "cursor-not-allowed opacity-50" : "hover:border-primary/40 cursor-pointer"}
-              transition-colors
-            `}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`${compact ? "size-8" : "size-12"} bg-base-200 relative overflow-hidden rounded-full`}>
-                {selectedOption ? (
-                  <ProtocolLogo
-                    protocolName={selectedOption.name}
-                    logoUrl={selectedOption.logo}
-                    size={compact ? "md" : "lg"}
-                    rounded="full"
-                  />
-                ) : (
-                  <div className="text-base-content/50 flex size-full items-center justify-center text-xs">
-                    Pick
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col">
-                <span className={`font-semibold ${compact ? "text-sm" : ""}`}>
-                  {selectedOption ? formatProtocolName(selectedOption.name) : placeholder}
-                </span>
-                {(() => {
-                  const rate = selectedOption && getRate(selectedOption);
-                  return rate !== undefined && (
-                    <span className="text-base-content/60 text-xs">
-                      {formatRate(rate)} APY
-                    </span>
-                  );
-                })()}
-              </div>
-            </div>
-            <ChevronDownIcon className="text-base-content/50 size-5" />
-          </div>
-
-          {!disabled && (
-            <div
-              tabIndex={0}
-              className="dropdown-content menu bg-base-100 border-base-200 z-50 w-full overflow-hidden rounded-2xl border p-0 shadow-xl"
-            >
-              {protocols.length === 0 ? (
-                <div className="text-base-content/50 px-4 py-3">No protocols available</div>
-              ) : (
-                <div className="max-h-[240px] overflow-y-auto">
-                  {protocols.map((protocol) => {
-                    const rate = getRate(protocol);
-                    const rateDiff = getRateDifference(rate);
-                    const isRateWorse = rateDiff !== undefined && rateDiff < 0;
-                    const isRateBetter = rateDiff !== undefined && rateDiff > 0;
-
-                    return (
-                      <ProtocolDropdownItem
-                        key={protocol.name}
-                        protocolName={protocol.name}
-                        displayName={formatProtocolName(protocol.name)}
-                        logoUrl={protocol.logo}
-                        rate={rate}
-                        isOptimal={protocol.isOptimal}
-                        isRateWorse={isRateWorse}
-                        isRateBetter={isRateBetter}
-                        isSelected={protocol.name === selectedProtocol}
-                        disabled={protocol.disabled}
-                        disabledReason={protocol.disabledReason}
-                        onClick={protocolClickHandlers[protocol.name]}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      <DropdownVariant
+        protocols={protocols}
+        selectedProtocol={selectedProtocol}
+        selectedOption={selectedOption}
+        disabled={disabled}
+        compact={compact}
+        placeholder={placeholder}
+        label={label}
+        className={className}
+        getRate={getRate}
+        getRateDifference={getRateDifference}
+        protocolClickHandlers={protocolClickHandlers}
+      />
     );
   }
 
   // Render grid variant
   if (variant === "grid") {
     return (
-      <div className={className}>
-        {label && (
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-base-content/80 text-sm font-semibold">{label}</div>
-            {showRateBadges && selectedOption && currentRate !== undefined && (
-              <RateBadge
-                selectedRate={getRate(selectedOption)}
-                currentRate={currentRate}
-                rateType={rateType}
-              />
-            )}
-          </div>
-        )}
-        <div
-          className={`grid gap-2`}
-          style={gridStyle}
-        >
-          {protocols.map((protocol) => {
-            const isSelected = protocol.name === selectedProtocol;
-            const rate = getRate(protocol);
-
-            return (
-              <div
-                key={protocol.name}
-                className={`
-                  ${compact ? "p-2" : "p-2 sm:p-3"}
-                  cursor-pointer rounded-lg border transition-all
-                  ${isSelected ? "border-primary bg-primary/10" : "border-base-300 hover:border-primary/40"}
-                  ${protocol.disabled ? "cursor-not-allowed opacity-50" : ""}
-                `}
-                onClick={protocolClickHandlers[protocol.name]}
-                title={protocol.disabled ? protocol.disabledReason : undefined}
-              >
-                <div className="flex items-center gap-2">
-                  <ProtocolLogo
-                    protocolName={protocol.name}
-                    logoUrl={protocol.logo}
-                    size={compact ? "xs" : "sm"}
-                    rounded="md"
-                  />
-                  <span className={`${compact ? "text-xs" : "text-sm"} truncate font-medium`}>
-                    {formatProtocolName(protocol.name)}
-                  </span>
-                  {protocol.isOptimal && (
-                    <span className="badge badge-success badge-xs ml-auto">Best</span>
-                  )}
-                </div>
-                {rate !== undefined && (
-                  <div className={`${compact ? "text-[10px]" : "text-xs"} text-base-content/60 mt-1`}>
-                    {formatRate(rate)} APY
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <GridVariant
+        protocols={protocols}
+        selectedProtocol={selectedProtocol}
+        selectedOption={selectedOption}
+        compact={compact}
+        label={label}
+        className={className}
+        showRateBadges={showRateBadges}
+        currentRate={currentRate}
+        rateType={rateType}
+        gridStyle={gridStyle}
+        getRate={getRate}
+        protocolClickHandlers={protocolClickHandlers}
+      />
     );
   }
 
   // Render tiles variant (compact inline)
   return (
-    <div className={className}>
-      {label && (
-        <label className="text-base-content/80 mb-2 block text-sm font-medium">
-          {label}
-        </label>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {protocols.map((protocol) => {
-          const isSelected = protocol.name === selectedProtocol;
-
-          return (
-            <button
-              key={protocol.name}
-              type="button"
-              className={`
-                btn btn-sm gap-2
-                ${isSelected ? "btn-primary" : "btn-ghost border-base-300 border"}
-                ${protocol.disabled ? "btn-disabled" : ""}
-              `}
-              onClick={protocolClickHandlers[protocol.name]}
-              title={protocol.disabled ? protocol.disabledReason : undefined}
-            >
-              <ProtocolLogo
-                protocolName={protocol.name}
-                logoUrl={protocol.logo}
-                size="xs"
-                rounded="md"
-              />
-              <span>{formatProtocolName(protocol.name)}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <TilesVariant
+      protocols={protocols}
+      selectedProtocol={selectedProtocol}
+      label={label}
+      className={className}
+      protocolClickHandlers={protocolClickHandlers}
+    />
   );
 });
 

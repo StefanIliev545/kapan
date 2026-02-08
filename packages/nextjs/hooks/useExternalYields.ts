@@ -116,6 +116,45 @@ export function hasExternalYield(symbol: string): boolean {
 }
 
 /**
+ * A yield source definition: symbol check, lookup function, and converter.
+ * Used to iterate over sources in a uniform way, reducing branching complexity.
+ */
+interface YieldSource<T> {
+  isMatch: (symbol: string) => boolean;
+  findYield: (address?: string, symbol?: string) => T | undefined;
+  toExternal: (yield_: T) => ExternalYield;
+}
+
+/**
+ * Try to find a yield by iterating over sources.
+ * First tries symbol-based matching, then falls back to address-only lookup.
+ */
+function findYieldFromSources(
+  sources: YieldSource<unknown>[],
+  address?: string,
+  symbol?: string,
+): ExternalYield | undefined {
+  // Symbol-based lookup (higher priority)
+  if (symbol) {
+    for (const source of sources) {
+      if (!source.isMatch(symbol)) continue;
+      const result = source.findYield(address, symbol);
+      if (result) return source.toExternal(result);
+    }
+  }
+
+  // Address-based fallback across all sources
+  if (address) {
+    for (const source of sources) {
+      const result = source.findYield(address);
+      if (result) return source.toExternal(result);
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * Hook to fetch yields from all external sources
  * Returns a unified findYield function that checks all sources
  */
@@ -136,39 +175,13 @@ export function useExternalYields(chainId?: number, enabled = true) {
   const lstFindYield = lst.findYield;
 
   const findYield = useMemo(() => {
-    return (address?: string, symbol?: string): ExternalYield | undefined => {
-      // Check Pendle first for PT tokens
-      if (symbol && isPTToken(symbol)) {
-        const ptYield = pendleFindYield(address, symbol);
-        if (ptYield) return ptYieldToExternal(ptYield);
-      }
-
-      // Check Maple for syrup tokens
-      if (symbol && isSyrupToken(symbol)) {
-        const mapleYield = mapleFindYield(address, symbol);
-        if (mapleYield) return mapleYieldToExternal(mapleYield);
-      }
-
-      // Check LST yields (wstETH, rETH, weETH, etc.)
-      if (symbol && isLSTToken(symbol)) {
-        const lstYield = lstFindYield(address, symbol);
-        if (lstYield) return lstYieldToExternal(lstYield);
-      }
-
-      // Try address-based lookup on all sources
-      if (address) {
-        const ptYield = pendleFindYield(address);
-        if (ptYield) return ptYieldToExternal(ptYield);
-
-        const mapleYield = mapleFindYield(address);
-        if (mapleYield) return mapleYieldToExternal(mapleYield);
-
-        const lstYield = lstFindYield(address);
-        if (lstYield) return lstYieldToExternal(lstYield);
-      }
-
-      return undefined;
-    };
+    const sources: YieldSource<unknown>[] = [
+      { isMatch: isPTToken, findYield: pendleFindYield, toExternal: ptYieldToExternal as (y: unknown) => ExternalYield },
+      { isMatch: isSyrupToken, findYield: mapleFindYield, toExternal: mapleYieldToExternal as (y: unknown) => ExternalYield },
+      { isMatch: isLSTToken, findYield: lstFindYield, toExternal: lstYieldToExternal as (y: unknown) => ExternalYield },
+    ];
+    return (address?: string, symbol?: string): ExternalYield | undefined =>
+      findYieldFromSources(sources, address, symbol);
   }, [pendleFindYield, mapleFindYield, lstFindYield]);
 
   /**

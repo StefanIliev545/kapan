@@ -281,6 +281,187 @@ interface UseEulerLendingPositionsResult {
   positionsError: unknown;
 }
 
+// ============ Extracted Helpers (reduce cognitive complexity of useMemo blocks) ============
+
+/** Parsed liquidity data for a single position group */
+interface ParsedGroupLiquidity {
+  collateralValueLiq: bigint;
+  liabilityValueLiq: bigint;
+  collateralValueBorrow: bigint;
+  liabilityValueBorrow: bigint;
+  collateralLtvs: EulerCollateralLtv[];
+}
+
+/**
+ * Parse liquidity + LTV results for a single position group from the flat results array.
+ * Expects results in order: accountLiquidity(true), accountLiquidity(false),
+ * then [LTVBorrow, LTVLiquidation] for each collateral.
+ *
+ * @returns The parsed data and the next index to read from in the results array.
+ */
+function parseLiquidityForGroup(
+  group: EulerPositionGroup,
+  liquidityResults: readonly { status: string; result?: unknown; error?: unknown }[],
+  startIndex: number,
+): { data: ParsedGroupLiquidity; nextIndex: number } {
+  let idx = startIndex;
+
+  // accountLiquidity(true) - liquidation mode
+  const liqResult = liquidityResults[idx++];
+  // accountLiquidity(false) - borrow mode
+  const borrowResult = liquidityResults[idx++];
+
+  let collateralValueLiq = 0n;
+  let liabilityValueLiq = 0n;
+  let collateralValueBorrow = 0n;
+  let liabilityValueBorrow = 0n;
+
+  if (liqResult?.status === "success") {
+    [collateralValueLiq, liabilityValueLiq] = liqResult.result as [bigint, bigint];
+  }
+  if (borrowResult?.status === "success") {
+    [collateralValueBorrow, liabilityValueBorrow] = borrowResult.result as [bigint, bigint];
+  }
+
+  // Parse LTV configs for each collateral
+  const collateralLtvs: EulerCollateralLtv[] = [];
+  for (const col of group.collaterals) {
+    const borrowLtvResult = liquidityResults[idx++];
+    const liqLtvResult = liquidityResults[idx++];
+
+    const borrowLtv = borrowLtvResult?.status === "success"
+      ? Number(borrowLtvResult.result as bigint) / 100 // 1e4 scale to percentage
+      : 0;
+    const liquidationLtv = liqLtvResult?.status === "success"
+      ? Number(liqLtvResult.result as bigint) / 100 // 1e4 scale to percentage
+      : 0;
+
+    collateralLtvs.push({ collateralVault: col.vault.address, borrowLtv, liquidationLtv });
+  }
+
+  return {
+    data: { collateralValueLiq, liabilityValueLiq, collateralValueBorrow, liabilityValueBorrow, collateralLtvs },
+    nextIndex: idx,
+  };
+}
+
+/**
+ * Build a map from "subAccount:vaultAddress" -> underlying asset amount
+ * from the convertToAssets results.
+ */
+function buildConvertedAssetsMap(
+  convertResults: readonly { status: string; result?: unknown }[],
+  convertContracts: readonly { _meta: { subAccount: string; vaultAddress: string } }[],
+): Map<string, bigint> {
+  const map = new Map<string, bigint>();
+  for (let i = 0; i < convertResults.length; i++) {
+    const result = convertResults[i];
+    const contract = convertContracts[i];
+    if (!contract?._meta) continue;
+
+    const key = `${contract._meta.subAccount.toLowerCase()}:${contract._meta.vaultAddress.toLowerCase()}`;
+    if (result?.status === "success") {
+      map.set(key, result.result as bigint);
+    }
+  }
+  return map;
+}
+
+/**
+ * Process a single balance result entry and update the balance map in-place.
+ * Handles both collateral (using convertedAssetsMap fallback) and debt entries.
+ */
+function processBalanceEntry(
+  index: number,
+  result: { status: string; result?: unknown; error?: unknown },
+  contract: { _meta?: { subAccount: string; vaultAddress: string; type: "collateral" | "debt" } },
+  convertedAssetsMap: Map<string, bigint>,
+  map: Map<string, { assets: bigint; debt: bigint }>,
+): void {
+  if (!contract?._meta) {
+    console.error(
+      `[useEulerLendingPositions] Missing _meta for contract at index ${index}. ` +
+      `Contract: ${JSON.stringify(contract)}. ` +
+      `This entry will be skipped, which may cause incorrect balance display.`,
+    );
+    return;
+  }
+
+  const { subAccount, vaultAddress, type } = contract._meta;
+  const key = `${subAccount.toLowerCase()}:${vaultAddress.toLowerCase()}`;
+  const existing = map.get(key) ?? { assets: 0n, debt: 0n };
+
+  if (result?.status === "success") {
+    const value = result.result as bigint;
+    if (type === "collateral") {
+      // Use converted assets if available, otherwise fall back to shares
+      existing.assets = convertedAssetsMap.get(key) ?? value;
+    } else {
+      // Debt is already in underlying asset units
+      existing.debt = value;
+    }
+  } else if (result?.status === "failure") {
+    console.warn(
+      `[useEulerLendingPositions] Balance query failed for ${type} at vault ${vaultAddress} ` +
+      `(subAccount: ${subAccount}): ${(result as { error?: unknown }).error}`,
+    );
+  }
+
+  map.set(key, existing);
+}
+
+/**
+ * Compute EulerAccountLiquidity from raw liquidity data returned by the liquidityMap.
+ * Returns null if there is no meaningful liability.
+ */
+function computeAccountLiquidity(
+  liquidityData: ParsedGroupLiquidity,
+): EulerAccountLiquidity | null {
+  if (liquidityData.liabilityValueLiq <= 0n) return null;
+
+  const {
+    collateralValueLiq,
+    liabilityValueLiq,
+    collateralValueBorrow,
+    collateralLtvs,
+  } = liquidityData;
+
+  // Liquidation health: collateralValueLiq / liabilityValueLiq
+  const liquidationHealth = Number(collateralValueLiq) / Number(liabilityValueLiq);
+
+  // Calculate effective LLTV and max LTV from collateral configs
+  // Use minimum LLTV if multiple collaterals (most conservative)
+  let effectiveLltv = 100;
+  let effectiveMaxLtv = 100;
+  for (const ltv of collateralLtvs) {
+    if (ltv.liquidationLtv > 0 && ltv.liquidationLtv < effectiveLltv) {
+      effectiveLltv = ltv.liquidationLtv;
+    }
+    if (ltv.borrowLtv > 0 && ltv.borrowLtv < effectiveMaxLtv) {
+      effectiveMaxLtv = ltv.borrowLtv;
+    }
+  }
+
+  // Current LTV calculation:
+  // Raw collateral value = collateralValueLiq / effectiveLltv * 100
+  // Current LTV = liabilityValue / rawCollateralValue * 100
+  // Simplified: currentLtv = (liabilityValue / collateralValueLiq) * effectiveLltv
+  const currentLtv = collateralValueLiq > 0n
+    ? (Number(liabilityValueLiq) / Number(collateralValueLiq)) * effectiveLltv
+    : 0;
+
+  return {
+    collateralValueLiquidation: collateralValueLiq,
+    collateralValueBorrow,
+    liabilityValue: liabilityValueLiq,
+    liquidationHealth,
+    collateralLtvs,
+    effectiveLltv,
+    effectiveMaxLtv,
+    currentLtv,
+  };
+}
+
 // ============ Main Hook ============
 
 export function useEulerLendingPositions(
@@ -517,67 +698,15 @@ export function useEulerLendingPositions(
 
   // Parse liquidity results into a map with all the data we need
   const liquidityMap = useMemo(() => {
-    const map = new Map<string, {
-      collateralValueLiq: bigint;
-      liabilityValueLiq: bigint;
-      collateralValueBorrow: bigint;
-      liabilityValueBorrow: bigint;
-      collateralLtvs: EulerCollateralLtv[];
-    }>();
+    const map = new Map<string, ParsedGroupLiquidity>();
     if (!liquidityResults || liquidityResults.length === 0) return map;
 
     let resultIndex = 0;
     for (const group of positionGroups) {
       if (group.debt && resultIndex < liquidityResults.length) {
-        // accountLiquidity(true) - liquidation mode
-        const liqResult = liquidityResults[resultIndex];
-        resultIndex++;
-
-        // accountLiquidity(false) - borrow mode
-        const borrowResult = liquidityResults[resultIndex];
-        resultIndex++;
-
-        let collateralValueLiq = 0n;
-        let liabilityValueLiq = 0n;
-        let collateralValueBorrow = 0n;
-        let liabilityValueBorrow = 0n;
-
-        if (liqResult?.status === "success") {
-          [collateralValueLiq, liabilityValueLiq] = liqResult.result as [bigint, bigint];
-        }
-        if (borrowResult?.status === "success") {
-          [collateralValueBorrow, liabilityValueBorrow] = borrowResult.result as [bigint, bigint];
-        }
-
-        // Parse LTV configs for each collateral
-        const collateralLtvs: EulerCollateralLtv[] = [];
-        for (const col of group.collaterals) {
-          const borrowLtvResult = liquidityResults[resultIndex];
-          resultIndex++;
-          const liqLtvResult = liquidityResults[resultIndex];
-          resultIndex++;
-
-          const borrowLtv = borrowLtvResult?.status === "success"
-            ? Number(borrowLtvResult.result as bigint) / 100 // 1e4 scale to percentage
-            : 0;
-          const liquidationLtv = liqLtvResult?.status === "success"
-            ? Number(liqLtvResult.result as bigint) / 100 // 1e4 scale to percentage
-            : 0;
-
-          collateralLtvs.push({
-            collateralVault: col.vault.address,
-            borrowLtv,
-            liquidationLtv,
-          });
-        }
-
-        map.set(group.subAccount.toLowerCase(), {
-          collateralValueLiq,
-          liabilityValueLiq,
-          collateralValueBorrow,
-          liabilityValueBorrow,
-          collateralLtvs,
-        });
+        const { data, nextIndex } = parseLiquidityForGroup(group, liquidityResults, resultIndex);
+        resultIndex = nextIndex;
+        map.set(group.subAccount.toLowerCase(), data);
       }
     }
 
@@ -593,19 +722,9 @@ export function useEulerLendingPositions(
     if (!balanceResults || balanceResults.length === 0 || !balanceContracts.length) return map;
 
     // Build a map of converted assets from convertResults
-    const convertedAssetsMap = new Map<string, bigint>();
-    if (convertResults && convertContracts.length > 0) {
-      for (let i = 0; i < convertResults.length; i++) {
-        const result = convertResults[i];
-        const contract = convertContracts[i];
-        if (!contract?._meta) continue;
-
-        const key = `${contract._meta.subAccount.toLowerCase()}:${contract._meta.vaultAddress.toLowerCase()}`;
-        if (result?.status === "success") {
-          convertedAssetsMap.set(key, result.result as bigint);
-        }
-      }
-    }
+    const convertedAssetsMap = (convertResults && convertContracts.length > 0)
+      ? buildConvertedAssetsMap(convertResults, convertContracts)
+      : new Map<string, bigint>();
 
     // Validate array alignment - this should never happen, but guard against race conditions
     if (balanceResults.length !== balanceContracts.length) {
@@ -616,45 +735,7 @@ export function useEulerLendingPositions(
     }
 
     for (let i = 0; i < balanceResults.length; i++) {
-      const result = balanceResults[i];
-      const contract = balanceContracts[i];
-
-      // Log error instead of silently skipping when _meta is missing
-      // This indicates a data integrity issue that should be investigated
-      if (!contract?._meta) {
-        console.error(
-          `[useEulerLendingPositions] Missing _meta for contract at index ${i}. ` +
-          `Contract: ${JSON.stringify(contract)}. ` +
-          `This entry will be skipped, which may cause incorrect balance display.`
-        );
-        continue;
-      }
-
-      const { subAccount, vaultAddress, type } = contract._meta;
-      const key = `${subAccount.toLowerCase()}:${vaultAddress.toLowerCase()}`;
-
-      // Get or create entry
-      const existing = map.get(key) ?? { assets: 0n, debt: 0n };
-
-      if (result?.status === "success") {
-        const value = result.result as bigint;
-        if (type === "collateral") {
-          // Use converted assets if available, otherwise fall back to shares
-          // (shares will be slightly off but better than nothing)
-          existing.assets = convertedAssetsMap.get(key) ?? value;
-        } else {
-          // Debt is already in underlying asset units
-          existing.debt = value;
-        }
-      } else if (result?.status === "failure") {
-        // Log failed balance queries for debugging
-        console.warn(
-          `[useEulerLendingPositions] Balance query failed for ${type} at vault ${vaultAddress} ` +
-          `(subAccount: ${subAccount}): ${result.error}`
-        );
-      }
-
-      map.set(key, existing);
+      processBalanceEntry(i, balanceResults[i], balanceContracts[i], convertedAssetsMap, map);
     }
 
     console.log("[useEulerLendingPositions] Balance map:", Array.from(map.entries()).map(([k, v]) => ({
@@ -695,50 +776,9 @@ export function useEulerLendingPositions(
       // Get liquidity data for this position group
       let liquidity: EulerAccountLiquidity | null = null;
       if (enrichedDebt) {
-        const liquidityData = liquidityMap.get(group.subAccount.toLowerCase());
-        if (liquidityData && liquidityData.liabilityValueLiq > 0n) {
-          const {
-            collateralValueLiq,
-            liabilityValueLiq,
-            collateralValueBorrow,
-            collateralLtvs,
-          } = liquidityData;
-
-          // Liquidation health: collateralValueLiq / liabilityValueLiq
-          // If < 1.0, position is liquidatable
-          const liquidationHealth = Number(collateralValueLiq) / Number(liabilityValueLiq);
-
-          // Calculate effective LLTV and max LTV from collateral configs
-          // Use minimum LLTV if multiple collaterals (most conservative)
-          let effectiveLltv = 100;
-          let effectiveMaxLtv = 100;
-          for (const ltv of collateralLtvs) {
-            if (ltv.liquidationLtv > 0 && ltv.liquidationLtv < effectiveLltv) {
-              effectiveLltv = ltv.liquidationLtv;
-            }
-            if (ltv.borrowLtv > 0 && ltv.borrowLtv < effectiveMaxLtv) {
-              effectiveMaxLtv = ltv.borrowLtv;
-            }
-          }
-
-          // Current LTV calculation:
-          // Raw collateral value = collateralValueLiq / effectiveLltv * 100
-          // Current LTV = liabilityValue / rawCollateralValue * 100
-          // Simplified: currentLtv = (liabilityValue / collateralValueLiq) * effectiveLltv
-          const currentLtv = collateralValueLiq > 0n
-            ? (Number(liabilityValueLiq) / Number(collateralValueLiq)) * effectiveLltv
-            : 0;
-
-          liquidity = {
-            collateralValueLiquidation: collateralValueLiq,
-            collateralValueBorrow,
-            liabilityValue: liabilityValueLiq,
-            liquidationHealth,
-            collateralLtvs,
-            effectiveLltv,
-            effectiveMaxLtv,
-            currentLtv,
-          };
+        const liquidityData = liquidityMap.get(subAccountLower);
+        if (liquidityData) {
+          liquidity = computeAccountLiquidity(liquidityData);
         }
       }
 

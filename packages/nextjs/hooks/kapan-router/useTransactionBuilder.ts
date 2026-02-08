@@ -159,6 +159,59 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
     ];
   }, [userAddress]);
 
+  /**
+   * Build a combined deposit-collateral + borrow flow with correct UTXO indices.
+   *
+   * IMPORTANT: Do NOT use [...buildDepositFlow(), ...buildBorrowFlow()] — the borrow
+   * flow's PushToken hardcodes index 0 which conflicts with the deposit flow's outputs.
+   *
+   * UTXO tracking:
+   * 0. PullToken(collateral)    → Output[0] = {collateralToken, depositAmount}
+   * 1. Approve(0, protocol)     → Output[1] = dummy
+   * 2. DepositCollateral(0)     → 0 outputs (both Compound and Euler gateways)
+   * 3. Borrow(amount, ctx, 999) → Output[2] = {debtToken, borrowAmount}
+   * 4. PushToken(2, user)       → sends Output[2] (borrow proceeds) to user
+   */
+  const buildDepositAndBorrowFlow = useCallback((
+    protocolName: string,
+    collateralToken: string,
+    collateralAmount: string,
+    collateralDecimals: number,
+    debtToken: string,
+    borrowAmount: string,
+    debtDecimals: number,
+    context = "0x",
+  ): ProtocolInstruction[] => {
+    if (!userAddress) return [];
+    const normalizedProtocol = normalizeProtocolName(protocolName);
+    const collateralAmountBigInt = parseUnits(collateralAmount, collateralDecimals);
+    const borrowAmountBigInt = parseUnits(borrowAmount, debtDecimals);
+
+    const isCompound = normalizedProtocol === "compound";
+    const isMorpho = normalizedProtocol === "morpho-blue";
+    const isEuler = normalizedProtocol === "euler";
+    const depositOp = (isCompound || isMorpho || isEuler) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+
+    return [
+      // 0. Pull collateral from user → Output[0]
+      createRouterInstruction(encodePullToken(collateralAmountBigInt, collateralToken, userAddress)),
+      // 1. Approve gateway for collateral → Output[1] (dummy)
+      createRouterInstruction(encodeApprove(0, normalizedProtocol)),
+      // 2. Deposit collateral (inputPtr=0) → 0 outputs
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(depositOp, collateralToken, userAddress, 0n, context, 0),
+      ),
+      // 3. Borrow debt token → Output[2]
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.Borrow, debtToken, userAddress, borrowAmountBigInt, context, 999),
+      ),
+      // 4. Push borrow proceeds (Output[2]) to user
+      createRouterInstruction(encodePushToken(2, userAddress)),
+    ];
+  }, [userAddress]);
+
   const buildRepayFlow = useCallback((
     protocolName: string,
     tokenAddress: string,
@@ -922,6 +975,7 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
   return {
     buildDepositFlow,
     buildBorrowFlow,
+    buildDepositAndBorrowFlow,
     buildRepayFlow,
     buildRepayFlowAsync,
     buildWithdrawFlow,

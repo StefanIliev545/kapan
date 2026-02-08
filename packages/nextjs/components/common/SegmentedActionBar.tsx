@@ -91,8 +91,8 @@ export const SegmentedActionBar: FC<SegmentedActionBarProps> = ({ actions, class
           title={action.title}
           style={action.disabled ? disabledButtonStyle : undefined}
         >
-          {action.icon}
-          <span className={`ml-1 ${hideLabel ? "hidden group-hover:inline" : ""}`}>{action.label}</span>
+          {action.icon && <span className="hidden sm:inline-flex">{action.icon}</span>}
+          <span className={`sm:ml-1 ${hideLabel ? "hidden group-hover:inline" : ""}`}>{action.label}</span>
         </button>
       );
     });

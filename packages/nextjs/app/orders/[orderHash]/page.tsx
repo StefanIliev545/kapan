@@ -9,7 +9,7 @@ import { formatUnits, type Address } from "viem";
 import { useCopyToClipboard } from "~~/hooks/common/useCopyToClipboard";
 import { useChunkExecutedEvents } from "~~/hooks/useChunkExecutedEvents";
 import { useTokenInfo } from "~~/hooks/useTokenInfo";
-import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
+import { useTokenPricesByAddress } from "~~/hooks/useTokenPrice";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import {
   OrderStatus,
@@ -856,10 +856,17 @@ export default function OrderDetailPage() {
   const sellSymbol = order ? getTokenSymbol(order.params.sellToken) : "";
   const buySymbol = order ? getTokenSymbol(order.params.buyToken) : "";
 
-  const sellPriceData = useTokenPriceApi(sellSymbol);
-  const buyPriceData = useTokenPriceApi(buySymbol);
-  const sellPrice = sellPriceData.isSuccess ? (sellPriceData as { price: number }).price : undefined;
-  const buyPrice = buyPriceData.isSuccess ? (buyPriceData as { price: number }).price : undefined;
+  const orderTokenAddresses = useMemo(() => {
+    if (!order) return [];
+    return [order.params.sellToken, order.params.buyToken];
+  }, [order]);
+  const { prices: orderTokenPrices, isSuccess: orderPricesLoaded } = useTokenPricesByAddress(
+    chainId,
+    orderTokenAddresses,
+    { enabled: !!order },
+  );
+  const sellPrice = orderPricesLoaded ? orderTokenPrices[order?.params.sellToken?.toLowerCase() ?? ""] : undefined;
+  const buyPrice = orderPricesLoaded ? orderTokenPrices[order?.params.buyToken?.toLowerCase() ?? ""] : undefined;
 
   const sellDecimals = order ? getTokenDecimals(order.params.sellToken) : 18;
   const buyDecimals = order ? getTokenDecimals(order.params.buyToken) : 18;

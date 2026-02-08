@@ -674,9 +674,57 @@ contract VenusGatewayView is Ownable {
 
     // ============ Price Queries (for ADL) ============
 
-    /// @notice Get the price of an underlying asset in USD (18 decimals)
+    /// @notice Get user account data for ADL trigger calculation
+    /// @dev Returns collateral and debt values in 8-decimal USD
+    /// @param user The user address
+    /// @return totalCollateralUsd Total collateral value in 8-decimal USD
+    /// @return totalDebtUsd Total debt value in 8-decimal USD
+    function getUserAccountData(address user)
+        external
+        view
+        returns (uint256 totalCollateralUsd, uint256 totalDebtUsd)
+    {
+        if (user == address(0)) return (0, 0);
+
+        VTokenInterface[] memory vTokens = comptroller.getAssetsIn(user);
+        if (vTokens.length == 0) return (0, 0);
+
+        uint256 totalCollateral18;
+        uint256 totalDebt18;
+
+        for (uint i = 0; i < vTokens.length; i++) {
+            address vTokenAddr = address(vTokens[i]);
+            VTokenInterface vToken = VTokenInterface(vTokenAddr);
+
+            uint256 price;
+            try oracle.getUnderlyingPrice(vTokenAddr) returns (uint256 p) { price = p; } catch { continue; }
+
+            // Collateral value
+            uint256 vTokenBalance = vToken.balanceOf(user);
+            if (vTokenBalance > 0) {
+                uint256 exchangeRate = vToken.exchangeRateStored();
+                uint256 underlyingAmount = (vTokenBalance * exchangeRate) / 1e18;
+                totalCollateral18 += (underlyingAmount * price) / 1e18;
+            }
+
+            // Debt value
+            try vToken.borrowBalanceStored(user) returns (uint256 borrowBalance) {
+                if (borrowBalance > 0) {
+                    totalDebt18 += (borrowBalance * price) / 1e18;
+                }
+            } catch {}
+        }
+
+        // Convert from 18 decimals to 8 decimals
+        totalCollateralUsd = totalCollateral18 / 1e10;
+        totalDebtUsd = totalDebt18 / 1e10;
+    }
+
+    /// @notice Get the price of an underlying asset in Venus oracle format
+    /// @dev Venus oracle returns price as: price_usd * 10^(36 - tokenDecimals)
+    ///      For WETH (18 dec): price * 1e18. For USDC (6 dec): price * 1e30.
     /// @param underlyingToken The underlying asset address
-    /// @return price Price in 18 decimals
+    /// @return price Price in Venus oracle format (36 - tokenDecimals decimals)
     function getAssetPrice(address underlyingToken) external view returns (uint256 price) {
         address vTokenAddress = getVTokenForUnderlying(underlyingToken);
         if (vTokenAddress == address(0)) return 0;
@@ -688,14 +736,26 @@ contract VenusGatewayView is Ownable {
     }
 
     /// @notice Get the price of an underlying asset normalized to 8 decimals
+    /// @dev Venus oracle returns price as price_usd * 10^(36 - tokenDecimals).
+    ///      To normalize to 8 decimals: divide by 10^(28 - tokenDecimals).
     /// @param underlyingToken The underlying asset address
     /// @return price Price in 8 decimals (for consistency with other protocols)
     function getAssetPrice8(address underlyingToken) external view returns (uint256 price) {
         address vTokenAddress = getVTokenForUnderlying(underlyingToken);
         if (vTokenAddress == address(0)) return 0;
         try oracle.getUnderlyingPrice(vTokenAddress) returns (uint256 p) {
-            // Convert from 18 decimals to 8 decimals
-            return p / 1e10;
+            // Venus oracle: price_usd * 10^(36 - tokenDecimals)
+            // Target:       price_usd * 10^8
+            // Divisor:      10^(28 - tokenDecimals)
+            uint8 tokenDecimals = 18;
+            try IERC20Metadata(underlyingToken).decimals() returns (uint8 d) {
+                tokenDecimals = d;
+            } catch {}
+            if (tokenDecimals < 28) {
+                return p / (10 ** (28 - uint256(tokenDecimals)));
+            } else {
+                return p * (10 ** (uint256(tokenDecimals) - 28));
+            }
         } catch {
             return 0;
         }

@@ -209,6 +209,118 @@ export interface BasePositionProps {
   adlProtected?: boolean;
 }
 
+
+/** Token name display - handles renderName, PT tokens, and fallback. Shared by mobile/desktop. */
+const TokenNameContent: FC<{
+  name: string;
+  renderName?: (name: string) => ReactNode;
+  subtitle?: ReactNode;
+  variant: "mobile" | "desktop";
+}> = ({ name, renderName: renderNameFn, subtitle, variant }) => {
+  if (renderNameFn) {
+    return variant === "desktop" ? <>{renderNameFn(name)}</> : <>{renderNameFn(name)}</>;
+  }
+  if (isPTToken(name)) {
+    return variant === "desktop"
+      ? <TokenSymbolDisplay symbol={name} size="sm" variant="stacked" />
+      : <TokenSymbolDisplay symbol={name} size="xs" />;
+  }
+  if (variant === "desktop") {
+    return (
+      <>
+        <span className="truncate text-base font-bold leading-tight tracking-tight" title={name}>{name}</span>
+        {subtitle ? (
+          <span className="text-base-content/40 truncate text-[10px] uppercase leading-tight tracking-wider">{subtitle}</span>
+        ) : null}
+      </>
+    );
+  }
+  return <>{name}</>;
+};
+
+
+/** Build the stat columns array for the desktop layout grid. */
+function buildStatColumns(opts: {
+  hideBalanceColumn: boolean;
+  balanceProps: {
+    tokenAddress: string;
+    tokenBalance: bigint;
+    tokenPrice?: bigint;
+    tokenDecimals?: number;
+    tokenSymbol: string;
+    isNegative: boolean;
+    className?: string;
+    showNoBalanceLabel: boolean;
+    noBalanceText: string;
+  };
+  rateLabel: string;
+  currentRate: number;
+  displayedOptimalRate: number;
+  displayedOptimalProtocol: string;
+  getProtocolLogo: (protocol: string) => string;
+  extraStats: Array<{ label: string; value: ReactNode }>;
+}): Array<{ key: string; content: ReactNode; hasBorder?: boolean }> {
+  const columns: Array<{ key: string; content: ReactNode; hasBorder?: boolean }> = [];
+
+  if (!opts.hideBalanceColumn) {
+    columns.push({
+      key: "balance",
+      hasBorder: true,
+      content: (
+        <>
+          <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">Balance</div>
+          <div className="font-mono text-xs font-semibold tabular-nums">
+            <BalanceDisplay {...opts.balanceProps} />
+          </div>
+        </>
+      ),
+    });
+  }
+
+  columns.push({
+    key: "rate",
+    hasBorder: true,
+    content: (
+      <>
+        <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{opts.rateLabel}</div>
+        <div className="text-base-content font-mono text-xs font-semibold tabular-nums">
+          {formatPercentage(opts.currentRate)}%
+        </div>
+      </>
+    ),
+  });
+
+  columns.push({
+    key: "best-rate",
+    content: (
+      <>
+        <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">Best {opts.rateLabel}</div>
+        <RateWithLogo
+          rate={opts.displayedOptimalRate}
+          protocolLogo={opts.getProtocolLogo(opts.displayedOptimalProtocol)}
+          protocolName={opts.displayedOptimalProtocol}
+        />
+      </>
+    ),
+  });
+
+  opts.extraStats.forEach((stat, index) => {
+    const isLast = index === opts.extraStats.length - 1;
+    columns.push({
+      key: `extra-${index}`,
+      hasBorder: !isLast,
+      content: (
+        <>
+          <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{stat.label}</div>
+          <div className="font-mono text-xs font-semibold tabular-nums">{stat.value}</div>
+        </>
+      ),
+    });
+  });
+
+  return columns;
+}
+
 export const BasePosition: FC<BasePositionProps> = ({
   icon,
   name,
@@ -303,21 +415,6 @@ export const BasePosition: FC<BasePositionProps> = ({
 
   const infoButtonNode = infoButton ?? (showInfoDropdown ? defaultInfoButton : null);
 
-  // Build stat columns
-  const baseStatColumns = hideBalanceColumn ? 2 : 3;
-  const totalStatColumns = baseStatColumns + extraStats.length;
-  const statColumnClassMap: Record<number, string> = {
-    1: "grid-cols-1",
-    2: "grid-cols-2",
-    3: "grid-cols-3",
-    4: "grid-cols-4",
-    5: "grid-cols-5",
-    6: "grid-cols-6",
-  };
-  const statGridClass = statColumnClassMap[totalStatColumns] ?? "grid-cols-3";
-
-  const statColumns: Array<{ key: string; content: ReactNode; hasBorder?: boolean }> = [];
-
   // Common balance props for reuse
   const balanceProps = {
     tokenAddress,
@@ -331,61 +428,29 @@ export const BasePosition: FC<BasePositionProps> = ({
     noBalanceText,
   };
 
-  if (!hideBalanceColumn) {
-    statColumns.push({
-      key: "balance",
-      hasBorder: true,
-      content: (
-        <>
-          <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">Balance</div>
-          <div className="font-mono text-xs font-semibold tabular-nums">
-            <BalanceDisplay {...balanceProps} />
-          </div>
-        </>
-      ),
-    });
-  }
-
-  statColumns.push({
-    key: "rate",
-    hasBorder: true,
-    content: (
-      <>
-        <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{rateLabel}</div>
-        <div className="text-base-content font-mono text-xs font-semibold tabular-nums">
-          {formatPercentage(currentRate)}%
-        </div>
-      </>
-    ),
+  // Build stat columns using extracted helper
+  const statColumns = buildStatColumns({
+    hideBalanceColumn,
+    balanceProps,
+    rateLabel,
+    currentRate,
+    displayedOptimalRate,
+    displayedOptimalProtocol,
+    getProtocolLogo,
+    extraStats,
   });
 
-  statColumns.push({
-    key: "best-rate",
-    content: (
-      <>
-        <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">Best {rateLabel}</div>
-        <RateWithLogo
-          rate={displayedOptimalRate}
-          protocolLogo={getProtocolLogo(displayedOptimalProtocol)}
-          protocolName={displayedOptimalProtocol}
-        />
-      </>
-    ),
-  });
-
-  extraStats.forEach((stat, index) => {
-    const isLast = index === extraStats.length - 1;
-    statColumns.push({
-      key: `extra-${index}`,
-      hasBorder: !isLast,
-      content: (
-        <>
-          <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{stat.label}</div>
-          <div className="font-mono text-xs font-semibold tabular-nums">{stat.value}</div>
-        </>
-      ),
-    });
-  });
+  const baseStatColumns = hideBalanceColumn ? 2 : 3;
+  const totalStatColumns = baseStatColumns + extraStats.length;
+  const statColumnClassMap: Record<number, string> = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+    3: "grid-cols-3",
+    4: "grid-cols-4",
+    5: "grid-cols-5",
+    6: "grid-cols-6",
+  };
+  const statGridClass = statColumnClassMap[totalStatColumns] ?? "grid-cols-3";
 
   return (
     <>
@@ -410,7 +475,7 @@ export const BasePosition: FC<BasePositionProps> = ({
               <Image src={icon} alt={`${name} icon`} fill className="rounded object-contain" />
             </div>
             <span className="max-w-[100px] truncate text-sm font-bold leading-none tracking-tight" title={name}>
-              {renderName ? renderName(name) : isPTToken(name) ? <TokenSymbolDisplay symbol={name} size="xs" /> : name}
+              <TokenNameContent name={name} renderName={renderName} variant="mobile" />
             </span>
             {infoButtonNode && (
               <div className="hidden flex-shrink-0 sm:block" onClick={stopPropagation}>
@@ -466,18 +531,7 @@ export const BasePosition: FC<BasePositionProps> = ({
             </div>
             <div className="ml-3 flex min-w-0 items-center gap-1.5">
               <div className="flex min-w-0 flex-col">
-                {renderName ? (
-                  <>{renderName(name)}</>
-                ) : isPTToken(name) ? (
-                  <TokenSymbolDisplay symbol={name} size="sm" variant="stacked" />
-                ) : (
-                  <>
-                    <span className="truncate text-base font-bold leading-tight tracking-tight" title={name}>{name}</span>
-                    {subtitle ? (
-                      <span className="text-base-content/40 truncate text-[10px] uppercase leading-tight tracking-wider">{subtitle}</span>
-                    ) : null}
-                  </>
-                )}
+                <TokenNameContent name={name} renderName={renderName} subtitle={subtitle} variant="desktop" />
               </div>
             </div>
             {infoButtonNode && (

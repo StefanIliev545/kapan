@@ -19,8 +19,9 @@ import {
 } from "~~/hooks/useConditionalOrders";
 import { useConditionalOrderEvents } from "~~/hooks/useConditionalOrderEvents";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
-import { ShieldCheckIcon, ArrowTrendingUpIcon, ArrowsRightLeftIcon, QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
+import { ShieldCheckIcon, ArrowTrendingUpIcon, ArrowsRightLeftIcon, QuestionMarkCircleIcon, ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import { type KapanProtocol } from "~~/utils/cow/appData";
+import { getCowExplorerAddressUrl } from "~~/utils/cow/addresses";
 
 // ============ Limit Price Trigger Decoding ============
 
@@ -104,6 +105,74 @@ function getProtocolNameFromId(protocolId: `0x${string}`): KapanProtocol | undef
 
 const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
 
+
+// ============ Extracted helpers/sub-components to reduce renderOrderItem complexity ============
+
+type OrderType = "adl" | "autoLeverage" | "limit" | "unknown";
+
+interface OrderTypeMetadata {
+  label: string;
+  Icon: typeof ArrowTrendingUpIcon;
+  badgeClass: string;
+}
+
+/** Resolve display metadata (label, icon, badge class) from order type. */
+function getOrderTypeMetadata(orderType: OrderType): OrderTypeMetadata {
+  switch (orderType) {
+    case "autoLeverage":
+      return { label: "Auto Leverage", Icon: ArrowTrendingUpIcon, badgeClass: "bg-info/20 text-info" };
+    case "limit":
+      return { label: "Swap", Icon: ArrowsRightLeftIcon, badgeClass: "bg-primary/20 text-primary" };
+    case "unknown":
+      return { label: "Unknown", Icon: QuestionMarkCircleIcon, badgeClass: "bg-warning/20 text-warning" };
+    default: // "adl"
+      return { label: "Auto Deleverage", Icon: ShieldCheckIcon, badgeClass: "bg-success/20 text-success" };
+  }
+}
+
+/** Resolve the protocol name and limit price params from a conditional order. */
+function resolveOrderProtocol(
+  order: ConditionalOrder,
+  orderType: OrderType,
+): { protocolName: KapanProtocol | undefined; limitPriceParams: DecodedLimitPriceParams | undefined } {
+  let protocolName: KapanProtocol | undefined;
+  let limitPriceParams: DecodedLimitPriceParams | undefined;
+
+  if (orderType === "limit" && order.context.params.triggerStaticData) {
+    limitPriceParams = decodeLimitPriceTriggerParams(order.context.params.triggerStaticData as `0x${string}`);
+    if (limitPriceParams) {
+      protocolName = getProtocolNameFromId(limitPriceParams.protocolId);
+    }
+  } else if (order.triggerParams) {
+    protocolName = getProtocolNameFromId(order.triggerParams.protocolId);
+  }
+
+  return { protocolName, limitPriceParams };
+}
+
+/** Format a limit price (token-to-token exchange rate) for display. */
+function formatLimitPrice(value: number): string {
+  if (value === 0) return "0";
+  const abs = Math.abs(value);
+  let maxFrac = 4;
+  if (abs < 0.0001) maxFrac = 8;
+  else if (abs < 0.01) maxFrac = 6;
+  else if (abs < 1) maxFrac = 5;
+  return value.toLocaleString(undefined, { maximumFractionDigits: maxFrac });
+}
+
+/** Format a token amount for display, using more decimals for small values. */
+function formatTokenAmount(amount: bigint, decimals: number): string {
+  const value = Number(formatUnits(amount, decimals));
+  if (value === 0) return "0";
+  const abs = Math.abs(value);
+  let maxFrac = 4;
+  if (abs < 0.0001) maxFrac = 8;
+  else if (abs < 0.01) maxFrac = 6;
+  else if (abs < 1) maxFrac = 5;
+  return value.toLocaleString(undefined, { maximumFractionDigits: maxFrac });
+}
+
 export function PendingOrdersDrawer() {
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
@@ -129,6 +198,8 @@ export function PendingOrdersDrawer() {
   const limitPriceTriggerAddress = limitPriceTriggerInfo?.address?.toLowerCase();
   const { data: ltvTriggerInfo } = useDeployedContractInfo({ contractName: "LtvTrigger", chainId } as any);
   const ltvTriggerAddress = ltvTriggerInfo?.address?.toLowerCase();
+  const { data: orderManagerInfo } = useDeployedContractInfo({ contractName: "KapanConditionalOrderManager", chainId } as any);
+  const cowExplorerUrl = orderManagerInfo?.address ? getCowExplorerAddressUrl(chainId, orderManagerInfo.address) : undefined;
 
   const [isOpen, setIsOpen] = useState(false);
   // Track if we have a pending order that hasn't been fetched yet
@@ -438,16 +509,7 @@ export function PendingOrdersDrawer() {
                     </div>
                     {/* Show last 3 completed orders in the drawer */}
                     {filteredCompletedOrders.slice(0, 3).map((order) => {
-                      const triggerAddr = order.context.params.trigger.toLowerCase();
-                      let type: "adl" | "autoLeverage" | "limit" | "unknown" = "unknown";
-                      if (autoLeverageTriggerAddress && triggerAddr === autoLeverageTriggerAddress) {
-                        type = "autoLeverage";
-                      } else if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) {
-                        type = "limit";
-                      } else if (ltvTriggerAddress && triggerAddr === ltvTriggerAddress) {
-                        type = "adl";
-                      }
-                      return renderOrderItem(order, type);
+                      return renderOrderItem(order, resolveOrderType(order));
                     })}
                     {filteredCompletedOrders.length > 3 && (
                       <div className="px-4 py-2 text-center">
@@ -464,11 +526,19 @@ export function PendingOrdersDrawer() {
 
           {/* Footer */}
           {recentOrders.length > 0 && (
-            <div className="border-base-200 text-base-content/40 flex justify-between border-t px-4 py-2 text-xs">
+            <div className="border-base-200 text-base-content/40 flex items-center justify-between border-t px-4 py-2 text-xs">
               <span>{activeCount} active{hasOlderOrders ? ` · ${conditionalOrders.length - recentOrders.length} older` : ''}</span>
-              <Link href="/orders" className="text-primary hover:underline">
-                View all
-              </Link>
+              <div className="flex items-center gap-3">
+                {cowExplorerUrl && (
+                  <a href={cowExplorerUrl} target="_blank" rel="noopener noreferrer" className="text-base-content/40 hover:text-primary flex items-center gap-1 transition-colors">
+                    <ArrowTopRightOnSquareIcon className="size-3" />
+                    CoW Explorer
+                  </a>
+                )}
+                <Link href="/orders" className="text-primary hover:underline">
+                  View all
+                </Link>
+              </div>
             </div>
           )}
         </div>
@@ -476,8 +546,17 @@ export function PendingOrdersDrawer() {
     </>
   );
 
+  // Helper to determine order type from trigger address
+  function resolveOrderType(order: ConditionalOrder): OrderType {
+    const triggerAddr = order.context.params.trigger.toLowerCase();
+    if (autoLeverageTriggerAddress && triggerAddr === autoLeverageTriggerAddress) return "autoLeverage";
+    if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) return "limit";
+    if (ltvTriggerAddress && triggerAddr === ltvTriggerAddress) return "adl";
+    return "unknown";
+  }
+
   // Helper function to render an order item
-  function renderOrderItem(order: ConditionalOrder, orderType: "adl" | "autoLeverage" | "limit" | "unknown") {
+  function renderOrderItem(order: ConditionalOrder, orderType: OrderType) {
     const { orderHash, context, triggerParams, isTriggerMet } = order;
     const { status, iterationCount, createdAt } = context;
     const isActive = status === ConditionalOrderStatus.Active;
@@ -489,45 +568,10 @@ export function PendingOrdersDrawer() {
     const completedIterations = Number(iterationCount);
     const progressPercent = maxIterations > 0 ? (completedIterations / maxIterations) * 100 : 0;
 
-    // Get protocol from trigger params
-    let protocolName: KapanProtocol | undefined;
-    let limitPriceParams: DecodedLimitPriceParams | undefined;
+    // Get protocol and limit price params from order
+    const { protocolName, limitPriceParams } = resolveOrderProtocol(order, orderType);
 
-    if (orderType === "limit" && context.params.triggerStaticData) {
-      // Decode limit price trigger params
-      limitPriceParams = decodeLimitPriceTriggerParams(context.params.triggerStaticData as `0x${string}`);
-      if (limitPriceParams) {
-        protocolName = getProtocolNameFromId(limitPriceParams.protocolId);
-      }
-    } else if (triggerParams) {
-      // Get protocol from LTV trigger params
-      protocolName = getProtocolNameFromId(triggerParams.protocolId);
-    }
-
-    // Determine order label and styling
-    let orderTypeLabel: string;
-    let OrderIcon: typeof ArrowTrendingUpIcon;
-    let badgeClass: string;
-
-    if (orderType === "autoLeverage") {
-      orderTypeLabel = "Auto Leverage";
-      OrderIcon = ArrowTrendingUpIcon;
-      badgeClass = "bg-info/20 text-info";
-    } else if (orderType === "limit") {
-      // For limit orders, try to infer operation type from token pair
-      // In the future, we can fetch appData for more accurate labels
-      orderTypeLabel = "Swap";
-      OrderIcon = ArrowsRightLeftIcon;
-      badgeClass = "bg-primary/20 text-primary";
-    } else if (orderType === "unknown") {
-      orderTypeLabel = "Unknown";
-      OrderIcon = QuestionMarkCircleIcon;
-      badgeClass = "bg-warning/20 text-warning";
-    } else {
-      orderTypeLabel = "Auto Deleverage";
-      OrderIcon = ShieldCheckIcon;
-      badgeClass = "bg-success/20 text-success";
-    }
+    const { label: orderTypeLabel, Icon: OrderIcon, badgeClass } = getOrderTypeMetadata(orderType);
 
     // Get protocol icon
     const protocolIcon = protocolName ? PROTOCOL_ICONS[protocolName] : undefined;
@@ -537,7 +581,7 @@ export function PendingOrdersDrawer() {
         {/* Row 0: Order type badge with protocol + Status */}
         <div className="mb-1.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium flex items-center gap-1 ${badgeClass}`}>
+            <span className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${badgeClass}`}>
               <OrderIcon className="size-3" />
               {orderTypeLabel}
             </span>
@@ -596,8 +640,8 @@ export function PendingOrdersDrawer() {
               </span>
               <span className="font-medium">
                 {limitPriceParams.isKindBuy
-                  ? `${Number(formatUnits(limitPriceParams.totalBuyAmount, limitPriceParams.buyDecimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${buySymbol}`
-                  : `${Number(formatUnits(limitPriceParams.totalSellAmount, limitPriceParams.sellDecimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${sellSymbol}`
+                  ? `${formatTokenAmount(limitPriceParams.totalBuyAmount, limitPriceParams.buyDecimals)} ${buySymbol}`
+                  : `${formatTokenAmount(limitPriceParams.totalSellAmount, limitPriceParams.sellDecimals)} ${sellSymbol}`
                 }
               </span>
             </div>
@@ -607,8 +651,8 @@ export function PendingOrdersDrawer() {
               </span>
               <span className="font-medium">
                 {limitPriceParams.isKindBuy
-                  ? `${Number(formatUnits(limitPriceParams.totalSellAmount, limitPriceParams.sellDecimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${sellSymbol}`
-                  : `${Number(formatUnits(limitPriceParams.totalBuyAmount, limitPriceParams.buyDecimals)).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${buySymbol}`
+                  ? `${formatTokenAmount(limitPriceParams.totalSellAmount, limitPriceParams.sellDecimals)} ${sellSymbol}`
+                  : `${formatTokenAmount(limitPriceParams.totalBuyAmount, limitPriceParams.buyDecimals)} ${buySymbol}`
                 }
               </span>
             </div>
@@ -616,7 +660,7 @@ export function PendingOrdersDrawer() {
               <span className="text-base-content/60">
                 {limitPriceParams.triggerAbovePrice ? "When price ≥" : "When price ≤"}
               </span>
-              <span className="font-medium">${(Number(limitPriceParams.limitPrice) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+              <span className="font-medium">{formatLimitPrice(Number(limitPriceParams.limitPrice) / 1e8)} {limitPriceParams.isKindBuy ? `${buySymbol}/${sellSymbol}` : `${sellSymbol}/${buySymbol}`}</span>
             </div>
           </div>
         )}

@@ -641,10 +641,11 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                 {isADLSupported && borrowDetails.borrowBalance > 0 && totalCollateralValue > 0 && (
                   <button
                     onClick={adlModal.open}
-                    className="text-base-content/50 hover:text-base-content hover:bg-base-200 rounded-lg p-1.5 transition-colors"
+                    className="text-base-content/50 hover:text-base-content hover:bg-base-200 flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
                     title="Auto-Deleverage Protection"
                   >
                     <Cog6ToothIcon className="size-4" />
+                    <span>Automate</span>
                   </button>
                 )}
               </div>
@@ -745,6 +746,8 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
             decimals: Number(baseTokenDecimalsArray[0]),
             balance: borrowDetails.borrowBalanceRaw,
           }}
+          totalCollateralUsd={BigInt(Math.round(totalCollateralValue * 1e8))}
+          totalDebtUsd={BigInt(Math.round(borrowDetails.borrowValue * 1e8))}
           compoundMarket={baseToken}
         />
       )}

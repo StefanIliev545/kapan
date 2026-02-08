@@ -92,6 +92,17 @@ function getProtocolNameFromId(protocolId: `0x${string}`): KapanProtocol | undef
 
 type OrderType = "adl" | "autoLeverage" | "limit";
 
+/** Format a limit price (token-to-token exchange rate) for display. */
+function formatLimitPrice(value: number): string {
+  if (value === 0) return "0";
+  const abs = Math.abs(value);
+  let maxFrac = 4;
+  if (abs < 0.0001) maxFrac = 8;
+  else if (abs < 0.01) maxFrac = 6;
+  else if (abs < 1) maxFrac = 5;
+  return value.toLocaleString(undefined, { maximumFractionDigits: maxFrac });
+}
+
 export default function OrdersPage() {
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
@@ -303,6 +314,32 @@ export default function OrdersPage() {
   );
 }
 
+/** Map order type to display label, icon component, and badge CSS class. */
+function getOrderTypeStyling(orderType: OrderType): {
+  label: string;
+  icon: typeof ArrowTrendingUpIcon;
+  badgeClass: string;
+} {
+  if (orderType === "autoLeverage") {
+    return { label: "Auto Leverage", icon: ArrowTrendingUpIcon, badgeClass: "bg-info/20 text-info" };
+  }
+  if (orderType === "limit") {
+    return { label: "Limit Order", icon: ArrowsRightLeftIcon, badgeClass: "bg-primary/20 text-primary" };
+  }
+  return { label: "Auto Deleverage", icon: ShieldCheckIcon, badgeClass: "bg-success/20 text-success" };
+}
+
+/** Get the status badge CSS class and label for a conditional order status. */
+function getStatusDisplay(status: ConditionalOrderStatus): { className: string; label: string } {
+  if (status === ConditionalOrderStatus.Active) {
+    return { className: "bg-success/20 text-success", label: "Active" };
+  }
+  if (status === ConditionalOrderStatus.Completed) {
+    return { className: "bg-base-200 text-base-content/60", label: "Completed" };
+  }
+  return { className: "bg-error/20 text-error", label: "Cancelled" };
+}
+
 function OrderRow({
   order,
   orderType,
@@ -323,6 +360,7 @@ function OrderRow({
   const { orderHash, context, triggerParams, isTriggerMet } = order;
   const { status, iterationCount, createdAt } = context;
   const isActive = status === ConditionalOrderStatus.Active;
+  const statusDisplay = getStatusDisplay(status);
 
   const sellSymbol = getTokenSymbol(context.params.sellToken);
   const buySymbol = getTokenSymbol(context.params.buyToken);
@@ -337,24 +375,7 @@ function OrderRow({
     limitPriceParams = decodeLimitPriceTriggerParams(context.params.triggerStaticData as `0x${string}`);
   }
 
-  // Order type styling
-  let orderTypeLabel: string;
-  let OrderIcon: typeof ArrowTrendingUpIcon;
-  let badgeClass: string;
-
-  if (orderType === "autoLeverage") {
-    orderTypeLabel = "Auto Leverage";
-    OrderIcon = ArrowTrendingUpIcon;
-    badgeClass = "bg-info/20 text-info";
-  } else if (orderType === "limit") {
-    orderTypeLabel = "Limit Order";
-    OrderIcon = ArrowsRightLeftIcon;
-    badgeClass = "bg-primary/20 text-primary";
-  } else {
-    orderTypeLabel = "Auto Deleverage";
-    OrderIcon = ShieldCheckIcon;
-    badgeClass = "bg-success/20 text-success";
-  }
+  const { label: orderTypeLabel, icon: OrderIcon, badgeClass } = getOrderTypeStyling(orderType);
 
   const protocolIcon = protocol ? PROTOCOL_ICONS[protocol] : undefined;
 
@@ -363,7 +384,7 @@ function OrderRow({
       {/* Row 1: Type badge, protocol, status */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`rounded px-2 py-1 text-xs font-medium flex items-center gap-1 ${badgeClass}`}>
+          <span className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${badgeClass}`}>
             <OrderIcon className="size-3.5" />
             {orderTypeLabel}
           </span>
@@ -379,13 +400,7 @@ function OrderRow({
             </span>
           )}
         </div>
-        <span className={`rounded px-2 py-1 text-xs font-medium ${
-          isActive ? 'bg-success/20 text-success' :
-          status === ConditionalOrderStatus.Completed ? 'bg-base-200 text-base-content/60' :
-          'bg-error/20 text-error'
-        }`}>
-          {isActive ? 'Active' : status === ConditionalOrderStatus.Completed ? 'Completed' : 'Cancelled'}
-        </span>
+        <span className={`rounded px-2 py-1 text-xs font-medium ${statusDisplay.className}`}>{statusDisplay.label}</span>
       </div>
 
       {/* Row 2: Token pair */}
@@ -426,7 +441,7 @@ function OrderRow({
               <span className="text-base-content/60">
                 {limitPriceParams.triggerAbovePrice ? "When price ≥ " : "When price ≤ "}
               </span>
-              <span className="font-medium">${(Number(limitPriceParams.limitPrice) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+              <span className="font-medium">{formatLimitPrice(Number(limitPriceParams.limitPrice) / 1e8)} {limitPriceParams.isKindBuy ? `${buySymbol}/${sellSymbol}` : `${sellSymbol}/${buySymbol}`}</span>
             </div>
             <div>
               <span className="text-base-content/60">Chunks: </span>

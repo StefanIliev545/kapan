@@ -55,6 +55,112 @@ export interface LTVAutomationModalProps {
   compoundMarket?: string;
 }
 
+// ============ Computation Helpers ============
+
+/** Calculate collateral price from usdValue and rawBalance, scaled to 8 decimals */
+function calcCollateralPrice(collateral: SwapAsset): bigint {
+  if (!collateral.usdValue || collateral.rawBalance <= 0n) return 0n;
+  return (BigInt(Math.round(collateral.usdValue * 1e8)) * BigInt(10 ** collateral.decimals)) / collateral.rawBalance;
+}
+
+/** Calculate ADL flash loan configuration from position data */
+function calcADLFlashLoanConfig(
+  collateral: SwapAsset | undefined,
+  totalCollateralUsd: bigint | undefined,
+  totalDebtUsd: bigint | undefined,
+  triggerBps: number,
+  targetBps: number,
+  chunks: number,
+  debtDecimals: number,
+): { amount: bigint; perChunkBuyAmount: bigint; userCollateralBalance: bigint } | null {
+  if (!collateral || !totalCollateralUsd || !totalDebtUsd) return null;
+
+  const perChunkFlashLoanUsd = calculateADLFlashLoanAmount(totalCollateralUsd, totalDebtUsd, triggerBps, targetBps, chunks);
+  if (perChunkFlashLoanUsd === 0n) return null;
+
+  // price = (usdValue * 10^8 * 10^tokenDecimals) / rawBalance gives price in 8 decimals
+  const collateralPrice = calcCollateralPrice(collateral);
+  if (collateralPrice === 0n) return null;
+
+  const perChunkFlashLoanAmount = usdToTokenAmount(perChunkFlashLoanUsd, collateralPrice, collateral.decimals);
+  const debtPrice = totalDebtUsd > 0n && totalCollateralUsd > 0n
+    ? (totalDebtUsd * BigInt(1e8)) / totalCollateralUsd
+    : BigInt(1e8);
+  const perChunkBuyAmount = usdToTokenAmount(perChunkFlashLoanUsd, debtPrice, debtDecimals);
+
+  return { amount: perChunkFlashLoanAmount, perChunkBuyAmount, userCollateralBalance: collateral.rawBalance };
+}
+
+/** Calculate debt token price from totalDebtUsd and balance, with stablecoin fallback */
+function calcDebtTokenPrice(
+  balance: bigint | undefined,
+  totalDebtUsd: bigint | undefined,
+  decimals: number,
+): bigint {
+  if (balance && balance > 0n && totalDebtUsd && totalDebtUsd > 0n) {
+    // price = (totalDebtUsd * 10^tokenDecimals) / balance gives price in 8 decimals
+    return (totalDebtUsd * BigInt(10 ** decimals)) / balance;
+  }
+  console.warn("[AutoLeverage] Using stablecoin fallback price - pass debtToken.balance for accurate pricing");
+  return BigInt(1e8); // $1.00 in 8 decimals
+}
+
+/** Calculate auto-leverage flash loan configuration from position data */
+function calcAutoLevFlashLoanConfig(
+  collateral: SwapAsset | undefined,
+  totalCollateralUsd: bigint | undefined,
+  totalDebtUsd: bigint | undefined,
+  triggerBps: number,
+  targetBps: number,
+  chunks: number,
+  debtToken: { decimals: number; balance?: bigint },
+): { amount: bigint; perChunkSellAmount: bigint } | null {
+  // For auto-leverage, we only need collateral (user might have 0 debt, wanting to leverage up)
+  if (!collateral || !totalCollateralUsd) return null;
+
+  // Pass 0n for debt if undefined - auto-leverage can start from 0% LTV
+  const effectiveDebtUsd = totalDebtUsd ?? 0n;
+  const perChunkFlashLoanUsd = calculateAutoLeverageFlashLoanAmount(
+    totalCollateralUsd, effectiveDebtUsd, triggerBps, targetBps, chunks,
+  );
+  if (perChunkFlashLoanUsd === 0n) return null;
+
+  // For auto-leverage, we flash loan DEBT tokens (not collateral!)
+  const debtTokenPrice = calcDebtTokenPrice(debtToken.balance, totalDebtUsd, debtToken.decimals);
+  const perChunkFlashLoanAmount = usdToTokenAmount(perChunkFlashLoanUsd, debtTokenPrice, debtToken.decimals);
+
+  console.log("[AutoLeverage] Flash loan config:", {
+    perChunkFlashLoanUsd: perChunkFlashLoanUsd.toString(),
+    debtTokenPrice: debtTokenPrice.toString(),
+    perChunkFlashLoanAmount: perChunkFlashLoanAmount.toString(),
+    debtTokenBalance: debtToken.balance?.toString(),
+  });
+
+  // Sell amount should match flash loan (we sell what we flash loaned)
+  // perChunkSellAmount is used as a reference but the trigger calculates actual sell amount
+  return { amount: perChunkFlashLoanAmount, perChunkSellAmount: perChunkFlashLoanAmount };
+}
+
+/** Determine the submit button label based on which modes are enabled */
+function getSubmitLabel(adl: boolean, autoLev: boolean): string {
+  if (adl && autoLev) return "Enable Both";
+  if (adl) return "Enable Protection";
+  if (autoLev) return "Enable Leverage";
+  return "Select an option";
+}
+
+/** Check whether the feature is unsupported on the current network */
+function isFeatureUnsupported(
+  loading: boolean,
+  enableADL: boolean,
+  adlSupported: boolean,
+  enableAutoLev: boolean,
+  autoLevSupported: boolean,
+): boolean {
+  if (loading) return false;
+  return (enableADL && !adlSupported) || (enableAutoLev && !autoLevSupported);
+}
+
 // ============ LTV Input ============
 
 interface LtvInputProps {
@@ -105,6 +211,119 @@ const LtvInput: FC<LtvInputProps> = ({ label, value, min, max, onChange, colorCl
     </div>
   );
 };
+
+// ============ Sub-components ============
+
+/** LTV visualization bar showing zone regions and position markers */
+const LtvBar: FC<{
+  ltvBarWidth: Record<string, number>;
+  enableADL: boolean;
+  enableAutoLeverage: boolean;
+}> = ({ ltvBarWidth, enableADL, enableAutoLeverage }) => {
+  const safeZoneLeft = enableAutoLeverage ? ltvBarWidth.autoLevTarget : 0;
+  const safeZoneRight = enableADL ? ltvBarWidth.adlTarget : ltvBarWidth.liquidation;
+
+  return (
+    <div className="bg-base-200 relative h-3 overflow-hidden rounded">
+      {enableAutoLeverage && (
+        <div className="bg-info/30 absolute left-0 top-0 h-full" style={{ width: `${ltvBarWidth.autoLevTrigger}%` }} />
+      )}
+      <div
+        className="bg-success/30 absolute top-0 h-full"
+        style={{ left: `${safeZoneLeft}%`, width: `${safeZoneRight - safeZoneLeft}%` }}
+      />
+      {enableADL && (
+        <>
+          <div className="bg-warning/30 absolute top-0 h-full" style={{ left: `${ltvBarWidth.adlTarget}%`, width: `${ltvBarWidth.adlTrigger - ltvBarWidth.adlTarget}%` }} />
+          <div className="bg-error/30 absolute top-0 h-full" style={{ left: `${ltvBarWidth.adlTrigger}%`, width: `${ltvBarWidth.liquidation - ltvBarWidth.adlTrigger}%` }} />
+        </>
+      )}
+      {/* Current marker */}
+      <div className="bg-base-content absolute top-0 z-10 h-full w-1" style={{ left: `${ltvBarWidth.current}%` }} />
+      {/* ADL markers */}
+      {enableADL && (
+        <>
+          <div className="bg-warning absolute top-0 h-full w-0.5" style={{ left: `${ltvBarWidth.adlTrigger}%` }} />
+          <div className="bg-success absolute top-0 h-full w-0.5" style={{ left: `${ltvBarWidth.adlTarget}%` }} />
+        </>
+      )}
+      {/* Auto-leverage markers */}
+      {enableAutoLeverage && (
+        <>
+          <div className="bg-info absolute top-0 h-full w-0.5" style={{ left: `${ltvBarWidth.autoLevTrigger}%` }} />
+          <div className="bg-primary absolute top-0 h-full w-0.5" style={{ left: `${ltvBarWidth.autoLevTarget}%` }} />
+        </>
+      )}
+    </div>
+  );
+};
+
+/** Single legend item: colored marker + label */
+const LegendItem: FC<{ colorClass: string; textClass: string; label: string }> = ({ colorClass, textClass, label }) => (
+  <span className="flex items-center gap-1">
+    <span className={`${colorClass} inline-block h-2 w-1 rounded-sm`} />
+    <span className={textClass}>{label}</span>
+  </span>
+);
+
+/** Legend row beneath the LTV bar */
+const LtvBarLegend: FC<{ enableADL: boolean; enableAutoLeverage: boolean }> = ({ enableADL, enableAutoLeverage }) => (
+  <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px]">
+    <LegendItem colorClass="bg-base-content" textClass="text-base-content/70" label="current" />
+    {enableAutoLeverage && (
+      <>
+        <LegendItem colorClass="bg-info" textClass="text-info" label="leverage trigger" />
+        <LegendItem colorClass="bg-primary" textClass="text-primary" label="leverage target" />
+      </>
+    )}
+    {enableADL && (
+      <>
+        <LegendItem colorClass="bg-success" textClass="text-success" label="deleverage target" />
+        <LegendItem colorClass="bg-warning" textClass="text-warning" label="deleverage trigger" />
+      </>
+    )}
+  </div>
+);
+
+/** Advanced settings panel (slippage, chunks, iterations) */
+const AdvancedSettings: FC<{
+  maxSlippageBps: number;
+  numChunks: number;
+  maxIterations: number;
+  onSlippageChange: (v: number) => void;
+  onChunksChange: (v: number) => void;
+  onIterationsChange: (v: number) => void;
+}> = ({ maxSlippageBps, numChunks, maxIterations, onSlippageChange, onChunksChange, onIterationsChange }) => (
+  <div className="grid grid-cols-3 gap-3 text-xs">
+    <div>
+      <div className="text-base-content/50 mb-1">Slippage</div>
+      <select className="select select-bordered select-xs w-full" value={maxSlippageBps} onChange={e => onSlippageChange(Number(e.target.value))}>
+        <option value={50}>0.5%</option>
+        <option value={100}>1%</option>
+        <option value={200}>2%</option>
+        <option value={500}>5%</option>
+        <option value={750}>7.5%</option>
+        <option value={1000}>10%</option>
+      </select>
+    </div>
+    <div>
+      <div className="text-base-content/50 mb-1">Chunks</div>
+      <select className="select select-bordered select-xs w-full" value={numChunks} onChange={e => onChunksChange(Number(e.target.value))}>
+        <option value={1}>1</option>
+        <option value={2}>2</option>
+        <option value={4}>4</option>
+      </select>
+    </div>
+    <div>
+      <div className="text-base-content/50 mb-1">Iterations</div>
+      <select className="select select-bordered select-xs w-full" value={maxIterations} onChange={e => onIterationsChange(Number(e.target.value))}>
+        <option value={5}>5</option>
+        <option value={10}>10</option>
+        <option value={25}>25</option>
+      </select>
+    </div>
+  </div>
+);
 
 // ============ Main Component ============
 
@@ -203,61 +422,15 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
     [currentLtvBps, liquidationLtvBps, autoLevTriggerLtvBps, autoLevTargetLtvBps, maxSlippageBps, numChunks, maxIterations, selectedCollateralAddress],
   );
 
-  const adlFlashLoanConfig = useMemo(() => {
-    if (!selectedCollateral || !totalCollateralUsd || !totalDebtUsd) return null;
-    const perChunkFlashLoanUsd = calculateADLFlashLoanAmount(totalCollateralUsd, totalDebtUsd, adlTriggerLtvBps, adlTargetLtvBps, numChunks);
-    if (perChunkFlashLoanUsd === 0n) return null;
-    // Price = usdValue / rawBalance, scaled to 8 decimals
-    // usdValue is a number in USD, rawBalance is in token decimals
-    // price = (usdValue * 10^8 * 10^tokenDecimals) / rawBalance gives price in 8 decimals
-    const collateralPrice = selectedCollateral.usdValue && selectedCollateral.rawBalance > 0n
-      ? (BigInt(Math.round(selectedCollateral.usdValue * 1e8)) * BigInt(10 ** selectedCollateral.decimals)) / selectedCollateral.rawBalance : 0n;
-    if (collateralPrice === 0n) return null;
-    const perChunkFlashLoanAmount = usdToTokenAmount(perChunkFlashLoanUsd, collateralPrice, selectedCollateral.decimals);
-    const debtPrice = totalDebtUsd > 0n && totalCollateralUsd > 0n ? (totalDebtUsd * BigInt(1e8)) / totalCollateralUsd : BigInt(1e8);
-    const perChunkBuyAmount = usdToTokenAmount(perChunkFlashLoanUsd, debtPrice, debtToken.decimals);
-    return { amount: perChunkFlashLoanAmount, perChunkBuyAmount, userCollateralBalance: selectedCollateral.rawBalance };
-  }, [selectedCollateral, totalCollateralUsd, totalDebtUsd, adlTriggerLtvBps, adlTargetLtvBps, numChunks, debtToken.decimals]);
+  const adlFlashLoanConfig = useMemo(
+    () => calcADLFlashLoanConfig(selectedCollateral, totalCollateralUsd, totalDebtUsd, adlTriggerLtvBps, adlTargetLtvBps, numChunks, debtToken.decimals),
+    [selectedCollateral, totalCollateralUsd, totalDebtUsd, adlTriggerLtvBps, adlTargetLtvBps, numChunks, debtToken.decimals],
+  );
 
-  const autoLevFlashLoanConfig = useMemo(() => {
-    // For auto-leverage, we only need collateral (user might have 0 debt, wanting to leverage up)
-    if (!selectedCollateral || !totalCollateralUsd) return null;
-    // Pass 0n for debt if undefined - auto-leverage can start from 0% LTV
-    const effectiveDebtUsd = totalDebtUsd ?? 0n;
-    const perChunkFlashLoanUsd = calculateAutoLeverageFlashLoanAmount(totalCollateralUsd, effectiveDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, 2000);
-    if (perChunkFlashLoanUsd === 0n) return null;
-
-    // For auto-leverage, we flash loan DEBT tokens (not collateral!)
-    // Calculate debt token price from totalDebtUsd and balance if available
-    let debtTokenPrice: bigint;
-    if (debtToken.balance && debtToken.balance > 0n && totalDebtUsd && totalDebtUsd > 0n) {
-      // Price = totalDebtUsd / balance, scaled to 8 decimals
-      // totalDebtUsd is in 8 decimals, balance is in token decimals
-      // price = (totalDebtUsd * 10^tokenDecimals) / balance gives price in 8 decimals
-      debtTokenPrice = (totalDebtUsd * BigInt(10 ** debtToken.decimals)) / debtToken.balance;
-    } else {
-      // Fallback for stablecoins or when balance not available
-      const STABLECOIN_PRICE = BigInt(1e8); // $1.00 in 8 decimals
-      debtTokenPrice = STABLECOIN_PRICE;
-      console.warn("[AutoLeverage] Using stablecoin fallback price - pass debtToken.balance for accurate pricing");
-    }
-
-    // Flash loan amount in DEBT token units (not collateral!)
-    const perChunkFlashLoanAmount = usdToTokenAmount(perChunkFlashLoanUsd, debtTokenPrice, debtToken.decimals);
-
-    // Sell amount should match flash loan (we sell what we flash loaned)
-    // perChunkSellAmount is used as a reference but the trigger calculates actual sell amount
-    const perChunkSellAmount = perChunkFlashLoanAmount;
-
-    console.log("[AutoLeverage] Flash loan config:", {
-      perChunkFlashLoanUsd: perChunkFlashLoanUsd.toString(),
-      debtTokenPrice: debtTokenPrice.toString(),
-      perChunkFlashLoanAmount: perChunkFlashLoanAmount.toString(),
-      debtTokenBalance: debtToken.balance?.toString(),
-    });
-
-    return { amount: perChunkFlashLoanAmount, perChunkSellAmount };
-  }, [selectedCollateral, totalCollateralUsd, totalDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, debtToken.decimals, debtToken.balance]);
+  const autoLevFlashLoanConfig = useMemo(
+    () => calcAutoLevFlashLoanConfig(selectedCollateral, totalCollateralUsd, totalDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, debtToken),
+    [selectedCollateral, totalCollateralUsd, totalDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, debtToken.decimals, debtToken.balance],
+  );
 
   const { createOrder: createADLOrder, isLoading: isCreatingADL } = useADLOrder({
     protocolName, chainId,
@@ -319,6 +492,8 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
     return errors;
   }, [enableADL, enableAutoLeverage, adlValidation, autoLevValidation]);
 
+  const showUnsupportedWarning = isFeatureUnsupported(isLoading, enableADL, isADLSupported, enableAutoLeverage, isAutoLevSupported);
+
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} title="LTV Automation" maxWidthClass="max-w-md">
       <div className="space-y-4">
@@ -334,85 +509,23 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
         </div>
 
         {/* Visual LTV bar */}
-        <div className="bg-base-200 relative h-3 rounded overflow-hidden">
-          {enableAutoLeverage && (
-            <div className="bg-info/30 absolute left-0 top-0 h-full" style={{ width: `${ltvBarWidth.autoLevTrigger}%` }} />
-          )}
-          <div
-            className="bg-success/30 absolute top-0 h-full"
-            style={{
-              left: `${enableAutoLeverage ? ltvBarWidth.autoLevTarget : 0}%`,
-              width: `${(enableADL ? ltvBarWidth.adlTarget : ltvBarWidth.liquidation) - (enableAutoLeverage ? ltvBarWidth.autoLevTarget : 0)}%`
-            }}
-          />
-          {enableADL && (
-            <>
-              <div className="bg-warning/30 absolute top-0 h-full" style={{ left: `${ltvBarWidth.adlTarget}%`, width: `${ltvBarWidth.adlTrigger - ltvBarWidth.adlTarget}%` }} />
-              <div className="bg-error/30 absolute top-0 h-full" style={{ left: `${ltvBarWidth.adlTrigger}%`, width: `${ltvBarWidth.liquidation - ltvBarWidth.adlTrigger}%` }} />
-            </>
-          )}
-          {/* Current marker */}
-          <div className="bg-base-content absolute top-0 h-full w-1 z-10" style={{ left: `${ltvBarWidth.current}%` }} />
-          {/* ADL markers */}
-          {enableADL && (
-            <>
-              <div className="bg-warning absolute top-0 h-full w-0.5" style={{ left: `${ltvBarWidth.adlTrigger}%` }} />
-              <div className="bg-success absolute top-0 h-full w-0.5" style={{ left: `${ltvBarWidth.adlTarget}%` }} />
-            </>
-          )}
-          {/* Auto-leverage markers */}
-          {enableAutoLeverage && (
-            <>
-              <div className="bg-info absolute top-0 h-full w-0.5" style={{ left: `${ltvBarWidth.autoLevTrigger}%` }} />
-              <div className="bg-primary absolute top-0 h-full w-0.5" style={{ left: `${ltvBarWidth.autoLevTarget}%` }} />
-            </>
-          )}
-        </div>
+        <LtvBar ltvBarWidth={ltvBarWidth} enableADL={enableADL} enableAutoLeverage={enableAutoLeverage} />
 
         {/* Legend row */}
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px]">
-          <span className="flex items-center gap-1">
-            <span className="bg-base-content inline-block h-2 w-1 rounded-sm" />
-            <span className="text-base-content/70">current</span>
-          </span>
-          {enableAutoLeverage && (
-            <>
-              <span className="flex items-center gap-1">
-                <span className="bg-info inline-block h-2 w-1 rounded-sm" />
-                <span className="text-info">leverage trigger</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="bg-primary inline-block h-2 w-1 rounded-sm" />
-                <span className="text-primary">leverage target</span>
-              </span>
-            </>
-          )}
-          {enableADL && (
-            <>
-              <span className="flex items-center gap-1">
-                <span className="bg-success inline-block h-2 w-1 rounded-sm" />
-                <span className="text-success">deleverage target</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="bg-warning inline-block h-2 w-1 rounded-sm" />
-                <span className="text-warning">deleverage trigger</span>
-              </span>
-            </>
-          )}
-        </div>
+        <LtvBarLegend enableADL={enableADL} enableAutoLeverage={enableAutoLeverage} />
 
         {/* Side-by-side checkboxes */}
         <div className="grid grid-cols-2 gap-4">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" className="checkbox checkbox-sm" checked={enableADL} onChange={e => setEnableADL(e.target.checked)} />
-            <span className={`flex items-center gap-1 text-sm font-medium ${enableADL ? "border-b-2 border-warning" : "text-base-content/50"}`}>
+            <span className={`flex items-center gap-1 text-sm font-medium ${enableADL ? "border-warning border-b-2" : "text-base-content/50"}`}>
               <ArrowTrendingDownIcon className="size-4" />
               Deleverage
             </span>
           </label>
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" className="checkbox checkbox-sm" checked={enableAutoLeverage} onChange={e => setEnableAutoLeverage(e.target.checked)} />
-            <span className={`flex items-center gap-1 text-sm font-medium ${enableAutoLeverage ? "border-b-2 border-info" : "text-base-content/50"}`}>
+            <span className={`flex items-center gap-1 text-sm font-medium ${enableAutoLeverage ? "border-info border-b-2" : "text-base-content/50"}`}>
               <ArrowTrendingUpIcon className="size-4" />
               Leverage
             </span>
@@ -462,47 +575,26 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
         </div>
 
         {showAdvanced && (
-          <div className="grid grid-cols-3 gap-3 text-xs">
-            <div>
-              <div className="text-base-content/50 mb-1">Slippage</div>
-              <select className="select select-bordered select-xs w-full" value={maxSlippageBps} onChange={e => setMaxSlippageBps(Number(e.target.value))}>
-                <option value={50}>0.5%</option>
-                <option value={100}>1%</option>
-                <option value={200}>2%</option>
-                <option value={500}>5%</option>
-                <option value={750}>7.5%</option>
-                <option value={1000}>10%</option>
-              </select>
-            </div>
-            <div>
-              <div className="text-base-content/50 mb-1">Chunks</div>
-              <select className="select select-bordered select-xs w-full" value={numChunks} onChange={e => setNumChunks(Number(e.target.value))}>
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={4}>4</option>
-              </select>
-            </div>
-            <div>
-              <div className="text-base-content/50 mb-1">Iterations</div>
-              <select className="select select-bordered select-xs w-full" value={maxIterations} onChange={e => setMaxIterations(Number(e.target.value))}>
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-              </select>
-            </div>
-          </div>
+          <AdvancedSettings
+            maxSlippageBps={maxSlippageBps}
+            numChunks={numChunks}
+            maxIterations={maxIterations}
+            onSlippageChange={setMaxSlippageBps}
+            onChunksChange={setNumChunks}
+            onIterationsChange={setMaxIterations}
+          />
         )}
 
         {/* Errors */}
         {allErrors.length > 0 && (
           <div className="text-error flex items-start gap-1.5 text-xs">
-            <ExclamationTriangleIcon className="size-4 flex-shrink-0 mt-0.5" />
+            <ExclamationTriangleIcon className="mt-0.5 size-4 flex-shrink-0" />
             <span>{allErrors[0]}</span>
           </div>
         )}
 
         {/* Not supported */}
-        {!isLoading && ((enableADL && !isADLSupported) || (enableAutoLeverage && !isAutoLevSupported)) && (
+        {showUnsupportedWarning && (
           <div className="text-warning flex items-center gap-1.5 text-xs">
             <InformationCircleIcon className="size-4" />
             <span>Not available on this network yet.</span>
@@ -514,7 +606,7 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
           {isCreating ? <ButtonLoading /> : (
             <>
               <ShieldCheckIcon className="size-4" />
-              {enableADL && enableAutoLeverage ? "Enable Both" : enableADL ? "Enable Protection" : enableAutoLeverage ? "Enable Leverage" : "Select an option"}
+              {getSubmitLabel(enableADL, enableAutoLeverage)}
             </>
           )}
         </button>

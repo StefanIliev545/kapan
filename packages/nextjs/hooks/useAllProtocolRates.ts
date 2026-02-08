@@ -206,45 +206,12 @@ export const useAllProtocolRates = ({ enabled: enabledProp = true }: { enabled?:
       if (!protocolRates || protocolRates.size === 0) return null;
 
       const candidates: Array<{ protocol: string; rate: number }> = [];
-      
-      const aaveRate = protocolRates.get("aave");
-      if (aaveRate) {
-        candidates.push({
-          protocol: "aave",
-          rate: type === "supply" ? aaveRate.supplyRate : aaveRate.borrowRate,
-        });
-      }
-      
-      const zerolendRate = protocolRates.get("zerolend");
-      if (zerolendRate) {
-        candidates.push({
-          protocol: "zerolend",
-          rate: type === "supply" ? zerolendRate.supplyRate : zerolendRate.borrowRate,
-        });
-      }
-      
-      const sparkRate = protocolRates.get("spark");
-      if (sparkRate) {
-        candidates.push({
-          protocol: "spark",
-          rate: type === "supply" ? sparkRate.supplyRate : sparkRate.borrowRate,
-        });
-      }
-      
-      const venusRate = protocolRates.get("venus");
-      if (venusRate) {
-        candidates.push({
-          protocol: "venus",
-          rate: type === "supply" ? venusRate.supplyRate : venusRate.borrowRate,
-        });
-      }
-      
-      const compoundRate = protocolRates.get("compound");
-      if (compoundRate) {
-        candidates.push({
-          protocol: "compound",
-          rate: type === "supply" ? compoundRate.supplyRate : compoundRate.borrowRate,
-        });
+      const allProtocols: ProtocolKey[] = ["aave", "zerolend", "spark", "venus", "compound"];
+      for (const proto of allProtocols) {
+        const r = protocolRates.get(proto);
+        if (r) {
+          candidates.push({ protocol: proto, rate: type === "supply" ? r.supplyRate : r.borrowRate });
+        }
       }
 
       if (candidates.length === 0) return null;

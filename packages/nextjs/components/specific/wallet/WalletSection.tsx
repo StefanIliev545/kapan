@@ -1,14 +1,16 @@
 "use client";
 
-import { FC, useState, useCallback } from "react";
-import Image from "next/image";
+import { FC, useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDownIcon, ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import { useWalletTokens, type WalletToken } from "~~/hooks/useWalletTokens";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { LoadingSpinner } from "~~/components/common/Loading";
 import { is1inchSupported } from "~~/utils/chainFeatures";
+import { TokenIcon } from "~~/components/common/TokenDisplay";
+import { UsdDisplay } from "~~/components/common/AmountDisplay";
+import { useGlobalState } from "~~/services/store/store";
 
 // Lazy load the swap modal
 const WalletSwapModal = dynamic(
@@ -21,130 +23,70 @@ const COLLAPSE_TRANSITION = { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const };
 const COLLAPSE_INITIAL = { opacity: 0, height: 0 };
 const COLLAPSE_ANIMATE = { opacity: 1, height: "auto" };
 
-// CSS class constants
-const TEXT_MUTED = "text-base-content/40";
-
 interface WalletSectionProps {
   chainId?: number;
   defaultExpanded?: boolean;
 }
 
-// Static image error handler
-const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-  (e.target as HTMLImageElement).src = "/logos/default.svg";
-};
-
-/**
- * Format a number with appropriate precision
- */
-function formatBalance(value: number): string {
-  if (value >= 1000) return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  if (value >= 1) return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
-  if (value >= 0.0001) return value.toLocaleString(undefined, { maximumFractionDigits: 6 });
-  return "<0.0001";
-}
-
-/**
- * Format USD value
- */
-function formatUsd(value: number): string {
-  if (value < 0.01) return "<$0.01";
-  return formatCurrencyCompact(value);
-}
-
-/**
- * Check if token is a Pendle PT token
- */
-function isPTToken(symbol: string): boolean {
-  return symbol.toLowerCase().startsWith("pt-");
-}
-
-/**
- * Check if token is a Maple syrup token
- */
-function isSyrupToken(symbol: string): boolean {
-  const lower = symbol.toLowerCase();
-  return lower.startsWith("syrup");
-}
-
-/**
- * Token row component
- */
-interface TokenRowProps {
+interface WalletTokenCardProps {
   token: WalletToken;
   canSwap: boolean;
   onSwapClick: (token: WalletToken) => void;
 }
 
-const TokenRow: FC<TokenRowProps> = ({ token, canSwap, onSwapClick }) => {
-  const hasYield = token.externalYield && token.externalYield.apy > 0;
-  const isPT = isPTToken(token.symbol);
-  const isSyrup = isSyrupToken(token.symbol);
+const WalletTokenCard: FC<WalletTokenCardProps> = ({ token, canSwap, onSwapClick }) => {
   const isNativeETH = token.address === "0x0000000000000000000000000000000000000000";
+  const showSwap = canSwap && !isNativeETH;
 
-  const handleSwapClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSwapClick(token);
-  }, [token, onSwapClick]);
+  const handleClick = useCallback(() => {
+    if (showSwap) onSwapClick(token);
+  }, [showSwap, token, onSwapClick]);
+
+  const hasYield = token.externalYield && token.externalYield.apy > 0;
+  const isPT = token.symbol.toLowerCase().startsWith("pt-");
+  const isSyrup = token.symbol.toLowerCase().startsWith("syrup");
 
   return (
-    <tr className="hover:bg-base-200/50 transition-colors">
-      {/* Token */}
-      <td className="py-1.5 pl-3">
-        <div className="flex items-center gap-2">
-          <Image
-            src={token.icon}
-            alt={token.symbol}
-            width={20}
-            height={20}
-            className="rounded-full"
-            onError={handleImageError}
-          />
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium">{token.symbol}</span>
-            {hasYield && (
-              <span className={`rounded px-1 py-0.5 text-[9px] font-semibold ${
-                isPT
-                  ? "bg-info/10 text-info"
-                  : isSyrup
-                    ? "bg-warning/10 text-warning"
-                    : "bg-success/10 text-success"
-              }`}>
-                {isPT ? "Fixed " : ""}{token.externalYield!.apy.toFixed(1)}%
-              </span>
-            )}
-          </div>
-        </div>
-      </td>
+    <div
+      onClick={handleClick}
+      className={`group bg-base-100 border-base-300/50 hover:border-base-content/15 hover:bg-base-200/60 flex items-center gap-2 overflow-hidden rounded-lg border p-2 transition-all ${showSwap ? "cursor-pointer" : ""}`}
+    >
+      {/* Icon */}
+      <TokenIcon icon={token.icon} symbol={token.symbol} customSize={24} />
 
-      {/* Balance */}
-      <td className="py-1.5 text-right">
-        <span className="font-mono text-xs">{formatBalance(token.balanceFormatted)}</span>
-      </td>
+      {/* Symbol + yield badge */}
+      <div className="flex min-w-0 items-center gap-1">
+        <span className="truncate text-sm font-medium">{token.symbol}</span>
+        {hasYield && (
+          <span className={`shrink-0 rounded px-1 py-0.5 text-[8px] font-semibold leading-none ${
+            isPT ? "bg-info/10 text-info"
+              : isSyrup ? "bg-warning/10 text-warning"
+              : "bg-success/10 text-success"
+          }`}>
+            {isPT ? "F " : ""}{token.externalYield!.apy.toFixed(1)}%
+          </span>
+        )}
+      </div>
 
-      {/* USD Value */}
-      <td className="py-1.5 text-right">
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Swap label — fades in on hover */}
+      {showSwap && (
+        <span className="text-primary shrink-0 text-[10px] font-semibold opacity-0 transition-opacity group-hover:opacity-100">
+          Swap
+        </span>
+      )}
+
+      {/* USD value — always visible, tooltip shows token balance */}
+      <div className="shrink-0" title={`${token.balanceFormatted} ${token.symbol}`}>
         {token.usdValue > 0 ? (
-          <span className="text-xs font-medium">{formatUsd(token.usdValue)}</span>
+          <UsdDisplay value={token.usdValue} className="text-[11px] text-base-content/50" />
         ) : (
-          <span className={`text-xs ${TEXT_MUTED}`}>-</span>
+          <span className="text-[11px] text-base-content/30">-</span>
         )}
-      </td>
-
-      {/* Actions */}
-      <td className="py-1.5 pr-3 text-right">
-        {canSwap && !isNativeETH && (
-          <button
-            onClick={handleSwapClick}
-            className="btn btn-ghost btn-xs text-primary hover:bg-primary/10 gap-1"
-            title="Swap token"
-          >
-            <ArrowsRightLeftIcon className="size-3" />
-            <span className="hidden sm:inline">Swap</span>
-          </button>
-        )}
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 };
 
@@ -154,6 +96,13 @@ export const WalletSection: FC<WalletSectionProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const { tokens, isLoading, totalValue, tokenCount, refetch } = useWalletTokens(chainId);
+  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+
+  // Report wallet value to the global portfolio balance
+  useEffect(() => {
+    if (isLoading) return;
+    setProtocolTotals("Wallet", totalValue, 0);
+  }, [isLoading, totalValue, setProtocolTotals, chainId]);
 
   // Swap modal state
   const [swapModalOpen, setSwapModalOpen] = useState(false);
@@ -181,57 +130,56 @@ export const WalletSection: FC<WalletSectionProps> = ({
 
   return (
     <>
-      <div className="card-surface-interactive shadow-lg">
-        {/* Header - compact like other protocol views */}
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex w-full items-center gap-3 px-3 py-2 sm:gap-4 sm:px-5"
-        >
-          {/* Icon + Title */}
-          <div className="flex items-center gap-2">
-            <div className="bg-base-300/50 flex size-6 items-center justify-center rounded-md">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="text-base-content/70 size-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                />
-              </svg>
+      <div className="card-surface-interactive border-t-primary/40 border-t-[3px] shadow-lg sm:border-t-0 sm:border-l-[3px] sm:border-l-primary/40" onClick={() => setIsExpanded(!isExpanded)}>
+        {/* Header - matches BaseProtocolHeader structure */}
+        <div className="card-body px-3 py-1.5 sm:px-5 sm:py-2">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Icon + Title — same fixed width as protocol headers */}
+            <div className="flex items-center gap-2 sm:min-w-[130px]">
+              <div className="bg-base-300/50 flex size-6 items-center justify-center rounded-md">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-base-content/70 size-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                  />
+                </svg>
+              </div>
+              <span className="text-sm font-bold">Wallet</span>
             </div>
-            <span className="text-sm font-bold">Wallet</span>
+
+            {/* Divider */}
+            <div className="via-base-300 hidden h-8 w-px bg-gradient-to-b from-transparent to-transparent sm:block" />
+
+            {/* Stats — Balance first, then Tokens */}
+            <div className="flex flex-1 items-center gap-6 sm:gap-10">
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider sm:text-[9px]">Balance</span>
+                <span className="text-success font-mono text-[11px] font-bold tabular-nums">
+                  {isLoading ? "—" : formatCurrencyCompact(totalValue)}
+                </span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider sm:text-[9px]">Tokens</span>
+                <span className="font-mono text-[11px] font-bold tabular-nums">
+                  {isLoading ? "—" : tokenCount}
+                </span>
+              </div>
+            </div>
+
+            {/* Expand icon */}
+            <ChevronDownIcon
+              className={`text-base-content/40 size-4 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`}
+            />
           </div>
-
-          {/* Divider */}
-          <div className="via-base-300 hidden h-6 w-px bg-gradient-to-b from-transparent to-transparent sm:block" />
-
-          {/* Stats */}
-          <div className="flex flex-1 items-center gap-4 sm:gap-6">
-            <div className="flex flex-col">
-              <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider sm:text-[9px]">Tokens</span>
-              <span className="font-mono text-xs font-bold tabular-nums">
-                {isLoading ? "—" : tokenCount}
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider sm:text-[9px]">Value</span>
-              <span className="text-success font-mono text-xs font-bold tabular-nums">
-                {isLoading ? "—" : formatCurrencyCompact(totalValue)}
-              </span>
-            </div>
-          </div>
-
-          {/* Expand icon */}
-          <ChevronDownIcon
-            className={`text-base-content/40 size-4 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`}
-          />
-        </button>
+        </div>
 
         {/* Collapsible Content */}
         <AnimatePresence initial={false}>
@@ -253,26 +201,16 @@ export const WalletSection: FC<WalletSectionProps> = ({
                     No tokens found in wallet
                   </div>
                 ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-base-300/50 border-b text-[10px]">
-                        <th className="text-base-content/50 py-1.5 pl-3 text-left font-medium">Token</th>
-                        <th className="text-base-content/50 py-1.5 text-right font-medium">Balance</th>
-                        <th className="text-base-content/50 py-1.5 text-right font-medium">Value</th>
-                        <th className="text-base-content/50 py-1.5 pr-3 text-right font-medium"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-base-200/50 divide-y">
-                      {tokens.map((token) => (
-                        <TokenRow
-                          key={token.address}
-                          token={token}
-                          canSwap={canSwap}
-                          onSwapClick={handleSwapClick}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="grid grid-cols-2 gap-1.5 p-2 sm:grid-cols-3 md:grid-cols-4">
+                    {tokens.map((token) => (
+                      <WalletTokenCard
+                        key={token.address}
+                        token={token}
+                        canSwap={canSwap}
+                        onSwapClick={handleSwapClick}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             </motion.div>

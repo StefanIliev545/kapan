@@ -17,6 +17,14 @@ type ReadContractConfig<T extends NetworkType, TContractName extends ContractNam
   [key: string]: unknown;
 };
 
+/**
+ * Network-aware contract read hook that bridges EVM (scaffold-eth) and
+ * Starknet (scaffold-stark) type systems.
+ *
+ * The two scaffold frameworks have incompatible function name unions, so this
+ * bridge uses Parameters<> extraction to stay type-safe at the boundary while
+ * still allowing callers to use generic string function names.
+ */
 export const useNetworkAwareReadContract = <
   T extends NetworkType,
   TContractName extends ContractName | ContractNameStark,
@@ -28,38 +36,42 @@ export const useNetworkAwareReadContract = <
   args,
   ...readConfig
 }: ReadContractConfig<T, TContractName, TFunctionName>): Omit<ReturnType<typeof useReadContract>, "data"> & {
-  data: T extends "evm" 
+  data: T extends "evm"
     ? AbiFunctionReturnType<ContractAbiEth, TFunctionName> | undefined
     : AbiFunctionOutputs<ContractAbiStark, TFunctionName> | undefined;
 } => {
-  // Call EVM hook only when network type is EVM
-  const evmResult = useScaffoldReadContractEth({
+  // Build config objects for each scaffold hook.
+  // The function name union types are incompatible across scaffolds, so we
+  // construct typed config objects using Parameters<> to let TS infer correctly.
+  type EthConfig = Parameters<typeof useScaffoldReadContractEth>[0];
+  type StarkConfig = Parameters<typeof useScaffoldReadContractStark>[0];
+
+  const evmConfig = {
     contractName: contractName as ContractName,
-    functionName: functionName as string & keyof ContractAbiEth,
-    args: args as unknown[],
+    functionName,
+    args,
     ...readConfig,
     query: {
-      // Shorter staleTime for protocol queries (10-30 seconds per docs)
-      // This allows faster refresh after transactions
       staleTime: 10_000, // 10 seconds
       ...readConfig.query,
       enabled: networkType === "evm",
     },
-  });
+  } as EthConfig;
 
-  // Call Starknet hook only when network type is Starknet
-  const starkResult = useScaffoldReadContractStark({
+  const starkConfig = {
     contractName: contractName as ContractNameStark,
-    functionName: functionName as string & keyof ContractAbiStark,
-    args: args as unknown[],
+    functionName,
+    args,
     ...readConfig,
     enabled: networkType === "starknet",
-  });
+  } as StarkConfig;
 
-  // Return the appropriate result based on network type
+  const evmResult = useScaffoldReadContractEth(evmConfig);
+  const starkResult = useScaffoldReadContractStark(starkConfig);
+
   return (networkType === "evm" ? evmResult : starkResult) as Omit<ReturnType<typeof useReadContract>, "data"> & {
-    data: T extends "evm" 
+    data: T extends "evm"
       ? AbiFunctionReturnType<ContractAbiEth, TFunctionName> | undefined
       : AbiFunctionOutputs<ContractAbiStark, TFunctionName> | undefined;
   };
-}; 
+};

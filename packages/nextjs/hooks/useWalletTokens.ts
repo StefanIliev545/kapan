@@ -4,7 +4,7 @@ import { useAccount, usePublicClient } from "wagmi";
 import { type Address, erc20Abi, formatUnits } from "viem";
 import { useExternalYields, type ExternalYield } from "./useExternalYields";
 import { useMorphoMarkets } from "./useMorphoLendingPositions";
-import { useTokenPrices } from "./useTokenPrice";
+import { useTokenPricesByAddress } from "./useTokenPrice";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 
 // Major tokens whitelist (addresses by chainId)
@@ -65,6 +65,99 @@ interface TokenMetadata {
   source: WalletToken["source"];
 }
 
+/** A Morpho-style asset with optional address, symbol, decimals, priceUsd. */
+interface MorphoAssetLike {
+  address?: string;
+  symbol: string;
+  decimals?: number;
+  priceUsd?: number | null;
+}
+
+/**
+ * Insert a token into the map, or update its price if it already exists and
+ * the incoming price is defined.
+ */
+function upsertTokenMetadata(
+  tokens: Map<string, TokenMetadata>,
+  addr: string,
+  symbol: string,
+  decimals: number,
+  price: number | undefined,
+  source: WalletToken["source"],
+): void {
+  const key = addr.toLowerCase();
+  const existing = tokens.get(key);
+  if (!existing) {
+    tokens.set(key, {
+      address: key as Address,
+      symbol,
+      decimals,
+      price,
+      source,
+    });
+    return;
+  }
+  // Update price when the new source provides one
+  if (price !== undefined) {
+    existing.price = price;
+  }
+}
+
+/**
+ * Walk every Morpho market pair and upsert both collateral & loan tokens into the map.
+ */
+function addMorphoMarketTokens(
+  tokens: Map<string, TokenMetadata>,
+  marketPairs: Map<string, { collateralAsset: MorphoAssetLike | null; loanAsset: MorphoAssetLike }[]>,
+): void {
+  for (const markets of marketPairs.values()) {
+    for (const market of markets) {
+      const collateral = market.collateralAsset;
+      if (collateral?.address) {
+        upsertTokenMetadata(
+          tokens,
+          collateral.address,
+          collateral.symbol,
+          collateral.decimals || 18,
+          collateral.priceUsd ?? undefined,
+          "morpho",
+        );
+      }
+
+      const loan = market.loanAsset;
+      if (loan?.address) {
+        upsertTokenMetadata(
+          tokens,
+          loan.address,
+          loan.symbol,
+          loan.decimals || 18,
+          loan.priceUsd ?? undefined,
+          "morpho",
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Resolve the USD price for a token using a 3-tier fallback:
+ *   1. Pendle PT price (for PT tokens -- ensures consistency with displayed APY)
+ *   2. Morpho price (from market data, stored in TokenMetadata)
+ *   3. CoinGecko price (fetched by contract address)
+ */
+function resolveTokenPrice(
+  token: TokenMetadata,
+  externalYield: ExternalYield | undefined,
+  fetchedPrices: Record<string, number>,
+): number {
+  // Pendle PT price takes highest priority
+  if (externalYield?.source === "pendle" && externalYield.metadata?.ptPriceUsd) {
+    return externalYield.metadata.ptPriceUsd;
+  }
+  // Then Morpho-provided price, then CoinGecko (keyed by lowercase address)
+  return token.price || fetchedPrices[token.address.toLowerCase()] || 0;
+}
+
 /**
  * Hook to fetch wallet token balances with spam filtering
  * Uses whitelist approach: only shows tokens from known sources
@@ -78,76 +171,38 @@ export function useWalletTokens(chainId?: number) {
   const { marketPairs } = useMorphoMarkets(effectiveChainId, undefined);
 
   // Build whitelist of known tokens
-  const { tokenWhitelist, symbolsNeedingPrices } = useMemo(() => {
+  const { tokenWhitelist, addressesNeedingPrices } = useMemo(() => {
     const tokens = new Map<string, TokenMetadata>();
-    const needPrices: string[] = [];
 
     // Add major tokens for this chain
     const majorTokens = MAJOR_TOKENS[chainId || 1] || [];
     for (const token of majorTokens) {
-      tokens.set(token.address.toLowerCase(), {
-        ...token,
-        address: token.address.toLowerCase() as Address,
-        source: "major",
-      });
-      needPrices.push(token.symbol);
+      upsertTokenMetadata(tokens, token.address, token.symbol, token.decimals, undefined, "major");
     }
 
     // Add tokens from Morpho markets (these have prices from Morpho API)
     if (marketPairs) {
-      // marketPairs is Map<string, MorphoMarket[]>
-      for (const markets of marketPairs.values()) {
-        for (const market of markets) {
-          if (market.collateralAsset?.address) {
-            const addr = market.collateralAsset.address.toLowerCase();
-            if (!tokens.has(addr)) {
-              tokens.set(addr, {
-                address: addr as Address,
-                symbol: market.collateralAsset.symbol,
-                decimals: market.collateralAsset.decimals || 18,
-                price: market.collateralAsset.priceUsd ?? undefined,
-                source: "morpho",
-              });
-            } else if (market.collateralAsset.priceUsd) {
-              // Update price if Morpho has it
-              const existing = tokens.get(addr)!;
-              existing.price = market.collateralAsset.priceUsd;
-            }
-          }
-          if (market.loanAsset?.address) {
-            const addr = market.loanAsset.address.toLowerCase();
-            if (!tokens.has(addr)) {
-              tokens.set(addr, {
-                address: addr as Address,
-                symbol: market.loanAsset.symbol,
-                decimals: market.loanAsset.decimals || 18,
-                price: market.loanAsset.priceUsd ?? undefined,
-                source: "morpho",
-              });
-            } else if (market.loanAsset.priceUsd) {
-              // Update price if Morpho has it
-              const existing = tokens.get(addr)!;
-              existing.price = market.loanAsset.priceUsd;
-            }
-          }
-        }
-      }
+      addMorphoMarketTokens(tokens, marketPairs);
     }
 
-    // Collect symbols that still need prices (include ETH for native balance)
-    const symbolsWithoutPrice = Array.from(tokens.values())
+    // Collect addresses that still need prices (tokens without Morpho/preset prices)
+    const addrsWithoutPrice = Array.from(tokens.values())
       .filter(t => !t.price)
-      .map(t => t.symbol);
+      .map(t => t.address);
 
-    return { tokenWhitelist: tokens, symbolsNeedingPrices: [...new Set(["ETH", ...needPrices, ...symbolsWithoutPrice])] };
+    return { tokenWhitelist: tokens, addressesNeedingPrices: [...new Set(addrsWithoutPrice)] };
   }, [chainId, marketPairs]);
 
-  // Fetch prices for tokens without Morpho prices
-  const { prices: fetchedPrices } = useTokenPrices(symbolsNeedingPrices);
+  // Fetch prices by contract address (no symbol ambiguity)
+  const { prices: fetchedPricesByAddress } = useTokenPricesByAddress(
+    chainId ?? 1,
+    addressesNeedingPrices,
+    { enabled: addressesNeedingPrices.length > 0 },
+  );
 
   // Fetch balances for whitelisted tokens
   const query = useQuery({
-    queryKey: ["wallet-tokens", chainId, userAddress, tokenWhitelist.size, Object.keys(fetchedPrices).length],
+    queryKey: ["wallet-tokens", chainId, userAddress, tokenWhitelist.size, Object.keys(fetchedPricesByAddress).length],
     queryFn: async (): Promise<WalletToken[]> => {
       if (!userAddress || !publicClient || tokenWhitelist.size === 0) {
         return [];
@@ -161,7 +216,9 @@ export function useWalletTokens(chainId?: number) {
         const nativeBalance = await publicClient.getBalance({ address: userAddress });
         if (nativeBalance > 0n) {
           const balanceFormatted = parseFloat(formatUnits(nativeBalance, 18));
-          const ethPrice = fetchedPrices["eth"] || fetchedPrices["weth"] || 0;
+          // Use WETH address price for native ETH
+          const wethToken = MAJOR_TOKENS[chainId || 1]?.find(t => t.symbol === "WETH");
+          const ethPrice = wethToken ? (fetchedPricesByAddress[wethToken.address.toLowerCase()] || 0) : 0;
           const usdValue = balanceFormatted * ethPrice;
 
           results.push({
@@ -200,41 +257,31 @@ export function useWalletTokens(chainId?: number) {
           const token = tokenList[i];
           const balanceResult = balances[i];
 
-          if (balanceResult.status === "success" && balanceResult.result) {
-            const balance = balanceResult.result as bigint;
+          // Early-continue: skip failed calls and zero balances
+          if (balanceResult.status !== "success" || !balanceResult.result) continue;
+          const balance = balanceResult.result as bigint;
+          if (balance === 0n) continue;
 
-            // Skip zero balances
-            if (balance === 0n) continue;
+          const balanceFormatted = parseFloat(formatUnits(balance, token.decimals));
 
-            const balanceFormatted = parseFloat(formatUnits(balance, token.decimals));
+          // Look up external yield data (do this first to get Pendle prices for PT tokens)
+          const externalYield = findYield(token.address, token.symbol);
+          const price = resolveTokenPrice(token, externalYield, fetchedPricesByAddress);
+          const usdValue = balanceFormatted * price;
 
-            // Look up external yield data (do this first to get Pendle prices for PT tokens)
-            const externalYield = findYield(token.address, token.symbol);
-
-            // Use price sources in order of preference:
-            // 1. Pendle PT price (for PT tokens - ensures consistency with displayed APY)
-            // 2. Morpho price (from market data)
-            // 3. CoinGecko price (fallback)
-            let price = token.price || fetchedPrices[token.symbol.toLowerCase()] || 0;
-            if (externalYield?.source === "pendle" && externalYield.metadata?.ptPriceUsd) {
-              price = externalYield.metadata.ptPriceUsd;
-            }
-            const usdValue = balanceFormatted * price;
-
-            results.push({
-              address: token.address,
-              symbol: token.symbol,
-              name: token.symbol, // Could fetch from contract if needed
-              decimals: token.decimals,
-              balance,
-              balanceFormatted,
-              usdValue,
-              price,
-              icon: tokenNameToLogo(token.symbol.toLowerCase()),
-              externalYield,
-              source: token.source,
-            });
-          }
+          results.push({
+            address: token.address,
+            symbol: token.symbol,
+            name: token.symbol, // TODO: could fetch name from contract if needed
+            decimals: token.decimals,
+            balance,
+            balanceFormatted,
+            usdValue,
+            price,
+            icon: tokenNameToLogo(token.symbol.toLowerCase()),
+            externalYield,
+            source: token.source,
+          });
         }
 
         // Sort by USD value descending

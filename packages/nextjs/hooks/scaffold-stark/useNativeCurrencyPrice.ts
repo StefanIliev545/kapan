@@ -9,15 +9,15 @@ export const useNativeCurrencyPrice = () => {
   const setStrkCurrencyPrice = useGlobalState(
     (state) => state.setStrkCurrencyPrice,
   );
-  const ref = useRef<string>(priceService.getNextId().toString());
+  const ref = useRef<object>({ id: priceService.getNextId() });
   useEffect(() => {
-    const id = ref.current;
-    priceService.startPolling(id, price => {
+    const idObj = ref.current;
+    priceService.startPolling(idObj, price => {
       setNativeCurrencyPrice(price);
       setStrkCurrencyPrice(price);
     });
     return () => {
-      priceService.stopPolling(id);
+      priceService.stopPolling(idObj);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

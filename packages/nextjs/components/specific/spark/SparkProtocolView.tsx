@@ -8,6 +8,7 @@ import { AaveForkProtocolView, AaveForkProtocolConfig } from "../common/AaveFork
 const SPARK_CONFIG: AaveForkProtocolConfig = {
   protocolName: "Spark",
   protocolIcon: "/logos/spark.svg",
+  protocolUrl: "https://app.spark.fi",
   viewContractName: "SparkGatewayView",
   writeContractName: "SparkGatewayWrite",
 };

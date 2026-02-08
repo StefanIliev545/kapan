@@ -33,6 +33,42 @@ const AVAILABLE_ACTIONS_NO_SWAP = { deposit: true, withdraw: true, move: false, 
 const BORROW_ACTIONS_WITH_DEBT = { borrow: true, repay: true, move: true, close: true, swap: true } as const;
 const BORROW_ACTIONS_NO_DEBT = { borrow: true, repay: false, move: false, swap: false, close: false } as const;
 
+/** Resolve a token's display symbol, falling back to address-based lookup */
+function resolveTokenSymbol(token: TokenWithRates): string {
+  const sym = (token as { symbol?: string | bigint }).symbol;
+  const raw = typeof sym === "bigint" ? feltToString(sym) : String(sym ?? "");
+  if (raw && raw.trim().length > 0) return raw;
+  const addr = `0x${token.address.toString(16).padStart(64, "0")}`;
+  return getTokenNameFallback(addr) ?? raw;
+}
+
+/** Convert a Starknet asset address to hex string with 0x prefix, padded to 64 chars */
+function assetToHex(address: bigint): string {
+  return `0x${address.toString(16).padStart(64, "0")}`;
+}
+
+/** Check if a swap candidate should be included (not the current collateral or debt) */
+function isValidSwapCandidate(
+  assetHex: string,
+  currentCollateralHex: string,
+  currentDebtHex: string | undefined,
+): boolean {
+  if (assetHex === currentCollateralHex) return false;
+  if (assetHex === currentDebtHex) return false;
+  return true;
+}
+
+/** Derive borrow button tooltip text based on current state */
+function getBorrowButtonTitle(
+  actionsDisabled: boolean | undefined,
+  actionsDisabledReason: string | undefined,
+  canInitiateBorrow: boolean,
+): string {
+  if (actionsDisabled) return actionsDisabledReason ?? "Actions disabled";
+  if (canInitiateBorrow) return "Borrow against this collateral";
+  return "No borrowable assets available";
+}
+
 interface VesuPositionRowItemProps {
   row: VesuPositionRow;
   protocolName: string;
@@ -63,7 +99,7 @@ const VesuPositionRowItem: FC<VesuPositionRowItemProps> = ({
 
   const availableBorrowTokens = useMemo(
     () => assetsWithRates.filter(
-      asset => `0x${asset.address.toString(16).padStart(64, "0")}` !== row.supply.tokenAddress,
+      asset => assetToHex(asset.address) !== row.supply.tokenAddress,
     ),
     [assetsWithRates, row.supply.tokenAddress],
   );
@@ -105,11 +141,7 @@ const VesuPositionRowItem: FC<VesuPositionRowItemProps> = ({
 
   const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
 
-  const borrowTitle = borrowButtonDisabled
-    ? row.supply.actionsDisabledReason
-    : canInitiateBorrow
-      ? "Borrow against this collateral"
-      : "No borrowable assets available";
+  const borrowTitle = getBorrowButtonTitle(borrowButtonDisabled, row.supply.actionsDisabledReason, canInitiateBorrow);
 
   return (
     <div
@@ -250,16 +282,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   };
 
   const selectedSymbolStr = useMemo(() => {
-    if (!selectedTarget) {
-      return "";
-    }
-    const sym = (selectedTarget as { symbol?: string | bigint }).symbol;
-    const raw = typeof sym === "bigint" ? feltToString(sym) : String(sym ?? "");
-    if (raw && raw.trim().length > 0) {
-      return raw;
-    }
-    const addr = `0x${selectedTarget.address.toString(16).padStart(64, "0")}`;
-    return getTokenNameFallback(addr) ?? raw;
+    if (!selectedTarget) return "";
+    return resolveTokenSymbol(selectedTarget);
   }, [selectedTarget]);
 
   const openSwapSelector = useCallback((type: "debt" | "collateral", row: VesuPositionRow) => {
@@ -273,33 +297,13 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   }, [swapSelectModal]);
 
   const swapCandidateTokens = useMemo(() => {
-    if (!swapRow) {
-      return [] as AssetWithRates[];
-    }
+    if (!swapRow) return [] as AssetWithRates[];
     const currentCollateralHex = swapRow.supply.tokenAddress;
     const currentDebtHex = swapRow.borrow?.tokenAddress;
-    return assetsWithRates.filter(asset => {
-      const addrHex = `0x${asset.address.toString(16).padStart(64, "0")}`;
-      if (swapType === "debt") {
-        // Exclude current debt and collateral
-        if (addrHex === currentDebtHex) {
-          return false;
-        }
-        if (addrHex === currentCollateralHex) {
-          return false;
-        }
-        return true;
-      }
-      // Collateral: exclude current collateral and debt
-      if (addrHex === currentCollateralHex) {
-        return false;
-      }
-      if (addrHex === currentDebtHex) {
-        return false;
-      }
-      return true;
-    });
-  }, [assetsWithRates, swapRow, swapType]);
+    return assetsWithRates.filter(asset =>
+      isValidSwapCandidate(assetToHex(asset.address), currentCollateralHex, currentDebtHex),
+    );
+  }, [assetsWithRates, swapRow]);
 
   const handleSelectSwapTarget = useCallback((token: TokenWithRates) => {
     setSelectedTarget(token);
@@ -403,7 +407,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   }, [swapCandidateTokens]);
 
   const handleSwitchTokenSelect = useCallback((opt: { address: string }) => {
-    const match = swapCandidateTokens.find(a => `0x${a.address.toString(16).padStart(64, "0")}` === opt.address);
+    const match = swapCandidateTokens.find(a => assetToHex(a.address) === opt.address);
     if (!match) {
       return;
     }

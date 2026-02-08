@@ -235,9 +235,8 @@ export function buildADLPreInstructions(
  * @deprecated Parameters kept for backwards compatibility but are unused
  */
 export function buildADLFlashLoanPreInstructions(
-  _collateralToken: string,
-  _hooksTrampolineAddress: string,
-  _orderManagerAddress: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  ..._args: string[]
 ): ProtocolInstruction[] {
   // EMPTY - token routing handled by appData hooks (fundOrderWithBalance)
   return [];
@@ -714,7 +713,6 @@ export function calculateAutoLeverageFlashLoanAmount(
   _triggerLtvBps: number,
   targetLtvBps: number,
   numChunks: number,
-  _bufferBps = 2000,
 ): bigint {
   // Flash loan must cover the trigger's calculated sell amount!
   //

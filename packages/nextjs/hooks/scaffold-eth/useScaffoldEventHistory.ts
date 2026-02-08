@@ -142,7 +142,7 @@ export const useScaffoldEventHistory = <
     },
     select: data => {
       const events = data.pages.flat();
-      const eventHistoryData = events?.map(addIndexedArgsToEvent) as UseScaffoldEventHistoryData<
+      const eventHistoryData = events?.map((e: any) => addIndexedArgsToEvent(e)) as UseScaffoldEventHistoryData<
         TContractName,
         TEventName,
         TBlockData,

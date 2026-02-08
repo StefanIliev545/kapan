@@ -25,6 +25,7 @@ export const useKapanRouterV2 = (options?: UseKapanRouterV2Options) => {
   const {
     buildDepositFlow,
     buildBorrowFlow,
+    buildDepositAndBorrowFlow,
     buildRepayFlow,
     buildRepayFlowAsync,
     buildWithdrawFlow,
@@ -79,6 +80,7 @@ export const useKapanRouterV2 = (options?: UseKapanRouterV2Options) => {
     // Flow builders
     buildDepositFlow,
     buildBorrowFlow,
+    buildDepositAndBorrowFlow,
     buildRepayFlow,
     buildRepayFlowAsync,
     buildWithdrawFlow,

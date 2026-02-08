@@ -331,7 +331,8 @@ function tryParsingParamReturnValues(fn: (x: any) => unknown, param: any, isRead
   }
 }
 
-function tryParsingParamReturnObject(fn: (x: unknown) => unknown, param: unknown) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function tryParsingParamReturnObject(fn: (x: any) => unknown, param: unknown) {
   try {
     return fn(param);
   } catch {

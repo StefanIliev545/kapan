@@ -25,7 +25,7 @@ export async function GET(
     quoteParams.set("tokenIn", searchParams.get("tokenIn") || "");
     quoteParams.set("tokenOut", searchParams.get("tokenOut") || "");
     quoteParams.set("amountIn", searchParams.get("amountIn") || "");
-    if (searchParams.get("saveGas")) quoteParams.set("saveGas", searchParams.get("saveGas")!);
+    if (searchParams.get("saveGas")) quoteParams.set("saveGas", searchParams.get("saveGas") ?? "");
 
     const quoteUrl = `https://aggregator-api.kyberswap.com/${kyberChain}/api/v1/routes?${quoteParams.toString()}`;
 

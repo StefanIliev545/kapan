@@ -22,6 +22,13 @@ interface TokenSelectModalProps {
   isBorrow?: boolean;
   position?: PositionManager;
   chainId?: number;
+  /** Pre-encoded protocol context (e.g., Compound market address) passed through to DepositModal/BorrowModal */
+  context?: string;
+  /** Custom modal title (overrides default "Select Token to Supply/Borrow") */
+  title?: string;
+  /** When provided, fires callback with the selected token instead of opening the default Deposit/Borrow modal.
+   *  Useful for custom flows like DepositAndBorrowModal where the parent controls the next modal. */
+  onTokenSelected?: (token: ProtocolPosition) => void;
 }
 
 export const TokenSelectModal: FC<TokenSelectModalProps> = ({
@@ -32,6 +39,9 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
   isBorrow = false,
   position,
   chainId,
+  context,
+  title: customTitle,
+  onTokenSelected,
 }) => {
   const {
     selectedToken,
@@ -39,7 +49,11 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
     handleSelectToken,
     handleActionModalClose,
     handleDone,
-  } = useTokenSelectModal<ProtocolPosition>({ onClose });
+  } = useTokenSelectModal<ProtocolPosition>({
+    onClose,
+    onSelectToken: onTokenSelected,
+    suppressActionModals: !!onTokenSelected,
+  });
 
   const { balances } = useWalletTokenBalances({
     tokens: tokens.map(token => ({ address: token.tokenAddress, decimals: token.tokenDecimals })),
@@ -79,7 +93,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
     [handleSelectToken],
   );
 
-  const modalTitle = isBorrow ? "Select Token to Borrow" : "Select Token to Supply";
+  const modalTitle = customTitle ?? (isBorrow ? "Select Token to Borrow" : "Select Token to Supply");
   const rateLabel = isBorrow ? "APR" : "APY";
   const emptyMessage = `No tokens available to ${isBorrow ? "borrow" : "supply"}`;
 
@@ -146,6 +160,7 @@ export const TokenSelectModal: FC<TokenSelectModalProps> = ({
             protocolName={protocolName}
             position={position}
             chainId={chainId}
+            context={context}
           />
         ))}
     </>

@@ -124,17 +124,28 @@ export interface EulerVaultResponse {
 
 // Extract token symbol from vault symbol (e.g., "eWETH-1" -> "WETH", "esUSDS-1" -> "sUSDS")
 function extractTokenFromVaultSymbol(vaultSymbol: string): string {
-  // Match patterns like "eWETH-1", "esUSDS-2", "eUSD₮0-1", "ePT-sUSDai-20NOV2025-1"
   const match = vaultSymbol.match(/^e(.+?)-\d+$/);
   if (match) {
     return match[1];
   }
-  // Fallback: remove leading 'e' if present
   return vaultSymbol.startsWith('e') ? vaultSymbol.slice(1) : vaultSymbol;
 }
 
 // LTVList function selector: 0x6a16ef84 - returns address[] of collaterals with LTV > 0
 const LTV_LIST_SELECTOR = "0x6a16ef84";
+
+/** Decode an ABI-encoded address[] from a raw hex RPC result. */
+function decodeAddressArray(hexResult: string): string[] {
+  const data = hexResult.slice(2); // Remove 0x
+  const length = parseInt(data.slice(64, 128), 16); // Second 32 bytes = array length
+  const addresses: string[] = [];
+  for (let k = 0; k < length; k++) {
+    const offset = 128 + k * 64;
+    const addrPadded = data.slice(offset, offset + 64);
+    addresses.push("0x" + addrPadded.slice(24).toLowerCase());
+  }
+  return addresses;
+}
 
 /**
  * Get valid collaterals for multiple vaults using LTVList() calls.
@@ -151,23 +162,14 @@ async function getValidCollaterals(
   }
 
   const validPairs = new Set<string>();
-
-  // Batch calls in groups
   const BATCH_SIZE = 20;
+
   for (let i = 0; i < vaultAddresses.length; i += BATCH_SIZE) {
     const batch = vaultAddresses.slice(i, i + BATCH_SIZE);
-
-    // Build batch RPC request - call LTVList() on each vault
     const calls = batch.map((vaultAddr, idx) => ({
       jsonrpc: "2.0",
       method: "eth_call",
-      params: [
-        {
-          to: vaultAddr,
-          data: LTV_LIST_SELECTOR,
-        },
-        "latest",
-      ],
+      params: [{ to: vaultAddr, data: LTV_LIST_SELECTOR }, "latest"],
       id: i + idx,
     }));
 
@@ -185,28 +187,20 @@ async function getValidCollaterals(
 
       const results = await response.json();
 
-      // Process results - LTVList returns address[] (dynamic array)
       for (let j = 0; j < batch.length; j++) {
         const result = Array.isArray(results) ? results[j] : results;
         const vaultAddr = batch[j].toLowerCase();
 
-        if (result?.result && result.result !== "0x" && !result.error && result.result.length > 66) {
-          try {
-            // Decode address[] from ABI-encoded result
-            // Format: 0x + 32 bytes offset + 32 bytes length + N * 32 bytes addresses
-            const data = result.result.slice(2); // Remove 0x
-            const length = parseInt(data.slice(64, 128), 16); // Second 32 bytes = array length
+        if (!result?.result || result.result === "0x" || result.error || result.result.length <= 66) {
+          continue;
+        }
 
-            for (let k = 0; k < length; k++) {
-              // Each address is padded to 32 bytes, take last 20 bytes (40 hex chars)
-              const offset = 128 + k * 64; // Start after offset+length, each element is 32 bytes
-              const addrPadded = data.slice(offset, offset + 64);
-              const collateralAddr = "0x" + addrPadded.slice(24).toLowerCase(); // Last 20 bytes
-              validPairs.add(`${vaultAddr}:${collateralAddr}`);
-            }
-          } catch (decodeError) {
-            console.error(`[euler/vaults] Failed to decode LTVList for ${vaultAddr}:`, decodeError);
+        try {
+          for (const collateralAddr of decodeAddressArray(result.result)) {
+            validPairs.add(`${vaultAddr}:${collateralAddr}`);
           }
+        } catch (decodeError) {
+          console.error(`[euler/vaults] Failed to decode LTVList for ${vaultAddr}:`, decodeError);
         }
       }
     } catch (error) {
@@ -215,6 +209,111 @@ async function getValidCollaterals(
   }
 
   return validPairs;
+}
+
+/** Fetch vault symbol/asset lookup map from the subgraph. */
+async function fetchVaultInfoLookup(
+  subgraphUrl: string,
+): Promise<Map<string, { symbol: string; asset: string }>> {
+  const lookup = new Map<string, { symbol: string; asset: string }>();
+  const symbolsResponse = await fetch(subgraphUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: VAULT_SYMBOLS_QUERY }),
+    next: { revalidate: 300 },
+  });
+  if (!symbolsResponse.ok) return lookup;
+
+  const symbolsData = await symbolsResponse.json();
+  for (const v of symbolsData.data?.eulerVaults || []) {
+    if (v.id && v.symbol) {
+      lookup.set(v.id.toLowerCase(), {
+        symbol: v.symbol,
+        asset: (v.asset || "").toLowerCase(),
+      });
+    }
+  }
+  return lookup;
+}
+
+/** Resolve asset symbol from known tokens or vault symbol fallback. */
+function resolveAssetSymbol(assetAddr: string, vaultSymbol?: string): { symbol: string; decimals: number } {
+  const tokenMeta = KNOWN_TOKENS[assetAddr] || { symbol: "???", decimals: 18 };
+  if (tokenMeta.symbol !== "???" || !vaultSymbol) return tokenMeta;
+
+  const match = vaultSymbol.match(/^e([A-Z]+)/i);
+  return {
+    symbol: match ? match[1].toUpperCase() : tokenMeta.symbol,
+    decimals: tokenMeta.decimals,
+  };
+}
+
+/** Resolve collateral list for a vault, filtering by on-chain LTV validity. */
+function resolveCollaterals(
+  rawCollaterals: string[] | undefined,
+  vaultAddr: string,
+  validLtvPairs: Set<string>,
+  vaultInfoLookup: Map<string, { symbol: string; asset: string }>,
+): CollateralInfo[] {
+  if (!Array.isArray(rawCollaterals)) return [];
+
+  return rawCollaterals
+    .filter((collateralAddr: string) =>
+      validLtvPairs.has(`${vaultAddr}:${collateralAddr.toLowerCase()}`),
+    )
+    .map((collateralAddr: string) => {
+      const addr = collateralAddr.toLowerCase();
+      const vaultInfo = vaultInfoLookup.get(addr);
+      const vaultSymbol = vaultInfo?.symbol || "???";
+      return {
+        vaultAddress: addr,
+        vaultSymbol,
+        tokenSymbol: extractTokenFromVaultSymbol(vaultSymbol),
+        tokenAddress: vaultInfo?.asset || "",
+      };
+    });
+}
+
+/** Normalize a single raw subgraph vault into the API response shape. */
+function normalizeVault(
+  v: any,
+  validLtvPairs: Set<string>,
+  vaultInfoLookup: Map<string, { symbol: string; asset: string }>,
+): EulerVaultResponse {
+  const assetAddr = (v.asset || "").toLowerCase();
+  const { symbol: assetSymbol, decimals } = resolveAssetSymbol(assetAddr, v.symbol);
+  const divisor = Math.pow(10, decimals);
+
+  const totalBorrows = parseFloat(v.state?.totalBorrows || "0") / divisor;
+  const cash = parseFloat(v.state?.cash || "0") / divisor;
+  const totalSupply = cash + totalBorrows;
+  const utilization = totalSupply > 0 ? totalBorrows / totalSupply : 0;
+
+  const vaultAddr = (v.id || "").toLowerCase();
+  const collaterals = resolveCollaterals(v.collaterals, vaultAddr, validLtvPairs, vaultInfoLookup);
+
+  const borrowCapRaw = parseFloat(v.borrowCap || "0");
+  const borrowCap = borrowCapRaw > 0 ? borrowCapRaw : null;
+  const availableBorrowCapacity = borrowCap !== null ? Math.max(0, borrowCap - totalBorrows) : null;
+
+  return {
+    id: v.id,
+    address: v.id,
+    name: v.name || "Unknown Vault",
+    symbol: v.symbol || "???",
+    asset: { address: assetAddr, symbol: assetSymbol, decimals },
+    totalSupply: totalSupply.toString(),
+    totalBorrows: totalBorrows.toString(),
+    borrowCap: borrowCap?.toString() ?? null,
+    availableBorrowCapacity: availableBorrowCapacity?.toString() ?? null,
+    // APY values are in RAY format (1e27) - convert to decimal (0.05 = 5%)
+    supplyApy: parseFloat(v.state?.supplyApy || "0") / 1e27,
+    borrowApy: parseFloat(v.state?.borrowApy || "0") / 1e27,
+    utilization,
+    collateralCount: collaterals.length,
+    collaterals,
+    creator: v.creator || "",
+  };
 }
 
 export async function GET(
@@ -229,7 +328,7 @@ export async function GET(
   // For hardhat (31337), use forkChainId param to determine which chain's subgraph to query
   // RPC calls go to localhost, but subgraph data comes from the forked chain
   const forkChainId = chainId === 31337
-    ? parseInt(searchParams.get("forkChainId") || "42161", 10) // Default to Arbitrum
+    ? parseInt(searchParams.get("forkChainId") || "42161", 10)
     : chainId;
 
   const subgraphUrl = EULER_SUBGRAPH_URLS[forkChainId];
@@ -245,175 +344,52 @@ export async function GET(
   const search = searchParams.get("search")?.toLowerCase();
 
   try {
-    // First fetch all vault symbols for collateral resolution (lightweight query)
-    const symbolsResponse = await fetch(subgraphUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: VAULT_SYMBOLS_QUERY }),
-      next: { revalidate: 300 }, // Cache symbols for 5 minutes
-    });
+    const vaultInfoLookup = await fetchVaultInfoLookup(subgraphUrl);
 
-    // Build lookup map: vault address -> { symbol, asset }
-    const vaultInfoLookup = new Map<string, { symbol: string; asset: string }>();
-    if (symbolsResponse.ok) {
-      const symbolsData = await symbolsResponse.json();
-      const allSymbols = symbolsData.data?.eulerVaults || [];
-      for (const v of allSymbols) {
-        if (v.id && v.symbol) {
-          vaultInfoLookup.set(v.id.toLowerCase(), {
-            symbol: v.symbol,
-            asset: (v.asset || "").toLowerCase(),
-          });
-        }
-      }
-    }
-
-    // Fetch main vault data
     const response = await fetch(subgraphUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: VAULTS_QUERY,
-        variables: { first, skip },
-      }),
-      next: { revalidate: 60 }, // Cache for 1 minute
+      body: JSON.stringify({ query: VAULTS_QUERY, variables: { first, skip } }),
+      next: { revalidate: 60 },
     });
 
     if (!response.ok) {
       console.error(`[euler/vaults] Subgraph error: ${response.status}`);
-      return NextResponse.json(
-        { error: "Failed to fetch vaults from subgraph" },
-        { status: 502 }
-      );
+      return NextResponse.json({ error: "Failed to fetch vaults from subgraph" }, { status: 502 });
     }
 
     const data = await response.json();
-
     if (data.errors) {
       console.error("[euler/vaults] GraphQL errors:", data.errors);
-      return NextResponse.json(
-        { error: "GraphQL query failed", details: data.errors },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "GraphQL query failed", details: data.errors }, { status: 500 });
     }
 
-    const allVaults = data.data?.eulerVaults || [];
+    const vaults = (data.data?.eulerVaults || []).filter(
+      (v: any) => parseFloat(v.state?.totalShares || "0") > 0,
+    );
 
-    // Filter out vaults with no supply
-    const vaults = allVaults.filter((v: any) => {
-      const totalShares = parseFloat(v.state?.totalShares || "0");
-      return totalShares > 0;
-    });
-
-    // Collect vault addresses for LTV check
     const vaultAddresses = vaults.map((v: any) => (v.id || "").toLowerCase());
-
-    // Get valid collaterals using LTVList() - returns only collaterals with LTV > 0
     const validLtvPairs = await getValidCollaterals(chainId, vaultAddresses);
     console.log(`[euler/vaults] LTV check: ${validLtvPairs.size} valid (vault:collateral) pairs found`);
 
-    // Normalize response
-    const normalized: EulerVaultResponse[] = vaults.map((v: any) => {
-      // Asset is just an address string - look up metadata
-      const assetAddr = (v.asset || "").toLowerCase();
-      const tokenMeta = KNOWN_TOKENS[assetAddr] || { symbol: "???", decimals: 18 };
+    const normalized = vaults.map((v: any) => normalizeVault(v, validLtvPairs, vaultInfoLookup));
 
-      // Try to extract symbol from vault name/symbol if unknown
-      let assetSymbol = tokenMeta.symbol;
-      if (assetSymbol === "???" && v.symbol) {
-        // Extract from "eUSDC-5" -> "USDC"
-        const match = v.symbol.match(/^e([A-Z]+)/i);
-        if (match) assetSymbol = match[1].toUpperCase();
-      }
-
-      // Raw values are in token units (with decimals)
-      const decimals = tokenMeta.decimals;
-      const divisor = Math.pow(10, decimals);
-
-      const totalBorrowsRaw = parseFloat(v.state?.totalBorrows || "0");
-      const cashRaw = parseFloat(v.state?.cash || "0");
-
-      // Convert to human-readable amounts
-      const totalBorrows = totalBorrowsRaw / divisor;
-      const cash = cashRaw / divisor;
-      const totalSupply = cash + totalBorrows;
-      const utilization = totalSupply > 0 ? totalBorrows / totalSupply : 0;
-
-      // Resolve collateral vault addresses to their symbols and tokens
-      // IMPORTANT: Only include collaterals with LTV > 0 (verified on-chain)
-      const vaultAddr = (v.id || "").toLowerCase();
-      const collaterals: CollateralInfo[] = Array.isArray(v.collaterals)
-        ? v.collaterals
-            .filter((collateralAddr: string) => {
-              const pairKey = `${vaultAddr}:${collateralAddr.toLowerCase()}`;
-              return validLtvPairs.has(pairKey);
-            })
-            .map((collateralAddr: string) => {
-              const addr = collateralAddr.toLowerCase();
-              const vaultInfo = vaultInfoLookup.get(addr);
-              const vaultSymbol = vaultInfo?.symbol || "???";
-              const tokenSymbol = extractTokenFromVaultSymbol(vaultSymbol);
-              const tokenAddress = vaultInfo?.asset || "";
-              return {
-                vaultAddress: addr,
-                vaultSymbol,
-                tokenSymbol,
-                tokenAddress,
-              };
-            })
-        : [];
-
-      // Parse borrow cap (0 = no cap)
-      // Note: borrowCap from subgraph is already in token units (not raw/wei)
-      const borrowCapRaw = parseFloat(v.borrowCap || "0");
-      const borrowCap = borrowCapRaw > 0 ? borrowCapRaw : null;
-      const availableBorrowCapacity = borrowCap !== null
-        ? Math.max(0, borrowCap - totalBorrows)
-        : null;
-
-      return {
-        id: v.id,
-        address: v.id,
-        name: v.name || "Unknown Vault",
-        symbol: v.symbol || "???",
-        asset: {
-          address: assetAddr,
-          symbol: assetSymbol,
-          decimals: decimals,
-        },
-        totalSupply: totalSupply.toString(),
-        totalBorrows: totalBorrows.toString(),
-        borrowCap: borrowCap?.toString() ?? null,
-        availableBorrowCapacity: availableBorrowCapacity?.toString() ?? null,
-        // APY values are in RAY format (1e27) - convert to decimal (0.05 = 5%)
-        supplyApy: parseFloat(v.state?.supplyApy || "0") / 1e27,
-        borrowApy: parseFloat(v.state?.borrowApy || "0") / 1e27,
-        utilization,
-        collateralCount: collaterals.length,
-        collaterals,
-        creator: v.creator || "",
-      };
-    });
-
-    // Filter by search term if provided (after normalization so we can search asset symbol)
     let filteredVaults = normalized;
     if (search) {
-      filteredVaults = normalized.filter((v) =>
+      filteredVaults = normalized.filter((v: EulerVaultResponse) =>
         v.name.toLowerCase().includes(search) ||
         v.symbol.toLowerCase().includes(search) ||
         v.asset.symbol.toLowerCase().includes(search)
       );
     }
 
-    // Sort by totalSupply descending
-    filteredVaults.sort((a, b) => parseFloat(b.totalSupply) - parseFloat(a.totalSupply));
+    filteredVaults.sort((a: EulerVaultResponse, b: EulerVaultResponse) =>
+      parseFloat(b.totalSupply) - parseFloat(a.totalSupply),
+    );
 
     return NextResponse.json({ vaults: filteredVaults });
   } catch (error) {
     console.error("[euler/vaults] Error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch vaults" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch vaults" }, { status: 500 });
   }
 }

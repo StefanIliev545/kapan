@@ -299,12 +299,74 @@ export function useConditionalOrders(options: UseConditionalOrdersOptions = {}) 
   const queryClient = useQueryClient();
 
   const { data: contractInfo } = useDeployedContractInfo({
-    contractName: "KapanConditionalOrderManager" as "KapanRouter",
-    chainId,
+    contractName: "KapanConditionalOrderManager" as any,
+    chainId: chainId as any,
   });
 
   const contractAddress = contractInfo?.address as Address | undefined;
   const isAvailable = !!contractAddress && !!publicClient && !!userAddress;
+
+  /** Fetch trigger status for an active order. Returns {isTriggerMet, triggerReason}. */
+  const fetchTriggerStatusForOrder = useCallback(async (
+    orderHash: `0x${string}`,
+  ): Promise<{ isTriggerMet?: boolean; triggerReason?: string }> => {
+    if (!contractAddress || !publicClient) return {};
+    try {
+      const [shouldExecute, reason] = (await publicClient.readContract({
+        address: contractAddress,
+        abi: CONDITIONAL_ORDER_MANAGER_ABI,
+        functionName: "isTriggerMet",
+        args: [orderHash],
+      })) as [boolean, string];
+      return { isTriggerMet: shouldExecute, triggerReason: reason };
+    } catch (error) {
+      console.warn("[useConditionalOrders] Failed to fetch trigger status:", error);
+      return {};
+    }
+  }, [contractAddress, publicClient]);
+
+  /** Fetch and parse a single order by hash. Returns undefined if it should be skipped. */
+  const fetchSingleOrder = useCallback(async (
+    orderHash: `0x${string}`,
+    onlyActive: boolean,
+    withTriggerStatus: boolean,
+  ): Promise<ConditionalOrder | undefined> => {
+    if (!contractAddress || !publicClient) return undefined;
+
+    const contextResult = await publicClient.readContract({
+      address: contractAddress,
+      abi: CONDITIONAL_ORDER_MANAGER_ABI,
+      functionName: "getOrder",
+      args: [orderHash],
+    });
+
+    const context = contextResult as {
+      params: ConditionalOrderParams;
+      status: number;
+      iterationCount: bigint;
+      createdAt: bigint;
+    };
+
+    if (onlyActive && context.status !== ConditionalOrderStatus.Active) return undefined;
+
+    const triggerParams = decodeTriggerParams(context.params.triggerStaticData);
+
+    const triggerInfo = (withTriggerStatus && context.status === ConditionalOrderStatus.Active)
+      ? await fetchTriggerStatusForOrder(orderHash)
+      : {};
+
+    return {
+      orderHash,
+      context: {
+        params: context.params,
+        status: context.status as ConditionalOrderStatus,
+        iterationCount: context.iterationCount,
+        createdAt: context.createdAt,
+      },
+      triggerParams,
+      ...triggerInfo,
+    };
+  }, [contractAddress, publicClient, fetchTriggerStatusForOrder]);
 
   const fetchOrders = useCallback(async (): Promise<ConditionalOrder[]> => {
     if (!isAvailable || !contractAddress || !publicClient || !userAddress) {
@@ -312,7 +374,6 @@ export function useConditionalOrders(options: UseConditionalOrdersOptions = {}) 
     }
 
     try {
-      // Get user's order hashes
       const orderHashes = (await publicClient.readContract({
         address: contractAddress,
         abi: CONDITIONAL_ORDER_MANAGER_ABI,
@@ -322,79 +383,23 @@ export function useConditionalOrders(options: UseConditionalOrdersOptions = {}) 
 
       if (orderHashes.length === 0) return [];
 
-      // Fetch order details for each hash
       const orders: ConditionalOrder[] = [];
-
       for (const hash of orderHashes) {
-        const orderHash = hash as `0x${string}`;
         try {
-          const contextResult = await publicClient.readContract({
-            address: contractAddress,
-            abi: CONDITIONAL_ORDER_MANAGER_ABI,
-            functionName: "getOrder",
-            args: [orderHash],
-          });
-
-          const context = contextResult as {
-            params: ConditionalOrderParams;
-            status: number;
-            iterationCount: bigint;
-            createdAt: bigint;
-          };
-
-          // Skip non-active orders if activeOnly
-          if (activeOnly && context.status !== ConditionalOrderStatus.Active) {
-            continue;
-          }
-
-          // Decode trigger params
-          const triggerParams = decodeTriggerParams(context.params.triggerStaticData);
-
-          // Optionally fetch trigger status
-          let isTriggerMet: boolean | undefined;
-          let triggerReason: string | undefined;
-
-          if (fetchTriggerStatus && context.status === ConditionalOrderStatus.Active) {
-            try {
-              const [shouldExecute, reason] = (await publicClient.readContract({
-                address: contractAddress,
-                abi: CONDITIONAL_ORDER_MANAGER_ABI,
-                functionName: "isTriggerMet",
-                args: [orderHash],
-              })) as [boolean, string];
-              isTriggerMet = shouldExecute;
-              triggerReason = reason;
-            } catch (error) {
-              console.warn("[useConditionalOrders] Failed to fetch trigger status:", error);
-            }
-          }
-
-          orders.push({
-            orderHash,
-            context: {
-              params: context.params,
-              status: context.status as ConditionalOrderStatus,
-              iterationCount: context.iterationCount,
-              createdAt: context.createdAt,
-            },
-            triggerParams,
-            isTriggerMet,
-            triggerReason,
-          });
+          const order = await fetchSingleOrder(hash, activeOnly, fetchTriggerStatus);
+          if (order) orders.push(order);
         } catch (error) {
-          console.warn(`[useConditionalOrders] Failed to fetch order ${orderHash}:`, error);
+          console.warn(`[useConditionalOrders] Failed to fetch order ${hash}:`, error);
         }
       }
 
-      // Sort by createdAt descending (newest first)
       orders.sort((a, b) => Number(b.context.createdAt - a.context.createdAt));
-
       return orders;
     } catch (error) {
       console.error("[useConditionalOrders] Failed to fetch orders:", error);
       return [];
     }
-  }, [isAvailable, contractAddress, publicClient, userAddress, activeOnly, fetchTriggerStatus]);
+  }, [isAvailable, contractAddress, publicClient, userAddress, activeOnly, fetchTriggerStatus, fetchSingleOrder]);
 
   const query = useQuery({
     queryKey: ["conditionalOrders", chainId, userAddress, activeOnly, fetchTriggerStatus],
@@ -503,6 +508,65 @@ function getExpectedProtocolId(protocolName: string): `0x${string}` | undefined 
   return undefined;
 }
 
+/** Case-insensitive address comparison. */
+function addressMatch(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
+/**
+ * Check if an order's protocol-specific context matches the given criteria.
+ * Returns false if a match criterion is provided but the context doesn't match.
+ */
+function matchesProtocolContext(
+  protocolContext: `0x${string}`,
+  expectedProtocolId: `0x${string}` | undefined,
+  morphoMarketId?: string,
+  eulerBorrowVault?: Address,
+  compoundMarket?: Address,
+): boolean {
+  if (morphoMarketId && expectedProtocolId === PROTOCOL_IDS.MORPHO_BLUE) {
+    const decoded = decodeMorphoContext(protocolContext);
+    if (!decoded || !addressMatch(decoded.marketId, morphoMarketId)) return false;
+  }
+
+  if (eulerBorrowVault && expectedProtocolId === PROTOCOL_IDS.EULER_V2) {
+    const decoded = decodeEulerContext(protocolContext);
+    if (!decoded || !addressMatch(decoded.borrowVault, eulerBorrowVault)) return false;
+  }
+
+  if (compoundMarket && expectedProtocolId === PROTOCOL_IDS.COMPOUND_V3) {
+    const decoded = decodeCompoundContext(protocolContext);
+    if (!decoded || !addressMatch(decoded.market, compoundMarket)) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Check if an order matches the ADL criteria (active, correct protocol, tokens, context).
+ */
+function isMatchingADLOrder(
+  order: ConditionalOrder,
+  expectedProtocolId: `0x${string}` | undefined,
+  collateralToken?: Address,
+  debtToken?: Address,
+  morphoMarketId?: string,
+  eulerBorrowVault?: Address,
+  compoundMarket?: Address,
+): boolean {
+  if (order.context.status !== ConditionalOrderStatus.Active) return false;
+  if (!order.triggerParams) return false;
+
+  if (expectedProtocolId && order.triggerParams.protocolId !== expectedProtocolId) return false;
+  if (collateralToken && !addressMatch(order.triggerParams.collateralToken, collateralToken)) return false;
+  if (debtToken && !addressMatch(order.triggerParams.debtToken, debtToken)) return false;
+
+  return matchesProtocolContext(
+    order.triggerParams.protocolContext, expectedProtocolId,
+    morphoMarketId, eulerBorrowVault, compoundMarket
+  );
+}
+
 /**
  * Check if there's an active ADL order for a specific position
  */
@@ -534,58 +598,9 @@ export function useActiveADL(options: UseActiveADLOptions) {
 
     const expectedProtocolId = getExpectedProtocolId(protocolName);
 
-    // Find an active order that matches the criteria
-    return orders.find(order => {
-      // Must be active
-      if (order.context.status !== ConditionalOrderStatus.Active) return false;
-
-      // Must have trigger params (ADL order)
-      if (!order.triggerParams) return false;
-
-      // Protocol ID must match
-      if (expectedProtocolId && order.triggerParams.protocolId !== expectedProtocolId) {
-        return false;
-      }
-
-      // If collateral specified, must match
-      if (collateralToken && order.triggerParams.collateralToken.toLowerCase() !== collateralToken.toLowerCase()) {
-        return false;
-      }
-
-      // If debt specified, must match
-      if (debtToken && order.triggerParams.debtToken.toLowerCase() !== debtToken.toLowerCase()) {
-        return false;
-      }
-
-      // Protocol-specific context matching
-      const protocolContext = order.triggerParams.protocolContext;
-
-      // Morpho: match by market ID
-      if (morphoMarketId && expectedProtocolId === PROTOCOL_IDS.MORPHO_BLUE) {
-        const decoded = decodeMorphoContext(protocolContext);
-        if (!decoded || decoded.marketId.toLowerCase() !== morphoMarketId.toLowerCase()) {
-          return false;
-        }
-      }
-
-      // Euler: match by borrow vault
-      if (eulerBorrowVault && expectedProtocolId === PROTOCOL_IDS.EULER_V2) {
-        const decoded = decodeEulerContext(protocolContext);
-        if (!decoded || decoded.borrowVault.toLowerCase() !== eulerBorrowVault.toLowerCase()) {
-          return false;
-        }
-      }
-
-      // Compound: match by market
-      if (compoundMarket && expectedProtocolId === PROTOCOL_IDS.COMPOUND_V3) {
-        const decoded = decodeCompoundContext(protocolContext);
-        if (!decoded || decoded.market.toLowerCase() !== compoundMarket.toLowerCase()) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+    return orders.find(order =>
+      isMatchingADLOrder(order, expectedProtocolId, collateralToken, debtToken, morphoMarketId, eulerBorrowVault, compoundMarket)
+    );
   }, [orders, isCorrectChain, userAddress, protocolName, collateralToken, debtToken, morphoMarketId, eulerBorrowVault, compoundMarket]);
 
   return {

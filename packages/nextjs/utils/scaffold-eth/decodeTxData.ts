@@ -26,15 +26,13 @@ export const decodeTransactionData = (tx: TransactionWithFunction) => {
           data: tx.input,
         });
         tx.functionName = functionName;
-        tx.functionArgs = args as readonly unknown[];
-        tx.functionArgNames = getAbiItem<AbiFunction[], string>({
+        tx.functionArgs = args ? Array.from(args) : [];
+        const abiItem = getAbiItem<AbiFunction[], string>({
           abi: contractAbi as AbiFunction[],
           name: functionName,
-        })?.inputs?.map((input: { name: string; type: string }) => input.name);
-        tx.functionArgTypes = getAbiItem<AbiFunction[], string>({
-          abi: contractAbi as AbiFunction[],
-          name: functionName,
-        })?.inputs.map((input: { name: string; type: string }) => input.type);
+        });
+        tx.functionArgNames = abiItem?.inputs?.map(input => input.name ?? "");
+        tx.functionArgTypes = abiItem?.inputs?.map(input => input.type);
         foundInterface = true;
         break;
       } catch {

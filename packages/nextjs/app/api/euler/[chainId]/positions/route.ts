@@ -238,7 +238,7 @@ function buildPositionGroups(
     if (!subAccountMap.has(key)) {
       subAccountMap.set(key, { deposits: [], borrows: [] });
     }
-    subAccountMap.get(key)!.deposits.push(entry.vault.toLowerCase());
+    subAccountMap.get(key)?.deposits.push(entry.vault.toLowerCase());
   }
 
   for (const entry of borrowEntries) {
@@ -246,7 +246,7 @@ function buildPositionGroups(
     if (!subAccountMap.has(key)) {
       subAccountMap.set(key, { deposits: [], borrows: [] });
     }
-    subAccountMap.get(key)!.borrows.push(entry.vault.toLowerCase());
+    subAccountMap.get(key)?.borrows.push(entry.vault.toLowerCase());
   }
 
   // Build position groups

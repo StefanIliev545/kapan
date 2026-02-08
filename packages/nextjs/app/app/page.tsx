@@ -67,6 +67,7 @@ const WalletSection = dynamic(
   { ssr: false }
 );
 
+
 // Network options (memo for referential stability)
 const networkOptions: NetworkOption[] = [
   { id: "ethereum", name: "Ethereum", logo: "/logos/ethereum.svg" },
@@ -82,17 +83,8 @@ const networkOptions: NetworkOption[] = [
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
 ];
 
-const protocolCountByNetwork: Record<string, number> = {
-  ethereum: 5, // Aave, Morpho, Spark, Euler, Compound
-  base: 6, // Aave, ZeroLend, Compound, Venus, Morpho, Euler
-  unichain: 4, // Morpho, Compound, Venus, Euler
-  arbitrum: 5, // Aave, Morpho, Euler, Compound, Venus
-  optimism: 4, // Aave, Morpho, Euler, Compound
-  linea: 4, // Aave, ZeroLend, Euler, Compound
-  starknet: 2,
-  plasma: 2, // Aave, Euler
-  hardhat: 4, // Aave, Morpho, Compound, Euler
-};
+// All protocol views now call setProtocolTotals() to report to the global portfolio balance.
+// Reporters: Wallet, Morpho, Euler, Compound, Nostra, Vesu, AaveFork (Aave/Spark/ZeroLend), Venus.
 
 // Static feature flags for protocol views (extracted for referential stability)
 const ENABLED_FEATURES_SWAP_AND_MOVE = { swap: true, move: true } as const;
@@ -105,14 +97,10 @@ const App: NextPage = () => {
   const totalBorrowed = useGlobalState(state => state.totalBorrowed);
   const totalNet = useGlobalState(state => state.totalNet);
   const resetTotals = useGlobalState(state => state.resetTotals);
-  const allLoaded = useGlobalState(
-    state => state.expectedProtocolCount > 0 && state.loadedProtocolCount === state.expectedProtocolCount,
-  );
+  const loadedProtocolCount = useGlobalState(state => state.loadedProtocolCount);
   const { address: evmAddress } = useEvmAccount();
   const { viewingAddress: starknetAddress } = useStarknetAccount();
   const lastSeenAddresses = useRef<{ evm?: string; starknet?: string }>({});
-
-  const expectedProtocolCount = protocolCountByNetwork[selectedNetwork] ?? 0;
 
   // Tiny helper so the button click never feels blocked
   const handleNetworkChange = useCallback((id: string) => {
@@ -150,9 +138,11 @@ const App: NextPage = () => {
 
 
 
+  // Reset totals on network switch or wallet address change.
+  // Uses expectedCount=0 since we no longer gate on exact count — just track loadedProtocolCount > 0.
   useEffect(() => {
-    resetTotals(expectedProtocolCount);
-  }, [resetTotals, expectedProtocolCount]);
+    resetTotals(0);
+  }, [resetTotals, selectedNetwork]);
 
   useEffect(() => {
     const nextEvm = evmAddress ?? "";
@@ -165,24 +155,26 @@ const App: NextPage = () => {
 
     if (!nextEvm && !nextStarknet) return;
 
-    resetTotals(expectedProtocolCount);
-  }, [evmAddress, starknetAddress, expectedProtocolCount, resetTotals]);
+    resetTotals(0);
+  }, [evmAddress, starknetAddress, resetTotals]);
 
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-4">
         {/* Compact header: title + metrics + network filter on one line (desktop) */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 px-4 sm:px-0 lg:flex-row lg:items-center lg:justify-between">
           {/* Left: Title + Metrics */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
             <h1 className="text-base-content text-lg font-bold uppercase tracking-tight">Positions</h1>
             <div className="bg-base-content/10 hidden h-6 w-px sm:block" />
-            <DashboardMetrics
-              netWorth={totalNet}
-              totalSupply={totalSupplied}
-              totalDebt={totalBorrowed}
-              isLoading={!allLoaded}
-            />
+            <div className="hidden sm:block">
+              <DashboardMetrics
+                netWorth={totalNet}
+                totalSupply={totalSupplied}
+                totalDebt={totalBorrowed}
+                isLoading={loadedProtocolCount === 0}
+              />
+            </div>
           </div>
 
           {/* Right: Network Switcher */}
@@ -191,32 +183,33 @@ const App: NextPage = () => {
             defaultNetwork={initialNetwork}
             onNetworkChange={handleNetworkChange}
           />
-          
+
           {/* Mobile metrics (below network filter) */}
           <div className="sm:hidden">
             <DashboardMetrics
               netWorth={totalNet}
               totalSupply={totalSupplied}
               totalDebt={totalBorrowed}
-              isLoading={!allLoaded}
+              isLoading={loadedProtocolCount === 0}
             />
           </div>
         </div>
 
         {/* Subtle warning */}
         {warnings[selectedNetwork as keyof typeof warnings] && (
-          <p className="text-base-content/30 border-base-content/10 border-l pl-3 text-[10px] uppercase tracking-wider">
+          <p className="text-base-content/30 border-base-content/10 border-l pl-3 text-[10px] uppercase tracking-wider px-4 sm:px-0">
             {warnings[selectedNetwork as keyof typeof warnings]}
           </p>
         )}
 
         {/* Protocols */}
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {/* ---- Network panes: only render the active selection ---- */}
           {/* ETHEREUM MAINNET */}
           {selectedNetwork === "ethereum" && (
-            <div className="space-y-3">
-              <WalletSection chainId={mainnet.id} />
+            <div className="space-y-2 sm:space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={mainnet.id} /></StableArea>
+
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={mainnet.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -237,8 +230,8 @@ const App: NextPage = () => {
 
           {/* ARBITRUM */}
           {selectedNetwork === "arbitrum" && (
-            <div className="space-y-3">
-              <WalletSection chainId={arbitrum.id} />
+            <div className="space-y-2 sm:space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={arbitrum.id} /></StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -259,8 +252,8 @@ const App: NextPage = () => {
 
           {/* BASE */}
           {selectedNetwork === "base" && (
-            <div className="space-y-3">
-              <WalletSection chainId={base.id} />
+            <div className="space-y-2 sm:space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={base.id} /></StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <MorphoProtocolView chainId={base.id} />
               </StableArea>
@@ -284,11 +277,11 @@ const App: NextPage = () => {
 
           {/* HARDHAT (conditionally enabled via NEXT_PUBLIC_ENABLE_HARDHAT_UI) */}
           {process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" && selectedNetwork === "hardhat" && (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               <div className="alert alert-warning text-sm">
                 Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
               </div>
-              <WalletSection chainId={hardhat.id} />
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={hardhat.id} /></StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={hardhat.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -306,7 +299,7 @@ const App: NextPage = () => {
 
           {/* STARKNET */}
           {selectedNetwork === "starknet" && (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <VesuProtocolView />
               </StableArea>
@@ -318,8 +311,8 @@ const App: NextPage = () => {
 
           {/* OPTIMISM */}
           {selectedNetwork === "optimism" && (
-            <div className="space-y-3">
-              <WalletSection chainId={optimism.id} />
+            <div className="space-y-2 sm:space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={optimism.id} /></StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={optimism.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -337,8 +330,8 @@ const App: NextPage = () => {
 
           {/* LINEA */}
           {selectedNetwork === "linea" && (
-            <div className="space-y-3">
-              <WalletSection chainId={linea.id} />
+            <div className="space-y-2 sm:space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={linea.id} /></StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={linea.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
@@ -356,8 +349,8 @@ const App: NextPage = () => {
 
           {/* PLASMA */}
           {selectedNetwork === "plasma" && (
-            <div className="space-y-3">
-              <WalletSection chainId={plasma.id} />
+            <div className="space-y-2 sm:space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={plasma.id} /></StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={plasma.id} enabledFeatures={ENABLED_FEATURES_SWAP_ONLY} />
               </StableArea>
@@ -369,8 +362,8 @@ const App: NextPage = () => {
 
           {/* UNICHAIN */}
           {selectedNetwork === "unichain" && (
-            <div className="space-y-3">
-              <WalletSection chainId={unichain.id} />
+            <div className="space-y-2 sm:space-y-3">
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={unichain.id} /></StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <MorphoProtocolView chainId={unichain.id} />
               </StableArea>

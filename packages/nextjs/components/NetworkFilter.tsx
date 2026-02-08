@@ -2,6 +2,7 @@
 
 import { track } from "@vercel/analytics";
 import { Suspense, useEffect, useRef, useState, useCallback, useMemo, FC } from "react";
+import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAccount, useSwitchChain } from "wagmi";
 import Image from "next/image";
@@ -25,6 +26,51 @@ const STORAGE_KEY = "kapan-network-filter-selection";
 // --- tweakable behavior flags ---
 const SHALLOW_URL_SYNC = true; // don't trigger app-router navigation
 const HISTORY_MODE: "replace" | "push" = "push"; // "push" so Back works
+// ============ Extracted helpers to reduce cognitive complexity ============
+
+/**
+ * Try to switch wallet to EVM chain for networkId. Non-blocking, skips hardhat.
+ */
+function trySwitchWalletChain(
+  networkId: string,
+  currentChainId: number | undefined,
+  switchChain: ((args: { chainId: number }) => void) | undefined,
+  label: string,
+): void {
+  if (networkId === "hardhat") return;
+  const chainId = NETWORK_ID_TO_CHAIN_ID[networkId];
+  if (!chainId || chainId === currentChainId) return;
+  try { void switchChain?.({ chainId }); }
+  catch (e) { console.warn(`Auto network switch failed on ${label}`, e); }
+}
+
+/** Persist network selection to localStorage (best-effort). */
+function cacheNetworkSelection(networkId: string): void {
+  try { localStorage.setItem(STORAGE_KEY, networkId); } catch { }
+}
+
+/** Read cached network selection from localStorage (best-effort). */
+function readCachedNetwork(): string | null {
+  try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
+}
+
+/**
+ * Apply a network selection: update React state, notify parent, persist to cache,
+ * and optionally switch the wallet chain.
+ */
+function applyNetworkSelection(
+  networkId: string,
+  setSelectedNetwork: (id: string) => void,
+  onNetworkChange: (id: string) => void,
+  currentChainId: number | undefined,
+  switchChain: ((args: { chainId: number }) => void) | undefined,
+  label: string,
+): void {
+  setSelectedNetwork(networkId);
+  onNetworkChange(networkId);
+  cacheNetworkSelection(networkId);
+  trySwitchWalletChain(networkId, currentChainId, switchChain, label);
+}
 
 // Sub-component for network button to handle ref and click properly
 interface NetworkButtonProps {
@@ -126,26 +172,8 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     const onPopState = () => {
       const url = new URL(window.location.href);
       const urlNetwork = url.searchParams.get("network");
-      if (isValid(urlNetwork) && urlNetwork && urlNetwork !== selectedRef.current) {
-        setSelectedNetwork(urlNetwork);
-        onNetworkChange(urlNetwork);
-
-        // cache
-        try {
-          localStorage.setItem(STORAGE_KEY, urlNetwork);
-        } catch { }
-        // non-blocking wallet network switch (skip for hardhat)
-        if (urlNetwork !== "hardhat") {
-          const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
-          if (chainId && chainId !== chain?.id) {
-            try {
-              void switchChain?.({ chainId });
-            } catch (e) {
-              console.warn("Auto network switch failed on popstate", e);
-            }
-          }
-        }
-      }
+      if (!isValid(urlNetwork) || !urlNetwork || urlNetwork === selectedRef.current) return;
+      applyNetworkSelection(urlNetwork, setSelectedNetwork, onNetworkChange, chain?.id, switchChain, "popstate");
     };
 
     window.addEventListener("popstate", onPopState);
@@ -163,30 +191,13 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     if (isValid(urlNetwork) && urlNetwork) {
       initial = urlNetwork;
     } else if (defaultNetwork !== "hardhat") {
-      // Only use cache if not in hardhat dev mode - hardhat mode should always start on hardhat
-      try {
-        const cached = localStorage.getItem(STORAGE_KEY);
-        if (isValid(cached) && cached) initial = cached;
-      } catch { }
+      // Only use cache if not in hardhat dev mode
+      const cached = readCachedNetwork();
+      if (isValid(cached) && cached) initial = cached;
     }
 
-    if (initial && initial !== selectedRef.current) {
-      setSelectedNetwork(initial);
-      onNetworkChange(initial);
-
-      // Switch wallet network if it's an EVM network (non-blocking)
-      // Skip for hardhat - wallet switch will fail and we don't want that to cause issues
-      if (initial !== "hardhat") {
-        const chainId = NETWORK_ID_TO_CHAIN_ID[initial];
-        if (chainId && chainId !== chain?.id) {
-          try {
-            void switchChain?.({ chainId });
-          } catch (e) {
-            console.warn("Auto network switch failed on init", e);
-          }
-        }
-      }
-    }
+    if (!initial || initial === selectedRef.current) return;
+    applyNetworkSelection(initial, setSelectedNetwork, onNetworkChange, chain?.id, switchChain, "init");
   }, [defaultNetwork, isValid, onNetworkChange, searchParams, chain?.id, switchChain]);
 
   // 2) React to *external* URL param changes driven by Next navigation only.
@@ -199,24 +210,8 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     if (SHALLOW_URL_SYNC) return; // shallow mode: we manage URL with popstate above
 
     const urlNetwork = searchParams.get("network");
-    if (isValid(urlNetwork) && urlNetwork && urlNetwork !== selectedRef.current) {
-      setSelectedNetwork(urlNetwork);
-      onNetworkChange(urlNetwork);
-      try {
-        localStorage.setItem(STORAGE_KEY, urlNetwork);
-      } catch { }
-      // Skip wallet switch for hardhat
-      if (urlNetwork !== "hardhat") {
-        const chainId = NETWORK_ID_TO_CHAIN_ID[urlNetwork];
-        if (chainId && chainId !== chain?.id) {
-          try {
-            void switchChain?.({ chainId });
-          } catch (e) {
-            console.warn("Auto network switch failed on URL change", e);
-          }
-        }
-      }
-    }
+    if (!isValid(urlNetwork) || !urlNetwork || urlNetwork === selectedRef.current) return;
+    applyNetworkSelection(urlNetwork, setSelectedNetwork, onNetworkChange, chain?.id, switchChain, "URL change");
   }, [isValid, onNetworkChange, searchParams, chain?.id, switchChain]);
 
   // 3) Handle invalid selection if networks change
@@ -234,9 +229,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   // Disabled entirely in hardhat dev mode to prevent unwanted network switches
   const isHardhatDevMode = process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true";
   useEffect(() => {
-    // Skip syncing entirely in hardhat dev mode
-    if (isHardhatDevMode) return;
-    if (!chain?.id) return;
+    if (isHardhatDevMode || !chain?.id) return;
 
     // If we initiated the chain switch, skip syncing back
     if (weInitiatedChainSwitchRef.current) {
@@ -253,10 +246,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       setSelectedNetwork(networkId);
       onNetworkChange(networkId);
 
-      // Update cache
-      try {
-        localStorage.setItem(STORAGE_KEY, networkId);
-      } catch { }
+      cacheNetworkSelection(networkId);
 
       // Update URL
       if (SHALLOW_URL_SYNC) {
@@ -281,10 +271,7 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     setSelectedNetwork(networkId);
     onNetworkChange(networkId);
 
-    // Persist to cache
-    try {
-      localStorage.setItem(STORAGE_KEY, networkId);
-    } catch { }
+    cacheNetworkSelection(networkId);
 
     // Switch wallet network if it's an EVM network (non-blocking)
     // Skip for hardhat - user should manually add hardhat network to wallet if needed
@@ -302,20 +289,19 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     }
 
     // Update URL
-    const params = new URLSearchParams(
-      typeof window !== "undefined" ? window.location.search : searchParams.toString()
-    );
-    if (params.get("network") !== networkId) {
-      if (SHALLOW_URL_SYNC) {
-        shallowUpdateUrl(networkId, HISTORY_MODE); // no navigation
-      } else {
-        // Fallback to Next navigation (rare case if you really need it)
-        const next = new URLSearchParams(searchParams.toString());
-        next.set("network", networkId);
-        suppressNextUrlSyncRef.current = true;
-        // No startTransition here; let Next handle it
-        router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-      }
+    const currentUrlNetwork = typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("network")
+      : searchParams.get("network");
+
+    if (currentUrlNetwork === networkId) return;
+
+    if (SHALLOW_URL_SYNC) {
+      shallowUpdateUrl(networkId, HISTORY_MODE);
+    } else {
+      const next = new URLSearchParams(searchParams.toString());
+      next.set("network", networkId);
+      suppressNextUrlSyncRef.current = true;
+      router.replace(`${pathname}?${next.toString()}`, { scroll: false });
     }
   }, [isValid, pathname, onNetworkChange, chain?.id, switchChain, searchParams, shallowUpdateUrl, router, isHardhatDevMode]);
 
@@ -354,33 +340,103 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     };
   }, [indicatorStyle]);
 
-  return (
-    <div
-      ref={containerRef}
-      className="bg-base-200/50 border-base-content/10 relative inline-flex items-center gap-0.5 rounded-lg border p-1 transition-[width] duration-200 ease-out"
-    >
-      {/* Animated sliding indicator */}
-      {indicatorStyleObject && (
-        <div
-          className="bg-base-content/10 absolute inset-y-1 rounded-md transition-all duration-200 ease-out"
-          style={indicatorStyleObject}
-        />
-      )}
+  // Mobile dropdown state
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const mobileRef = useRef<HTMLDivElement>(null);
 
-      {networks.map((network) => {
-        const isActive = selectedNetwork === network.id;
-        return (
-          <NetworkButton
-            key={network.id}
-            network={network}
-            isActive={isActive}
-            isDarkMode={isDarkMode}
-            onNetworkChange={handleNetworkChange}
-            onRef={handleButtonRef}
+  // Close mobile dropdown on outside click
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (mobileRef.current && !mobileRef.current.contains(e.target as Node)) {
+        setIsMobileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMobileOpen]);
+
+  const activeNetwork = networks.find(n => n.id === selectedNetwork) || networks[0];
+
+  return (
+    <>
+      {/* Mobile: dropdown trigger + popover */}
+      <div ref={mobileRef} className="relative sm:hidden">
+        <button
+          type="button"
+          onClick={() => setIsMobileOpen(prev => !prev)}
+          className="bg-base-200/50 border-base-content/10 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors"
+        >
+          <div className="relative size-4 shrink-0">
+            <Image
+              src={getNetworkOptionLogo(activeNetwork, isDarkMode)}
+              alt={activeNetwork.name}
+              fill
+              sizes="16px"
+              className="object-contain"
+            />
+          </div>
+          <span>{activeNetwork.name}</span>
+          <ChevronDownIcon className={`size-3.5 transition-transform ${isMobileOpen ? "rotate-180" : ""}`} />
+        </button>
+        {isMobileOpen && (
+          <div className="bg-base-200 border-base-content/10 absolute left-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border py-1 shadow-xl">
+            {networks.map((network) => (
+              <button
+                key={network.id}
+                type="button"
+                onClick={() => {
+                  handleNetworkChange(network.id);
+                  setIsMobileOpen(false);
+                }}
+                className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
+                  network.id === selectedNetwork
+                    ? "bg-base-content/10 text-base-content font-semibold"
+                    : "text-base-content/60 hover:bg-base-content/5 hover:text-base-content"
+                }`}
+              >
+                <div className="relative size-4 shrink-0">
+                  <Image
+                    src={getNetworkOptionLogo(network, isDarkMode)}
+                    alt={network.name}
+                    fill
+                    sizes="16px"
+                    className="object-contain"
+                  />
+                </div>
+                <span>{network.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: inline tab bar with sliding indicator */}
+      <div
+        ref={containerRef}
+        className="bg-base-200/50 border-base-content/10 relative hidden items-center gap-0.5 rounded-lg border p-1 transition-[width] duration-200 ease-out sm:inline-flex"
+      >
+        {indicatorStyleObject && (
+          <div
+            className="bg-base-content/10 absolute inset-y-1 rounded-md transition-all duration-200 ease-out"
+            style={indicatorStyleObject}
           />
-        );
-      })}
-    </div>
+        )}
+        {networks.map((network) => {
+          const isActive = selectedNetwork === network.id;
+          return (
+            <NetworkButton
+              key={network.id}
+              network={network}
+              isActive={isActive}
+              isDarkMode={isDarkMode}
+              onNetworkChange={handleNetworkChange}
+              onRef={handleButtonRef}
+            />
+          );
+        })}
+      </div>
+    </>
   );
 };
 

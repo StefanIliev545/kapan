@@ -200,6 +200,58 @@ const CONDITIONAL_ORDER_MANAGER_ABI = [
   },
 ] as const;
 
+// Helper: execute authorization transactions sequentially
+async function executeAuthCalls(
+  authCalls: Array<{ target: string; data: string }>,
+  walletClient: any, publicClient: any, account: Address,
+): Promise<void> {
+  if (authCalls.length === 0) return;
+  notification.info(`Requesting ${authCalls.length} authorization(s)...`);
+  for (const authCall of authCalls) {
+    const hash = await walletClient.sendTransaction({
+      to: authCall.target as Address, data: authCall.data as Hex,
+      chain: walletClient.chain, account,
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+  }
+}
+
+// Helper: extract order hash from receipt logs
+function extractOrderHashFromLogs(
+  logs: Array<{ address: string; topics: string[] }>,
+  managerAddr: string, fallback: string,
+): string {
+  for (const log of logs) {
+    if (log.address.toLowerCase() === managerAddr.toLowerCase() && log.topics.length >= 2 && log.topics[1]) {
+      return log.topics[1];
+    }
+  }
+  return fallback;
+}
+
+// Helper: ensure router delegation for order manager
+async function ensureRouterDelegation(
+  publicClient: any, walletClient: any,
+  routerContract: { address: string; abi: any },
+  userAddress: Address, orderManagerAddress: Address,
+  connectedAddress: Address, orderType: string,
+): Promise<void> {
+  const isDelegated = await publicClient.readContract({
+    address: routerContract.address as Address, abi: routerContract.abi,
+    functionName: "userDelegates", args: [userAddress, orderManagerAddress],
+  }) as boolean;
+  if (!isDelegated) {
+    notification.info(`Setting up router delegation for ${orderType} orders...`);
+    const delegateHash = await walletClient.sendTransaction({
+      to: routerContract.address as Address,
+      data: encodeFunctionData({ abi: routerContract.abi, functionName: "setDelegate", args: [orderManagerAddress, true] }),
+      chain: walletClient.chain, account: connectedAddress,
+    });
+    await publicClient.waitForTransactionReceipt({ hash: delegateHash });
+    notification.success("Router delegation enabled");
+  }
+}
+
 // ============ Hook ============
 
 export function useADLOrder(input: UseADLOrderInput): UseADLOrderReturn {
@@ -279,33 +331,13 @@ export function useADLOrder(input: UseADLOrderInput): UseADLOrderReturn {
       }
 
       // Check and set router delegation for the OrderManager
-      // This is required for the OrderManager to execute hooks on behalf of the user
       if (!routerContract?.address) {
         throw new Error("KapanRouter not deployed on this chain");
       }
-
-      const isDelegated = await publicClient.readContract({
-        address: routerContract.address as Address,
-        abi: routerContract.abi,
-        functionName: "userDelegates",
-        args: [userAddress, validOrderManager],
-      }) as boolean;
-
-      if (!isDelegated) {
-        notification.info("Setting up router delegation for ADL orders...");
-        const delegateHash = await walletClient.sendTransaction({
-          to: routerContract.address as Address,
-          data: encodeFunctionData({
-            abi: routerContract.abi,
-            functionName: "setDelegate",
-            args: [validOrderManager, true],
-          }),
-          chain: walletClient.chain,
-          account: connectedAddress as Address,
-        });
-        await publicClient.waitForTransactionReceipt({ hash: delegateHash });
-        notification.success("Router delegation enabled");
-      }
+      await ensureRouterDelegation(
+        publicClient, walletClient, routerContract, userAddress,
+        validOrderManager, connectedAddress as Address, "ADL"
+      );
 
       // Generate unique salt
       const salt = generateOrderSalt() as `0x${string}`;
@@ -408,19 +440,7 @@ export function useADLOrder(input: UseADLOrderInput): UseADLOrderReturn {
       const notificationId = notification.loading("Creating ADL protection order...");
 
       try {
-        // Execute authorization transactions first (approvals, credit delegations, etc.)
-        if (authCalls.length > 0) {
-          notification.info(`Requesting ${authCalls.length} authorization(s)...`);
-          for (const authCall of authCalls) {
-            const authHash = await walletClient.sendTransaction({
-              to: authCall.target as Address,
-              data: authCall.data as Hex,
-              chain: walletClient.chain,
-              account: connectedAddress as Address,
-            });
-            await publicClient.waitForTransactionReceipt({ hash: authHash });
-          }
-        }
+        await executeAuthCalls(authCalls, walletClient, publicClient, connectedAddress as Address);
 
         // Send createOrder transaction
         const hash = await walletClient.sendTransaction({
@@ -438,21 +458,7 @@ export function useADLOrder(input: UseADLOrderInput): UseADLOrderReturn {
         }
 
         // Extract orderHash from logs
-        // Event: ConditionalOrderCreated(bytes32 indexed orderHash, address indexed user, ...)
-        let orderHash = salt; // Fallback to salt if we can't extract
-
-        // Look for ConditionalOrderCreated event
-        for (const log of receipt.logs) {
-          // First topic is event signature, second is indexed orderHash
-          if (
-            log.address.toLowerCase() === validOrderManager.toLowerCase() &&
-            log.topics.length >= 2 &&
-            log.topics[1]
-          ) {
-            orderHash = log.topics[1];
-            break;
-          }
-        }
+        const orderHash = extractOrderHashFromLogs(receipt.logs, validOrderManager, salt);
 
         notification.remove(notificationId);
         notification.success("ADL protection order created successfully!");

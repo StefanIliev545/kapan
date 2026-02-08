@@ -20,7 +20,7 @@ import { CollateralSwapModal } from "./modals/CollateralSwapModal";
 import { CloseWithCollateralEvmModal } from "./modals/CloseWithCollateralEvmModal";
 import { DebtSwapEvmModal } from "./modals/DebtSwapEvmModal";
 import { MultiplyEvmModal } from "./modals/MultiplyEvmModal";
-import { useAaveEMode } from "~~/hooks/useAaveEMode";
+import { useAaveEMode, type EModeCategory } from "~~/hooks/useAaveEMode";
 import { usePTEnhancedApyMaps } from "~~/hooks/usePendlePTYields";
 import { useExternalYields, type ExternalYield } from "~~/hooks/useExternalYields";
 import { useAaveReserveConfigs } from "~~/hooks/usePredictiveLtv";
@@ -59,7 +59,7 @@ function matchesStableEMode(symbol: string): boolean {
 }
 
 /** Create E-Mode filter function based on user's E-Mode */
-function createEModeFilter(userEMode: { id: number; label: string } | null | undefined): (assets: SwapAsset[]) => SwapAsset[] {
+function createEModeFilter(userEMode: EModeCategory | null | undefined): (assets: SwapAsset[]) => SwapAsset[] {
   if (!userEMode || userEMode.id === 0) {
     return (assets) => assets;
   }
@@ -442,7 +442,7 @@ const CollateralLtvBreakdown: FC<CollateralLtvBreakdownProps> = ({ items, totalD
   return (
     <div className="flex flex-col gap-2 text-xs">
       {/* Header with current LTV */}
-      <div className="flex items-center justify-between border-b border-base-300/50 pb-2">
+      <div className="border-base-300/50 flex items-center justify-between border-b pb-2">
         <span className="text-base-content/60 text-[10px] font-semibold uppercase tracking-wide">
           Collateral Breakdown
         </span>
@@ -452,7 +452,7 @@ const CollateralLtvBreakdown: FC<CollateralLtvBreakdownProps> = ({ items, totalD
       </div>
       {/* Per-collateral rows */}
       <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2 text-[10px] text-base-content/40">
+        <div className="text-base-content/40 flex items-center gap-2 text-[10px]">
           <span className="flex-1">Asset</span>
           <span className="w-16 text-right">Value</span>
           <span className="w-12 text-right">Max LTV</span>
@@ -522,6 +522,592 @@ const MOTION_TRANSITION = { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const };
 // CSS class constants to avoid duplicate string warnings
 const TEXT_SUCCESS = "text-success";
 const TEXT_ERROR = "text-error";
+
+// ============================================================================
+// Sub-components extracted from ProtocolView JSX to reduce cognitive complexity.
+// Each sub-component encapsulates a major section of the original return JSX,
+// moving conditional rendering out of the main component body.
+// ============================================================================
+
+/** Mobile header layout for protocol card */
+interface ProtocolHeaderMobileProps {
+  protocolIcon: string;
+  protocolName: string;
+  forceShowAll: boolean;
+  disableMarkets: boolean;
+  isMarketsOpen: boolean;
+  onToggleMarkets: (e: React.MouseEvent) => void;
+  readOnly: boolean;
+  isCollapsed: boolean;
+  hideUtilization: boolean;
+  netBalance: number;
+  netYield30d: number;
+  netApyPercent: number | null;
+  utilizationPercentage: number;
+  headerElement?: React.ReactNode;
+  onStopPropagation: (e: React.MouseEvent) => void;
+}
+
+const ProtocolHeaderMobile: FC<ProtocolHeaderMobileProps> = ({
+  protocolIcon, protocolName, forceShowAll, disableMarkets, isMarketsOpen,
+  onToggleMarkets, readOnly, isCollapsed, hideUtilization, netBalance,
+  netYield30d, netApyPercent, utilizationPercentage, headerElement, onStopPropagation,
+}) => (
+  <div className="space-y-3 sm:hidden">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <div className="token-icon-wrapper-md">
+          <Image src={protocolIcon} alt={`${protocolName} icon`} width={20} height={20} className="object-contain drop-shadow-sm" />
+        </div>
+        <span className="text-sm font-bold tracking-tight">{protocolName}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <MarketsButton show={!forceShowAll && !disableMarkets} isOpen={isMarketsOpen} onToggle={onToggleMarkets} isMobile />
+        <ConnectHint show={forceShowAll && !readOnly} isMobile />
+        <ChevronDownIcon className={`text-base-content/40 size-4 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`} />
+      </div>
+    </div>
+    <div className={`grid gap-1 ${hideUtilization ? 'grid-cols-3' : 'grid-cols-4'}`}>
+      <StatDisplay label="Balance" value={formatCurrency(netBalance)} valueClass={getValueClass(netBalance)} isMobile />
+      <StatDisplay label="30D" value={formatCurrency(netYield30d)} valueClass={getValueClass(netYield30d)} isMobile />
+      <StatDisplay label="Net APY" value={netApyPercent == null ? "\u2014" : formatSignedPercentage(netApyPercent)} valueClass={getValueClass(netApyPercent)} isMobile />
+      {!hideUtilization && (
+        <div className="flex flex-col items-center py-1">
+          <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">LTV</span>
+          <HealthStatus utilizationPercentage={utilizationPercentage} />
+        </div>
+      )}
+    </div>
+    {headerElement && (
+      <div className="border-base-300/30 flex items-center justify-start border-t pt-2" onClick={onStopPropagation}>
+        {headerElement}
+      </div>
+    )}
+  </div>
+);
+ProtocolHeaderMobile.displayName = "ProtocolHeaderMobile";
+
+/** Utilization stat with collateral breakdown tooltip (desktop) */
+interface UtilizationWithTooltipProps {
+  utilizationPercentage: number;
+  collateralBreakdown: CollateralBreakdownItem[];
+  totalDebtUsd: number;
+}
+
+const UtilizationWithTooltip: FC<UtilizationWithTooltipProps> = ({
+  utilizationPercentage, collateralBreakdown, totalDebtUsd,
+}) => (
+  <div className="group/util hover:bg-base-200/30 relative flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
+    <div className="flex items-center gap-1">
+      <span className="label-text-xs-semibold">Utilization</span>
+      {collateralBreakdown.length > 0 && <span className="text-primary text-[8px]">{"\u24d8"}</span>}
+    </div>
+    <HealthStatus utilizationPercentage={utilizationPercentage} />
+    {collateralBreakdown.length > 0 && (
+      <div className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 hidden -translate-x-1/2 group-hover/util:block">
+        <div className="bg-base-100 ring-base-300/50 pointer-events-auto min-w-[280px] rounded-lg p-3 shadow-xl ring-1">
+          <CollateralLtvBreakdown items={collateralBreakdown} totalDebtUsd={totalDebtUsd} />
+        </div>
+      </div>
+    )}
+  </div>
+);
+UtilizationWithTooltip.displayName = "UtilizationWithTooltip";
+
+/** Desktop header layout for protocol card */
+interface ProtocolHeaderDesktopProps {
+  protocolIcon: string;
+  protocolName: string;
+  forceShowAll: boolean;
+  disableMarkets: boolean;
+  isMarketsOpen: boolean;
+  onToggleMarkets: (e: React.MouseEvent) => void;
+  readOnly: boolean;
+  isCollapsed: boolean;
+  hideUtilization: boolean;
+  netBalance: number;
+  netYield30d: number;
+  netApyPercent: number | null;
+  utilizationPercentage: number;
+  collateralBreakdown: CollateralBreakdownItem[];
+  totalDebtUsd: number;
+  headerElement?: React.ReactNode;
+  onStopPropagation: (e: React.MouseEvent) => void;
+}
+
+const ProtocolHeaderDesktop: FC<ProtocolHeaderDesktopProps> = ({
+  protocolIcon, protocolName, forceShowAll, disableMarkets, isMarketsOpen,
+  onToggleMarkets, readOnly, isCollapsed, hideUtilization, netBalance,
+  netYield30d, netApyPercent, utilizationPercentage, collateralBreakdown,
+  totalDebtUsd, headerElement, onStopPropagation,
+}) => (
+  <div className="hidden sm:block">
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+      <div className="flex items-center gap-3">
+        <div className="token-icon-wrapper-lg">
+          <Image src={protocolIcon} alt={`${protocolName} icon`} width={24} height={24} className="object-contain drop-shadow-sm" />
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="label-text-xs-semibold">Protocol</span>
+          <span className="text-base font-bold tracking-tight">{protocolName}</span>
+        </div>
+      </div>
+      <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
+      <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
+        <StatDisplay label="Balance" value={formatCurrency(netBalance)} valueClass={getValueClass(netBalance)} />
+        <StatDisplay label="30D Yield" value={formatCurrency(netYield30d)} valueClass={getValueClass(netYield30d)} />
+        <StatDisplay label="Net APY" value={netApyPercent == null ? "\u2014" : formatSignedPercentage(netApyPercent)} valueClass={getValueClass(netApyPercent)} />
+        {!hideUtilization && (
+          <UtilizationWithTooltip utilizationPercentage={utilizationPercentage} collateralBreakdown={collateralBreakdown} totalDebtUsd={totalDebtUsd} />
+        )}
+      </div>
+      {headerElement && (
+        <div className="hidden items-center md:flex" onClick={onStopPropagation}>{headerElement}</div>
+      )}
+      <div className="border-base-300/50 flex items-center gap-2.5 border-l pl-2">
+        <MarketsButton show={!forceShowAll && !disableMarkets} isOpen={isMarketsOpen} onToggle={onToggleMarkets} />
+        <ConnectHint show={forceShowAll && !readOnly} />
+        <ChevronDownIcon className={`text-base-content/40 size-5 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`} />
+      </div>
+    </div>
+    {headerElement && (
+      <div className="border-base-300/30 mt-2 flex items-center justify-start border-t pt-2 md:hidden" onClick={onStopPropagation}>
+        {headerElement}
+      </div>
+    )}
+  </div>
+);
+ProtocolHeaderDesktop.displayName = "ProtocolHeaderDesktop";
+
+/** Markets section - expandable panel showing suppliable/borrowable assets */
+interface MarketsSectionProps {
+  show: boolean;
+  suppliedPositions: ProtocolPosition[];
+  borrowedPositions: ProtocolPosition[];
+  readOnly: boolean;
+  filteredSuppliedPositionsCount: number;
+  protocolName: string;
+  networkType: "evm" | "starknet";
+  chainId?: number;
+  findYield: (address?: string, symbol?: string) => ExternalYield | undefined;
+  onAddSupply: () => void;
+  onAddBorrow: () => void;
+}
+
+const InternalMarketsSection: FC<MarketsSectionProps> = ({
+  show, suppliedPositions, borrowedPositions, readOnly,
+  filteredSuppliedPositionsCount, protocolName, networkType, chainId,
+  findYield, onAddSupply, onAddBorrow,
+}) => {
+  if (!show) return null;
+
+  return (
+    <div className="card-surface">
+      <div className="card-body p-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {suppliedPositions.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">Suppliable assets</div>
+                {!readOnly && (
+                  <button className="btn btn-xs btn-outline" type="button" onClick={onAddSupply}>Deposit</button>
+                )}
+              </div>
+              {suppliedPositions.map(position => (
+                <SupplyPosition
+                  key={`market-supply-${position.tokenAddress}`}
+                  {...position}
+                  currentRate={getExternalYieldOverride(position, findYield)}
+                  protocolName={protocolName}
+                  networkType={networkType}
+                  chainId={chainId}
+                  hideBalanceColumn
+                  availableActions={MARKET_SUPPLY_ACTIONS}
+                  showInfoDropdown={false}
+                />
+              ))}
+            </div>
+          )}
+          {borrowedPositions.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">Borrowable assets</div>
+                {!readOnly && filteredSuppliedPositionsCount > 0 && (
+                  <button className="btn btn-xs btn-outline" type="button" onClick={onAddBorrow}>Borrow</button>
+                )}
+              </div>
+              {borrowedPositions.map(position => (
+                <BorrowPosition
+                  key={`market-borrow-${position.tokenAddress}`}
+                  {...position}
+                  protocolName={protocolName}
+                  networkType={networkType}
+                  chainId={chainId}
+                  hideBalanceColumn
+                  availableActions={MARKET_BORROW_ACTIONS}
+                  showInfoDropdown={false}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+InternalMarketsSection.displayName = "InternalMarketsSection";
+
+/** Supplied assets panel with position list or empty state */
+interface SuppliedAssetsPanelProps {
+  positions: (ProtocolPosition & { actionsDisabled?: boolean })[];
+  protocolName: string;
+  networkType: "evm" | "starknet";
+  chainId?: number;
+  positionManager: PositionManager;
+  disableMoveSupply: boolean;
+  readOnly: boolean;
+  supplyAvailableActions: Record<string, boolean>;
+  supplySwapHandlers: Record<string, () => void>;
+  expandFirstPositions: boolean;
+  adlCollateralToken?: string;
+  effectiveShowAll: boolean;
+  loopingDisabled: boolean;
+  availableCollateralsCount: number;
+  debtOptionsCount: number;
+  onAddSupply: () => void;
+  onOpenMultiply: () => void;
+}
+
+const SuppliedAssetsPanel: FC<SuppliedAssetsPanelProps> = ({
+  positions, protocolName, networkType, chainId, positionManager,
+  disableMoveSupply, readOnly, supplyAvailableActions, supplySwapHandlers,
+  expandFirstPositions, adlCollateralToken, effectiveShowAll, loopingDisabled,
+  availableCollateralsCount, debtOptionsCount, onAddSupply, onOpenMultiply,
+}) => {
+  const canLoop = availableCollateralsCount > 0 && debtOptionsCount > 0;
+  const loopTitle = canLoop ? "Build a flash-loan loop" : "Supply collateral and have a debt option to build a loop";
+
+  return (
+    <div className="h-full">
+      <div className="card-surface-hover h-full">
+        <div className="card-body flex flex-col p-4">
+          <div className="border-base-200/50 mb-1 flex items-center justify-between border-b pb-3">
+            <div className="flex items-center gap-2">
+              <div className="bg-success h-5 w-1 rounded-full" />
+              <span className="text-base-content/60 text-[11px] font-semibold uppercase tracking-widest">Supplied</span>
+            </div>
+            <div className="count-badge-success">
+              <span className="font-mono text-xs font-bold">{positions.length}</span>
+              <span className="label-text-xs-muted opacity-70">{positions.length === 1 ? "asset" : "assets"}</span>
+            </div>
+          </div>
+          {positions.length > 0 ? (
+            <div className="flex flex-1 flex-col pt-2">
+              <div className="space-y-3">
+                {positions.map((position, index) => {
+                  const key = `supplied-${position.name}-${index}`;
+                  return (
+                    <div key={key} className="min-h-[60px]">
+                      <SupplyPosition
+                        {...position}
+                        protocolName={protocolName}
+                        networkType={networkType}
+                        chainId={chainId}
+                        position={positionManager}
+                        disableMove={disableMoveSupply || readOnly}
+                        availableActions={supplyAvailableActions}
+                        onSwap={supplySwapHandlers[key]}
+                        suppressDisabledMessage
+                        defaultExpanded={expandFirstPositions && index === 0}
+                        adlActive={adlCollateralToken?.toLowerCase() === position.tokenAddress.toLowerCase()}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              {!readOnly && (
+                <div className="mt-auto flex flex-col gap-2 pt-4">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <AddButton onClick={onAddSupply} label="Add Supply" />
+                    {!loopingDisabled && (
+                      <AddButton onClick={onOpenMultiply} label="Add Loop" variant="secondary" disabled={!canLoop} title={loopTitle} />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <EmptyState
+              message={effectiveShowAll ? "No available assets" : "No supplied assets"}
+              showAddButton={!readOnly}
+              onAdd={onAddSupply}
+              addButtonLabel="Supply Assets"
+              showLoopButton={!loopingDisabled}
+              onAddLoop={onOpenMultiply}
+              loopDisabled={!canLoop}
+              loopTitle={loopTitle}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+SuppliedAssetsPanel.displayName = "SuppliedAssetsPanel";
+
+/** Borrowed assets panel with position list or empty state */
+interface BorrowedAssetsPanelProps {
+  positions: (ProtocolPosition & { actionsDisabled?: boolean })[];
+  protocolName: string;
+  networkType: "evm" | "starknet";
+  chainId?: number;
+  positionManager: PositionManager;
+  availableCollaterals: SwapAsset[];
+  borrowAvailableActions: Record<string, boolean>;
+  borrowCloseHandlers: Record<string, () => void>;
+  borrowDebtSwapHandlers: Record<string, () => void>;
+  expandFirstPositions: boolean;
+  expandedBorrowPositions: Record<string, boolean>;
+  borrowExpandToggleHandlers: Record<string, () => void>;
+  adlDebtToken?: string;
+  readOnly: boolean;
+  effectiveShowAll: boolean;
+  filteredSuppliedPositionsCount: number;
+  onAddBorrow: () => void;
+}
+
+const BorrowedAssetsPanel: FC<BorrowedAssetsPanelProps> = ({
+  positions, protocolName, networkType, chainId, positionManager,
+  availableCollaterals, borrowAvailableActions, borrowCloseHandlers,
+  borrowDebtSwapHandlers, expandFirstPositions, expandedBorrowPositions,
+  borrowExpandToggleHandlers, adlDebtToken, readOnly, effectiveShowAll,
+  filteredSuppliedPositionsCount, onAddBorrow,
+}) => (
+  <div className="h-full">
+    <div className="card-surface-hover h-full">
+      <div className="card-body flex flex-col p-4">
+        <div className="border-base-200/50 mb-1 flex items-center justify-between border-b pb-3">
+          <div className="flex items-center gap-2">
+            <div className="bg-error h-5 w-1 rounded-full" />
+            <span className="text-base-content/60 text-[11px] font-semibold uppercase tracking-widest">Borrowed</span>
+          </div>
+          <div className="count-badge-error">
+            <span className="font-mono text-xs font-bold">{positions.length}</span>
+            <span className="label-text-xs-muted opacity-70">{positions.length === 1 ? "asset" : "assets"}</span>
+          </div>
+        </div>
+        {positions.length > 0 ? (
+          <div className="flex flex-1 flex-col pt-2">
+            <div className="space-y-3">
+              {positions.map((position, index) => {
+                const key = `borrowed-${position.name}-${index}`;
+                const isExpanded = expandedBorrowPositions[key] ?? (expandFirstPositions && index === 0);
+                return (
+                  <div key={key} className="min-h-[60px]">
+                    <BorrowPosition
+                      {...position}
+                      protocolName={protocolName}
+                      networkType={networkType}
+                      chainId={chainId}
+                      position={positionManager}
+                      availableAssets={position.collaterals || availableCollaterals}
+                      availableActions={borrowAvailableActions}
+                      onClosePosition={borrowCloseHandlers[key]}
+                      onSwap={borrowDebtSwapHandlers[key]}
+                      suppressDisabledMessage
+                      controlledExpanded={isExpanded}
+                      onToggleExpanded={borrowExpandToggleHandlers[key]}
+                      adlProtected={adlDebtToken?.toLowerCase() === position.tokenAddress.toLowerCase()}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            {!readOnly && (
+              <div className="mt-auto pt-4">
+                <AddButton
+                  onClick={onAddBorrow}
+                  label="Borrow"
+                  disabled={filteredSuppliedPositionsCount === 0}
+                  title={filteredSuppliedPositionsCount === 0 ? "Supply assets first to enable borrowing" : undefined}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <EmptyState
+            message={effectiveShowAll ? "No available assets" : "No borrowed assets"}
+            showAddButton={!readOnly}
+            onAdd={onAddBorrow}
+            addButtonLabel="Borrow Assets"
+            buttonDisabled={filteredSuppliedPositionsCount === 0}
+            buttonTitle={filteredSuppliedPositionsCount === 0 ? "Supply assets first to enable borrowing" : undefined}
+          />
+        )}
+      </div>
+    </div>
+  </div>
+);
+BorrowedAssetsPanel.displayName = "BorrowedAssetsPanel";
+
+/** Starknet-specific modals */
+interface StarknetModalsProps {
+  isTokenSelectModalOpen: boolean;
+  onCloseTokenSelectModal: () => void;
+  starknetSupplyTokens: ReturnType<typeof positionToStarknetToken>[];
+  protocolName: string;
+  positionManager: PositionManager;
+  isTokenBorrowSelectModalOpen: boolean;
+  onCloseBorrowSelectModal: () => void;
+  starknetBorrowTokens: ReturnType<typeof positionToStarknetToken>[];
+  isTokenBorrowModalOpen: boolean;
+  onCloseBorrowModal: () => void;
+  borrowModalStarkToken: ReturnType<typeof createBorrowModalToken>;
+  borrowModalCurrentDebt: number;
+  selectedToken: ProtocolPosition | null;
+  borrowedPositions: ProtocolPosition[];
+  isCloseModalOpen: boolean;
+  selectedClosePosition: ProtocolPosition | null;
+  onCloseCloseModal: () => void;
+  chainId: number;
+  availableCollaterals: SwapAsset[];
+  isDebtSwapModalOpen: boolean;
+  selectedDebtSwapPosition: ProtocolPosition | null;
+  onCloseDebtSwapModal: () => void;
+}
+
+const StarknetModals: FC<StarknetModalsProps> = ({
+  isTokenSelectModalOpen, onCloseTokenSelectModal, starknetSupplyTokens,
+  protocolName, positionManager, isTokenBorrowSelectModalOpen,
+  onCloseBorrowSelectModal, starknetBorrowTokens, isTokenBorrowModalOpen,
+  onCloseBorrowModal, borrowModalStarkToken, borrowModalCurrentDebt,
+  selectedToken, borrowedPositions, isCloseModalOpen, selectedClosePosition,
+  onCloseCloseModal, chainId, availableCollaterals, isDebtSwapModalOpen,
+  selectedDebtSwapPosition, onCloseDebtSwapModal,
+}) => (
+  <>
+    <TokenSelectModalStark isOpen={isTokenSelectModalOpen} onClose={onCloseTokenSelectModal} tokens={starknetSupplyTokens} protocolName={protocolName} position={positionManager} action="deposit" />
+    <TokenSelectModalStark isOpen={isTokenBorrowSelectModalOpen} onClose={onCloseBorrowSelectModal} tokens={starknetBorrowTokens} protocolName={protocolName} position={positionManager} />
+    {isTokenBorrowModalOpen && (
+      <BorrowModalStark
+        isOpen={isTokenBorrowModalOpen} onClose={onCloseBorrowModal} token={borrowModalStarkToken}
+        protocolName={protocolName} currentDebt={borrowModalCurrentDebt} position={positionManager}
+        vesuContext={selectedToken?.vesuContext?.borrow ?? borrowedPositions[0]?.vesuContext?.borrow}
+      />
+    )}
+    {isCloseModalOpen && selectedClosePosition && (
+      <CloseWithCollateralEvmModal
+        isOpen={isCloseModalOpen} onClose={onCloseCloseModal} protocolName={protocolName} chainId={chainId}
+        debtToken={selectedClosePosition.tokenAddress as Address} debtName={selectedClosePosition.name}
+        debtIcon={selectedClosePosition.icon} debtDecimals={selectedClosePosition.tokenDecimals || 18}
+        debtPrice={selectedClosePosition.tokenPrice} debtBalance={selectedClosePosition.tokenBalance}
+        availableCollaterals={selectedClosePosition.collaterals || availableCollaterals}
+        context={getProtocolContext(protocolName, selectedClosePosition)}
+      />
+    )}
+    {isDebtSwapModalOpen && selectedDebtSwapPosition && (
+      <DebtSwapEvmModal
+        isOpen={isDebtSwapModalOpen} onClose={onCloseDebtSwapModal} protocolName={protocolName} chainId={chainId}
+        debtFromToken={selectedDebtSwapPosition.tokenAddress as Address} debtFromName={selectedDebtSwapPosition.name}
+        debtFromIcon={selectedDebtSwapPosition.icon} debtFromDecimals={selectedDebtSwapPosition.tokenDecimals || 18}
+        debtFromPrice={selectedDebtSwapPosition.tokenPrice} currentDebtBalance={selectedDebtSwapPosition.tokenBalance}
+        availableAssets={selectedDebtSwapPosition.collaterals || availableCollaterals}
+        context={getProtocolContext(protocolName, selectedDebtSwapPosition)}
+      />
+    )}
+  </>
+);
+StarknetModals.displayName = "StarknetModals";
+
+/** EVM-specific modals */
+interface EvmModalsProps {
+  isTokenSelectModalOpen: boolean;
+  onCloseTokenSelectModal: () => void;
+  allSupplyPositions: ProtocolPosition[];
+  protocolName: string;
+  positionManager: PositionManager;
+  chainId?: number;
+  isTokenBorrowSelectModalOpen: boolean;
+  onCloseBorrowSelectModal: () => void;
+  allBorrowPositions: ProtocolPosition[];
+  isSwapModalOpen: boolean;
+  selectedSwapPosition: ProtocolPosition | null;
+  collateralSwapPosition: { name: string; tokenAddress: string; decimals: number; balance: number; type: "supply" } | null;
+  onCloseSwapModal: () => void;
+  availableCollaterals: SwapAsset[];
+  isMultiplyModalOpen: boolean;
+  onCloseMultiplyModal: () => void;
+  debtOptions: SwapAsset[];
+  ltvBps: bigint;
+  lltvBps: bigint;
+  supplyApyMap: Record<string, number>;
+  borrowApyMap: Record<string, number>;
+  isAaveProtocol: boolean;
+  userEMode: EModeCategory | null | undefined;
+  isTokenBorrowModalOpen: boolean;
+  onCloseBorrowModal: () => void;
+  borrowModalToken: ReturnType<typeof createBorrowModalToken>;
+  borrowModalCurrentDebt: number;
+}
+
+const EvmModals: FC<EvmModalsProps> = ({
+  isTokenSelectModalOpen, onCloseTokenSelectModal, allSupplyPositions,
+  protocolName, positionManager, chainId, isTokenBorrowSelectModalOpen,
+  onCloseBorrowSelectModal, allBorrowPositions, isSwapModalOpen,
+  selectedSwapPosition, collateralSwapPosition, onCloseSwapModal,
+  availableCollaterals, isMultiplyModalOpen, onCloseMultiplyModal,
+  debtOptions, ltvBps, lltvBps, supplyApyMap, borrowApyMap,
+  isAaveProtocol, userEMode, isTokenBorrowModalOpen, onCloseBorrowModal,
+  borrowModalToken, borrowModalCurrentDebt,
+}) => (
+  <>
+    <TokenSelectModal isOpen={isTokenSelectModalOpen} onClose={onCloseTokenSelectModal} tokens={allSupplyPositions} protocolName={protocolName} isBorrow={false} position={positionManager} chainId={chainId} />
+    <TokenSelectModal isOpen={isTokenBorrowSelectModalOpen} onClose={onCloseBorrowSelectModal} tokens={allBorrowPositions} protocolName={protocolName} isBorrow={true} position={positionManager} chainId={chainId} />
+    {isSwapModalOpen && selectedSwapPosition && collateralSwapPosition && (
+      <CollateralSwapModal
+        isOpen={isSwapModalOpen} onClose={onCloseSwapModal} protocolName={protocolName}
+        availableAssets={availableCollaterals} initialFromTokenAddress={selectedSwapPosition.tokenAddress}
+        chainId={chainId || 1} position={collateralSwapPosition}
+      />
+    )}
+    {isMultiplyModalOpen && (
+      <MultiplyEvmModal
+        isOpen={isMultiplyModalOpen} onClose={onCloseMultiplyModal} protocolName={protocolName}
+        chainId={chainId || 1} collaterals={availableCollaterals} debtOptions={debtOptions}
+        market={getMultiplyMarket(protocolName, availableCollaterals)}
+        maxLtvBps={ltvBps > 0n ? ltvBps : 8000n} lltvBps={lltvBps > 0n ? lltvBps : 8500n}
+        supplyApyMap={supplyApyMap} borrowApyMap={borrowApyMap}
+        eMode={isAaveProtocol ? userEMode : undefined}
+      />
+    )}
+    {isTokenBorrowModalOpen && (
+      <BorrowModal
+        isOpen={isTokenBorrowModalOpen} onClose={onCloseBorrowModal} token={borrowModalToken}
+        protocolName={protocolName} currentDebt={borrowModalCurrentDebt}
+        position={positionManager} chainId={chainId}
+      />
+    )}
+  </>
+);
+EvmModals.displayName = "EvmModals";
+
+/** Renders the correct modals based on network type and readOnly state.
+ * Extracted as a plain function to avoid adding conditional complexity to ProtocolView.
+ */
+function renderProtocolModals(
+  networkType: "evm" | "starknet",
+  readOnly: boolean,
+  starknetProps: StarknetModalsProps,
+  evmProps: EvmModalsProps,
+): React.ReactNode {
+  if (readOnly) return null;
+  if (networkType === "starknet") return <StarknetModals {...starknetProps} />;
+  return <EvmModals {...evmProps} />;
+}
+
+// ============================================================================
+// Main ProtocolView component
+// ============================================================================
 
 export interface ProtocolPosition {
   icon: string;
@@ -713,14 +1299,14 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   useEffect(() => {
     if (!autoExpandOnPositions) return;
     if (!hasLoadedOnce) return; // Wait for initial load to complete
-    
+
     if (hasPositions) {
       setIsCollapsed(false); // Expand when positions exist
     } else {
       setIsCollapsed(true); // Stay/become collapsed when no positions
     }
   }, [autoExpandOnPositions, hasLoadedOnce, hasPositions]);
-  
+
 
   // E-Mode filter using extracted helper
   const filterByEMode = useMemo(() => createEModeFilter(userEMode), [userEMode]);
@@ -738,7 +1324,7 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   }, [availableCollaterals, borrowedPositions, isAaveProtocol, filterByEMode]);
 
   // APY maps for multiply modal - PT tokens get Pendle fixed yields automatically
-  const apyMapTokens = useMemo(() => 
+  const apyMapTokens = useMemo(() =>
     suppliedPositions.map(p => ({
       address: p.tokenAddress,
       symbol: p.name,
@@ -1028,225 +1614,48 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
     [selectedSwapPosition]
   );
 
+  // Whether the markets section (non-inline) should be shown
+  const showMarketsSection = isMarketsOpen && !isCollapsed && !disableMarkets && !inlineMarkets;
+
   return (
     <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 p-3'}`}>
       {/* Protocol Header Card */}
-      <div
-        className="card-surface-interactive shadow-lg"
-        onClick={handleToggleCollapse}
-      >
+      <div className="card-surface-interactive shadow-lg" onClick={handleToggleCollapse}>
         <div className="card-body p-3 sm:px-5">
-          {/* Mobile Layout (< sm) */}
-          <div className="space-y-3 sm:hidden">
-            {/* Row 1: Protocol name + Markets + Collapse */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="token-icon-wrapper-md">
-                  <Image
-                    src={protocolIcon}
-                    alt={`${protocolName} icon`}
-                    width={20}
-                    height={20}
-                    className="object-contain drop-shadow-sm"
-                  />
-                </div>
-                <span className="text-sm font-bold tracking-tight">{protocolName}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MarketsButton
-                  show={!forceShowAll && !disableMarkets}
-                  isOpen={isMarketsOpen}
-                  onToggle={handleToggleMarkets}
-                  isMobile
-                />
-                <ConnectHint show={forceShowAll && !readOnly} isMobile />
-                <ChevronDownIcon
-                  className={`text-base-content/40 size-4 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`}
-                />
-              </div>
-            </div>
-            {/* Row 2: Stats in a grid */}
-            <div className={`grid gap-1 ${hideUtilization ? 'grid-cols-3' : 'grid-cols-4'}`}>
-              <StatDisplay label="Balance" value={formatCurrency(netBalance)} valueClass={getValueClass(netBalance)} isMobile />
-              <StatDisplay label="30D" value={formatCurrency(netYield30d)} valueClass={getValueClass(netYield30d)} isMobile />
-              <StatDisplay label="Net APY" value={netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)} valueClass={getValueClass(netApyPercent)} isMobile />
-              {!hideUtilization && (
-                <div className="flex flex-col items-center py-1">
-                  <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">LTV</span>
-                  <HealthStatus utilizationPercentage={utilizationPercentage} />
-                </div>
-              )}
-            </div>
-            {/* Header Element - Mobile row */}
-            {headerElement && (
-              <div
-                className="border-base-300/30 flex items-center justify-start border-t pt-2"
-                onClick={handleStopPropagation}
-              >
-                {headerElement}
-              </div>
-            )}
-          </div>
-
-          {/* Desktop Layout (>= sm) */}
-          <div className="hidden sm:block">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-              {/* Protocol name + icon */}
-              <div className="flex items-center gap-3">
-                <div className="token-icon-wrapper-lg">
-                  <Image
-                    src={protocolIcon}
-                    alt={`${protocolName} icon`}
-                    width={24}
-                    height={24}
-                    className="object-contain drop-shadow-sm"
-                  />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="label-text-xs-semibold">Protocol</span>
-                  <span className="text-base font-bold tracking-tight">{protocolName}</span>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
-
-              {/* Stats - spread evenly across available space */}
-              <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
-                <StatDisplay label="Balance" value={formatCurrency(netBalance)} valueClass={getValueClass(netBalance)} />
-                <StatDisplay label="30D Yield" value={formatCurrency(netYield30d)} valueClass={getValueClass(netYield30d)} />
-                <StatDisplay label="Net APY" value={netApyPercent == null ? "—" : formatSignedPercentage(netApyPercent)} valueClass={getValueClass(netApyPercent)} />
-                {!hideUtilization && (
-                  <div className="group/util relative hover:bg-base-200/30 flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                    <div className="flex items-center gap-1">
-                      <span className="label-text-xs-semibold">Utilization</span>
-                      {collateralBreakdown.length > 0 && (
-                        <span className="text-primary text-[8px]">ⓘ</span>
-                      )}
-                    </div>
-                    <HealthStatus utilizationPercentage={utilizationPercentage} />
-                    {/* Tooltip popover for collateral breakdown */}
-                    {collateralBreakdown.length > 0 && (
-                      <div className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 hidden -translate-x-1/2 group-hover/util:block">
-                        <div className="pointer-events-auto min-w-[280px] rounded-lg bg-base-100 p-3 shadow-xl ring-1 ring-base-300/50">
-                          <CollateralLtvBreakdown items={collateralBreakdown} totalDebtUsd={totalDebtUsd} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Header Element (e.g., E-Mode toggle) - hidden on mobile, shown in separate row */}
-              {headerElement && (
-                <div
-                  className="hidden items-center md:flex"
-                  onClick={handleStopPropagation}
-                >
-                  {headerElement}
-                </div>
-              )}
-
-              {/* Markets Toggle + Collapse */}
-              <div className="border-base-300/50 flex items-center gap-2.5 border-l pl-2">
-                <MarketsButton
-                  show={!forceShowAll && !disableMarkets}
-                  isOpen={isMarketsOpen}
-                  onToggle={handleToggleMarkets}
-                />
-                <ConnectHint show={forceShowAll && !readOnly} />
-                <ChevronDownIcon
-                  className={`text-base-content/40 size-5 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`}
-                />
-              </div>
-            </div>
-
-            {/* Header Element - Tablet row (shown below stats on md screens) */}
-            {headerElement && (
-              <div
-                className="border-base-300/30 mt-2 flex items-center justify-start border-t pt-2 md:hidden"
-                onClick={handleStopPropagation}
-              >
-                {headerElement}
-              </div>
-            )}
-          </div>
+          <ProtocolHeaderMobile
+            protocolIcon={protocolIcon} protocolName={protocolName} forceShowAll={forceShowAll}
+            disableMarkets={disableMarkets} isMarketsOpen={isMarketsOpen} onToggleMarkets={handleToggleMarkets}
+            readOnly={readOnly} isCollapsed={isCollapsed} hideUtilization={hideUtilization}
+            netBalance={netBalance} netYield30d={netYield30d} netApyPercent={netApyPercent}
+            utilizationPercentage={utilizationPercentage} headerElement={headerElement}
+            onStopPropagation={handleStopPropagation}
+          />
+          <ProtocolHeaderDesktop
+            protocolIcon={protocolIcon} protocolName={protocolName} forceShowAll={forceShowAll}
+            disableMarkets={disableMarkets} isMarketsOpen={isMarketsOpen} onToggleMarkets={handleToggleMarkets}
+            readOnly={readOnly} isCollapsed={isCollapsed} hideUtilization={hideUtilization}
+            netBalance={netBalance} netYield30d={netYield30d} netApyPercent={netApyPercent}
+            utilizationPercentage={utilizationPercentage} collateralBreakdown={collateralBreakdown}
+            totalDebtUsd={totalDebtUsd} headerElement={headerElement}
+            onStopPropagation={handleStopPropagation}
+          />
         </div>
       </div>
 
       {/* Markets Section - expandable (only if not inlineMarkets) */}
-      {isMarketsOpen && !isCollapsed && !disableMarkets && !inlineMarkets && (
-        <div className="card-surface">
-          <div className="card-body p-4">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {/* Suppliable Assets */}
-              {suppliedPositions.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">
-                      Suppliable assets
-                    </div>
-                    {!readOnly && (
-                      <button
-                        className="btn btn-xs btn-outline"
-                        type="button"
-                        onClick={handleAddSupply}
-                      >
-                        Deposit
-                      </button>
-                    )}
-                  </div>
-                  {suppliedPositions.map(position => (
-                    <SupplyPosition
-                      key={`market-supply-${position.tokenAddress}`}
-                      {...position}
-                      currentRate={getExternalYieldOverride(position, findYield)}
-                      protocolName={protocolName}
-                      networkType={networkType}
-                      chainId={chainId}
-                      hideBalanceColumn
-                      availableActions={MARKET_SUPPLY_ACTIONS}
-                      showInfoDropdown={false}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Borrowable Assets */}
-              {borrowedPositions.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-base-content/60 text-sm font-semibold uppercase tracking-wide">
-                      Borrowable assets
-                    </div>
-                    {!readOnly && filteredSuppliedPositions.length > 0 && (
-                      <button
-                        className="btn btn-xs btn-outline"
-                        type="button"
-                        onClick={handleAddBorrow}
-                      >
-                        Borrow
-                      </button>
-                    )}
-                  </div>
-                  {borrowedPositions.map(position => (
-                    <BorrowPosition
-                      key={`market-borrow-${position.tokenAddress}`}
-                      {...position}
-                      protocolName={protocolName}
-                      networkType={networkType}
-                      chainId={chainId}
-                      hideBalanceColumn
-                      availableActions={MARKET_BORROW_ACTIONS}
-                      showInfoDropdown={false}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <InternalMarketsSection
+        show={showMarketsSection}
+        suppliedPositions={suppliedPositions}
+        borrowedPositions={borrowedPositions}
+        readOnly={readOnly}
+        filteredSuppliedPositionsCount={filteredSuppliedPositions.length}
+        protocolName={protocolName}
+        networkType={networkType}
+        chainId={chainId}
+        findYield={findYield}
+        onAddSupply={handleAddSupply}
+        onAddBorrow={handleAddBorrow}
+      />
 
       {/* Positions Container - collapsible with animation */}
       <AnimatePresence initial={false}>
@@ -1259,298 +1668,70 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
             className="overflow-hidden"
           >
             <div className="grid grid-cols-1 gap-4 pt-1 xl:grid-cols-2">
-          {/* Supplied Assets */}
-          <div className="h-full">
-            <div className="card-surface-hover h-full">
-              <div className="card-body flex flex-col p-4">
-                <div className="border-base-200/50 mb-1 flex items-center justify-between border-b pb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-success h-5 w-1 rounded-full" />
-                    <span className="text-base-content/60 text-[11px] font-semibold uppercase tracking-widest">Supplied</span>
-                  </div>
-                  <div className="count-badge-success">
-                    <span className="font-mono text-xs font-bold">{filteredSuppliedPositions.length}</span>
-                    <span className="label-text-xs-muted opacity-70">{filteredSuppliedPositions.length === 1 ? "asset" : "assets"}</span>
-                  </div>
-                </div>
-                {filteredSuppliedPositions.length > 0 ? (
-                  <div className="flex flex-1 flex-col pt-2">
-                    <div className="space-y-3">
-                      {filteredSuppliedPositions.map((position, index) => {
-                        const key = `supplied-${position.name}-${index}`;
-                        return (
-                          <div key={key} className="min-h-[60px]">
-                            <SupplyPosition
-                              {...position}
-                              protocolName={protocolName}
-                              networkType={networkType}
-                              chainId={chainId}
-                              position={positionManager}
-                              disableMove={disableMoveSupply || readOnly}
-                              availableActions={supplyAvailableActions}
-                              onSwap={supplySwapHandlers[key]}
-                              suppressDisabledMessage
-                              defaultExpanded={expandFirstPositions && index === 0}
-                              adlActive={adlCollateralToken?.toLowerCase() === position.tokenAddress.toLowerCase()}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Primary actions pinned to bottom */}
-                    {!readOnly && (
-                      <div className="mt-auto flex flex-col gap-2 pt-4">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                          <AddButton onClick={handleAddSupply} label="Add Supply" />
-                          {!loopingDisabled && (
-                            <AddButton
-                              onClick={handleOpenMultiply}
-                              label="Add Loop"
-                              variant="secondary"
-                              disabled={availableCollaterals.length === 0 || debtOptions.length === 0}
-                              title={availableCollaterals.length === 0 || debtOptions.length === 0
-                                ? "Supply collateral and have a debt option to build a loop"
-                                : "Build a flash-loan loop"}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <EmptyState
-                    message={effectiveShowAll ? "No available assets" : "No supplied assets"}
-                    showAddButton={!readOnly}
-                    onAdd={handleAddSupply}
-                    addButtonLabel="Supply Assets"
-                    showLoopButton={!loopingDisabled}
-                    onAddLoop={handleOpenMultiply}
-                    loopDisabled={availableCollaterals.length === 0 || debtOptions.length === 0}
-                    loopTitle={availableCollaterals.length === 0 || debtOptions.length === 0
-                      ? "Supply collateral and have a debt option to build a loop"
-                      : "Build a flash-loan loop"}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Borrowed Assets */}
-          <div className="h-full">
-            <div className="card-surface-hover h-full">
-              <div className="card-body flex flex-col p-4">
-                <div className="border-base-200/50 mb-1 flex items-center justify-between border-b pb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-error h-5 w-1 rounded-full" />
-                    <span className="text-base-content/60 text-[11px] font-semibold uppercase tracking-widest">Borrowed</span>
-                  </div>
-                  <div className="count-badge-error">
-                    <span className="font-mono text-xs font-bold">{filteredBorrowedPositions.length}</span>
-                    <span className="label-text-xs-muted opacity-70">{filteredBorrowedPositions.length === 1 ? "asset" : "assets"}</span>
-                  </div>
-                </div>
-                {filteredBorrowedPositions.length > 0 ? (
-                  <div className="flex flex-1 flex-col pt-2">
-                    <div className="space-y-3">
-                      {filteredBorrowedPositions.map((position, index) => {
-                        const key = `borrowed-${position.name}-${index}`;
-                        const isExpanded = expandedBorrowPositions[key] ?? (expandFirstPositions && index === 0);
-                        return (
-                          <div key={key} className="min-h-[60px]">
-                            <BorrowPosition
-                              {...position}
-                              protocolName={protocolName}
-                              networkType={networkType}
-                              chainId={chainId}
-                              position={positionManager}
-                              availableAssets={position.collaterals || availableCollaterals}
-                              availableActions={borrowAvailableActions}
-                              onClosePosition={borrowCloseHandlers[key]}
-                              onSwap={borrowDebtSwapHandlers[key]}
-                              suppressDisabledMessage
-                              controlledExpanded={isExpanded}
-                              onToggleExpanded={borrowExpandToggleHandlers[key]}
-                              adlProtected={adlDebtToken?.toLowerCase() === position.tokenAddress.toLowerCase()}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* "Add Borrow" button - pinned to bottom with gap */}
-                    {!readOnly && (
-                      <div className="mt-auto pt-4">
-                        <AddButton
-                          onClick={handleAddBorrow}
-                          label="Borrow"
-                          disabled={filteredSuppliedPositions.length === 0}
-                          title={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <EmptyState
-                    message={effectiveShowAll ? "No available assets" : "No borrowed assets"}
-                    showAddButton={!readOnly}
-                    onAdd={handleAddBorrow}
-                    addButtonLabel="Borrow Assets"
-                    buttonDisabled={filteredSuppliedPositions.length === 0}
-                    buttonTitle={filteredSuppliedPositions.length === 0 ? "Supply assets first to enable borrowing" : undefined}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
+              <SuppliedAssetsPanel
+                positions={filteredSuppliedPositions}
+                protocolName={protocolName}
+                networkType={networkType}
+                chainId={chainId}
+                positionManager={positionManager}
+                disableMoveSupply={disableMoveSupply}
+                readOnly={readOnly}
+                supplyAvailableActions={supplyAvailableActions}
+                supplySwapHandlers={supplySwapHandlers}
+                expandFirstPositions={expandFirstPositions}
+                adlCollateralToken={adlCollateralToken}
+                effectiveShowAll={effectiveShowAll}
+                loopingDisabled={loopingDisabled}
+                availableCollateralsCount={availableCollaterals.length}
+                debtOptionsCount={debtOptions.length}
+                onAddSupply={handleAddSupply}
+                onOpenMultiply={handleOpenMultiply}
+              />
+              <BorrowedAssetsPanel
+                positions={filteredBorrowedPositions}
+                protocolName={protocolName}
+                networkType={networkType}
+                chainId={chainId}
+                positionManager={positionManager}
+                availableCollaterals={availableCollaterals}
+                borrowAvailableActions={borrowAvailableActions}
+                borrowCloseHandlers={borrowCloseHandlers}
+                borrowDebtSwapHandlers={borrowDebtSwapHandlers}
+                expandFirstPositions={expandFirstPositions}
+                expandedBorrowPositions={expandedBorrowPositions}
+                borrowExpandToggleHandlers={borrowExpandToggleHandlers}
+                adlDebtToken={adlDebtToken}
+                readOnly={readOnly}
+                effectiveShowAll={effectiveShowAll}
+                filteredSuppliedPositionsCount={filteredSuppliedPositions.length}
+                onAddBorrow={handleAddBorrow}
+              />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Modals - Conditional based on network type */}
-      {!readOnly && networkType === "starknet" ? (
-        <>
-          {/* Supply Token Select - unified Stark modal */}
-          <TokenSelectModalStark
-            isOpen={isTokenSelectModalOpen}
-            onClose={handleCloseTokenSelectModal}
-            tokens={starknetSupplyTokens}
-            protocolName={protocolName}
-            position={positionManager}
-            action="deposit"
-          />
-
-          {/* Token Select Modal for Borrow - Starknet */}
-          <TokenSelectModalStark
-            isOpen={isTokenBorrowSelectModalOpen}
-            onClose={handleCloseBorrowSelectModal}
-            tokens={starknetBorrowTokens}
-            protocolName={protocolName}
-            position={positionManager}
-          />
-
-          {/* Deposit handled by TokenSelectModalStark after selection */}
-
-          {/* Borrow Modal for Starknet */}
-          {isTokenBorrowModalOpen && (
-            <BorrowModalStark
-              isOpen={isTokenBorrowModalOpen}
-              onClose={handleCloseBorrowModal}
-              token={borrowModalStarkToken}
-              protocolName={protocolName}
-              currentDebt={borrowModalCurrentDebt}
-              position={positionManager}
-              vesuContext={
-                selectedToken?.vesuContext?.borrow ?? borrowedPositions[0]?.vesuContext?.borrow
-              }
-            />
-          )}
-
-          {/* Close With Collateral (EVM) */}
-          {isCloseModalOpen && selectedClosePosition && (
-            <CloseWithCollateralEvmModal
-              isOpen={isCloseModalOpen}
-              onClose={handleCloseCloseModal}
-              protocolName={protocolName}
-              chainId={chainId || 1}
-              debtToken={selectedClosePosition.tokenAddress as Address}
-              debtName={selectedClosePosition.name}
-              debtIcon={selectedClosePosition.icon}
-              debtDecimals={selectedClosePosition.tokenDecimals || 18}
-              debtPrice={selectedClosePosition.tokenPrice}
-              debtBalance={selectedClosePosition.tokenBalance}
-              availableCollaterals={selectedClosePosition.collaterals || availableCollaterals}
-              context={getProtocolContext(protocolName, selectedClosePosition)}
-            />
-          )}
-
-          {/* Debt Swap (EVM) */}
-          {isDebtSwapModalOpen && selectedDebtSwapPosition && (
-            <DebtSwapEvmModal
-              isOpen={isDebtSwapModalOpen}
-              onClose={handleCloseDebtSwapModal}
-              protocolName={protocolName}
-              chainId={chainId || 1}
-              debtFromToken={selectedDebtSwapPosition.tokenAddress as Address}
-              debtFromName={selectedDebtSwapPosition.name}
-              debtFromIcon={selectedDebtSwapPosition.icon}
-              debtFromDecimals={selectedDebtSwapPosition.tokenDecimals || 18}
-              debtFromPrice={selectedDebtSwapPosition.tokenPrice}
-              currentDebtBalance={selectedDebtSwapPosition.tokenBalance}
-              availableAssets={selectedDebtSwapPosition.collaterals || availableCollaterals}
-              context={getProtocolContext(protocolName, selectedDebtSwapPosition)}
-            />
-          )}
-        </>
-      ) : !readOnly ? (
-        <>
-          {/* Token Select Modal for Supply - EVM */}
-          <TokenSelectModal
-            isOpen={isTokenSelectModalOpen}
-            onClose={handleCloseTokenSelectModal}
-            tokens={allSupplyPositions}
-            protocolName={protocolName}
-            isBorrow={false}
-            position={positionManager}
-            chainId={chainId}
-          />
-
-          {/* Token Select Modal for Borrow - EVM */}
-          <TokenSelectModal
-            isOpen={isTokenBorrowSelectModalOpen}
-            onClose={handleCloseBorrowSelectModal}
-            tokens={allBorrowPositions}
-            protocolName={protocolName}
-            isBorrow={true}
-            position={positionManager}
-            chainId={chainId}
-          />
-
-          {/* Collateral Swap Modal */}
-          {isSwapModalOpen && selectedSwapPosition && collateralSwapPosition && (
-            <CollateralSwapModal
-              isOpen={isSwapModalOpen}
-              onClose={handleCloseSwapModal}
-              protocolName={protocolName}
-              availableAssets={availableCollaterals}
-              initialFromTokenAddress={selectedSwapPosition.tokenAddress}
-              chainId={chainId || 1}
-              position={collateralSwapPosition}
-            />
-          )}
-
-          {isMultiplyModalOpen && (
-            <MultiplyEvmModal
-              isOpen={isMultiplyModalOpen}
-              onClose={handleCloseMultiplyModal}
-              protocolName={protocolName}
-              chainId={chainId || 1}
-              collaterals={availableCollaterals}
-              debtOptions={debtOptions}
-              market={getMultiplyMarket(protocolName, availableCollaterals)}
-              maxLtvBps={ltvBps > 0n ? ltvBps : 8000n}
-              lltvBps={lltvBps > 0n ? lltvBps : 8500n}
-              supplyApyMap={supplyApyMap}
-              borrowApyMap={borrowApyMap}
-              eMode={isAaveProtocol ? userEMode : undefined}
-            />
-          )}
-
-          {/* Borrow Modal - EVM */}
-          {isTokenBorrowModalOpen && (
-            <BorrowModal
-              isOpen={isTokenBorrowModalOpen}
-              onClose={handleCloseBorrowModal}
-              token={borrowModalToken}
-              protocolName={protocolName}
-              currentDebt={borrowModalCurrentDebt}
-              position={positionManager}
-              chainId={chainId}
-            />
-          )}
-        </>
-      ) : null}
+      {renderProtocolModals(networkType, readOnly, {
+        isTokenSelectModalOpen, onCloseTokenSelectModal: handleCloseTokenSelectModal,
+        starknetSupplyTokens, protocolName, positionManager,
+        isTokenBorrowSelectModalOpen, onCloseBorrowSelectModal: handleCloseBorrowSelectModal,
+        starknetBorrowTokens, isTokenBorrowModalOpen, onCloseBorrowModal: handleCloseBorrowModal,
+        borrowModalStarkToken, borrowModalCurrentDebt, selectedToken, borrowedPositions,
+        isCloseModalOpen, selectedClosePosition, onCloseCloseModal: handleCloseCloseModal,
+        chainId: chainId || 1, availableCollaterals,
+        isDebtSwapModalOpen, selectedDebtSwapPosition, onCloseDebtSwapModal: handleCloseDebtSwapModal,
+      }, {
+        isTokenSelectModalOpen, onCloseTokenSelectModal: handleCloseTokenSelectModal,
+        allSupplyPositions, protocolName, positionManager, chainId,
+        isTokenBorrowSelectModalOpen, onCloseBorrowSelectModal: handleCloseBorrowSelectModal,
+        allBorrowPositions, isSwapModalOpen, selectedSwapPosition, collateralSwapPosition,
+        onCloseSwapModal: handleCloseSwapModal, availableCollaterals,
+        isMultiplyModalOpen, onCloseMultiplyModal: handleCloseMultiplyModal,
+        debtOptions, ltvBps, lltvBps, supplyApyMap, borrowApyMap,
+        isAaveProtocol, userEMode, isTokenBorrowModalOpen,
+        onCloseBorrowModal: handleCloseBorrowModal, borrowModalToken, borrowModalCurrentDebt,
+      })}
     </div>
   );
 };

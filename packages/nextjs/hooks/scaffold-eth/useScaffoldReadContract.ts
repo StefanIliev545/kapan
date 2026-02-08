@@ -62,12 +62,12 @@ export const useScaffoldReadContract = <
     args: serializedArgs as typeof args,
     blockNumber: sanitizedBlockNumber,
     blockTag: sanitizedBlockTag,
-    ...(restConfig as Record<string, unknown>),
+    ...restConfig,
     query: {
       enabled: !Array.isArray(args) || !args.some(arg => arg === undefined),
-      ...queryOptions,
+      ...(queryOptions as any),
     },
-  }) as Omit<ReturnType<typeof useReadContract>, "data" | "refetch"> & {
+  } as any) as Omit<ReturnType<typeof useReadContract>, "data" | "refetch"> & {
     data: AbiFunctionReturnType<ContractAbi, TFunctionName> | undefined;
     refetch: (
       options?: RefetchOptions | undefined,

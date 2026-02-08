@@ -156,20 +156,21 @@ function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
       className="bg-base-300 relative flex-shrink-0 overflow-hidden rounded-full"
       style={containerStyle}
     >
-      <Image
-        src={src}
-        alt={symbol}
-        width={size}
-        height={size}
-        className="object-cover"
-        onError={handleImageError}
-      />
+      {/* Fallback initials — only visible when the image fails to load */}
       <span
         className="text-base-content/70 absolute inset-0 flex items-center justify-center text-xs font-medium"
         style={fontStyle}
       >
         {symbol.slice(0, 2).toUpperCase()}
       </span>
+      <Image
+        src={src}
+        alt={symbol}
+        width={size}
+        height={size}
+        className="relative z-10 object-cover"
+        onError={handleImageError}
+      />
     </div>
   );
 }
@@ -357,7 +358,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   const dropdownContent = isOpen && position && typeof document !== "undefined" ? (
     <div
       ref={dropdownRef}
-      className="bg-base-100 fixed z-[9999] w-80 rounded-xl shadow-xl ring-1 ring-base-content/5"
+      className="bg-base-100 ring-base-content/5 fixed z-[9999] w-80 rounded-xl shadow-xl ring-1"
       style={dropdownStyle}
       onClick={handleStopPropagation}
     >
@@ -370,7 +371,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
             placeholder={`Search ${placeholder.toLowerCase()}...`}
             value={searchTerm}
             onChange={createTextChangeHandler(setSearchTerm)}
-            className="input input-sm bg-base-200/30 w-full border-0 pl-9 pr-8 focus:bg-base-200/50 focus:outline-none"
+            className="input input-sm bg-base-200/30 focus:bg-base-200/50 w-full border-0 pl-9 pr-8 focus:outline-none"
           />
           {searchTerm && (
             <button
@@ -393,7 +394,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
             />
           ))}
           <div className="flex-1" />
-          <button onClick={handleClear} className="text-xs text-base-content/50 hover:text-base-content/70 transition-colors">Clear</button>
+          <button onClick={handleClear} className="text-base-content/50 hover:text-base-content/70 text-xs transition-colors">Clear</button>
         </div>
       </div>
       <div className="max-h-72 overflow-y-auto px-2 pb-2">
@@ -427,7 +428,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
       <button
         ref={triggerRef}
         type="button"
-        className="flex min-w-[140px] items-center justify-between gap-2 rounded-lg bg-base-200/40 px-3 py-1.5 text-sm transition-colors hover:bg-base-200/70"
+        className="bg-base-200/40 hover:bg-base-200/70 flex min-w-[140px] items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors"
         onClick={handleToggleOpen}
       >
         <div className="flex items-center gap-2 overflow-hidden">
@@ -782,13 +783,13 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
         <Flex gap="6" align="center" justify="end" className="ml-6">
           <button
             onClick={() => handleSupplyClick(info.row.original.market)}
-            className="text-sm font-medium text-base-content hover:text-primary transition-colors"
+            className="text-base-content hover:text-primary text-sm font-medium transition-colors"
           >
             Supply
           </button>
           <button
             onClick={() => handleLoopClick(info.row.original.market)}
-            className="text-sm font-medium text-base-content hover:text-primary transition-colors"
+            className="text-base-content hover:text-primary text-sm font-medium transition-colors"
           >
             Loop
           </button>
