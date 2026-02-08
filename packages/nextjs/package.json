@@ -12,7 +12,7 @@
     "storybook:serve": "npx http-server storybook-static -p 6006",
     "storybook:capture": "node scripts/capture-story.mjs",
     "build:analyze": "ANALYZE=true NEXT_TELEMETRY_DISABLED=1 next build",
-    "check-types": "NODE_OPTIONS='--max-old-space-size=8192' tsc --noEmit --incremental",
+    "check-types": "tsc --noEmit --incremental",
     "dev": "next dev --turbo",
     "format": "prettier --write . '!(node_modules|.next|contracts)/**/*'",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 1000",
