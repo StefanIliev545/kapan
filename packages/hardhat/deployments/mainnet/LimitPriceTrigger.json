@@ -1,0 +1,466 @@
+{
+  "address": "0xd9f90676128C341967Dc3183F55f30c5cC488e2e",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_viewRouter",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidTriggerParams",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AAVE_V3",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "COMPOUND_V3",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MORPHO_BLUE",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "staticData",
+          "type": "bytes"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "iterationCount",
+          "type": "uint256"
+        }
+      ],
+      "name": "calculateExecution",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "sellAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "buyAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "staticData",
+          "type": "bytes"
+        }
+      ],
+      "name": "decodeTriggerParams",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes4",
+              "name": "protocolId",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "bytes",
+              "name": "protocolContext",
+              "type": "bytes"
+            },
+            {
+              "internalType": "address",
+              "name": "sellToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "buyToken",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "sellDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "buyDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "limitPrice",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "triggerAbovePrice",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalSellAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalBuyAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "numChunks",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxSlippageBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "isKindBuy",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct LimitPriceTrigger.TriggerParams",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes4",
+              "name": "protocolId",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "bytes",
+              "name": "protocolContext",
+              "type": "bytes"
+            },
+            {
+              "internalType": "address",
+              "name": "sellToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "buyToken",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "sellDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "buyDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "limitPrice",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "triggerAbovePrice",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalSellAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalBuyAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "numChunks",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxSlippageBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "isKindBuy",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct LimitPriceTrigger.TriggerParams",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "name": "encodeTriggerParams",
+      "outputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        },
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "context",
+          "type": "bytes"
+        }
+      ],
+      "name": "getCurrentPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "staticData",
+          "type": "bytes"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "iterationCount",
+          "type": "uint256"
+        }
+      ],
+      "name": "isComplete",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "staticData",
+          "type": "bytes"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "shouldExecute",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        },
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "triggerName",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "viewRouter",
+      "outputs": [
+        {
+          "internalType": "contract IKapanViewRouter",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "args": [
+    "0xeE0DE5F53F018f3e8827913dB3743dc1ACE0BB34"
+  ],
+  "numDeployments": 1,
+  "solcInputHash": "0fea5cc4d237037126c3fb60329d2945",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_viewRouter\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"InvalidTriggerParams\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"AAVE_V3\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"COMPOUND_V3\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MORPHO_BLUE\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"staticData\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"iterationCount\",\"type\":\"uint256\"}],\"name\":\"calculateExecution\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"sellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"buyAmount\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"staticData\",\"type\":\"bytes\"}],\"name\":\"decodeTriggerParams\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"bytes\",\"name\":\"protocolContext\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"sellToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"buyToken\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"sellDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"buyDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"limitPrice\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"triggerAbovePrice\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"totalSellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"totalBuyAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"numChunks\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"maxSlippageBps\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"isKindBuy\",\"type\":\"bool\"}],\"internalType\":\"struct LimitPriceTrigger.TriggerParams\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"bytes\",\"name\":\"protocolContext\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"sellToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"buyToken\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"sellDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"buyDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"limitPrice\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"triggerAbovePrice\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"totalSellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"totalBuyAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"numChunks\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"maxSlippageBps\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"isKindBuy\",\"type\":\"bool\"}],\"internalType\":\"struct LimitPriceTrigger.TriggerParams\",\"name\":\"params\",\"type\":\"tuple\"}],\"name\":\"encodeTriggerParams\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"context\",\"type\":\"bytes\"}],\"name\":\"getCurrentPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"staticData\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"iterationCount\",\"type\":\"uint256\"}],\"name\":\"isComplete\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"staticData\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"shouldExecute\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"},{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"triggerName\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"viewRouter\",\"outputs\":[{\"internalType\":\"contract IKapanViewRouter\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Designed for chunked limit orders - executes fixed chunks when price condition is met Use cases: - Take profit: Sell when price rises above limit - Stop loss: Sell when price drops below limit - DCA buy: Buy when price drops below limit Chunking: - totalSellAmount is the full amount to sell across all chunks - numChunks determines how many iterations - Each iteration sells totalSellAmount / numChunks - Last iteration sells remaining to handle rounding\",\"kind\":\"dev\",\"methods\":{\"calculateExecution(bytes,address,uint256)\":{\"details\":\"For SELL orders: returns (exactSellAmount, minBuyAmount)      For BUY orders: returns (maxSellAmount, exactBuyAmount)\",\"params\":{\"iterationCount\":\"Number of executions completed so far (for chunked orders)\",\"owner\":\"The order owner\",\"staticData\":\"ABI-encoded trigger-specific parameters\"},\"returns\":{\"buyAmount\":\"Minimum amount to receive (includes slippage protection)\",\"sellAmount\":\"Amount of sell token to trade in this execution\"}},\"isComplete(bytes,address,uint256)\":{\"details\":\"Called after each execution to determine if order should be marked complete\",\"params\":{\"iterationCount\":\"Number of executions completed so far\",\"owner\":\"The order owner\",\"staticData\":\"ABI-encoded trigger-specific parameters\"},\"returns\":{\"_0\":\"True if the order goal has been reached\"}},\"shouldExecute(bytes,address)\":{\"details\":\"For limit orders, tradeable until all chunks are filled\",\"params\":{\"owner\":\"The order owner (user whose position is being monitored)\",\"staticData\":\"ABI-encoded trigger-specific parameters\"},\"returns\":{\"_0\":\"True if the trigger condition is met\",\"_1\":\"Human-readable reason for the result (for debugging/logging)\"}},\"triggerName()\":{\"returns\":{\"_0\":\"Trigger name (e.g., \\\"LTV\\\", \\\"Price\\\", \\\"HealthFactor\\\")\"}}},\"title\":\"LimitPriceTrigger\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"calculateExecution(bytes,address,uint256)\":{\"notice\":\"Calculate the execution amounts when the trigger fires\"},\"decodeTriggerParams(bytes)\":{\"notice\":\"Decode trigger params from static data\"},\"encodeTriggerParams((bytes4,bytes,address,address,uint8,uint8,uint256,bool,uint256,uint256,uint8,uint256,bool))\":{\"notice\":\"Encode trigger params for order creation\"},\"getCurrentPrice(bytes4,address,bytes)\":{\"notice\":\"Get current price for a token\"},\"isComplete(bytes,address,uint256)\":{\"notice\":\"Check if the order is complete and should stop executing\"},\"shouldExecute(bytes,address)\":{\"notice\":\"Check if the order should execute based on current conditions\"},\"triggerName()\":{\"notice\":\"Get human-readable name of the trigger type\"}},\"notice\":\"Triggers order execution when price crosses a limit threshold\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/v2/triggers/LimitPriceTrigger.sol\":\"LimitPriceTrigger\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":10},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/v2/interfaces/IOrderTrigger.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\n/// @title IOrderTrigger\\n/// @notice Interface for pluggable order triggers in the Kapan conditional order system\\n/// @dev Triggers determine when an order should execute and how much to trade\\ninterface IOrderTrigger {\\n    /// @notice Check if the order should execute based on current conditions\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner (user whose position is being monitored)\\n    /// @return shouldExecute True if the trigger condition is met\\n    /// @return reason Human-readable reason for the result (for debugging/logging)\\n    function shouldExecute(\\n        bytes calldata staticData,\\n        address owner\\n    ) external view returns (bool shouldExecute, string memory reason);\\n\\n    /// @notice Calculate the execution amounts when the trigger fires\\n    /// @dev Only called when shouldExecute returns true\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner\\n    /// @param iterationCount Number of executions completed so far (for chunked orders)\\n    /// @return sellAmount Amount of sell token to trade in this execution\\n    /// @return minBuyAmount Minimum amount to receive (includes slippage protection)\\n    function calculateExecution(\\n        bytes calldata staticData,\\n        address owner,\\n        uint256 iterationCount\\n    ) external view returns (uint256 sellAmount, uint256 minBuyAmount);\\n\\n    /// @notice Check if the order is complete and should stop executing\\n    /// @dev Called after each execution to determine if order should be marked complete\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner\\n    /// @param iterationCount Number of executions completed so far\\n    /// @return complete True if the order goal has been reached\\n    function isComplete(\\n        bytes calldata staticData,\\n        address owner,\\n        uint256 iterationCount\\n    ) external view returns (bool complete);\\n\\n    /// @notice Get human-readable name of the trigger type\\n    /// @return name Trigger name (e.g., \\\"LTV\\\", \\\"Price\\\", \\\"HealthFactor\\\")\\n    function triggerName() external pure returns (string memory name);\\n}\\n\",\"keccak256\":\"0x852a502f0d40f6547adddd882bdbe33f2993af371d691abd211cb372ff646c35\",\"license\":\"MIT\"},\"contracts/v2/triggers/LimitPriceTrigger.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport { IOrderTrigger } from \\\"../interfaces/IOrderTrigger.sol\\\";\\n\\n/// @title KapanViewRouter Interface (for price and position queries)\\ninterface IKapanViewRouter {\\n    function getCollateralPrice(\\n        bytes4 protocolId,\\n        address collateralToken,\\n        bytes calldata context\\n    ) external view returns (uint256 price);\\n\\n    function getDebtPrice(\\n        bytes4 protocolId,\\n        address debtToken,\\n        bytes calldata context\\n    ) external view returns (uint256 price);\\n\\n    function getPositionValue(\\n        bytes4 protocolId,\\n        address user,\\n        bytes calldata context\\n    ) external view returns (uint256 collateralValueUsd, uint256 debtValueUsd);\\n}\\n\\n/// @title LimitPriceTrigger\\n/// @notice Triggers order execution when price crosses a limit threshold\\n/// @dev Designed for chunked limit orders - executes fixed chunks when price condition is met\\n///\\n/// Use cases:\\n/// - Take profit: Sell when price rises above limit\\n/// - Stop loss: Sell when price drops below limit\\n/// - DCA buy: Buy when price drops below limit\\n///\\n/// Chunking:\\n/// - totalSellAmount is the full amount to sell across all chunks\\n/// - numChunks determines how many iterations\\n/// - Each iteration sells totalSellAmount / numChunks\\n/// - Last iteration sells remaining to handle rounding\\ncontract LimitPriceTrigger is IOrderTrigger {\\n    // ============ Errors ============\\n    error InvalidTriggerParams();\\n\\n    // ============ Constants ============\\n    bytes4 public constant AAVE_V3 = bytes4(keccak256(\\\"aave-v3\\\"));\\n    bytes4 public constant COMPOUND_V3 = bytes4(keccak256(\\\"compound-v3\\\"));\\n    bytes4 public constant MORPHO_BLUE = bytes4(keccak256(\\\"morpho-blue\\\"));\\n\\n    // ============ Immutables ============\\n    IKapanViewRouter public immutable viewRouter;\\n\\n    // ============ Structs ============\\n\\n    /// @notice Trigger parameters for price-based limit orders\\n    struct TriggerParams {\\n        bytes4 protocolId;           // Protocol for price oracle\\n        bytes protocolContext;       // Protocol-specific context\\n        address sellToken;           // Token to sell\\n        address buyToken;            // Token to buy\\n        uint8 sellDecimals;          // Decimals of sell token\\n        uint8 buyDecimals;           // Decimals of buy token\\n        uint256 limitPrice;          // Limit price (8 decimals, like Chainlink)\\n        bool triggerAbovePrice;      // true = trigger when price >= limit (take profit)\\n                                     // false = trigger when price <= limit (stop loss)\\n        uint256 totalSellAmount;     // Total amount to sell across all chunks (SELL orders)\\n                                     // OR max amount willing to sell (BUY orders)\\n        uint256 totalBuyAmount;      // Total amount to buy across all chunks (BUY orders)\\n                                     // Ignored for SELL orders\\n        uint8 numChunks;             // Number of chunks (1 = single execution)\\n        uint256 maxSlippageBps;      // Maximum slippage tolerance\\n        bool isKindBuy;              // true = BUY order (exact buy, max sell), false = SELL order\\n    }\\n\\n    // ============ Constructor ============\\n\\n    constructor(address _viewRouter) {\\n        if (_viewRouter == address(0)) revert InvalidTriggerParams();\\n        viewRouter = IKapanViewRouter(_viewRouter);\\n    }\\n\\n    // ============ IOrderTrigger Implementation ============\\n\\n    /// @inheritdoc IOrderTrigger\\n    /// @dev For limit orders, tradeable until all chunks are filled\\n    function shouldExecute(\\n        bytes calldata staticData,\\n        address /* owner */\\n    ) external view override returns (bool, string memory) {\\n        if (staticData.length == 0) {\\n            return (false, \\\"No params\\\");\\n        }\\n        // Note: iteration count check happens in handler via isComplete\\n        // shouldExecute just confirms the order params are valid\\n        return (true, \\\"Limit order active\\\");\\n    }\\n\\n    /// @inheritdoc IOrderTrigger\\n    /// @dev For SELL orders: returns (exactSellAmount, minBuyAmount)\\n    ///      For BUY orders: returns (maxSellAmount, exactBuyAmount)\\n    function calculateExecution(\\n        bytes calldata staticData,\\n        address /* owner */,\\n        uint256 iterationCount\\n    ) external pure override returns (uint256 sellAmount, uint256 buyAmount) {\\n        TriggerParams memory params = abi.decode(staticData, (TriggerParams));\\n\\n        uint8 chunks = params.numChunks > 0 ? params.numChunks : 1;\\n\\n        if (params.isKindBuy) {\\n            // BUY order: exact buyAmount, calculate maxSellAmount\\n            uint256 buyChunkSize = params.totalBuyAmount / chunks;\\n\\n            // For last chunk, use remaining to handle rounding\\n            if (iterationCount >= chunks - 1) {\\n                uint256 alreadyBought = iterationCount * buyChunkSize;\\n                buyAmount = params.totalBuyAmount > alreadyBought\\n                    ? params.totalBuyAmount - alreadyBought\\n                    : 0;\\n            } else {\\n                buyAmount = buyChunkSize;\\n            }\\n\\n            if (buyAmount == 0) return (0, 0);\\n\\n            // Calculate maxSellAmount from limit price\\n            // limitPrice = (buyAmount / sellAmount) * 1e8\\n            // So: sellAmount = buyAmount * 1e8 / limitPrice, adjusted for decimals\\n            uint256 expectedSell = (buyAmount * 1e8 * (10 ** params.sellDecimals))\\n                / (params.limitPrice * (10 ** params.buyDecimals));\\n\\n            // Apply slippage (add slippage for max sell)\\n            sellAmount = (expectedSell * (10000 + params.maxSlippageBps)) / 10000;\\n\\n            // Cap to totalSellAmount if specified (user's max willingness to sell)\\n            if (params.totalSellAmount > 0 && sellAmount > params.totalSellAmount) {\\n                sellAmount = params.totalSellAmount;\\n            }\\n        } else {\\n            // SELL order: exact sellAmount, calculate minBuyAmount\\n            uint256 sellChunkSize = params.totalSellAmount / chunks;\\n\\n            // For last chunk, use remaining to handle rounding\\n            if (iterationCount >= chunks - 1) {\\n                uint256 alreadySold = iterationCount * sellChunkSize;\\n                sellAmount = params.totalSellAmount > alreadySold\\n                    ? params.totalSellAmount - alreadySold\\n                    : 0;\\n            } else {\\n                sellAmount = sellChunkSize;\\n            }\\n\\n            if (sellAmount == 0) return (0, 0);\\n\\n            // Calculate minBuyAmount from limit price (exchange rate)\\n            // limitPrice = (buyAmount / sellAmount) * 1e8 (set by frontend)\\n            // So: expectedBuy = sellAmount * limitPrice / 1e8, adjusted for decimals\\n            uint256 expectedBuy = (sellAmount * params.limitPrice * (10 ** params.buyDecimals))\\n                / (1e8 * (10 ** params.sellDecimals));\\n\\n            // Apply slippage (subtract for min buy)\\n            buyAmount = (expectedBuy * (10000 - params.maxSlippageBps)) / 10000;\\n        }\\n    }\\n\\n    /// @inheritdoc IOrderTrigger\\n    function isComplete(\\n        bytes calldata staticData,\\n        address /* owner */,\\n        uint256 iterationCount\\n    ) external pure override returns (bool) {\\n        TriggerParams memory params = abi.decode(staticData, (TriggerParams));\\n\\n        uint8 chunks = params.numChunks > 0 ? params.numChunks : 1;\\n\\n        // Complete when all chunks executed\\n        return iterationCount >= chunks;\\n    }\\n\\n    /// @inheritdoc IOrderTrigger\\n    function triggerName() external pure override returns (string memory) {\\n        return \\\"LimitPrice\\\";\\n    }\\n\\n    // ============ View Helpers ============\\n\\n    /// @notice Get current price for a token\\n    function getCurrentPrice(\\n        bytes4 protocolId,\\n        address token,\\n        bytes calldata context\\n    ) external view returns (uint256) {\\n        return viewRouter.getCollateralPrice(protocolId, token, context);\\n    }\\n\\n    /// @notice Encode trigger params for order creation\\n    function encodeTriggerParams(TriggerParams memory params) external pure returns (bytes memory) {\\n        return abi.encode(params);\\n    }\\n\\n    /// @notice Decode trigger params from static data\\n    function decodeTriggerParams(bytes calldata staticData) external pure returns (TriggerParams memory) {\\n        return abi.decode(staticData, (TriggerParams));\\n    }\\n\\n}\\n\",\"keccak256\":\"0xe847b5dea778c83d3dbe77a9397b438f8e3ce900a725f3cdb96c69c76abe8ee8\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x60a034608357601f610cd438819003918201601f19168301916001600160401b03831184841017608757808492602094604052833981010312608357516001600160a01b038116908190036083578015607457608052604051610c38908161009c82396080518181816103e101526104b30152f35b63f77479dd60e01b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe6080806040526004361015610012575f80fd5b5f3560e01c9081633131489f1461059b57508063321394961461057957806343fc0865146105335780634d94e61d146104105780634f1cb291146103cc578063632224a71461036b578063676e7551146102c557806368c4be251461029e57806399fec7a01461027c578063d808ab5d146100e95763dd90a89114610095575f80fd5b346100e5575f3660031901126100e5576100e16040516100b6604082610784565b600a8152694c696d6974507269636560b01b602082015260405191829160208352602083019061066c565b0390f35b5f80fd5b346100e55760203660031901126100e5576004356001600160401b0381116100e5576101a060031982360301126100e5576040519061012782610754565b61013381600401610657565b825260248101356001600160401b0381116100e557810191366023840112156100e557600483013590610165826107a7565b916101736040519384610784565b80835236602486830101116100e55761018461025a94610268945f6020856102459660246100e19c01838601378301015260208501526101b5604482016105fd565b60408501526101c6606482016105fd565b60608501526101d7608482016107c2565b60808501526101e860a482016107c2565b60a085015260c481013560c085015261020360e482016107d0565b60e085015261010481013561010085015261012481013561012085015261022d61014482016107c2565b610140850152610164810135610160850152016107d0565b61018082015260405192839160208301610690565b03601f198101835282610784565b60405191829160208352602083019061066c565b346100e5575f3660031901126100e557604051633028125760e01b8152602090f35b346100e55760406102b96102b136610611565b9290506109fd565b82519182526020820152f35b346100e55760203660031901126100e5576004356001600160401b0381116100e55761035f6102fb6100e19236906004016105ba565b5f61018060405161030b81610754565b828152606060208201528260408201528260608201528260808201528260a08201528260c08201528260e08201528261010082015282610120820152826101408201528261016082015201528101906107dd565b60405191829182610690565b346100e55760403660031901126100e5576004356001600160401b0381116100e55761039e6103ad9136906004016105ba565b906103a76105e7565b50610926565b906100e16040519283921515835260406020840152604083019061066c565b346100e5575f3660031901126100e5576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346100e55760603660031901126100e55760043563ffffffff60e01b81168091036100e55761043d6105e7565b604435906001600160401b0382116100e557608461046160209336906004016105ba565b604051630794e50360e01b815260048101969096526001600160a01b0390931660248601526060604486015260648501839052849283918190848401375f828201840152601f01601f191681010301817f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165afa8015610528575f906104f5575b602090604051908152f35b506020813d602011610520575b8161050f60209383610784565b810103126100e557602090516104ea565b3d9150610502565b6040513d5f823e3d90fd5b346100e557602061055860ff61014061054b36610611565b95928092915001906107dd565b015116801561057057905b60ff604051921611158152f35b50600190610563565b346100e5575f3660031901126100e55760405163bbbf88eb60e01b8152602090f35b346100e5575f3660031901126100e557633af167ff60e01b8152602090f35b9181601f840112156100e5578235916001600160401b0383116100e557602083818601950101116100e557565b602435906001600160a01b03821682036100e557565b35906001600160a01b03821682036100e557565b60606003198201126100e557600435906001600160401b0382116100e55761063b916004016105ba565b90916024356001600160a01b03811681036100e5579060443590565b35906001600160e01b0319821682036100e557565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b6020815263ffffffff60e01b82511660208201526101a06101806106c360208501518360408601526101c085019061066c565b9360018060a01b03604082015116606085015260018060a01b03606082015116608085015260ff60808201511660a085015260ff60a08201511660c085015260c081015160e085015260e0810151151561010085015261010081015161012085015261012081015161014085015260ff61014082015116610160850152610160810151828501520151151591015290565b6101a081019081106001600160401b0382111761077057604052565b634e487b7160e01b5f52604160045260245ffd5b601f909101601f19168101906001600160401b0382119082101761077057604052565b6001600160401b03811161077057601f01601f191660200190565b359060ff821682036100e557565b359081151582036100e557565b6020818303126100e5578035906001600160401b0382116100e55701906101a0828203126100e5576040519161081283610754565b61081b81610657565b835260208101356001600160401b0381116100e55781019082601f830112156100e55781359261084a846107a7565b906108586040519283610784565b848252602085850101116100e5575f60208561091d968261018097018386013783010152602085015261088d604082016105fd565b604085015261089e606082016105fd565b60608501526108af608082016107c2565b60808501526108c060a082016107c2565b60a085015260c081013560c08501526108db60e082016107d0565b60e085015261010081013561010085015261012081013561012085015261090561014082016107c2565b610140850152610160810135610160850152016107d0565b61018082015290565b501561095f5760019060405161093d604082610784565b60128152714c696d6974206f726465722061637469766560701b602082015290565b5f9060405161096f604082610784565b60098152684e6f20706172616d7360b81b602082015290565b8115610992570490565b634e487b7160e01b5f52601260045260245ffd5b60ff5f199116019060ff82116109b857565b634e487b7160e01b5f52601160045260245ffd5b818102929181159184041417156109b857565b919082039182116109b857565b60ff16604d81116109b857600a0a90565b610a0c919392938101906107dd565b61014081015190929060ff168015610bfa575b61018084015115610b265761012084019160ff610a49610a43855183861690610988565b936109a6565b168110610b1d5790610a5a916109cc565b90519080821115610b1557610a6e916109df565b905b8115610b0d576305f5e10082028281046305f5e10014831517156109b857610aab610ac991610aa560ff6080880151166109ec565b906109cc565b610ac360c0860151610aa560ff60a0890151166109ec565b90610988565b6101608401516127100180612710116109b857610aec61271091610100936109cc565b0493015180151580610b04575b610b005750565b9250565b50808411610af9565b5f9250829150565b50505f610a6e565b50905090610a70565b61010084019160ff610b3f610a43855183861690610988565b168110610bf15790610b50916109cc565b90519080821115610be957610b64916109df565b915b8215610be157610b8d610b7d60c0830151856109cc565b610aa560ff60a0850151166109ec565b610b9d60ff6080840151166109ec565b90816305f5e10002916305f5e1008304036109b85761016091610bbf91610988565b910151612710039061271082116109b85761271091610bdd916109cc565b0490565b505f91508190565b50505f610b64565b50905091610b66565b506001610a1f56fea26469706673582212201199a73d0f81717278824d744c026613a10f3363c341c06a80bc1ffd755911f064736f6c634300081e0033",
+  "deployedBytecode": "0x6080806040526004361015610012575f80fd5b5f3560e01c9081633131489f1461059b57508063321394961461057957806343fc0865146105335780634d94e61d146104105780634f1cb291146103cc578063632224a71461036b578063676e7551146102c557806368c4be251461029e57806399fec7a01461027c578063d808ab5d146100e95763dd90a89114610095575f80fd5b346100e5575f3660031901126100e5576100e16040516100b6604082610784565b600a8152694c696d6974507269636560b01b602082015260405191829160208352602083019061066c565b0390f35b5f80fd5b346100e55760203660031901126100e5576004356001600160401b0381116100e5576101a060031982360301126100e5576040519061012782610754565b61013381600401610657565b825260248101356001600160401b0381116100e557810191366023840112156100e557600483013590610165826107a7565b916101736040519384610784565b80835236602486830101116100e55761018461025a94610268945f6020856102459660246100e19c01838601378301015260208501526101b5604482016105fd565b60408501526101c6606482016105fd565b60608501526101d7608482016107c2565b60808501526101e860a482016107c2565b60a085015260c481013560c085015261020360e482016107d0565b60e085015261010481013561010085015261012481013561012085015261022d61014482016107c2565b610140850152610164810135610160850152016107d0565b61018082015260405192839160208301610690565b03601f198101835282610784565b60405191829160208352602083019061066c565b346100e5575f3660031901126100e557604051633028125760e01b8152602090f35b346100e55760406102b96102b136610611565b9290506109fd565b82519182526020820152f35b346100e55760203660031901126100e5576004356001600160401b0381116100e55761035f6102fb6100e19236906004016105ba565b5f61018060405161030b81610754565b828152606060208201528260408201528260608201528260808201528260a08201528260c08201528260e08201528261010082015282610120820152826101408201528261016082015201528101906107dd565b60405191829182610690565b346100e55760403660031901126100e5576004356001600160401b0381116100e55761039e6103ad9136906004016105ba565b906103a76105e7565b50610926565b906100e16040519283921515835260406020840152604083019061066c565b346100e5575f3660031901126100e5576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346100e55760603660031901126100e55760043563ffffffff60e01b81168091036100e55761043d6105e7565b604435906001600160401b0382116100e557608461046160209336906004016105ba565b604051630794e50360e01b815260048101969096526001600160a01b0390931660248601526060604486015260648501839052849283918190848401375f828201840152601f01601f191681010301817f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165afa8015610528575f906104f5575b602090604051908152f35b506020813d602011610520575b8161050f60209383610784565b810103126100e557602090516104ea565b3d9150610502565b6040513d5f823e3d90fd5b346100e557602061055860ff61014061054b36610611565b95928092915001906107dd565b015116801561057057905b60ff604051921611158152f35b50600190610563565b346100e5575f3660031901126100e55760405163bbbf88eb60e01b8152602090f35b346100e5575f3660031901126100e557633af167ff60e01b8152602090f35b9181601f840112156100e5578235916001600160401b0383116100e557602083818601950101116100e557565b602435906001600160a01b03821682036100e557565b35906001600160a01b03821682036100e557565b60606003198201126100e557600435906001600160401b0382116100e55761063b916004016105ba565b90916024356001600160a01b03811681036100e5579060443590565b35906001600160e01b0319821682036100e557565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b6020815263ffffffff60e01b82511660208201526101a06101806106c360208501518360408601526101c085019061066c565b9360018060a01b03604082015116606085015260018060a01b03606082015116608085015260ff60808201511660a085015260ff60a08201511660c085015260c081015160e085015260e0810151151561010085015261010081015161012085015261012081015161014085015260ff61014082015116610160850152610160810151828501520151151591015290565b6101a081019081106001600160401b0382111761077057604052565b634e487b7160e01b5f52604160045260245ffd5b601f909101601f19168101906001600160401b0382119082101761077057604052565b6001600160401b03811161077057601f01601f191660200190565b359060ff821682036100e557565b359081151582036100e557565b6020818303126100e5578035906001600160401b0382116100e55701906101a0828203126100e5576040519161081283610754565b61081b81610657565b835260208101356001600160401b0381116100e55781019082601f830112156100e55781359261084a846107a7565b906108586040519283610784565b848252602085850101116100e5575f60208561091d968261018097018386013783010152602085015261088d604082016105fd565b604085015261089e606082016105fd565b60608501526108af608082016107c2565b60808501526108c060a082016107c2565b60a085015260c081013560c08501526108db60e082016107d0565b60e085015261010081013561010085015261012081013561012085015261090561014082016107c2565b610140850152610160810135610160850152016107d0565b61018082015290565b501561095f5760019060405161093d604082610784565b60128152714c696d6974206f726465722061637469766560701b602082015290565b5f9060405161096f604082610784565b60098152684e6f20706172616d7360b81b602082015290565b8115610992570490565b634e487b7160e01b5f52601260045260245ffd5b60ff5f199116019060ff82116109b857565b634e487b7160e01b5f52601160045260245ffd5b818102929181159184041417156109b857565b919082039182116109b857565b60ff16604d81116109b857600a0a90565b610a0c919392938101906107dd565b61014081015190929060ff168015610bfa575b61018084015115610b265761012084019160ff610a49610a43855183861690610988565b936109a6565b168110610b1d5790610a5a916109cc565b90519080821115610b1557610a6e916109df565b905b8115610b0d576305f5e10082028281046305f5e10014831517156109b857610aab610ac991610aa560ff6080880151166109ec565b906109cc565b610ac360c0860151610aa560ff60a0890151166109ec565b90610988565b6101608401516127100180612710116109b857610aec61271091610100936109cc565b0493015180151580610b04575b610b005750565b9250565b50808411610af9565b5f9250829150565b50505f610a6e565b50905090610a70565b61010084019160ff610b3f610a43855183861690610988565b168110610bf15790610b50916109cc565b90519080821115610be957610b64916109df565b915b8215610be157610b8d610b7d60c0830151856109cc565b610aa560ff60a0850151166109ec565b610b9d60ff6080840151166109ec565b90816305f5e10002916305f5e1008304036109b85761016091610bbf91610988565b910151612710039061271082116109b85761271091610bdd916109cc565b0490565b505f91508190565b50505f610b64565b50905091610b66565b506001610a1f56fea26469706673582212201199a73d0f81717278824d744c026613a10f3363c341c06a80bc1ffd755911f064736f6c634300081e0033",
+  "devdoc": {
+    "details": "Designed for chunked limit orders - executes fixed chunks when price condition is met Use cases: - Take profit: Sell when price rises above limit - Stop loss: Sell when price drops below limit - DCA buy: Buy when price drops below limit Chunking: - totalSellAmount is the full amount to sell across all chunks - numChunks determines how many iterations - Each iteration sells totalSellAmount / numChunks - Last iteration sells remaining to handle rounding",
+    "kind": "dev",
+    "methods": {
+      "calculateExecution(bytes,address,uint256)": {
+        "details": "For SELL orders: returns (exactSellAmount, minBuyAmount)      For BUY orders: returns (maxSellAmount, exactBuyAmount)",
+        "params": {
+          "iterationCount": "Number of executions completed so far (for chunked orders)",
+          "owner": "The order owner",
+          "staticData": "ABI-encoded trigger-specific parameters"
+        },
+        "returns": {
+          "buyAmount": "Minimum amount to receive (includes slippage protection)",
+          "sellAmount": "Amount of sell token to trade in this execution"
+        }
+      },
+      "isComplete(bytes,address,uint256)": {
+        "details": "Called after each execution to determine if order should be marked complete",
+        "params": {
+          "iterationCount": "Number of executions completed so far",
+          "owner": "The order owner",
+          "staticData": "ABI-encoded trigger-specific parameters"
+        },
+        "returns": {
+          "_0": "True if the order goal has been reached"
+        }
+      },
+      "shouldExecute(bytes,address)": {
+        "details": "For limit orders, tradeable until all chunks are filled",
+        "params": {
+          "owner": "The order owner (user whose position is being monitored)",
+          "staticData": "ABI-encoded trigger-specific parameters"
+        },
+        "returns": {
+          "_0": "True if the trigger condition is met",
+          "_1": "Human-readable reason for the result (for debugging/logging)"
+        }
+      },
+      "triggerName()": {
+        "returns": {
+          "_0": "Trigger name (e.g., \"LTV\", \"Price\", \"HealthFactor\")"
+        }
+      }
+    },
+    "title": "LimitPriceTrigger",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "calculateExecution(bytes,address,uint256)": {
+        "notice": "Calculate the execution amounts when the trigger fires"
+      },
+      "decodeTriggerParams(bytes)": {
+        "notice": "Decode trigger params from static data"
+      },
+      "encodeTriggerParams((bytes4,bytes,address,address,uint8,uint8,uint256,bool,uint256,uint256,uint8,uint256,bool))": {
+        "notice": "Encode trigger params for order creation"
+      },
+      "getCurrentPrice(bytes4,address,bytes)": {
+        "notice": "Get current price for a token"
+      },
+      "isComplete(bytes,address,uint256)": {
+        "notice": "Check if the order is complete and should stop executing"
+      },
+      "shouldExecute(bytes,address)": {
+        "notice": "Check if the order should execute based on current conditions"
+      },
+      "triggerName()": {
+        "notice": "Get human-readable name of the trigger type"
+      }
+    },
+    "notice": "Triggers order execution when price crosses a limit threshold",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}

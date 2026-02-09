@@ -69,7 +69,9 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
 
   useEffect(() => {
-    if (!isOpen || !address) return;
+    if (!isOpen || !address) {
+      return;
+    }
     let cancelled = false;
     const fetchCalldata = async () => {
       try {
@@ -83,18 +85,25 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         if (quotes.length === 0) {
           throw new Error("no avnu quote");
         }
-        if (!cancelled) setSelectedQuote(quotes[0]);
+        if (!cancelled) {
+          setSelectedQuote(quotes[0]);
+        }
         const tx = await fetchBuildExecuteTransaction(
           quotes[0].quoteId,
           address,
           0.05,
           false,
         );
-        const calldata = (tx.calls?.find((c: any) => c.entrypoint === "swap_exact_token_to")?.calldata as any[]) || [];
-        if (!cancelled)
-          setAvnuCalldata(calldata.map((c: any) => BigInt(c.toString())));
-      } catch (e) {
-        console.error("failed to fetch avnu calldata", e);
+        interface AvnuCall {
+          entrypoint: string;
+          calldata?: string[];
+        }
+        const calldata = ((tx.calls as any)?.find((c: AvnuCall) => c.entrypoint === "swap_exact_token_to")?.calldata) || [];
+        if (!cancelled) {
+          setAvnuCalldata((calldata as any[]).map((c: any) => BigInt(c.toString())));
+        }
+      } catch (error) {
+        console.error("failed to fetch avnu calldata", error);
         if (!cancelled) {
           setAvnuCalldata([]);
           setSelectedQuote(null);
@@ -108,7 +117,9 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   }, [isOpen, address, collateral.address, debt.address, debtBalance]);
 
   const protocolInstructions = useMemo(() => {
-    if (!address || avnuCalldata.length === 0) return [];
+    if (!address || avnuCalldata.length === 0) {
+      return [];
+    }
 
     const repayContext = toPoolContext(protocolKey, poolKey, collateral.address);
     const withdrawContext = toPoolContext(protocolKey, poolKey, debt.address);
@@ -190,7 +201,9 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
 
   // Build a minimal instruction set that includes only the Withdraw step for authorization requests
   const withdrawAuthInstructions = useMemo(() => {
-    if (!address) return [] as any[];
+    if (!address) {
+      return [] as unknown[];
+    }
 
     const withdrawContext = toPoolContext(protocolKey, poolKey, debt.address);
     const withdrawInstruction = new CairoCustomEnum({
@@ -224,10 +237,14 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
         return;
       }
       try {
-        const auths = await getAuthorizations(withdrawAuthInstructions as any);
-        if (!cancelled) setFetchedAuthorizations(auths);
+        const auths = await getAuthorizations(withdrawAuthInstructions as Parameters<typeof getAuthorizations>[0]);
+        if (!cancelled) {
+          setFetchedAuthorizations(auths);
+        }
       } catch {
-        if (!cancelled) setFetchedAuthorizations([]);
+        if (!cancelled) {
+          setFetchedAuthorizations([]);
+        }
       }
     };
     fetchAuths();
@@ -237,28 +254,30 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   }, [isOpen, isAuthReady, getAuthorizations, withdrawAuthInstructions]);
 
   const calls = useMemo(() => {
-    if (protocolInstructions.length === 0) return [];
+    if (protocolInstructions.length === 0) {
+      return [];
+    }
     const revokeAuthorizations = buildModifyDelegationRevokeCalls(fetchedAuthorizations);
     return [
-      ...(fetchedAuthorizations as any),
+      ...fetchedAuthorizations,
       {
         contractName: "RouterGateway" as const,
         functionName: "move_debt" as const,
         args: CallData.compile({ instructions: protocolInstructions }),
       },
-      ...(revokeAuthorizations as any),
+      ...revokeAuthorizations,
     ];
   }, [fetchedAuthorizations, protocolInstructions]);
 
-  const { sendAsync } = useScaffoldMultiWriteContract({ calls });
+  const { sendAsync } = useScaffoldMultiWriteContract({ calls: calls as any });
 
   const handleClosePosition = useCallback(async () => {
     try {
-      await sendAsync();
+      await (sendAsync as any)();
       notification.success("Position closed");
       onClose();
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
       notification.error("Failed to close position");
     }
   }, [sendAsync, onClose]);
@@ -300,7 +319,9 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
   ), [handleClosePosition]);
 
   const additionalContentElement = useMemo(() => {
-    if (!feesInDebtToken) return null;
+    if (!feesInDebtToken) {
+      return null;
+    }
     return (
       <div className="flex justify-between text-[12px]">
         <span className="text-gray-600">Fees in {debt.name}</span>

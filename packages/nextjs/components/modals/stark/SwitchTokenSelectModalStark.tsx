@@ -29,7 +29,9 @@ export const SwitchTokenSelectModalStark: FC<SwitchTokenSelectModalStarkProps> =
   const title = kind === "debt" ? "Swap Debt" : "Swap Collateral";
 
   const resolveDisplay = (t: TokenOption): TokenOption => {
-    if (!t) return t;
+    if (!t) {
+      return t;
+    }
     const rawName = t.name || "";
     const name = rawName && rawName.trim().length > 0 ? rawName : getTokenNameFallback(t.address) ?? rawName;
     const symbol = (t.symbol && t.symbol.trim().length > 0) ? t.symbol : name;

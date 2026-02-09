@@ -11,6 +11,7 @@ import { composeEventFilterKeys } from "~~/utils/scaffold-stark/eventKeyFilter";
 import { parseEventData } from "~~/utils/scaffold-stark/eventsData";
 
 const MAX_KEYS_COUNT = 16;
+
 /**
  * Reads events from a deployed contract
  * @param config - The config settings
@@ -42,6 +43,8 @@ export const useScaffoldEventHistory = <
   format = true,
   enabled = true,
 }: UseScaffoldEventHistoryConfig<TContractName, TEventName, TBlockData, TTransactionData, TReceiptData>) => {
+  // Events have dynamic structure based on contract ABI - using any[] for flexibility
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [events, setEvents] = useState<any[]>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>();
@@ -57,6 +60,51 @@ export const useScaffoldEventHistory = <
     });
   }, [targetNetwork.rpcUrls.public.http]);
 
+  /** Resolve the latest block number, using the provided value or fetching from the provider. */
+  const resolveLatestBlock = async (latestBlock?: bigint): Promise<number> => {
+    if (latestBlock !== undefined) return Number(latestBlock);
+    const blockResult = await (
+      (publicClient as any).getBlockLatestAccepted
+        ? (publicClient as any).getBlockLatestAccepted()
+        : (publicClient as any).getBlock("latest")
+    );
+    return Number(blockResult.block_number);
+  };
+
+  /** Build event filter keys from the event ABI and user-provided filters. */
+  const buildEventKeys = (
+    event: ExtractAbiEvent<ContractAbi<TContractName>, TEventName>,
+    contractAbi: Abi,
+  ): string[][] => {
+    let keys: string[][] = [[hash.getSelectorFromName(event.name.split("::").slice(-1)[0])]];
+    if (filters) {
+      keys = keys.concat(composeEventFilterKeys(filters, event, contractAbi));
+    }
+    return keys.slice(0, MAX_KEYS_COUNT);
+  };
+
+  /** Enrich a single log entry with optional block, transaction, and receipt data. */
+  const enrichLogEntry = async (
+    event: ExtractAbiEvent<ContractAbi<TContractName>, TEventName>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    log: any,
+  ) => ({
+    event,
+    log,
+    block:
+      blockData && log.block_hash === null
+        ? null
+        : await publicClient.getBlockWithTxHashes(log.block_hash),
+    transaction:
+      transactionData && log.transaction_hash !== null
+        ? await publicClient.getTransactionByHash(log.transaction_hash)
+        : null,
+    receipt:
+      receiptData && log.transaction_hash !== null
+        ? await publicClient.getTransactionReceipt(log.transaction_hash)
+        : null,
+  });
+
   const readEvents = async (fromBlock?: bigint, latestBlock?: bigint) => {
     if (!enabled) {
       setIsLoading(false);
@@ -65,78 +113,48 @@ export const useScaffoldEventHistory = <
 
     setIsLoading(true);
     try {
-      if (deployedContractLoading) {
-        return;
-      }
+      if (deployedContractLoading) return;
+      if (!deployedContractData) throw new Error("Contract not found");
 
-      if (!deployedContractData) {
-        throw new Error("Contract not found");
-      }
-
-      const event = (deployedContractData.abi as Abi).find(
+      const contractAbi = deployedContractData.abi as Abi;
+      const event = contractAbi.find(
         part => part.type === "event" && part.name === eventName,
       ) as ExtractAbiEvent<ContractAbi<TContractName>, TEventName>;
 
-      const latestBlockNumber =
-        latestBlock ??
-        (
-          await (
-            (publicClient as any).getBlockLatestAccepted
-              ? (publicClient as any).getBlockLatestAccepted()
-              : (publicClient as any).getBlock("latest")
-          )
-        ).block_number;
-      const blockNumber = Number(latestBlockNumber);
+      const blockNumber = await resolveLatestBlock(latestBlock);
+      const startBlock = Number(fromBlock || fromBlockUpdated);
 
-      if ((fromBlock && blockNumber >= Number(fromBlock)) || blockNumber >= Number(fromBlockUpdated)) {
-        let keys: string[][] = [[hash.getSelectorFromName(event.name.split("::").slice(-1)[0])]];
-        if (filters) {
-          keys = keys.concat(composeEventFilterKeys(filters, event, deployedContractData.abi));
-        }
-        keys = keys.slice(0, MAX_KEYS_COUNT);
-        const rawEventResp = await publicClient.getEvents({
-          chunk_size: 100,
-          keys,
-          address: deployedContractData?.address,
-          from_block: { block_number: Number(fromBlock || fromBlockUpdated) },
-          to_block: { block_number: blockNumber },
-        });
-        if (!rawEventResp) {
-          return;
-        }
-        const logs = rawEventResp.events;
-        setFromBlockUpdated(BigInt(blockNumber + 1));
+      if (blockNumber < startBlock) return;
 
-        const newEvents = [];
-        for (let i = logs.length - 1; i >= 0; i--) {
-          newEvents.push({
-            event,
-            log: logs[i],
-            block:
-              blockData && logs[i].block_hash === null
-                ? null
-                : await publicClient.getBlockWithTxHashes(logs[i].block_hash),
-            transaction:
-              transactionData && logs[i].transaction_hash !== null
-                ? await publicClient.getTransactionByHash(logs[i].transaction_hash)
-                : null,
-            receipt:
-              receiptData && logs[i].transaction_hash !== null
-                ? await publicClient.getTransactionReceipt(logs[i].transaction_hash)
-                : null,
-          });
-        }
-        if (events && typeof fromBlock === "undefined") {
-          setEvents([...newEvents, ...events]);
-        } else {
-          setEvents(newEvents);
-        }
-        setError(undefined);
+      const keys = buildEventKeys(event, contractAbi);
+      const rawEventResp = await publicClient.getEvents({
+        chunk_size: 100,
+        keys,
+        address: deployedContractData.address,
+        from_block: { block_number: startBlock },
+        to_block: { block_number: blockNumber },
+      });
+
+      if (!rawEventResp) return;
+
+      const logs = rawEventResp.events;
+      setFromBlockUpdated(BigInt(blockNumber + 1));
+
+      const newEvents = [];
+      for (let i = logs.length - 1; i >= 0; i--) {
+        newEvents.push(await enrichLogEntry(event, logs[i]));
       }
-    } catch (e: any) {
-      console.error(e);
+
+      if (events && typeof fromBlock === "undefined") {
+        setEvents([...newEvents, ...events]);
+      } else {
+        setEvents(newEvents);
+      }
+      setError(undefined);
+    } catch (error: unknown) {
+      console.error(error);
       setEvents(undefined);
-      setError(e);
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }

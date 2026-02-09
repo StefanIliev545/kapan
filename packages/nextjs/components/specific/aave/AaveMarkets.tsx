@@ -5,6 +5,7 @@ import { MarketsSection, MarketData } from "~~/components/markets/MarketsSection
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
+import { useExternalYields } from "~~/hooks/useExternalYields";
 import formatPercentage from "~~/utils/formatPercentage";
 import { aaveRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
 
@@ -27,18 +28,23 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search, chainId })
     chainId,
   });
 
+  // Fetch external yields (LST staking yields, PT fixed yields, etc.)
+  const { getEffectiveSupplyRate } = useExternalYields(chainId);
+
   const markets: MarketData[] = useMemo(() => {
     if (!allTokensInfo) return [];
     const network = (chainId && CHAIN_ID_TO_NETWORK[chainId]) || "arbitrum";
     return (allTokensInfo as any[]).map(token => {
-      const supplyAPY = aaveRateToAPY(token.supplyRate);
+      const protocolSupplyAPY = aaveRateToAPY(token.supplyRate);
       const borrowAPY = aaveRateToAPY(token.borrowRate);
+      // Get effective supply rate (includes LST staking yields, PT fixed yields, etc.)
+      const effectiveSupplyAPY = getEffectiveSupplyRate(token.token, token.symbol, protocolSupplyAPY);
       const price = Number(formatUnits(token.price, 8));
-      const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
+      const utilization = borrowAPY > 0 ? (protocolSupplyAPY / borrowAPY) * 100 : 0;
       return {
         icon: tokenNameToLogo(token.symbol),
         name: token.symbol,
-        supplyRate: `${formatPercentage(supplyAPY)}%`,
+        supplyRate: `${formatPercentage(effectiveSupplyAPY)}%`,
         borrowRate: `${formatPercentage(borrowAPY)}%`,
         price: price.toFixed(2),
         utilization: utilization.toFixed(2),
@@ -48,7 +54,7 @@ export const AaveMarkets: FC<AaveMarketsProps> = ({ viewMode, search, chainId })
         protocol: "aave",
       } as MarketData;
     });
-  }, [allTokensInfo, chainId]);
+  }, [allTokensInfo, chainId, getEffectiveSupplyRate]);
 
   return <MarketsSection title="Aave Markets" markets={markets} viewMode={viewMode} search={search} />;
 };

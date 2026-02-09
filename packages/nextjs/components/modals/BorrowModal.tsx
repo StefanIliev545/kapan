@@ -1,10 +1,12 @@
-import { FC, useCallback } from "react";
-import { TokenActionModal, TokenInfo } from "./TokenActionModal";
-import { BatchingPreference } from "./common/BatchingPreference";
+import type { FC } from "react";
+import { useCallback } from "react";
+import type { PositionManager } from "~~/utils/position";
+import type { TokenInfo } from "./TokenActionModal";
+import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useTokenBalance } from "~~/hooks/useTokenBalance";
-import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
-import { PositionManager } from "~~/utils/position";
+import { BatchingPreference } from "./common/BatchingPreference";
+import { TokenActionModal } from "./TokenActionModal";
 
 interface BorrowModalProps {
   isOpen: boolean;
@@ -32,7 +34,7 @@ export const BorrowModal: FC<BorrowModalProps> = ({
   const { balance, decimals } = useTokenBalance(token.address, "evm", chainId, token.decimals);
   const normalizedProtocolName = protocolName.toLowerCase();
 
-  if (token.decimals == null) {
+  if (token.decimals === null || token.decimals === undefined) {
     token.decimals = decimals;
   }
 

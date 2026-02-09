@@ -1,58 +1,46 @@
 "use client";
 
-import { FC, useState, useMemo, useEffect, ReactNode, useCallback } from "react";
-import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { FC, useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
-import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
+import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { BaseProtocolHeader, type HeaderMetric } from "../common";
+import { CollateralLtvBreakdown, type CollateralBreakdownItem } from "../common/UtilizationTooltip";
+import { CollapsibleSection } from "~~/components/common/CollapsibleSection";
+import { MetricColors } from "~~/utils/protocolMetrics";
 import {
   useEulerLendingPositions,
   useEulerVaults,
   type EulerPositionGroupWithBalances,
+  type EulerVault,
 } from "~~/hooks/useEulerLendingPositions";
 import { EulerMarketsSection } from "./EulerMarketsSection";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { SupplyPosition } from "~~/components/SupplyPosition";
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { LoadingSpinner } from "~~/components/common/Loading";
+import { AddButton } from "~~/components/common/AddButton";
+import { MultiPositionLayout } from "~~/components/positions/MultiPositionLayout";
+import { useEulerPositionGroups } from "~~/hooks/adapters/useEulerPositionGroups";
+import type { PositionGroup } from "~~/types/positions";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
 import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
 import { CloseWithCollateralEvmModal } from "~~/components/modals/CloseWithCollateralEvmModal";
 import { AddEulerCollateralModal } from "~~/components/modals/AddEulerCollateralModal";
 import { EulerBorrowModal } from "~~/components/modals/EulerBorrowModal";
+import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
 import type { SwapAsset } from "~~/components/modals/SwapModalShell";
+import { useADLContracts } from "~~/hooks/useADLOrder";
 import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
-import { useTokenPrices } from "~~/hooks/useTokenPrice";
+import { useTokenPricesByAddress } from "~~/hooks/useTokenPrice";
 import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useGlobalState } from "~~/services/store/store";
-import { formatCurrencyCompact } from "~~/utils/formatNumber";
-import { formatSignedPercent } from "../utils";
 import { useModal } from "~~/hooks/useModal";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { useTxCompletedListenerDelayed } from "~~/hooks/common/useTxCompletedListener";
 
-/**
- * Reusable collapsible section with animated expand/collapse.
- */
-interface CollapsibleSectionProps {
-  isOpen: boolean;
-  children: ReactNode;
-}
-
-// Static image error handler
-const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-  (e.target as HTMLImageElement).src = "/logos/default.svg";
-};
-
-// Static animation constants
-const COLLAPSE_TRANSITION = { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const };
-const COLLAPSE_INITIAL = { opacity: 0, height: 0 };
-const COLLAPSE_ANIMATE = { opacity: 1, height: "auto" };
-
-// CSS class constants
+// CSS class constants (used by EulerPositionGroupRow)
 const TEXT_SUCCESS = "text-success";
 const TEXT_ERROR = "text-error";
-const TEXT_MUTED = "text-base-content/40";
 
 /** Metrics computed from user positions */
 interface PositionMetrics {
@@ -70,37 +58,6 @@ const EMPTY_METRICS: PositionMetrics = {
   netApyPercent: null,
   positionsWithDebt: 0,
 };
-
-/**
- * Get the appropriate text color class for a numeric value.
- */
-function getValueColorClass(hasPositions: boolean, value: number): string {
-  if (!hasPositions) return TEXT_MUTED;
-  return value >= 0 ? TEXT_SUCCESS : TEXT_ERROR;
-}
-
-/**
- * Get the appropriate text color class for the APY value.
- */
-function getApyColorClass(hasPositions: boolean, apyValue: number | null): string {
-  if (!hasPositions || apyValue == null) return TEXT_MUTED;
-  return apyValue >= 0 ? TEXT_SUCCESS : TEXT_ERROR;
-}
-
-/**
- * Format a metric value for display, or return placeholder if no positions.
- */
-function formatMetricValue(hasPositions: boolean, value: number): string {
-  return hasPositions ? formatCurrencyCompact(value) : "—";
-}
-
-/**
- * Format APY value for display, or return placeholder if no positions or null APY.
- */
-function formatApyValue(hasPositions: boolean, apyValue: number | null): string {
-  if (!hasPositions || apyValue == null) return "—";
-  return formatSignedPercent(apyValue);
-}
 
 /** Collateral swap state for tracking which collateral is being swapped */
 interface CollateralSwapState {
@@ -202,20 +159,25 @@ const INITIAL_CLOSE_STATE: CloseModalState = {
  */
 interface EulerPositionGroupRowProps {
   group: EulerPositionGroupWithBalances;
+  /** Unified PositionGroup from the adapter hook (drives the layout component) */
+  positionGroup: PositionGroup;
   chainId: number;
   /** Map of lowercase symbol -> price in raw format (8 decimals) */
   pricesRaw: Record<string, bigint>;
   /** All sub-account indices that are currently in use (have positions) */
   usedSubAccountIndices: number[];
+  /** Whether ADL is supported on this chain */
+  isADLSupported: boolean;
 }
 
-const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId, pricesRaw, usedSubAccountIndices }) => {
+const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, positionGroup, chainId, pricesRaw, usedSubAccountIndices, isADLSupported }) => {
   const { debt, collaterals, isMainAccount, subAccount } = group;
   const swapModal = useModal();
   const debtSwapModal = useModal();
   const closeModal = useModal();
   const addCollateralModal = useModal();
   const borrowModal = useModal();
+  const adlModal = useModal();
   const [swapState, setSwapState] = useState<CollateralSwapState>(INITIAL_SWAP_STATE);
   const [debtSwapState, setDebtSwapState] = useState<DebtSwapState>(INITIAL_DEBT_SWAP_STATE);
   const [closeState, setCloseState] = useState<CloseModalState>(INITIAL_CLOSE_STATE);
@@ -276,6 +238,30 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
     })),
     [collaterals, pricesRaw, getIcon]
   );
+
+  // Calculate total collateral and debt USD values for ADL modal (scaled to 8 decimals)
+  const { totalCollateralUsd, totalDebtUsd } = useMemo(() => {
+    let collateralUsd = 0n;
+    for (const col of collaterals) {
+      const symbol = col.vault.asset.symbol?.toLowerCase();
+      const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+      if (col.balance > 0n && priceRaw > 0n) {
+        // balance * price / 10^decimals gives USD value in 8 decimals
+        collateralUsd += (col.balance * priceRaw) / BigInt(10 ** col.vault.asset.decimals);
+      }
+    }
+
+    let debtUsd = 0n;
+    if (debt && debt.balance > 0n) {
+      const symbol = debt.vault.asset.symbol?.toLowerCase();
+      const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+      if (priceRaw > 0n) {
+        debtUsd = (debt.balance * priceRaw) / BigInt(10 ** debt.vault.asset.decimals);
+      }
+    }
+
+    return { totalCollateralUsd: collateralUsd, totalDebtUsd: debtUsd };
+  }, [collaterals, debt, pricesRaw]);
 
   // Handler to open collateral swap modal
   const handleOpenSwap = useCallback((collateral: typeof collaterals[0]) => {
@@ -403,58 +389,103 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
 
   const healthStatus = getHealthStatus();
 
-  return (
-    <div className="bg-base-300/30 rounded-lg p-3">
-      {/* Header: Sub-account label + Health indicator */}
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          {!isMainAccount && (
-            <span className="text-[10px] font-medium text-base-content/40 uppercase tracking-wider">
-              Sub-account
-            </span>
-          )}
-        </div>
-        {/* Health indicator for positions with debt - similar to Morpho display */}
-        {healthStatus && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-base-content/60">
-              LTV:{" "}
-              <span className={`font-mono font-semibold ${healthStatus.colorClass}`}>
-                {healthStatus.currentLtv.toFixed(1)}%
-              </span>
-              <span className="text-base-content/50">/{healthStatus.effectiveLltv.toFixed(0)}%</span>
-            </span>
-            <span className={`text-[10px] font-medium uppercase ${healthStatus.colorClass}`}>
-              {healthStatus.label}
-            </span>
-          </div>
-        )}
-      </div>
+  // Build collateral breakdown for the hover tooltip
+  const collateralBreakdown = useMemo((): CollateralBreakdownItem[] => {
+    const activeCollaterals = collaterals.filter(c => c.balance > 0n);
+    if (activeCollaterals.length === 0 || !group.liquidity) return [];
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Left side: Collaterals */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-base-content/50">
-              Collateral
+    const ltvMap = new Map(
+      group.liquidity.collateralLtvs.map(l => [l.collateralVault.toLowerCase(), l]),
+    );
+
+    const items = activeCollaterals.map(col => {
+      const symbol = col.vault.asset.symbol?.toLowerCase() ?? "";
+      const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+      const valueUsd = priceRaw > 0n
+        ? (Number(col.balance) / 10 ** col.vault.asset.decimals) * (Number(priceRaw) / 1e8)
+        : 0;
+      const ltv = ltvMap.get(col.vault.address.toLowerCase());
+      return {
+        name: col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol,
+        icon: getIcon(col.vault.asset.symbol),
+        valueUsd,
+        // borrowLtv/liquidationLtv are percentages (e.g., 80 = 80%), convert to bps
+        ltvBps: ltv ? Math.round(ltv.borrowLtv * 100) : 0,
+        lltvBps: ltv ? Math.round(ltv.liquidationLtv * 100) : 0,
+        weightPct: 0, // filled below
+      };
+    });
+
+    const totalUsd = items.reduce((sum, i) => sum + i.valueUsd, 0);
+    if (totalUsd > 0) {
+      for (const item of items) {
+        item.weightPct = (item.valueUsd / totalUsd) * 100;
+      }
+    }
+    return items;
+  }, [collaterals, group.liquidity, pricesRaw, getIcon]);
+
+  const debtUsdNumber = Number(totalDebtUsd) / 1e8;
+
+  return (
+    <div className="py-3 first:pt-0 last:pb-0">
+      <MultiPositionLayout
+        group={positionGroup}
+        header={
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              {!isMainAccount && (
+                <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-wider">
+                  Sub-account
+                </span>
+              )}
             </div>
-            {debt && (
-              <button
-                type="button"
-                className="btn btn-xs btn-ghost text-primary hover:bg-primary/10"
-                onClick={addCollateralModal.open}
-              >
-                Add Collateral
-              </button>
+            {healthStatus && (
+              <div className="flex items-center gap-2 text-xs">
+                <div className="group/ltv relative inline-flex items-center gap-1">
+                  <span className="text-base-content/60">
+                    LTV:{" "}
+                    <span className={`font-mono font-semibold ${healthStatus.colorClass}`}>
+                      {healthStatus.currentLtv.toFixed(1)}%
+                    </span>
+                    <span className="text-base-content/50">/{healthStatus.effectiveLltv.toFixed(0)}%</span>
+                  </span>
+                  {collateralBreakdown.length > 0 && (
+                    <>
+                      <span className="text-primary text-[8px]">{"\u24d8"}</span>
+                      <div className="pointer-events-none absolute right-0 top-full z-[100] mt-2 hidden group-hover/ltv:block">
+                        <div className="bg-base-100 ring-base-300/50 pointer-events-auto min-w-[280px] rounded-lg p-3 shadow-xl ring-1">
+                          <CollateralLtvBreakdown items={collateralBreakdown} totalDebtUsd={debtUsdNumber} />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <span className={`text-[10px] font-medium uppercase ${healthStatus.colorClass}`}>
+                  {healthStatus.label}
+                </span>
+                {isADLSupported && debt && collaterals.length > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      adlModal.open();
+                    }}
+                    className="text-base-content/50 hover:text-base-content hover:bg-base-200 flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
+                    title="Auto-Deleverage Protection"
+                  >
+                    <Cog6ToothIcon className="size-3.5" />
+                    <span>Automate</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
-          {collaterals.length === 0 ? (
-            <div className="text-sm text-base-content/40 italic">None</div>
-          ) : (
+        }
+        collateralContent={
+          collaterals.length === 0 ? undefined : (
             <div className="space-y-2">
               {collaterals.map((col, idx) => {
                 const symbol = col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol;
-                // Encode Euler context: borrowVault + collateralVault + subAccountIndex
                 const context = encodeEulerContext({
                   borrowVault: borrowVaultAddress,
                   collateralVault: col.vault.address,
@@ -482,34 +513,16 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
                 );
               })}
             </div>
-          )}
-        </div>
-
-        {/* Divider */}
-        <div className="hidden sm:block w-px bg-base-content/10 self-stretch" />
-        <div className="sm:hidden h-px bg-base-content/10 w-full" />
-
-        {/* Right side: Debt */}
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-base-content/50 mb-2">
-            Debt
-          </div>
-          {!debt ? (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-base-content/40 italic">None</span>
-              {collaterals.length > 0 && (
-                <button
-                  type="button"
-                  className="btn btn-xs btn-ghost text-primary hover:bg-primary/10"
-                  onClick={borrowModal.open}
-                >
-                  Borrow
-                </button>
-              )}
-            </div>
-          ) : (() => {
+          )
+        }
+        collateralFooter={
+          debt ? (
+            <AddButton onClick={addCollateralModal.open} label="Add Collateral" />
+          ) : undefined
+        }
+        debtContent={
+          !debt ? undefined : (() => {
             const debtSymbol = debt.vault.asset.symbol === "???" ? "unknown" : debt.vault.asset.symbol;
-            // For debt, use the first collateral vault (or borrow vault itself if no collaterals)
             const primaryCollateralVault = collaterals[0]?.vault.address || debt.vault.address;
             const debtContext = encodeEulerContext({
               borrowVault: debt.vault.address,
@@ -538,9 +551,14 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
                 onClosePosition={collaterals.length > 0 ? handleOpenCloseModal : undefined}
               />
             );
-          })()}
-        </div>
-      </div>
+          })()
+        }
+        debtFooter={
+          !debt && collaterals.length > 0 ? (
+            <AddButton onClick={borrowModal.open} label="Borrow" />
+          ) : undefined
+        }
+      />
 
       {/* Collateral Swap Modal */}
       <CollateralSwapModal
@@ -641,29 +659,48 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, chainId,
           }))}
         />
       )}
+
+      {/* ADL Automation Modal */}
+      {debt && collaterals.length > 0 && healthStatus && (
+        <LTVAutomationModal
+          isOpen={adlModal.isOpen}
+          onClose={adlModal.close}
+          protocolName="Euler"
+          chainId={chainId}
+          currentLtvBps={Math.round(healthStatus.currentLtv * 100)}
+          liquidationLtvBps={Math.round(healthStatus.effectiveLltv * 100)}
+          collateralTokens={collaterals.map((col): SwapAsset => {
+            const symbol = col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol;
+            const priceRaw = pricesRaw[symbol.toLowerCase()] ?? 0n;
+            const balance = Number(col.balance) / (10 ** col.vault.asset.decimals);
+            const usdValue = balance * (Number(priceRaw) / 1e8);
+            return {
+              symbol,
+              address: col.vault.asset.address,
+              decimals: col.vault.asset.decimals,
+              rawBalance: col.balance,
+              balance,
+              icon: getIcon(col.vault.asset.symbol),
+              price: priceRaw,
+              usdValue,
+            };
+          })}
+          debtToken={{
+            address: debt.vault.asset.address,
+            symbol: debt.vault.asset.symbol === "???" ? "unknown" : debt.vault.asset.symbol,
+            decimals: debt.vault.asset.decimals,
+            balance: debt.balance,
+          }}
+          totalCollateralUsd={totalCollateralUsd}
+          totalDebtUsd={totalDebtUsd}
+          eulerBorrowVault={debt.vault.address}
+          eulerCollateralVaults={collaterals.map(c => c.vault.address)}
+          eulerSubAccountIndex={subAccountIndex}
+        />
+      )}
     </div>
   );
 };
-
-const CollapsibleSection: FC<CollapsibleSectionProps> = ({ isOpen, children }) => (
-  <AnimatePresence initial={false}>
-    {isOpen && (
-      <motion.div
-        initial={COLLAPSE_INITIAL}
-        animate={COLLAPSE_ANIMATE}
-        exit={COLLAPSE_INITIAL}
-        transition={COLLAPSE_TRANSITION}
-        className="overflow-hidden"
-      >
-        <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-md">
-          <div className="card-body p-4">
-            {children}
-          </div>
-        </div>
-      </motion.div>
-    )}
-  </AnimatePresence>
-);
 
 interface EulerProtocolViewProps {
   chainId?: number;
@@ -678,6 +715,7 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
 
   const [isMarketsOpen, setIsMarketsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const openPositionModal = useModal();
 
   // Reset collapsed state when chainId changes
   useEffect(() => {
@@ -699,6 +737,9 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     refetchPositions,
   } = useEulerLendingPositions(effectiveChainId, connectedAddress);
 
+  // Check if ADL is supported on this chain
+  const { isSupported: isADLSupported } = useADLContracts(effectiveChainId);
+
   // Refetch positions after transactions complete (with delay for subgraph indexing)
   useTxCompletedListenerDelayed(
     useCallback(() => {
@@ -708,72 +749,107 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     hasLoadedOnce
   );
 
-  // Extract unique token symbols for price fetching
-  const tokenSymbols = useMemo(() => {
-    const symbols = new Set<string>();
+  // Extract unique token addresses and build address→symbol mapping for price fetching.
+  // Stabilize the tokenAddresses array by value (sorted join) so the downstream
+  // price query doesn't restart every time enrichedPositionGroups re-renders
+  // with the same token set but a new object reference.
+  const prevAddrKeyRef = useRef("");
+  const prevTokenAddressesRef = useRef<string[]>([]);
+
+  const { tokenAddresses, addressToSymbol } = useMemo(() => {
+    const addrs = new Set<string>();
+    const mapping: Record<string, string> = {};
     for (const group of enrichedPositionGroups) {
-      if (group.debt?.vault.asset.symbol && group.debt.vault.asset.symbol !== "???") {
-        symbols.add(group.debt.vault.asset.symbol);
+      if (group.debt?.vault.asset.address && group.debt.vault.asset.symbol !== "???") {
+        const addr = group.debt.vault.asset.address.toLowerCase();
+        addrs.add(addr);
+        mapping[addr] = group.debt.vault.asset.symbol.toLowerCase();
       }
       for (const col of group.collaterals) {
-        if (col.vault.asset.symbol && col.vault.asset.symbol !== "???") {
-          symbols.add(col.vault.asset.symbol);
+        if (col.vault.asset.address && col.vault.asset.symbol !== "???") {
+          const addr = col.vault.asset.address.toLowerCase();
+          addrs.add(addr);
+          mapping[addr] = col.vault.asset.symbol.toLowerCase();
         }
       }
     }
-    return Array.from(symbols);
+    const sorted = Array.from(addrs).sort();
+    const key = sorted.join(",");
+    // Only produce a new array reference if the actual addresses changed
+    if (key !== prevAddrKeyRef.current) {
+      prevAddrKeyRef.current = key;
+      prevTokenAddressesRef.current = sorted;
+    }
+    return { tokenAddresses: prevTokenAddressesRef.current, addressToSymbol: mapping };
   }, [enrichedPositionGroups]);
 
-  // Fetch token prices
-  const { pricesRaw } = useTokenPrices(tokenSymbols, {
-    enabled: tokenSymbols.length > 0,
-  });
+  // Fetch token prices by contract address (no symbol ambiguity)
+  const { pricesRaw: pricesRawByAddress, isLoading: isPricesLoading, isSuccess: hasPricesLoaded } = useTokenPricesByAddress(
+    effectiveChainId,
+    tokenAddresses,
+    { enabled: tokenAddresses.length > 0 },
+  );
+
+  // Map address-keyed prices back to symbol keys (downstream code uses symbol lookups)
+  const pricesRaw = useMemo(() => {
+    const result: Record<string, bigint> = {};
+    for (const [addr, price] of Object.entries(pricesRawByAddress)) {
+      const symbol = addressToSymbol[addr.toLowerCase()];
+      if (symbol) {
+        result[symbol] = price;
+      }
+    }
+    return result;
+  }, [pricesRawByAddress, addressToSymbol]);
+
+  // Check if we have meaningful price data (at least one non-zero price)
+  const hasPrices = hasPricesLoaded && Object.keys(pricesRaw).length > 0;
+
+  // Helper: calculate USD value from balance and price (8 decimal prices)
+  const calcUsdValue = (balance: bigint, decimals: number, priceRaw: bigint): number => {
+    if (balance <= 0n || priceRaw <= 0n) return 0;
+    return (Number(balance) / 10 ** decimals) * (Number(priceRaw) / 1e8);
+  };
+
+  // Helper: sum collateral and debt USD values across position groups
+  const sumPositionValues = (groups: typeof enrichedPositionGroups) => {
+    let totalCollateral = 0;
+    let totalDebt = 0;
+    let debtCount = 0;
+    for (const group of groups) {
+      for (const col of group.collaterals) {
+        const symbol = col.vault.asset.symbol?.toLowerCase();
+        const price = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+        totalCollateral += calcUsdValue(col.balance, col.vault.asset.decimals, price);
+      }
+      if (group.debt && group.debt.balance > 0n) {
+        debtCount++;
+        const symbol = group.debt.vault.asset.symbol?.toLowerCase();
+        const price = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+        totalDebt += calcUsdValue(group.debt.balance, group.debt.vault.asset.decimals, price);
+      }
+    }
+    return { totalCollateral, totalDebt, debtCount };
+  };
 
   // Compute metrics from enriched position groups using balances and prices
   // This handles both positions with debt (have liquidity data) and supply-only positions
+  // Note: We still calculate metrics even while prices are loading to avoid UI flicker,
+  // but keepPreviousData in useTokenPrices ensures we show stale prices rather than $0
   const metrics = useMemo((): PositionMetrics => {
     if (!enrichedPositionGroups.length) return EMPTY_METRICS;
+    // If prices are still loading on initial load (no previous data), show null metrics
+    if (isPricesLoading && !hasPrices) return EMPTY_METRICS;
 
-    let totalCollateralValueUsd = 0;
-    let totalDebtValueUsd = 0;
-    let positionsWithDebt = 0;
-
-    for (const group of enrichedPositionGroups) {
-      // Calculate collateral value from balances and prices
-      for (const col of group.collaterals) {
-        const symbol = col.vault.asset.symbol?.toLowerCase();
-        const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
-        const decimals = col.vault.asset.decimals;
-
-        // balance is in underlying asset units, price is in 8 decimals (USD)
-        // USD value = balance * price / 10^decimals / 10^8
-        if (col.balance > 0n && priceRaw > 0n) {
-          const valueUsd = (Number(col.balance) / 10 ** decimals) * (Number(priceRaw) / 1e8);
-          totalCollateralValueUsd += valueUsd;
-        }
-      }
-
-      // Calculate debt value from balance and price
-      if (group.debt && group.debt.balance > 0n) {
-        positionsWithDebt++;
-        const symbol = group.debt.vault.asset.symbol?.toLowerCase();
-        const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
-        const decimals = group.debt.vault.asset.decimals;
-
-        if (priceRaw > 0n) {
-          const valueUsd = (Number(group.debt.balance) / 10 ** decimals) * (Number(priceRaw) / 1e8);
-          totalDebtValueUsd += valueUsd;
-        }
-      }
-    }
+    const { totalCollateral, totalDebt, debtCount } = sumPositionValues(enrichedPositionGroups);
 
     return {
-      netBalance: totalCollateralValueUsd - totalDebtValueUsd,
+      netBalance: totalCollateral - totalDebt,
       netYield30d: 0, // Would need APY-weighted calculation
       netApyPercent: null, // Would need APY data
-      positionsWithDebt,
+      positionsWithDebt: debtCount,
     };
-  }, [enrichedPositionGroups, pricesRaw]);
+  }, [enrichedPositionGroups, pricesRaw, isPricesLoading, hasPrices]);
 
   // Compute all used sub-account indices (for debt swap to find next available)
   const usedSubAccountIndices = useMemo(() => {
@@ -784,42 +860,27 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     });
   }, [enrichedPositionGroups]);
 
+  // Next available sub-account index for fresh positions
+  const nextSubAccountIndex = useMemo(() => {
+    if (usedSubAccountIndices.length === 0) return 0;
+    const maxUsed = Math.max(...usedSubAccountIndices);
+    return maxUsed + 1;
+  }, [usedSubAccountIndices]);
+
+  // Adapter hook: convert enriched groups to unified PositionGroup[] for topology layout
+  const positionGroups = useEulerPositionGroups(effectiveChainId, enrichedPositionGroups);
+
   // Report totals to global state (using balance + price calculation from metrics)
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
   useEffect(() => {
     if (!hasLoadedOnce) return;
+    // Don't report $0 totals while prices are loading for the first time
+    if (isPricesLoading && !hasPrices) return;
 
-    // Calculate totals from balances and prices (same logic as metrics)
-    let totalSupplied = 0;
-    let totalBorrowed = 0;
-
-    for (const group of enrichedPositionGroups) {
-      // Sum collateral values
-      for (const col of group.collaterals) {
-        const symbol = col.vault.asset.symbol?.toLowerCase();
-        const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
-        const decimals = col.vault.asset.decimals;
-
-        if (col.balance > 0n && priceRaw > 0n) {
-          totalSupplied += (Number(col.balance) / 10 ** decimals) * (Number(priceRaw) / 1e8);
-        }
-      }
-
-      // Sum debt values
-      if (group.debt && group.debt.balance > 0n) {
-        const symbol = group.debt.vault.asset.symbol?.toLowerCase();
-        const priceRaw = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
-        const decimals = group.debt.vault.asset.decimals;
-
-        if (priceRaw > 0n) {
-          totalBorrowed += (Number(group.debt.balance) / 10 ** decimals) * (Number(priceRaw) / 1e8);
-        }
-      }
-    }
-
-    setProtocolTotals("Euler", totalSupplied, totalBorrowed);
-  }, [hasLoadedOnce, enrichedPositionGroups, pricesRaw, setProtocolTotals, effectiveChainId]);
+    const { totalCollateral, totalDebt } = sumPositionValues(enrichedPositionGroups);
+    setProtocolTotals("Euler", totalCollateral, totalDebt);
+  }, [hasLoadedOnce, enrichedPositionGroups, pricesRaw, setProtocolTotals, effectiveChainId, isPricesLoading, hasPrices]);
 
   // Use enrichedPositionGroups for hasPositions check - this comes from subgraph data
   // and ensures auto-expand works even before balance fetching completes
@@ -851,140 +912,51 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     });
   }, [isCollapsed]);
 
+  // Track which vault the user clicked "Borrow" on in the markets table
+  const [preselectedBorrowVault, setPreselectedBorrowVault] = useState<string | null>(null);
+
+  // Handle "Borrow" click from a market row — opens EulerBorrowModal with the vault pre-selected
+  const handleMarketBorrow = useCallback((vault: EulerVault) => {
+    setPreselectedBorrowVault(vault.address);
+    openPositionModal.open();
+  }, [openPositionModal]);
+
+  const handleCloseOpenPosition = useCallback(() => {
+    setPreselectedBorrowVault(null);
+    openPositionModal.close();
+  }, [openPositionModal]);
+
+  // Build metrics array for the header
+  const headerMetrics: HeaderMetric[] = useMemo(() => [
+    { label: "Balance", value: metrics.netBalance, type: "currency" },
+    { label: "30D Yield", mobileLabel: "30D", value: metrics.netYield30d, type: "currency" },
+    { label: "Net APY", value: metrics.netApyPercent, type: "apy" },
+    {
+      label: "Positions",
+      value: metrics.positionsWithDebt,
+      type: "custom",
+      customRender: (hasData: boolean) => (
+        <span className={`font-mono text-xs font-bold tabular-nums ${hasData ? 'text-base-content' : MetricColors.MUTED}`}>
+          {hasData ? metrics.positionsWithDebt : "—"}
+        </span>
+      ),
+    },
+  ], [metrics]);
+
   return (
-    <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 p-3'}`}>
-      {/* Protocol Header Card */}
-      <div
-        className="card-surface-interactive shadow-lg"
-        onClick={toggleCollapsed}
-      >
-        <div className="card-body p-3 sm:px-5">
-          {/* Mobile Layout */}
-          <div className="space-y-3 sm:hidden">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="token-icon-wrapper-md">
-                  <Image
-                    src="/logos/euler.svg"
-                    alt="Euler icon"
-                    width={20}
-                    height={20}
-                    className="object-contain drop-shadow-sm"
-                    onError={handleImageError}
-                  />
-                </div>
-                <span className="text-sm font-bold tracking-tight">Euler</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="btn btn-xs btn-ghost gap-1"
-                  type="button"
-                  onClick={toggleMarketsOpen}
-                >
-                  <span className="text-[9px] font-semibold uppercase tracking-wider">Markets</span>
-                  {isMarketsOpen ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />}
-                </button>
-                <ChevronDownIcon
-                  className={`text-base-content/40 size-4 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
-                />
-              </div>
-            </div>
-            {/* Stats grid */}
-            <div className="grid grid-cols-4 gap-1">
-              <div className="flex flex-col items-center py-1">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Balance</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${getValueColorClass(hasPositions, metrics.netBalance)}`}>
-                  {formatMetricValue(hasPositions, metrics.netBalance)}
-                </span>
-              </div>
-              <div className="flex flex-col items-center py-1">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">30D</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${getValueColorClass(hasPositions, metrics.netYield30d)}`}>
-                  {formatMetricValue(hasPositions, metrics.netYield30d)}
-                </span>
-              </div>
-              <div className="flex flex-col items-center py-1">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Net APY</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${getApyColorClass(hasPositions, metrics.netApyPercent)}`}>
-                  {formatApyValue(hasPositions, metrics.netApyPercent)}
-                </span>
-              </div>
-              <div className="flex flex-col items-center py-1">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">Positions</span>
-                <span className={`font-mono text-xs font-bold tabular-nums ${hasPositions ? 'text-base-content' : TEXT_MUTED}`}>
-                  {hasPositions ? metrics.positionsWithDebt : "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop Layout */}
-          <div className="hidden flex-wrap items-center gap-x-6 gap-y-4 sm:flex">
-            <div className="flex items-center gap-3">
-              <div className="token-icon-wrapper-lg">
-                <Image
-                  src="/logos/euler.svg"
-                  alt="Euler icon"
-                  width={24}
-                  height={24}
-                  className="object-contain drop-shadow-sm"
-                  onError={handleImageError}
-                />
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="label-text-xs-semibold">Protocol</span>
-                <span className="text-base font-bold tracking-tight">Euler</span>
-              </div>
-            </div>
-
-            <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
-
-            <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
-              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                <span className="label-text-xs-semibold">Balance</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${getValueColorClass(hasPositions, metrics.netBalance)}`}>
-                  {formatMetricValue(hasPositions, metrics.netBalance)}
-                </span>
-              </div>
-
-              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                <span className="label-text-xs-semibold">30D Yield</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${getValueColorClass(hasPositions, metrics.netYield30d)}`}>
-                  {formatMetricValue(hasPositions, metrics.netYield30d)}
-                </span>
-              </div>
-
-              <div className="hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                <span className="label-text-xs-semibold">Net APY</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${getApyColorClass(hasPositions, metrics.netApyPercent)}`}>
-                  {formatApyValue(hasPositions, metrics.netApyPercent)}
-                </span>
-              </div>
-
-              <div className="group/util hover:bg-base-200/30 flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-                <span className="label-text-xs-semibold">Positions</span>
-                <span className={`font-mono text-sm font-bold tabular-nums tracking-tight ${hasPositions ? 'text-base-content' : TEXT_MUTED}`}>
-                  {hasPositions ? metrics.positionsWithDebt : "—"}
-                </span>
-              </div>
-            </div>
-
-            <div className="border-base-300/50 flex items-center gap-2.5 border-l pl-2">
-              <button
-                className="btn btn-sm btn-ghost gap-1.5"
-                type="button"
-                onClick={toggleMarketsOpen}
-              >
-                <span className="text-[10px] font-semibold uppercase tracking-widest">Markets</span>
-                {isMarketsOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}
-              </button>
-              <ChevronDownIcon
-                className={`text-base-content/40 size-5 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 py-2 sm:p-3'}`}>
+      {/* Protocol Header */}
+      <BaseProtocolHeader
+        protocolName="Euler"
+        protocolIcon="/logos/euler.svg"
+        protocolUrl="https://app.euler.finance"
+        isCollapsed={isCollapsed}
+        isMarketsOpen={isMarketsOpen}
+        onToggleCollapsed={toggleCollapsed}
+        onToggleMarkets={toggleMarketsOpen}
+        hasPositions={hasPositions}
+        metrics={headerMetrics}
+      />
 
       {/* Markets Section - expandable */}
       <CollapsibleSection isOpen={isMarketsOpen && !isCollapsed}>
@@ -992,27 +964,39 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
           vaults={vaults}
           isLoading={isLoadingMarkets}
           chainId={effectiveChainId}
+          onBorrow={connectedAddress ? handleMarketBorrow : undefined}
         />
       </CollapsibleSection>
 
       {/* Positions Section - grouped by sub-account with collaterals left, debt right */}
       {!isCollapsed && hasPositions && (
-        <div className="card bg-base-200/40 border-base-300/50 rounded-xl border shadow-md">
+        <div className="card bg-base-200/40 border-base-300/50 border shadow-md">
           <div className="card-body p-4">
             {isLoadingPositions && !hasLoadedOnce ? (
               <div className="flex justify-center py-4">
                 <LoadingSpinner />
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-base-content/10 divide-y">
                 {enrichedPositionGroups.map((group, idx) => (
-                  <EulerPositionGroupRow key={group.subAccount || idx} group={group} chainId={chainId} pricesRaw={pricesRaw} usedSubAccountIndices={usedSubAccountIndices} />
+                  <EulerPositionGroupRow key={group.subAccount || idx} group={group} positionGroup={positionGroups[idx]} chainId={chainId} pricesRaw={pricesRaw} usedSubAccountIndices={usedSubAccountIndices} isADLSupported={isADLSupported} />
                 ))}
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* Borrow modal triggered from market rows (deposit collateral + borrow in one tx) */}
+      <EulerBorrowModal
+        isOpen={openPositionModal.isOpen}
+        onClose={handleCloseOpenPosition}
+        chainId={effectiveChainId}
+        collateralVaultAddresses={[]}
+        subAccountIndex={nextSubAccountIndex}
+        needsCollateral
+        defaultBorrowVault={preselectedBorrowVault}
+      />
     </div>
   );
 };

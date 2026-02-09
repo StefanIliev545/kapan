@@ -21,6 +21,10 @@ const commonConfig = {
     ignoreDuringBuilds: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
   },
 
+  experimental: {
+    // Reduce webpack memory usage during builds (v15+)
+    webpackMemoryOptimizations: true,
+  },
   webpack: (config) => {
     config.resolve.fallback = { fs: false, net: false, tls: false };
     config.externals.push("pino-pretty", "lokijs", "encoding");
@@ -31,6 +35,15 @@ const commonConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "identicon.starknet.id", pathname: "/**" },
       { protocol: "https", hostname: "img.starkurabu.com", pathname: "/**" },
+      // 1inch token images come from various sources
+      { protocol: "https", hostname: "tokens-data.1inch.io", pathname: "/**" },
+      { protocol: "https", hostname: "tokens.1inch.io", pathname: "/**" },
+      { protocol: "https", hostname: "s2.coinmarketcap.com", pathname: "/**" },
+      { protocol: "https", hostname: "assets.coingecko.com", pathname: "/**" },
+      { protocol: "https", hostname: "asset-images.messari.io", pathname: "/**" },
+      { protocol: "https", hostname: "cdn.ondo.finance", pathname: "/**" },
+      { protocol: "https", hostname: "raw.githubusercontent.com", pathname: "/**" },
+      { protocol: "https", hostname: "xstocks-metadata.backed.fi", pathname: "/**" },
     ],
   },
 };

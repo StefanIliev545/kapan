@@ -40,9 +40,10 @@ export const WalletStatus = ({
 }: WalletStatusProps) => {
   const { evm, starknet } = useWalletConnection();
 
-  const isConnected = useMemo(() => {
-    return networkType === "evm" ? evm.isConnected : starknet.isConnected;
-  }, [networkType, evm.isConnected, starknet.isConnected]);
+  const isConnected = useMemo(
+    () => (networkType === "evm" ? evm.isConnected : starknet.isConnected),
+    [networkType, evm.isConnected, starknet.isConnected],
+  );
 
   if (!isConnected) {
     return (
@@ -87,11 +88,14 @@ export const WalletAddress = ({
 }: WalletAddressProps) => {
   const { evm, starknet } = useWalletConnection();
 
-  const address = useMemo(() => {
-    return networkType === "evm" ? evm.address : starknet.address;
-  }, [networkType, evm.address, starknet.address]);
+  const address = useMemo(
+    () => (networkType === "evm" ? evm.address : starknet.address),
+    [networkType, evm.address, starknet.address],
+  );
 
-  if (!address) return null;
+  if (!address) {
+    return null;
+  }
 
   const displayAddress =
     format === "full"

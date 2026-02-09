@@ -13,12 +13,18 @@ export const isValidInteger = (dataType: string, value: string | bigint): boolea
   const isSigned = isSignedType(dataType);
   const bitcount = extractBitCount(dataType, isSigned);
 
-  if (!isValidFormat(value, isSigned)) return false;
+  if (!isValidFormat(value, isSigned)) {
+    return false;
+  }
 
   const valueAsBigInt = parseBigInt(value);
-  if (valueAsBigInt === null) return false;
+  if (valueAsBigInt === null) {
+    return false;
+  }
 
-  if (isInvalidUnsignedValue(valueAsBigInt, isSigned)) return false;
+  if (isInvalidUnsignedValue(valueAsBigInt, isSigned)) {
+    return false;
+  }
 
   return fitsWithinBitCount(valueAsBigInt, bitcount, isSigned);
 };
@@ -35,8 +41,12 @@ const extractBitCount = (dataType: string, isSigned: boolean): number => {
 };
 
 const isValidFormat = (value: string | bigint, isSigned: boolean): boolean => {
-  if (typeof value !== "string") return true;
-  if (isSigned) return SHARED_SIGNED_REGEX.test(value);
+  if (typeof value !== "string") {
+    return true;
+  }
+  if (isSigned) {
+    return SHARED_SIGNED_REGEX.test(value);
+  }
   return SHARED_UNSIGNED_REGEX.test(value);
 };
 
@@ -57,12 +67,16 @@ const fitsWithinBitCount = (value: bigint, bitcount: number, isSigned: boolean):
   const hexString = value.toString(16);
   const significantHexDigits = hexString.match(/.*x0*(.*)$/)?.[1] ?? "";
 
-  if (significantHexDigits.length * 4 > bitcount) return false;
+  if (significantHexDigits.length * 4 > bitcount) {
+    return false;
+  }
 
   // Check if the value is a negative overflow for signed integers.
   if (isSigned && significantHexDigits.length * 4 === bitcount) {
-    const mostSignificantDigit = parseInt(significantHexDigits.slice(-1)?.[0], 16);
-    if (mostSignificantDigit >= 8) return false;
+    const mostSignificantDigit = Number.parseInt(significantHexDigits.slice(-1)?.[0], 16);
+    if (mostSignificantDigit >= 8) {
+      return false;
+    }
   }
 
   return true;

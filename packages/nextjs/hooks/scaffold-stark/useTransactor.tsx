@@ -1,5 +1,5 @@
 import { useTargetNetwork } from "./useTargetNetwork";
-import { AccountInterface, InvokeFunctionResponse } from "starknet";
+import type { AccountInterface, InvokeFunctionResponse } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import providerFactory from "~~/services/web3/provider";
@@ -9,6 +9,42 @@ type TransactionFunc = (
   tx: () => Promise<InvokeFunctionResponse> | Promise<string>,
   // | SendTransactionParameters,
 ) => Promise<string | undefined>;
+
+const REJECTION_KEYWORDS = ["user rejected", "user denied", "user cancelled", "rejected", "denied", "cancelled"];
+const REJECTION_CODES: (number | string)[] = [4001, "ACTION_REJECTED", "USER_REJECTED"];
+
+/** Check whether the error represents a user rejection in the wallet. */
+function isUserRejection(error: unknown): boolean {
+  const errorObj = error as Error & { code?: number | string };
+  const lowerMessage = (errorObj?.message || "").toLowerCase();
+  if (REJECTION_KEYWORDS.some(kw => lowerMessage.includes(kw))) return true;
+  if (errorObj?.code !== undefined && REJECTION_CODES.includes(errorObj.code)) return true;
+  return false;
+}
+
+/** Extract a user-facing error message from a transaction error. */
+function extractTransactorErrorMessage(error: unknown): string {
+  if (isUserRejection(error)) return "User rejected the request";
+  const errorMessage = (error as Error)?.message || "";
+  const errorPattern = /Contract (.*?)"}/;
+  const match = errorPattern.exec(errorMessage);
+  return match ? match[1] : errorMessage;
+}
+
+/** Resolve the transaction hash from a tx function or raw transaction object. */
+async function resolveHash(
+  tx: (() => Promise<InvokeFunctionResponse> | Promise<string>) | unknown,
+  walletClient: AccountInterface,
+): Promise<string> {
+  if (typeof tx === "function") {
+    const result = await tx();
+    return typeof result === "string" ? result : result.transaction_hash;
+  }
+  if (tx != null) {
+    return (await walletClient.execute(tx as any)).transaction_hash;
+  }
+  throw new Error("Incorrect transaction passed to transactor");
+}
 
 /**
  * Runs Transaction passed in to returned function showing UI feedback.
@@ -33,52 +69,28 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
     }
 
     let notificationId: string | number | null = null;
-    let transactionHash: Awaited<InvokeFunctionResponse>["transaction_hash"] | undefined = undefined;
+    let transactionHash: string | undefined = undefined;
+
     try {
       const networkId = await walletClient.getChainId();
-      // Show pending notification - this will stay until we get the transaction hash or timeout
       notificationId = notification.loading(
         <TransactionToast step="pending" message="Waiting for approval..." />
       );
-      
-      // Set up 10 second timeout for pending state
+
       const pendingTimeout = setTimeout(() => {
-        if (notificationId) {
-          notification.remove(notificationId);
-        }
+        if (notificationId) notification.remove(notificationId);
       }, 10000);
-      
+
       try {
-        // Wait for user to confirm in wallet and get transaction hash
-        if (typeof tx === "function") {
-          // Tx is already prepared by the caller
-          console.log("tx is a function");
-          const result = await tx();
-          if (typeof result === "string") {
-            transactionHash = result;
-          } else {
-            transactionHash = result.transaction_hash;
-          }
-        } else if (tx != null) {
-          console.log("tx", tx);
-          // This will wait for wallet confirmation before returning hash
-          transactionHash = (await walletClient.execute(tx)).transaction_hash;
-        } else {
-          throw new Error("Incorrect transaction passed to transactor");
-        }
-        
-        // Clear timeout since we got the hash
+        transactionHash = await resolveHash(tx, walletClient);
         clearTimeout(pendingTimeout);
       } catch (error) {
-        // Clear timeout on error
         clearTimeout(pendingTimeout);
         throw error;
       }
 
-      // Now that we have the hash, transaction is sent - switch to "sent" state
       const blockExplorerTxURL = networkId ? getBlockExplorerTxLink(targetNetwork.network, transactionHash) : "";
 
-      // Update notification to "sent" state
       notification.remove(notificationId);
       notificationId = notification.loading(
         <TransactionToast
@@ -110,33 +122,10 @@ export const useTransactor = (_walletClient?: AccountInterface): TransactionFunc
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("txCompleted"));
       }
-    } catch (error: any) {
-      if (notificationId) {
-        notification.remove(notificationId);
-      }
+    } catch (error: unknown) {
+      if (notificationId) notification.remove(notificationId);
 
-      // Check for user rejection
-      const errorMessage = error?.message || "";
-      const lowerMessage = errorMessage.toLowerCase();
-      const isRejection = 
-        lowerMessage.includes("user rejected") ||
-        lowerMessage.includes("user denied") ||
-        lowerMessage.includes("user cancelled") ||
-        lowerMessage.includes("rejected") ||
-        lowerMessage.includes("denied") ||
-        lowerMessage.includes("cancelled") ||
-        error?.code === 4001 ||
-        error?.code === "ACTION_REJECTED" ||
-        error?.code === "USER_REJECTED";
-
-      const message = isRejection 
-        ? "User rejected the request"
-        : (() => {
-            const errorPattern = /Contract (.*?)"}/;
-            const match = errorPattern.exec(errorMessage);
-            return match ? match[1] : errorMessage;
-          })();
-
+      const message = extractTransactorErrorMessage(error);
       console.error("⚡️ ~ file: useTransactor.ts ~ error", message);
 
       const blockExplorerTxURL = transactionHash

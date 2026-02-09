@@ -16,20 +16,18 @@ export function etherValueToDisplayValue(
   nativeCurrencyPrice: number,
 ): string {
   if (usdMode && nativeCurrencyPrice) {
-    const parsedEthValue = parseFloat(etherValue);
+    const parsedEthValue = Number.parseFloat(etherValue);
     if (Number.isNaN(parsedEthValue)) {
       return etherValue;
-    } else {
-      // We need to round the value rather than use toFixed,
-      // since otherwise a user would not be able to modify the decimal value
-      return (
-        Math.round(parsedEthValue * nativeCurrencyPrice * 10 ** MAX_DECIMALS_USD) /
-        10 ** MAX_DECIMALS_USD
-      ).toString();
     }
-  } else {
-    return etherValue;
+    // We need to round the value rather than use toFixed,
+    // since otherwise a user would not be able to modify the decimal value
+    return (
+      Math.round(parsedEthValue * nativeCurrencyPrice * 10 ** MAX_DECIMALS_USD) /
+      10 ** MAX_DECIMALS_USD
+    ).toString();
   }
+  return etherValue;
 }
 
 /**
@@ -42,15 +40,13 @@ export function displayValueToEtherValue(
   nativeCurrencyPrice: number,
 ): string {
   if (usdMode && nativeCurrencyPrice) {
-    const parsedDisplayValue = parseFloat(displayValue);
+    const parsedDisplayValue = Number.parseFloat(displayValue);
     if (Number.isNaN(parsedDisplayValue)) {
       // Invalid number.
       return displayValue;
-    } else {
-      // Compute the ETH value if a valid number.
-      return (parsedDisplayValue / nativeCurrencyPrice).toString();
     }
-  } else {
-    return displayValue;
+    // Compute the ETH value if a valid number.
+    return (parsedDisplayValue / nativeCurrencyPrice).toString();
   }
+  return displayValue;
 }

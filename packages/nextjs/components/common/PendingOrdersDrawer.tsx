@@ -1,209 +1,224 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAccount, useChainId } from "wagmi";
-import { useQueryClient } from "@tanstack/react-query";
-import { formatUnits, type Address } from "viem";
-import { useCowOrder } from "~~/hooks/useCowOrder";
-import { useMultipleChunkExecutedEvents, useWatchChunkExecuted } from "~~/hooks/useChunkExecutedEvents";
+import { type Address, decodeAbiParameters, formatUnits } from "viem";
 import { useTokenInfo } from "~~/hooks/useTokenInfo";
-import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
-import { OrderStatus, calculateExecutionSummary } from "~~/utils/cow";
-import type { OrderContext } from "~~/utils/cow";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import {
-  getOrderNote,
-  findPendingNoteForOrder,
-  linkNoteToOrderHash,
-  getOperationLabel,
-  getOperationColorClass,
-  ORDER_CREATED_EVENT,
-  type OrderNote,
-  type OperationType,
-} from "~~/utils/orderNotes";
-import { useOrderHistory, type Order } from "~~/hooks/useOrderHistory";
-import { getProtocolLogo } from "~~/utils/protocol";
+import { tokenNameToLogo, PROTOCOL_ICONS } from "~~/contracts/externalContracts";
+import { ORDER_CREATED_EVENT } from "~~/utils/orderNotes";
 import { timeAgo } from "~~/utils/deadline";
 import { truncateAddress } from "~~/utils/address";
-import { useIntervalWhen } from "~~/hooks/common";
-import { qk } from "~~/lib/queryKeys";
+import {
+  useConditionalOrders,
+  ConditionalOrderStatus,
+  formatLtvPercent,
+  type ConditionalOrder,
+  PROTOCOL_IDS,
+} from "~~/hooks/useConditionalOrders";
+import { useConditionalOrderEvents } from "~~/hooks/useConditionalOrderEvents";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { ShieldCheckIcon, ArrowTrendingUpIcon, ArrowsRightLeftIcon, QuestionMarkCircleIcon, ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
+import { type KapanProtocol } from "~~/utils/cow/appData";
+import { getCowExplorerAddressUrl } from "~~/utils/cow/addresses";
 
-function formatAmount(amount: bigint, decimals: number): string {
-  const formatted = formatUnits(amount, decimals);
-  const num = parseFloat(formatted);
-  if (num >= 1000) return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  if (num >= 1) return num.toLocaleString(undefined, { maximumFractionDigits: 4 });
-  return num.toLocaleString(undefined, { maximumFractionDigits: 6 });
+// ============ Limit Price Trigger Decoding ============
+
+interface DecodedLimitPriceParams {
+  protocolId: `0x${string}`;
+  sellToken: Address;
+  buyToken: Address;
+  sellDecimals: number;
+  buyDecimals: number;
+  limitPrice: bigint;
+  triggerAbovePrice: boolean;
+  totalSellAmount: bigint;
+  totalBuyAmount: bigint;
+  numChunks: number;
+  isKindBuy: boolean;
 }
 
-function formatUsd(amount: number): string {
-  if (amount < 0.01) return "<$0.01";
-  if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}k`;
-  return `$${amount.toFixed(2)}`;
+function decodeLimitPriceTriggerParams(data: `0x${string}`): DecodedLimitPriceParams | undefined {
+  try {
+    const decoded = decodeAbiParameters(
+      [{
+        type: "tuple",
+        components: [
+          { name: "protocolId", type: "bytes4" },
+          { name: "protocolContext", type: "bytes" },
+          { name: "sellToken", type: "address" },
+          { name: "buyToken", type: "address" },
+          { name: "sellDecimals", type: "uint8" },
+          { name: "buyDecimals", type: "uint8" },
+          { name: "limitPrice", type: "uint256" },
+          { name: "triggerAbovePrice", type: "bool" },
+          { name: "totalSellAmount", type: "uint256" },
+          { name: "totalBuyAmount", type: "uint256" },
+          { name: "numChunks", type: "uint8" },
+          { name: "maxSlippageBps", type: "uint256" },
+          { name: "isKindBuy", type: "bool" },
+        ],
+      }],
+      data,
+    );
+    const p = decoded[0];
+    return {
+      protocolId: p.protocolId as `0x${string}`,
+      sellToken: p.sellToken,
+      buyToken: p.buyToken,
+      sellDecimals: p.sellDecimals,
+      buyDecimals: p.buyDecimals,
+      limitPrice: p.limitPrice,
+      triggerAbovePrice: p.triggerAbovePrice,
+      totalSellAmount: p.totalSellAmount,
+      totalBuyAmount: p.totalBuyAmount,
+      numChunks: p.numChunks,
+      isKindBuy: p.isKindBuy,
+    };
+  } catch {
+    return undefined;
+  }
 }
+
+// ============ Protocol ID to Name Mapping ============
+
+function getProtocolNameFromId(protocolId: `0x${string}`): KapanProtocol | undefined {
+  if (protocolId === PROTOCOL_IDS.AAVE_V3) {
+    return "aave";
+  }
+  if (protocolId === PROTOCOL_IDS.COMPOUND_V3) {
+    return "compound";
+  }
+  if (protocolId === PROTOCOL_IDS.MORPHO_BLUE) {
+    return "morpho";
+  }
+  if (protocolId === PROTOCOL_IDS.EULER_V2) {
+    return "euler";
+  }
+  if (protocolId === PROTOCOL_IDS.VENUS) {
+    return "venus";
+  }
+  return undefined;
+}
+
 
 const SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
 
-interface OrderWithHash {
-  orderHash: string;
-  context: OrderContext;
+
+// ============ Extracted helpers/sub-components to reduce renderOrderItem complexity ============
+
+type OrderType = "adl" | "autoLeverage" | "limit" | "unknown";
+
+interface OrderTypeMetadata {
+  label: string;
+  Icon: typeof ArrowTrendingUpIcon;
+  badgeClass: string;
 }
 
-// Component to fetch and display USD value
-function UsdValue({ symbol, amount }: { symbol: string; amount: number }) {
-  const priceData = useTokenPriceApi(symbol);
-  const price = priceData.isSuccess ? (priceData as { price: number }).price : undefined;
-  
-  if (!price) return null;
-  const usdValue = amount * price;
-  return <span className="text-base-content/40">{formatUsd(usdValue)}</span>;
+/** Resolve display metadata (label, icon, badge class) from order type. */
+function getOrderTypeMetadata(orderType: OrderType): OrderTypeMetadata {
+  switch (orderType) {
+    case "autoLeverage":
+      return { label: "Auto Leverage", Icon: ArrowTrendingUpIcon, badgeClass: "bg-info/20 text-info" };
+    case "limit":
+      return { label: "Swap", Icon: ArrowsRightLeftIcon, badgeClass: "bg-primary/20 text-primary" };
+    case "unknown":
+      return { label: "Unknown", Icon: QuestionMarkCircleIcon, badgeClass: "bg-warning/20 text-warning" };
+    default: // "adl"
+      return { label: "Auto Deleverage", Icon: ShieldCheckIcon, badgeClass: "bg-success/20 text-success" };
+  }
+}
+
+/** Resolve the protocol name and limit price params from a conditional order. */
+function resolveOrderProtocol(
+  order: ConditionalOrder,
+  orderType: OrderType,
+): { protocolName: KapanProtocol | undefined; limitPriceParams: DecodedLimitPriceParams | undefined } {
+  let protocolName: KapanProtocol | undefined;
+  let limitPriceParams: DecodedLimitPriceParams | undefined;
+
+  if (orderType === "limit" && order.context.params.triggerStaticData) {
+    limitPriceParams = decodeLimitPriceTriggerParams(order.context.params.triggerStaticData as `0x${string}`);
+    if (limitPriceParams) {
+      protocolName = getProtocolNameFromId(limitPriceParams.protocolId);
+    }
+  } else if (order.triggerParams) {
+    protocolName = getProtocolNameFromId(order.triggerParams.protocolId);
+  }
+
+  return { protocolName, limitPriceParams };
+}
+
+/** Format a limit price (token-to-token exchange rate) for display. */
+function formatLimitPrice(value: number): string {
+  if (value === 0) return "0";
+  const abs = Math.abs(value);
+  let maxFrac = 4;
+  if (abs < 0.0001) maxFrac = 8;
+  else if (abs < 0.01) maxFrac = 6;
+  else if (abs < 1) maxFrac = 5;
+  return value.toLocaleString(undefined, { maximumFractionDigits: maxFrac });
+}
+
+/** Format a token amount for display, using more decimals for small values. */
+function formatTokenAmount(amount: bigint, decimals: number): string {
+  const value = Number(formatUnits(amount, decimals));
+  if (value === 0) return "0";
+  const abs = Math.abs(value);
+  let maxFrac = 4;
+  if (abs < 0.0001) maxFrac = 8;
+  else if (abs < 0.01) maxFrac = 6;
+  else if (abs < 1) maxFrac = 5;
+  return value.toLocaleString(undefined, { maximumFractionDigits: maxFrac });
 }
 
 export function PendingOrdersDrawer() {
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
-  const queryClient = useQueryClient();
-  const { getUserOrdersWithDetails, cancelOrder, isCancelling, isAvailable } = useCowOrder();
 
-  // Fetch orders from database to get order types
-  const { data: dbOrders } = useOrderHistory({ chainId, enabled: !!userAddress });
+  // Fetch conditional orders (ADL, Auto-Leverage, Limit Orders, Swaps)
+  const {
+    orders: conditionalOrders,
+    activeCount,
+    isAvailable,
+    refetch: refetchOrders,
+    cancelOrder,
+    isCancelling,
+    isLoading,
+  } = useConditionalOrders({ fetchTriggerStatus: true });
+
+  // Watch for conditional order events (created, completed, cancelled) to trigger real-time refreshes
+  useConditionalOrderEvents();
+
+  // Get trigger contract addresses to differentiate order types
+  const { data: autoLeverageTriggerInfo } = useDeployedContractInfo({ contractName: "AutoLeverageTrigger", chainId } as any);
+  const autoLeverageTriggerAddress = autoLeverageTriggerInfo?.address?.toLowerCase();
+  const { data: limitPriceTriggerInfo } = useDeployedContractInfo({ contractName: "LimitPriceTrigger", chainId } as any);
+  const limitPriceTriggerAddress = limitPriceTriggerInfo?.address?.toLowerCase();
+  const { data: ltvTriggerInfo } = useDeployedContractInfo({ contractName: "LtvTrigger", chainId } as any);
+  const ltvTriggerAddress = ltvTriggerInfo?.address?.toLowerCase();
+  const { data: orderManagerInfo } = useDeployedContractInfo({ contractName: "KapanConditionalOrderManager", chainId } as any);
+  const cowExplorerUrl = orderManagerInfo?.address ? getCowExplorerAddressUrl(chainId, orderManagerInfo.address) : undefined;
 
   const [isOpen, setIsOpen] = useState(false);
-  const [orders, setOrders] = useState<OrderWithHash[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [cancellingHash, setCancellingHash] = useState<string | null>(null);
   // Track if we have a pending order that hasn't been fetched yet
   const [hasPendingNew, setHasPendingNew] = useState(false);
-
-  // Track previous order states to detect progress/completion
-  const prevOrderStates = useRef<Map<string, { status: number; iterations: bigint }>>(new Map());
-
-  // Track which user+chain combo we've fetched for to detect changes
-  const [fetchedFor, setFetchedFor] = useState<string | null>(null);
-  const currentKey = userAddress && chainId ? `${userAddress}-${chainId}` : null;
-  const hasFetched = fetchedFor === currentKey;
-
-  // Refresh protocol data when orders progress or complete
-  const refreshProtocolData = useCallback(() => {
-    console.log("[PendingOrdersDrawer] Order state changed, refreshing protocol data...");
-    Promise.all([
-      queryClient.refetchQueries({ queryKey: ['readContract'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['readContracts'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['balance'], type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['token'], type: 'active' }),
-      // Morpho-specific queries - use hierarchical keys for chain-specific invalidation
-      queryClient.refetchQueries({ queryKey: qk.morpho.all(chainId), type: 'active' }),
-      // Euler-specific queries
-      queryClient.refetchQueries({ queryKey: qk.euler.all(chainId), type: 'active' }),
-    ]).catch(e => console.warn("[PendingOrdersDrawer] Refetch error:", e));
-
-    // Also dispatch txCompleted event for any other listeners
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("txCompleted"));
-    }
-  }, [queryClient, chainId]);
-
-  const fetchOrders = useCallback(async () => {
-    if (!userAddress || !isAvailable || !currentKey) return;
-    setIsLoading(true);
-    try {
-      const userOrders = await getUserOrdersWithDetails();
-
-      // Check if any order progressed or completed
-      let hasChanges = false;
-      for (const order of userOrders) {
-        const prev = prevOrderStates.current.get(order.orderHash);
-        if (prev) {
-          const statusChanged = prev.status !== order.context.status;
-          const iterationsIncreased = order.context.iterationCount > prev.iterations;
-          if (statusChanged || iterationsIncreased) {
-            hasChanges = true;
-            console.log(`[PendingOrdersDrawer] Order ${order.orderHash.slice(0, 10)}... changed:`, {
-              statusChanged,
-              iterationsIncreased,
-              oldStatus: prev.status,
-              newStatus: order.context.status,
-              oldIterations: prev.iterations.toString(),
-              newIterations: order.context.iterationCount.toString(),
-            });
-          }
-        }
-        // Update tracked state
-        prevOrderStates.current.set(order.orderHash, {
-          status: order.context.status,
-          iterations: order.context.iterationCount,
-        });
-      }
-
-      // Refresh protocol data if any order changed
-      if (hasChanges) {
-        refreshProtocolData();
-      }
-
-      setOrders(userOrders);
-      setFetchedFor(currentKey);
-    } catch (error) {
-      console.error("Failed to fetch orders:", error);
-      setFetchedFor(currentKey); // Mark as fetched even on error to prevent infinite retries
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userAddress, isAvailable, getUserOrdersWithDetails, currentKey, refreshProtocolData]);
-
-  // Reset state when user or chain changes
-  useEffect(() => {
-    if (currentKey !== fetchedFor) {
-      setOrders([]);
-      setIsOpen(false);
-    }
-  }, [currentKey, fetchedFor]);
-
-  // Fetch on mount or when user/chain changes
-  // This ensures we have order hashes for event watching even if drawer is never opened
-  useEffect(() => {
-    if (userAddress && isAvailable && !hasFetched) {
-      fetchOrders();
-    }
-  }, [userAddress, isAvailable, hasFetched, fetchOrders]);
-
-  // Also fetch when hasPendingNew is set (order just created) - don't wait for timeout
-  useEffect(() => {
-    if (hasPendingNew && userAddress && isAvailable) {
-      // Immediate fetch attempt, then the delayed one will also run
-      fetchOrders();
-    }
-  }, [hasPendingNew, userAddress, isAvailable, fetchOrders]);
-
-  // Auto-refresh when drawer is open (fast - 15s)
-  useIntervalWhen(fetchOrders, 15000, isOpen);
-
-  // Background refresh even when drawer is closed (slow - 60s) to detect completions
-  // Only runs when we have orders (we'll filter active ones in the callback)
-  useIntervalWhen(fetchOrders, 60000, !isOpen && orders.length > 0);
+  // Protocol filter - null means "All"
+  const [selectedProtocol, setSelectedProtocol] = useState<KapanProtocol | null>(null);
 
   // Listen for new order created events and refetch
   useEffect(() => {
     const handleOrderCreated = () => {
-      // Immediately show the button (even before fetch completes)
       setHasPendingNew(true);
-      // Small delay to allow the order to be indexed, then fetch
       setTimeout(() => {
-        fetchOrders().then(() => setHasPendingNew(false));
+        refetchOrders().then(() => setHasPendingNew(false));
       }, 2000);
     };
 
     window.addEventListener(ORDER_CREATED_EVENT, handleOrderCreated);
     return () => window.removeEventListener(ORDER_CREATED_EVENT, handleOrderCreated);
-  }, [fetchOrders]);
-
-  const handleCancel = useCallback(async (orderHash: string) => {
-    setCancellingHash(orderHash);
-    const success = await cancelOrder(orderHash);
-    setCancellingHash(null);
-    if (success) await fetchOrders();
-  }, [cancelOrder, fetchOrders]);
+  }, [refetchOrders]);
 
   // Toggle drawer open/close
   const toggleDrawer = useCallback(() => {
@@ -215,75 +230,116 @@ export function PendingOrdersDrawer() {
     setIsOpen(false);
   }, []);
 
-  // Filter to recent orders (past 7 days), exclude cancelled, sort newest first
-  const now = Math.floor(Date.now() / 1000);
-
+  // Filter orders: show ALL active orders (regardless of age) + recent completed/cancelled (past 7 days)
   const recentOrders = useMemo(() => {
-    return orders
-      .filter(o => now - Number(o.context.createdAt) < SEVEN_DAYS_SECONDS)
-      .filter(o => o.context.status !== OrderStatus.Cancelled) // Exclude cancelled orders
+    const now = Math.floor(Date.now() / 1000);
+    return conditionalOrders
+      .filter(o => {
+        // Always show active orders
+        if (o.context.status === ConditionalOrderStatus.Active) {
+          return true;
+        }
+        // Only show recent completed/cancelled orders
+        return now - Number(o.context.createdAt) < SEVEN_DAYS_SECONDS;
+      })
       .sort((a, b) => Number(b.context.createdAt) - Number(a.context.createdAt));
-  }, [orders, now]);
-  
-  const hasOlderOrders = orders.length > recentOrders.length;
-  const activeOrders = recentOrders.filter(o => o.context.status === OrderStatus.Active);
-  const pastOrders = recentOrders.filter(o => o.context.status !== OrderStatus.Active);
-  const activeCount = activeOrders.length;
+  }, [conditionalOrders]);
 
-  // Get active order hashes for live event watching
-  const activeOrderHashes = useMemo(
-    () => activeOrders.map(o => o.orderHash),
-    [activeOrders]
-  );
+  const hasOlderOrders = conditionalOrders.length > recentOrders.length;
 
-  // Watch for live ChunkExecuted events and refresh when chunks fill
-  const handleChunkExecuted = useCallback((orderHash: string, chunkIndex: number) => {
-    console.log(`[PendingOrdersDrawer] Chunk ${chunkIndex} filled for order ${orderHash.slice(0, 10)}...`);
-    // Refetch orders to get updated iteration counts
-    fetchOrders();
-    // Also refresh protocol data since positions changed
-    refreshProtocolData();
-  }, [fetchOrders, refreshProtocolData]);
+  // Helper to get protocol from order
+  const getOrderProtocol = useCallback((order: ConditionalOrder): KapanProtocol | undefined => {
+    const triggerAddr = order.context.params.trigger.toLowerCase();
+    if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) {
+      // Decode limit price trigger params
+      const params = decodeLimitPriceTriggerParams(order.context.params.triggerStaticData as `0x${string}`);
+      return params ? getProtocolNameFromId(params.protocolId) : undefined;
+    }
+    // For LTV-based triggers (ADL/AL), get from triggerParams
+    if (order.triggerParams) {
+      return getProtocolNameFromId(order.triggerParams.protocolId);
+    }
+    return undefined;
+  }, [limitPriceTriggerAddress]);
 
-  useWatchChunkExecuted(activeOrderHashes, handleChunkExecuted, activeCount > 0);
+  // Extract unique protocols from orders
+  const availableProtocols = useMemo(() => {
+    const protocols = new Set<KapanProtocol>();
+    for (const order of recentOrders) {
+      const protocol = getOrderProtocol(order);
+      if (protocol) {
+        protocols.add(protocol);
+      }
+    }
+    return [...protocols].sort();
+  }, [recentOrders, getOrderProtocol]);
 
-  const ordersForEvents = useMemo(() =>
-    recentOrders.map(o => ({
-      orderHash: o.orderHash,
-      isComplete: o.context.status === OrderStatus.Completed,
-    })),
-    [recentOrders]
-  );
+  // Filter orders by selected protocol
+  const filteredOrders = useMemo(() => {
+    if (!selectedProtocol) {
+      return recentOrders;
+    }
+    return recentOrders.filter(order => getOrderProtocol(order) === selectedProtocol);
+  }, [recentOrders, selectedProtocol, getOrderProtocol]);
 
-  // Memoized cancel handlers for each order
-  const cancelHandlers = useMemo(() => {
-    return recentOrders.reduce<Record<string, () => void>>((acc, order) => {
-      acc[order.orderHash] = () => handleCancel(order.orderHash);
-      return acc;
-    }, {});
-  }, [recentOrders, handleCancel]);
+  // Re-categorize filtered orders
+  const filteredCategorizedOrders = useMemo(() => {
+    const adlOrders: ConditionalOrder[] = [];
+    const autoLeverageOrders: ConditionalOrder[] = [];
+    const limitOrders: ConditionalOrder[] = [];
+    const unknownOrders: ConditionalOrder[] = [];
 
-  // Memoized progress bar styles for each order
-  const progressStyles = useMemo(() => {
-    return recentOrders.reduce<Record<string, React.CSSProperties>>((acc, order) => {
-      const totalChunks = Number(order.context.params.targetValue);
-      const completedChunks = Number(order.context.iterationCount);
-      const progressPercent = totalChunks > 0 ? (completedChunks / totalChunks) * 100 : 0;
-      acc[order.orderHash] = { width: `${progressPercent}%` };
-      return acc;
-    }, {});
-  }, [recentOrders]);
+    for (const order of filteredOrders) {
+      const triggerAddress = order.context.params.trigger.toLowerCase();
+      if (autoLeverageTriggerAddress && triggerAddress === autoLeverageTriggerAddress) {
+        autoLeverageOrders.push(order);
+      } else if (limitPriceTriggerAddress && triggerAddress === limitPriceTriggerAddress) {
+        limitOrders.push(order);
+      } else if (ltvTriggerAddress && triggerAddress === ltvTriggerAddress) {
+        adlOrders.push(order);
+      } else {
+        // Put unrecognized triggers in unknown category so they can still be cancelled
+        unknownOrders.push(order);
+      }
+    }
 
-  const executionDataMap = useMultipleChunkExecutedEvents(ordersForEvents);
+    return {
+      adl: {
+        active: adlOrders.filter(o => o.context.status === ConditionalOrderStatus.Active),
+        completed: adlOrders.filter(o => o.context.status === ConditionalOrderStatus.Completed),
+      },
+      autoLeverage: {
+        active: autoLeverageOrders.filter(o => o.context.status === ConditionalOrderStatus.Active),
+        completed: autoLeverageOrders.filter(o => o.context.status === ConditionalOrderStatus.Completed),
+      },
+      limit: {
+        active: limitOrders.filter(o => o.context.status === ConditionalOrderStatus.Active),
+        completed: limitOrders.filter(o => o.context.status === ConditionalOrderStatus.Completed),
+      },
+      unknown: {
+        active: unknownOrders.filter(o => o.context.status === ConditionalOrderStatus.Active),
+        completed: unknownOrders.filter(o => o.context.status === ConditionalOrderStatus.Completed),
+      },
+    };
+  }, [filteredOrders, autoLeverageTriggerAddress, limitPriceTriggerAddress, ltvTriggerAddress]);
 
+  // Filtered completed orders (not cancelled)
+  const filteredCompletedOrders = useMemo(() => [
+    ...filteredCategorizedOrders.adl.completed,
+    ...filteredCategorizedOrders.autoLeverage.completed,
+    ...filteredCategorizedOrders.limit.completed,
+    ...filteredCategorizedOrders.unknown.completed,
+  ].sort((a, b) => Number(b.context.createdAt) - Number(a.context.createdAt)), [filteredCategorizedOrders]);
+
+  // Token addresses for fetching info
   const tokenAddresses = useMemo(() => {
     const addresses = new Set<Address>();
-    orders.forEach(o => {
+    conditionalOrders.forEach(o => {
       addresses.add(o.context.params.sellToken as Address);
       addresses.add(o.context.params.buyToken as Address);
     });
-    return Array.from(addresses);
-  }, [orders]);
+    return [...addresses];
+  }, [conditionalOrders]);
 
   const tokenInfoMap = useTokenInfo(tokenAddresses, chainId);
 
@@ -292,83 +348,13 @@ export function PendingOrdersDrawer() {
     return info?.symbol ?? truncateAddress(address);
   }, [tokenInfoMap]);
 
-  const getTokenDecimals = useCallback((address: string): number => {
-    const info = tokenInfoMap.get(address.toLowerCase());
-    return info?.decimals ?? 18;
-  }, [tokenInfoMap]);
+  // Don't render anything if not connected or no contract available
+  if (!isAvailable || !userAddress) {
+    return null;
+  }
 
-  // Look up order notes for operation type and protocol info
-  // Check localStorage first, then fall back to database orders
-  const orderNotesMap = useMemo(() => {
-    const notesMap = new Map<string, OrderNote>();
-
-    for (const order of orders) {
-      const { orderHash, context } = order;
-
-      // Try direct lookup by orderHash from localStorage
-      let note = getOrderNote(orderHash);
-
-      // If not found, try to match by tokens and timestamp from localStorage
-      if (!note) {
-        const sellSymbol = getTokenSymbol(context.params.sellToken);
-        const buySymbol = getTokenSymbol(context.params.buyToken);
-        note = findPendingNoteForOrder(
-          sellSymbol,
-          buySymbol,
-          chainId,
-          Number(context.createdAt)
-        );
-
-        // If found a pending note, link it to the orderHash
-        if (note && note.salt) {
-          linkNoteToOrderHash(note.salt, orderHash);
-        }
-      }
-
-      // If still not found, try to match from database orders by tokens and timestamp
-      if (!note && dbOrders && dbOrders.length > 0) {
-        const sellTokenLower = context.params.sellToken.toLowerCase();
-        const buyTokenLower = context.params.buyToken.toLowerCase();
-        const createdAtMs = Number(context.createdAt) * 1000;
-
-        // Find matching database order (within 5 minute tolerance)
-        const dbOrder = dbOrders.find((db: Order) => {
-          const tokenMatch = db.sellToken.toLowerCase() === sellTokenLower &&
-                            db.buyToken.toLowerCase() === buyTokenLower;
-          const timeMatch = Math.abs(new Date(db.createdAt).getTime() - createdAtMs) < 5 * 60 * 1000;
-          return tokenMatch && timeMatch;
-        });
-
-        if (dbOrder) {
-          // Create a note from database order
-          note = {
-            orderHash,
-            salt: dbOrder.salt || undefined,
-            operationType: dbOrder.orderType as OperationType,
-            description: `${dbOrder.orderType}: ${dbOrder.sellTokenSymbol} → ${dbOrder.buyTokenSymbol}`,
-            protocol: dbOrder.protocol || undefined,
-            sellToken: dbOrder.sellTokenSymbol || undefined,
-            buyToken: dbOrder.buyTokenSymbol || undefined,
-            chainId: dbOrder.chainId,
-            createdAt: new Date(dbOrder.createdAt).getTime(),
-          };
-        }
-      }
-
-      if (note) {
-        notesMap.set(orderHash, note);
-      }
-    }
-
-    return notesMap;
-  }, [orders, chainId, getTokenSymbol, dbOrders]);
-
-  // Don't render anything if CoW not available or not connected
-  if (!isAvailable || !userAddress) return null;
-
-  // Show button if we have orders OR if a new order was just created (pending fetch)
-  // This allows the button to appear immediately when ORDER_CREATED_EVENT fires
-  const showButton = orders.length > 0 || hasPendingNew;
+  // Show button if we have orders OR if a new order was just created
+  const showButton = conditionalOrders.length > 0 || hasPendingNew;
 
   return (
     <>
@@ -395,12 +381,12 @@ export function PendingOrdersDrawer() {
           <div className="border-base-200 flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="font-semibold">Orders</span>
-              <button 
-                onClick={fetchOrders} 
+              <button
+                onClick={() => refetchOrders()}
                 disabled={isLoading}
                 className="hover:bg-base-200 rounded p-1 transition-colors"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className={`text-base-content/50 size-4${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className={`text-base-content/50 size-4${isLoading ? ' animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
@@ -412,15 +398,49 @@ export function PendingOrdersDrawer() {
             </button>
           </div>
 
+          {/* Protocol Tabs */}
+          {availableProtocols.length > 1 && (
+            <div className="border-base-200 flex items-center gap-4 border-b px-4 py-2">
+              <button
+                onClick={() => setSelectedProtocol(null)}
+                className={`flex items-center gap-1.5 text-sm transition-colors ${
+                  selectedProtocol === null
+                    ? "text-base-content border-primary border-b-2 pb-0.5 font-medium"
+                    : "text-base-content/50 hover:text-base-content"
+                }`}
+              >
+                All
+              </button>
+              {availableProtocols.map(protocol => (
+                <button
+                  key={protocol}
+                  onClick={() => setSelectedProtocol(protocol)}
+                  className={`flex items-center gap-1.5 text-sm transition-colors ${
+                    selectedProtocol === protocol
+                      ? "text-base-content border-primary border-b-2 pb-0.5 font-medium"
+                      : "text-base-content/50 hover:text-base-content"
+                  }`}
+                >
+                  <Image src={PROTOCOL_ICONS[protocol]} alt={protocol} width={14} height={14} className="rounded-full" />
+                  {protocol.charAt(0).toUpperCase() + protocol.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
-            {isLoading && orders.length === 0 ? (
+            {isLoading && conditionalOrders.length === 0 ? (
               <div className="flex items-center justify-center py-16">
                 <span className="loading loading-spinner loading-md"></span>
               </div>
-            ) : recentOrders.length === 0 ? (
+            ) : conditionalOrders.length === 0 ? (
               <div className="text-base-content/50 py-16 text-center">
-                <p className="text-sm">{orders.length > 0 ? 'No recent orders' : 'No orders yet'}</p>
+                <p className="text-sm">No orders yet</p>
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="text-base-content/50 py-16 text-center">
+                <p className="text-sm">No orders for this protocol</p>
                 {hasOlderOrders && (
                   <Link href="/orders" className="text-primary mt-2 inline-block text-sm hover:underline">
                     View all orders
@@ -429,17 +449,75 @@ export function PendingOrdersDrawer() {
               </div>
             ) : (
               <div className="divide-base-200 divide-y">
-                {/* Active orders first */}
-                {activeOrders.map((order) => renderOrderItem(order))}
-
-                {/* Past orders section */}
-                {pastOrders.length > 0 && (
+                {/* Active ADL Orders Section */}
+                {filteredCategorizedOrders.adl.active.length > 0 && (
                   <>
-                    {/* Separator with PAST header */}
                     <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
-                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">Past Orders</span>
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
+                        <ShieldCheckIcon className="mr-1 inline size-3" />
+                        Auto-Deleverage Protection
+                      </span>
                     </div>
-                    {pastOrders.map((order) => renderOrderItem(order))}
+                    {filteredCategorizedOrders.adl.active.map((order) => renderOrderItem(order, "adl"))}
+                  </>
+                )}
+
+                {/* Active Auto-Leverage Orders Section */}
+                {filteredCategorizedOrders.autoLeverage.active.length > 0 && (
+                  <>
+                    <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
+                        <ArrowTrendingUpIcon className="mr-1 inline size-3" />
+                        Auto-Leverage
+                      </span>
+                    </div>
+                    {filteredCategorizedOrders.autoLeverage.active.map((order) => renderOrderItem(order, "autoLeverage"))}
+                  </>
+                )}
+
+                {/* Active Limit Orders Section */}
+                {filteredCategorizedOrders.limit.active.length > 0 && (
+                  <>
+                    <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
+                        <ArrowsRightLeftIcon className="mr-1 inline size-3" />
+                        Limit Orders
+                      </span>
+                    </div>
+                    {filteredCategorizedOrders.limit.active.map((order) => renderOrderItem(order, "limit"))}
+                  </>
+                )}
+
+                {/* Unknown Orders Section - orders with unrecognized triggers */}
+                {filteredCategorizedOrders.unknown.active.length > 0 && (
+                  <>
+                    <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
+                        <QuestionMarkCircleIcon className="mr-1 inline size-3" />
+                        Unknown Orders
+                      </span>
+                    </div>
+                    {filteredCategorizedOrders.unknown.active.map((order) => renderOrderItem(order, "unknown"))}
+                  </>
+                )}
+
+                {/* Completed orders section */}
+                {filteredCompletedOrders.length > 0 && (
+                  <>
+                    <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">Completed</span>
+                    </div>
+                    {/* Show last 3 completed orders in the drawer */}
+                    {filteredCompletedOrders.slice(0, 3).map((order) => {
+                      return renderOrderItem(order, resolveOrderType(order));
+                    })}
+                    {filteredCompletedOrders.length > 3 && (
+                      <div className="px-4 py-2 text-center">
+                        <Link href="/orders" className="text-primary text-xs hover:underline">
+                          View all completed orders
+                        </Link>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -448,11 +526,19 @@ export function PendingOrdersDrawer() {
 
           {/* Footer */}
           {recentOrders.length > 0 && (
-            <div className="border-base-200 text-base-content/40 flex justify-between border-t px-4 py-2 text-xs">
-              <span>{activeCount} active{hasOlderOrders ? ` · ${orders.length - recentOrders.length} older` : ''}</span>
-              <Link href="/orders" className="text-primary hover:underline">
-                View all
-              </Link>
+            <div className="border-base-200 text-base-content/40 flex items-center justify-between border-t px-4 py-2 text-xs">
+              <span>{activeCount} active{hasOlderOrders ? ` · ${conditionalOrders.length - recentOrders.length} older` : ''}</span>
+              <div className="flex items-center gap-3">
+                {cowExplorerUrl && (
+                  <a href={cowExplorerUrl} target="_blank" rel="noopener noreferrer" className="text-base-content/40 hover:text-primary flex items-center gap-1 transition-colors">
+                    <ArrowTopRightOnSquareIcon className="size-3" />
+                    CoW Explorer
+                  </a>
+                )}
+                <Link href="/orders" className="text-primary hover:underline">
+                  View all
+                </Link>
+              </div>
             </div>
           )}
         </div>
@@ -460,191 +546,155 @@ export function PendingOrdersDrawer() {
     </>
   );
 
+  // Helper to determine order type from trigger address
+  function resolveOrderType(order: ConditionalOrder): OrderType {
+    const triggerAddr = order.context.params.trigger.toLowerCase();
+    if (autoLeverageTriggerAddress && triggerAddr === autoLeverageTriggerAddress) return "autoLeverage";
+    if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) return "limit";
+    if (ltvTriggerAddress && triggerAddr === ltvTriggerAddress) return "adl";
+    return "unknown";
+  }
+
   // Helper function to render an order item
-  function renderOrderItem(order: OrderWithHash) {
-                  const { orderHash, context } = order;
-                  const { params, status, iterationCount, createdAt } = context;
-                  const isActive = status === OrderStatus.Active;
-                  const isCompleted = status === OrderStatus.Completed;
-                  const isCancellingThis = cancellingHash === orderHash;
+  function renderOrderItem(order: ConditionalOrder, orderType: OrderType) {
+    const { orderHash, context, triggerParams, isTriggerMet } = order;
+    const { status, iterationCount, createdAt } = context;
+    const isActive = status === ConditionalOrderStatus.Active;
 
-                  const sellSymbol = getTokenSymbol(params.sellToken);
-                  const buySymbol = getTokenSymbol(params.buyToken);
-                  const sellDecimals = getTokenDecimals(params.sellToken);
-                  const buyDecimals = getTokenDecimals(params.buyToken);
+    const sellSymbol = getTokenSymbol(context.params.sellToken);
+    const buySymbol = getTokenSymbol(context.params.buyToken);
 
-                  const totalChunks = Number(params.targetValue);
-                  const completedChunks = Number(iterationCount);
-                  const progressPercent = totalChunks > 0 ? (completedChunks / totalChunks) * 100 : 0;
+    const maxIterations = Number(context.params.maxIterations);
+    const completedIterations = Number(iterationCount);
+    const progressPercent = maxIterations > 0 ? (completedIterations / maxIterations) * 100 : 0;
 
-                  const executionData = executionDataMap.get(orderHash);
-                  const hasExecutionData = executionData && executionData.chunks.length > 0;
-                  const executionSummary = hasExecutionData
-                    ? calculateExecutionSummary(executionData, params.minBuyPerChunk, sellDecimals, buyDecimals)
-                    : null;
+    // Get protocol and limit price params from order
+    const { protocolName, limitPriceParams } = resolveOrderProtocol(order, orderType);
 
-                  const totalReceived = executionData?.totalReceived ?? 0n;
-                  const totalSold = executionData?.totalSold ?? 0n;
-                  const hasSurplus = executionSummary && executionSummary.surplusAmount > 0n;
+    const { label: orderTypeLabel, Icon: OrderIcon, badgeClass } = getOrderTypeMetadata(orderType);
 
-                  const sellAmountNum = parseFloat(formatUnits(params.preTotalAmount, sellDecimals));
-                  const receivedAmountNum = parseFloat(formatUnits(totalReceived, buyDecimals));
-                  const actualSoldAmountNum = parseFloat(formatUnits(totalSold, sellDecimals));
-                  const surplusAmountNum = executionSummary ? parseFloat(formatUnits(executionSummary.surplusAmount, buyDecimals)) : 0;
+    // Get protocol icon
+    const protocolIcon = protocolName ? PROTOCOL_ICONS[protocolName] : undefined;
 
-                  // Get order note for operation type and protocol
-                  const orderNote = orderNotesMap.get(orderHash);
-                  const operationType = orderNote?.operationType ?? "unknown";
-                  const operationLabel = getOperationLabel(operationType);
-                  const operationColorClass = getOperationColorClass(operationType);
-                  const protocolName = orderNote?.protocol;
-                  const protocolLogo = protocolName ? getProtocolLogo(protocolName) : null;
+    return (
+      <div key={orderHash} className={`hover:bg-base-50 px-4 py-3 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
+        {/* Row 0: Order type badge with protocol + Status */}
+        <div className="mb-1.5 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${badgeClass}`}>
+              <OrderIcon className="size-3" />
+              {orderTypeLabel}
+            </span>
+            {/* Protocol badge */}
+            {protocolIcon && (
+              <span className="bg-base-200 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium">
+                <Image src={protocolIcon} alt={protocolName || ""} width={12} height={12} className="rounded-full" />
+                {protocolName?.charAt(0).toUpperCase()}{protocolName?.slice(1)}
+              </span>
+            )}
+            {isTriggerMet && (
+              <span className="bg-warning/20 text-warning rounded px-1.5 py-0.5 text-[10px] font-medium">
+                Trigger Met
+              </span>
+            )}
+          </div>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+            isActive ? 'bg-success/20 text-success' : 'bg-base-300 text-base-content/50'
+          }`}>
+            {isActive ? 'Active' : (status === ConditionalOrderStatus.Completed ? 'Done' : 'Cancelled')}
+          </span>
+        </div>
 
-                  return (
-                    <div key={orderHash} className={`hover:bg-base-50 px-4 py-3 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
-                      {/* Row 0: Protocol (left) | Operation type + Order kind + Status (right) */}
-                      <div className="mb-1.5 flex items-center justify-between">
-                        {/* Left: Protocol */}
-                        <div className="flex items-center gap-1">
-                          {protocolName && protocolLogo && (
-                            <Image
-                              src={protocolLogo}
-                              alt={protocolName}
-                              width={14}
-                              height={14}
-                              className="rounded-sm"
-                            />
-                          )}
-                          {protocolName && (
-                            <span className="text-base-content/50 text-[10px]">{protocolName}</span>
-                          )}
-                        </div>
-                        {/* Right: Tags grouped */}
-                        <div className="flex items-center gap-1.5">
-                          {/* Operation type badge */}
-                          {operationType !== "unknown" && (
-                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${operationColorClass}`}>
-                              {operationLabel}
-                            </span>
-                          )}
-                          {/* Order kind badge */}
-                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                            params.isKindBuy ? 'bg-info/20 text-info' : 'bg-secondary/20 text-secondary'
-                          }`}>
-                            {params.isKindBuy ? 'BUY' : 'SELL'}
-                          </span>
-                          {/* Status badge */}
-                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                            isActive ? 'bg-warning/20 text-warning' :
-                            isCompleted ? 'bg-success/20 text-success' :
-                            'bg-error/20 text-error'
-                          }`}>
-                            {isActive ? 'Active' : isCompleted ? 'Done' : 'Cancelled'}
-                          </span>
-                        </div>
-                      </div>
+        {/* Row 1: Token pair + time */}
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center -space-x-1">
+              <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={24} height={24} className="ring-base-100 rounded-full ring-2" />
+              <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={24} height={24} className="ring-base-100 rounded-full ring-2" />
+            </div>
+            <span className="text-sm font-medium">{sellSymbol} → {buySymbol}</span>
+          </div>
+          <span className="text-base-content/40 text-xs">{timeAgo(createdAt, true)}</span>
+        </div>
 
-                      {/* Row 1: Token pair + time */}
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center -space-x-1">
-                            <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={24} height={24} className="ring-base-100 rounded-full ring-2" />
-                            <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={24} height={24} className="ring-base-100 rounded-full ring-2" />
-                          </div>
-                          <span className="text-sm font-medium">{sellSymbol} → {buySymbol}</span>
-                        </div>
-                        <span className="text-base-content/40 text-xs">{timeAgo(createdAt, true)}</span>
-                      </div>
+        {/* Row 2: LTV info for ADL/Auto-Leverage orders */}
+        {triggerParams && orderType !== "limit" && (
+          <div className="bg-base-200/50 mb-2 rounded-lg p-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">Trigger LTV</span>
+              <span className="text-warning font-medium">{formatLtvPercent(triggerParams.triggerLtvBps)}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">Target LTV</span>
+              <span className="text-success font-medium">{formatLtvPercent(triggerParams.targetLtvBps)}</span>
+            </div>
+          </div>
+        )}
 
-                      {/* Row 2: Progress bar */}
-                      <div className="mb-2">
-                        <div className="bg-base-200 h-1 w-full">
-                          <div
-                            className={`h-full transition-all ${isActive ? 'bg-primary' : 'bg-success'}`}
-                            style={progressStyles[orderHash]}
-                          />
-                        </div>
-                        <div className="mt-1 flex justify-between">
-                          <span className="text-base-content/40 text-xs">{completedChunks}/{totalChunks} chunks</span>
-                          <span className="text-base-content/50 text-xs font-medium">{progressPercent.toFixed(0)}%</span>
-                        </div>
-                      </div>
+        {/* Row 2b: Limit order details */}
+        {orderType === "limit" && limitPriceParams && (
+          <div className="bg-base-200/50 mb-2 rounded-lg p-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">
+                {limitPriceParams.isKindBuy ? "Buy" : "Sell"}
+              </span>
+              <span className="font-medium">
+                {limitPriceParams.isKindBuy
+                  ? `${formatTokenAmount(limitPriceParams.totalBuyAmount, limitPriceParams.buyDecimals)} ${buySymbol}`
+                  : `${formatTokenAmount(limitPriceParams.totalSellAmount, limitPriceParams.sellDecimals)} ${sellSymbol}`
+                }
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">
+                {limitPriceParams.isKindBuy ? "For up to" : "For min"}
+              </span>
+              <span className="font-medium">
+                {limitPriceParams.isKindBuy
+                  ? `${formatTokenAmount(limitPriceParams.totalSellAmount, limitPriceParams.sellDecimals)} ${sellSymbol}`
+                  : `${formatTokenAmount(limitPriceParams.totalBuyAmount, limitPriceParams.buyDecimals)} ${buySymbol}`
+                }
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-base-content/60">
+                {limitPriceParams.triggerAbovePrice ? "When price ≥" : "When price ≤"}
+              </span>
+              <span className="font-medium">{formatLimitPrice(Number(limitPriceParams.limitPrice) / 1e8)} {limitPriceParams.isKindBuy ? `${buySymbol}/${sellSymbol}` : `${sellSymbol}/${buySymbol}`}</span>
+            </div>
+          </div>
+        )}
 
-                      {/* Row 3: Amounts - Sell/Buy with expected amounts */}
-                      {/* KIND_SELL: Exact sell amount, minimum buy amount */}
-                      {/* KIND_BUY: Maximum sell amount, exact buy amount */}
-                      <div className="mb-2 space-y-1 text-sm">
-                        {/* Sell row */}
-                        <div className="flex justify-between">
-                          <div>
-                            <span className="text-base-content/50">{params.isKindBuy ? 'Sell up to ' : 'Sell '}</span>
-                            <span className="font-medium">{formatAmount(params.preTotalAmount, sellDecimals)}</span>
-                            <span className="text-base-content/50 ml-1">{sellSymbol}</span>
-                          </div>
-                          <UsdValue symbol={sellSymbol} amount={sellAmountNum} />
-                        </div>
-                        {/* Buy row - expected buy amount */}
-                        <div className="flex justify-between">
-                          <div>
-                            <span className="text-base-content/50">{params.isKindBuy ? 'Buy ' : 'Get at least '}</span>
-                            <span className="font-medium">{formatAmount(params.minBuyPerChunk * params.targetValue, buyDecimals)}</span>
-                            <span className="text-base-content/50 ml-1">{buySymbol}</span>
-                          </div>
-                          <UsdValue symbol={buySymbol} amount={parseFloat(formatUnits(params.minBuyPerChunk * params.targetValue, buyDecimals))} />
-                        </div>
-                        {/* Execution result row - shows the floating side (what actually varied) */}
-                        {/* KIND_SELL: "Got X" (buy amount varied), KIND_BUY: "Sold X" (sell amount varied) */}
-                        {hasExecutionData && (
-                          <div className="flex justify-between">
-                            <div>
-                              {params.isKindBuy ? (
-                                <>
-                                  <span className="text-base-content/50">Sold </span>
-                                  <span className="text-success font-medium">{formatAmount(totalSold, sellDecimals)}</span>
-                                  <span className="text-base-content/50 ml-1">{sellSymbol}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-base-content/50">Got </span>
-                                  <span className="text-success font-medium">{formatAmount(totalReceived, buyDecimals)}</span>
-                                  <span className="text-base-content/50 ml-1">{buySymbol}</span>
-                                </>
-                              )}
-                            </div>
-                            {params.isKindBuy ? (
-                              <UsdValue symbol={sellSymbol} amount={actualSoldAmountNum} />
-                            ) : (
-                              <UsdValue symbol={buySymbol} amount={receivedAmountNum} />
-                            )}
-                          </div>
-                        )}
-                      </div>
+        {/* Row 3: Progress (if has iterations) */}
+        {maxIterations > 0 && (
+          <div className="mb-2">
+            <div className="bg-base-200 h-1 w-full">
+              <div
+                className={`h-full transition-all ${isActive ? 'bg-success' : 'bg-base-300'}`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="text-base-content/40 text-xs">{completedIterations}/{maxIterations} iterations</span>
+              <span className="text-base-content/50 text-xs font-medium">{progressPercent.toFixed(0)}%</span>
+            </div>
+          </div>
+        )}
 
-                      {/* Row 4: Surplus (if any) */}
-                      {hasSurplus && executionSummary && (
-                        <div className="text-success mb-2 text-sm">
-                          <span>+{formatAmount(executionSummary.surplusAmount, buyDecimals)} {buySymbol}</span>
-                          <span className="text-success/70 ml-1">(+{executionSummary.surplusPercentage.toFixed(2)}%)</span>
-                          <span className="ml-2"><UsdValue symbol={buySymbol} amount={surplusAmountNum} /></span>
-                        </div>
-                      )}
-
-                      {/* Row 5: Actions */}
-                      <div className="flex items-center gap-3 text-xs">
-                        <Link href={`/orders/${orderHash}`} className="text-primary hover:underline">
-                          Details
-                        </Link>
-                        {isActive && (
-                          <button
-                            onClick={cancelHandlers[orderHash]}
-                            disabled={isCancelling || isCancellingThis}
-                            className="text-error hover:underline disabled:opacity-50"
-                          >
-                            {isCancellingThis ? 'Cancelling...' : 'Cancel'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
+        {/* Row 4: Actions */}
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-base-content/40">{truncateAddress(orderHash)}</span>
+          {isActive && (
+            <button
+              onClick={() => cancelOrder(orderHash)}
+              disabled={isCancelling}
+              className="text-error hover:underline disabled:opacity-50"
+            >
+              {isCancelling ? 'Cancelling...' : 'Cancel'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 }

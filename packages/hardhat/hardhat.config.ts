@@ -53,8 +53,8 @@ const FORK_BLOCK_NUMBERS: Record<string, number | undefined> = {
   ethereum: undefined, // Use latest - contracts deployed recently
   eth: undefined,
   mainnet: undefined,
-  arbitrum: 423810000, // ~Jan 2026
-  arb: 423810000,
+  arbitrum: undefined, // Use latest - recent deployments
+  arb: undefined,
   base: undefined,     // Use latest - testing recent orders
   optimism: 129000000, // ~Dec 2024
   op: 129000000,
@@ -161,7 +161,7 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
     },
     mainnet: {
-      url: `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`,
+      url: `https://eth-mainnet.g.alchemy.com/v2/${providerApiKey}`,
       accounts: [deployerPrivateKey],
     },
     sepolia: {

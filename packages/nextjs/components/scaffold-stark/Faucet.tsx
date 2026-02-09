@@ -196,6 +196,7 @@ export const Faucet = () => {
             <EtherInput placeholder="Amount to send" value={sendValue} onChange={handleSendValueChange} />
           </div>
           <button
+            type="button"
             className="btn btn-sm bg-btn-wallet h-10 cursor-pointer rounded-[4px] border border-[#4f4ab7] px-2 hover:bg-[#385183]"
             onClick={sendETH}
             disabled={loading || !inputAddress}
@@ -203,7 +204,7 @@ export const Faucet = () => {
             {!loading ? (
               <BanknotesIcon className="size-6" />
             ) : (
-              <span className="loading loading-spinner loading-sm"></span>
+              <span className="loading loading-spinner loading-sm" />
             )}
             <span>Send to Connected Account</span>
           </button>
@@ -216,6 +217,7 @@ export const Faucet = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold">Get Lending Tokens</h3>
             <button
+              type="button"
               className="btn btn-ghost btn-sm btn-circle"
               onClick={handleCloseMintModal}
             >
@@ -237,6 +239,7 @@ export const Faucet = () => {
             </div>
           </div>
           <button
+            type="button"
             className="btn btn-sm bg-btn-wallet h-10 cursor-pointer rounded-[4px] border border-[#4f4ab7] px-2 hover:bg-[#385183]"
             onClick={mintLendingTokens}
             disabled={mintLoading || !connectedAddress}
@@ -244,7 +247,7 @@ export const Faucet = () => {
             {!mintLoading ? (
               <CurrencyDollarIcon className="size-6" />
             ) : (
-              <span className="loading loading-spinner loading-sm"></span>
+              <span className="loading loading-spinner loading-sm" />
             )}
             <span>Mint Tokens to Connected Wallet</span>
           </button>

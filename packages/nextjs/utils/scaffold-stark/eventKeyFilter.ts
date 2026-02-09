@@ -83,6 +83,48 @@ const certainLengthTypeMap: { [key: string]: string[][] } = {
   "core::felt252": [[]],
 };
 
+/** Serialize a member value into merged key arrays. */
+const serializeMemberKeys = (
+  member: { name: string; type: string; kind: string; value: any },
+  structs: AbiStructs,
+  enums: AbiEnums,
+  parser: ReturnType<typeof createAbiParser>,
+): string[][] => {
+  return mergeArrays(
+    member.value.map((matchingItem: any) =>
+      serializeEventKey(matchingItem, member, structs, enums, parser).map(item => [item]),
+    ),
+  );
+};
+
+/** Process a single key member and return its keys, or null to signal a break. */
+const processKeyMember = (
+  member: { name: string; type: string; kind: string; value: any },
+  structs: AbiStructs,
+  enums: AbiEnums,
+  parser: ReturnType<typeof createAbiParser>,
+): string[][] | null => {
+  if (member.value === undefined) {
+    if (member.type in certainLengthTypeMap) {
+      return certainLengthTypeMap[member.type];
+    }
+    return null; // signal break
+  }
+
+  const isArrayType = member.type.startsWith("core::array::Array::");
+
+  if (!isArrayType && Array.isArray(member.value)) {
+    return serializeMemberKeys(member, structs, enums, parser);
+  }
+
+  if (isArrayType && is2DArray(member.value)) {
+    if (!isUniformLength(member.value)) return null; // signal break
+    return serializeMemberKeys(member, structs, enums, parser);
+  }
+
+  return serializeEventKey(member.value, member, structs, enums, parser).map(item => [item]);
+};
+
 export const composeEventFilterKeys = (
   input: { [key: string]: any },
   event: ExtractAbiEvent<ContractAbi<ContractName>, ExtractAbiEventNames<ContractAbi<ContractName>>>,
@@ -109,37 +151,9 @@ export const composeEventFilterKeys = (
     }
   }
   for (const member of clonedKeyMembers) {
-    if (member.value !== undefined) {
-      if (!member.type.startsWith("core::array::Array::") && Array.isArray(member.value)) {
-        keys = keys.concat(
-          mergeArrays(
-            member.value.map((matchingItem: any) =>
-              serializeEventKey(matchingItem, member, structs, enums, parser).map(item => [item]),
-            ),
-          ),
-        );
-      } else if (member.type.startsWith("core::array::Array::") && is2DArray(member.value)) {
-        if (!isUniformLength(member.value)) {
-          break;
-        }
-        keys = keys.concat(
-          mergeArrays(
-            member.value.map((matchingItem: any) =>
-              serializeEventKey(matchingItem, member, structs, enums, parser).map(item => [item]),
-            ),
-          ),
-        );
-      } else {
-        const serializedKeys = serializeEventKey(member.value, member, structs, enums, parser).map(item => [item]);
-        keys = keys.concat(serializedKeys);
-      }
-    } else {
-      if (member.type in certainLengthTypeMap) {
-        keys = keys.concat(certainLengthTypeMap[member.type]);
-      } else {
-        break;
-      }
-    }
+    const memberKeys = processKeyMember(member, structs, enums, parser);
+    if (memberKeys === null) break;
+    keys = keys.concat(memberKeys);
   }
   return keys;
 };

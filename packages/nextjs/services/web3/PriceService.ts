@@ -17,7 +17,7 @@ export const fetchPrice = async (retries = 3): Promise<number> => {
         },
       }
     );
-  } catch (error) {
+  } catch {
     console.error(`Failed to fetch price after ${retries + 1} attempts.`);
     return 0;
   }
@@ -26,13 +26,13 @@ export const fetchPrice = async (retries = 3): Promise<number> => {
 class PriceService {
   private static instance: PriceService;
   private intervalId: NodeJS.Timeout | null = null;
-  private listeners: Map<
-    any,
+  private listeners = new Map<
+    object,
     {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       setNativeCurrencyPrice: (price: number) => void;
     }
-  > = new Map();
+  >();
   private currentNativeCurrencyPrice = 0;
   private idCounter = 0;
 
@@ -47,7 +47,7 @@ class PriceService {
     return ++this.idCounter;
   }
 
-  public startPolling(ref: any, setNativeCurrencyPrice: (price: number) => void) {
+  public startPolling(ref: object, setNativeCurrencyPrice: (price: number) => void) {
     if (this.listeners.has(ref)) return;
     this.listeners.set(ref, { setNativeCurrencyPrice });
 
@@ -62,7 +62,7 @@ class PriceService {
     }, scaffoldConfig.pollingInterval);
   }
 
-  public stopPolling(ref: any) {
+  public stopPolling(ref: object) {
     if (!this.intervalId) return;
     if (!this.listeners.has(ref)) return;
 

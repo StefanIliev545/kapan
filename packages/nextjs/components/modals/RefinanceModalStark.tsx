@@ -27,6 +27,30 @@ import {
   type RefinanceModalStarkProps,
 } from "./common";
 
+/* ---- Vesu Pool Helpers ---- */
+
+function resolveSourceV1PoolId(proto: string, poolId?: bigint | string): bigint | undefined {
+  if (proto !== "Vesu" || !poolId) return undefined;
+  return typeof poolId === "string" ? BigInt(poolId) : poolId;
+}
+
+function resolveSourceV2Normalized(proto: string, poolId?: bigint | string): string | undefined {
+  if (proto !== "VesuV2" || !poolId) return undefined;
+  return String(poolId).toLowerCase();
+}
+
+function selectBestV1Pool(pools: Array<{ id: bigint }>, current: bigint, srcId: bigint | undefined): bigint | null {
+  if (pools.some(p => p.id === current) && (!srcId || current !== srcId)) return null;
+  const found = pools.find(p => srcId === undefined || p.id !== srcId);
+  return found?.id ?? pools[0]?.id ?? null;
+}
+
+function selectBestV2Pool(pools: Array<{ address: string }>, current: string | undefined, srcNorm: string | undefined): string | null {
+  if (!!current && pools.some(p => p.address.toLowerCase() === current.toLowerCase()) && (!srcNorm || current.toLowerCase() !== srcNorm)) return null;
+  const found = pools.find(p => !srcNorm || p.address.toLowerCase() !== srcNorm);
+  return found?.address ?? pools[0]?.address ?? null;
+}
+
 /* ---------------------------- Component ------------------------------ */
 export { type RefinanceModalStarkProps };
 
@@ -74,7 +98,9 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
 
   // Determine source pool name to exclude from destination dropdown
   const sourcePoolName = useMemo(() => {
-    if (!position.poolId || (fromProtocol !== "Vesu" && fromProtocol !== "VesuV2")) return null;
+    if (!position.poolId || (fromProtocol !== "Vesu" && fromProtocol !== "VesuV2")) {
+      return null;
+    }
 
     if (fromProtocol === "Vesu") {
       const poolId = typeof position.poolId === "string" ? BigInt(position.poolId) : position.poolId;
@@ -201,34 +227,22 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
     setSelectedProtocol,
   });
 
+  // Auto-select best Vesu pool, avoiding the source pool
   useEffect(() => {
     if (!isOpen) return;
     const isVesu = selectedProtocol === "Vesu" || selectedProtocol === "VesuV2";
     if (!isVesu || !starkVesuPools) return;
 
     if (selectedVersion === "v1") {
-      const sourceV1Id = fromProtocol === "Vesu" && position.poolId
-        ? (typeof position.poolId === "string" ? BigInt(position.poolId) : position.poolId)
-        : undefined;
-      const filtered = starkVesuPools.v1Pools.filter(p => sourceV1Id === undefined || p.id !== sourceV1Id);
-      const currentValid = starkVesuPools.v1Pools.some(p => p.id === selectedPoolId) && (!sourceV1Id || selectedPoolId !== sourceV1Id);
-      if (!currentValid) {
-        const next = (filtered[0]?.id) ?? starkVesuPools.v1Pools[0]?.id;
-        if (next) setSelectedPoolId(next);
-      }
+      const sourceV1Id = resolveSourceV1PoolId(fromProtocol, position.poolId);
+      const next = selectBestV1Pool(starkVesuPools.v1Pools, selectedPoolId, sourceV1Id);
+      if (next !== null) setSelectedPoolId(next);
     } else {
-      const sourceV2Addr = fromProtocol === "VesuV2" && position.poolId ? String(position.poolId) : undefined;
-      const sourceV2Normalized = sourceV2Addr ? sourceV2Addr.toLowerCase() : undefined;
-      const currentValid = !!selectedV2PoolAddress
-        && starkVesuPools.v2Pools.some(p => p.address.toLowerCase() === selectedV2PoolAddress.toLowerCase())
-        && (!sourceV2Normalized || selectedV2PoolAddress.toLowerCase() !== sourceV2Normalized);
-      if (!currentValid) {
-        const filtered = starkVesuPools.v2Pools.filter(p => !sourceV2Normalized || p.address.toLowerCase() !== sourceV2Normalized);
-        const next = (filtered[0]?.address) ?? starkVesuPools.v2Pools[0]?.address;
-        if (next) setSelectedV2PoolAddress(next);
-      }
+      const srcNorm = resolveSourceV2Normalized(fromProtocol, position.poolId);
+      const next = selectBestV2Pool(starkVesuPools.v2Pools, selectedV2PoolAddress, srcNorm);
+      if (next !== null) setSelectedV2PoolAddress(next);
     }
-  }, [isOpen, selectedProtocol, selectedVersion, starkVesuPools, setSelectedPoolId, setSelectedV2PoolAddress]);
+  }, [isOpen, selectedProtocol, selectedVersion, starkVesuPools, setSelectedPoolId, setSelectedV2PoolAddress, fromProtocol, position.poolId, selectedPoolId, selectedV2PoolAddress]);
 
   // Auto-focus debt input using shared hook
   useDebtInputFocus({ isOpen, debtConfirmed, debtInputRef });
@@ -274,7 +288,9 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
   const isActionDisabled = !debtConfirmed || !selectedProtocol || Object.keys(addedCollaterals).length === 0;
 
   const handleExecuteMove = useCallback(async () => {
-    if (!debtConfirmed || !selectedProtocol) return;
+    if (!debtConfirmed || !selectedProtocol) {
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -307,8 +323,8 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
         status: "success",
       });
       setTimeout(() => onClose(), 2000);
-    } catch (e: any) {
-      console.error("Refinance flow error:", e);
+    } catch (error) {
+      console.error("Refinance flow error:", error);
       track("refinance_tx_complete", {
         network: "starknet",
         fromProtocol,
@@ -319,7 +335,7 @@ export const RefinanceModalStark: FC<RefinanceModalStarkProps> = ({
         preferBatching: false,
         batchingUsed: false,
         status: "error",
-        error: e instanceof Error ? e.message : String(e),
+        error: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setIsSubmitting(false);

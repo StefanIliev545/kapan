@@ -12,3 +12,8 @@ export * from "./useScaffoldReadContract";
 export * from "./useScaffoldMultiWriteContract";
 export * from "./useBlockNumberContext";
 export * from "./useScaffoldContract";
+
+// Balance hooks
+export * from "./useScaffoldTokenBalance";
+export { default as useScaffoldEthBalance } from "./useScaffoldEthBalance";
+export { default as useScaffoldStrkBalance } from "./useScaffoldStrkBalance";

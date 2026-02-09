@@ -3,6 +3,9 @@ export * from "./useAnimationConfig";
 export * from "./useCopyToClipboard";
 export * from "./useAppUrl";
 
+// Modal state management
+export * from "../useModal";
+
 // Modal tracking and analytics
 export * from "./useModalTracking";
 

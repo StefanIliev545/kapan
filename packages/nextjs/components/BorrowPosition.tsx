@@ -1,4 +1,4 @@
-import React, { FC, useMemo, useCallback, MouseEvent } from "react";
+import React, { FC, useMemo } from "react";
 import { Address } from "viem";
 import { MinusIcon, PlusIcon, ArrowPathIcon, XMarkIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "./FiatBalance";
@@ -16,9 +16,7 @@ import { PositionInfoDropdown } from "./common/PositionInfoDropdown";
 import { SegmentedAction } from "./common/SegmentedActionBar";
 import { buildModalTokenInfo, encodeCompoundContext } from "./modals/common/modalUtils";
 import { useModal } from "~~/hooks/useModal";
-import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { PositionManager } from "~~/utils/position";
-import { normalizeProtocolName } from "~~/utils/protocol";
 import { isVesuContextV1, isVesuContextV2, VesuContext } from "~~/utils/vesu";
 
 // --- Helper Functions ---
@@ -47,25 +45,6 @@ function getMoveFromProtocol(protocolName: string): "Vesu" | "Nostra" | "VesuV2"
 /**
  * Determines if a better rate is available on another protocol
  */
-function checkHasBetterRate(params: {
-  hasBalance: boolean;
-  displayedOptimalProtocol: string | undefined;
-  displayedOptimalRate: number;
-  currentRate: number;
-  protocolName: string;
-}): boolean {
-  const { hasBalance, displayedOptimalProtocol, displayedOptimalRate, currentRate, protocolName } = params;
-  const ratesAreSame = Math.abs(currentRate - displayedOptimalRate) < 0.000001;
-  return (
-    hasBalance &&
-    displayedOptimalProtocol !== undefined &&
-    displayedOptimalProtocol !== null &&
-    !ratesAreSame &&
-    normalizeProtocolName(displayedOptimalProtocol) !== normalizeProtocolName(protocolName) &&
-    displayedOptimalRate < currentRate
-  );
-}
-
 /**
  * Gets the tooltip/title text for action buttons based on state
  */
@@ -98,24 +77,6 @@ interface ActionBuilderParams {
   handleSwapClick: () => void;
   moveModalOpen: () => void;
   handleCloseClick: () => void;
-}
-
-/**
- * Calculates displayed optimal protocol and rate considering demo override
- */
-function getDisplayedOptimalValues(params: {
-  demoOptimalOverride?: { protocol: string; rate: number };
-  optimalProtocol: string | undefined;
-  optimalRateDisplay: number;
-  currentRate: number;
-  protocolName: string;
-}): { displayedOptimalProtocol: string | undefined; displayedOptimalRate: number } {
-  const { demoOptimalOverride, optimalProtocol, optimalRateDisplay, currentRate, protocolName } = params;
-  const hasOptimalProtocol = Boolean(optimalProtocol);
-  return {
-    displayedOptimalProtocol: demoOptimalOverride?.protocol ?? (hasOptimalProtocol ? optimalProtocol : protocolName),
-    displayedOptimalRate: demoOptimalOverride?.rate ?? (hasOptimalProtocol ? optimalRateDisplay : currentRate),
-  };
 }
 
 interface ButtonVisibilityConfig {
@@ -350,6 +311,8 @@ export type BorrowPositionProps = ProtocolPosition & {
   suppressDisabledMessage?: boolean;
   demoOptimalOverride?: { protocol: string; rate: number };
   defaultExpanded?: boolean;
+  /** ADL protected status - lights up right border when debt is protected */
+  adlProtected?: boolean;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -391,6 +354,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   suppressDisabledMessage = false,
   demoOptimalOverride,
   defaultExpanded = false,
+  adlProtected = false,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -458,31 +422,6 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     actionsDisabledReason,
   });
 
-  // Fetch optimal rate for "better rate" badge calculation
-  const { protocol: optimalProtocol, rate: optimalRateDisplay } = useOptimalRate({
-    networkType,
-    tokenAddress,
-    type: "borrow",
-  });
-
-  // Calculate displayed optimal values for "better rate" badge
-  const { displayedOptimalProtocol, displayedOptimalRate } = getDisplayedOptimalValues({
-    demoOptimalOverride,
-    optimalProtocol,
-    optimalRateDisplay,
-    currentRate,
-    protocolName,
-  });
-
-  // Determine if there's a better rate available on another protocol
-  const hasBetterRate = checkHasBetterRate({
-    hasBalance,
-    displayedOptimalProtocol,
-    displayedOptimalRate,
-    currentRate,
-    protocolName,
-  });
-
   // Calculate which buttons to show
   const canInitiateBorrow = networkType === "evm" || Boolean(vesuContext?.borrow || onBorrow);
   const { showBorrowButton, showRepayButton, showMoveButton, showCloseButton, showSwapButton } = getButtonVisibility({
@@ -540,36 +479,6 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
     handleCloseClick,
   });
 
-  // Quick "Move" badge shown in header when better rate available
-  const isQuickMoveDisabled = !isWalletConnected || actionsDisabled;
-  const quickMoveTitle = getActionTitle({
-    isWalletConnected,
-    actionsDisabled,
-    disabledMessage,
-    disconnectedMessage: "Connect wallet to move debt",
-    enabledMessage: "Move debt to another protocol",
-  });
-  const handleQuickMoveClick = useCallback((e: MouseEvent) => {
-    e.stopPropagation();
-    if (!isQuickMoveDisabled) {
-      moveModal.open();
-    }
-  }, [isQuickMoveDisabled, moveModal]);
-  const headerQuickAction = hasBetterRate && showMoveButton ? (
-    <button
-      className={`flex-shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
-        isQuickMoveDisabled
-          ? "bg-base-300 text-base-content/50 cursor-not-allowed"
-          : "bg-primary text-primary-content hover:bg-primary/80 animate-pulse"
-      }`}
-      onClick={handleQuickMoveClick}
-      disabled={isQuickMoveDisabled}
-      aria-label="Move"
-      title={quickMoveTitle}
-    >
-      Move
-    </button>
-  ) : null;
 
   // Collateral view content shown when expanded
   const collateralContent = collateralView ? (
@@ -648,8 +557,8 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
         isNegativeBalance={true}
         showNoBalanceLabel={showNoDebtLabel}
         noBalanceText="No debt"
-        // Header quick action (Move badge)
-        headerQuickAction={headerQuickAction}
+        // ADL protected status
+        adlProtected={adlProtected}
       />
 
       {/* Collateral View (if provided) - Only visible when expanded */}

@@ -3,10 +3,10 @@ import { renderHook } from "@testing-library/react";
 import { useScaffoldContract } from "~~/hooks/scaffold-stark/useScaffoldContract";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark/useDeployedContractInfo";
 import { useAccount } from "@starknet-react/core";
-import { Contract, RpcProvider } from "starknet";
+import { Contract } from "starknet";
 
 import type { Mock } from "vitest";
-import { ContractName } from "~~/utils/scaffold-stark/contract";
+import type { ContractName } from "~~/utils/scaffold-stark/contract";
 import { useProvider } from "@starknet-react/core";
 
 //Using vitest's functionality to mock modules from different paths
@@ -36,8 +36,6 @@ describe("useScaffoldContract", () => {
   const mockUseProvider = useProvider as unknown as Mock;
   const mockedUseAccount = useAccount as unknown as Mock;
   const MockedContract = Contract as unknown as Mock;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _MockedRpcProvider = RpcProvider as unknown as Mock;
 
   beforeEach(() => {
     vi.resetAllMocks();

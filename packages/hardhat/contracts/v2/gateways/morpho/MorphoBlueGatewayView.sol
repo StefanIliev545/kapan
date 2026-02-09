@@ -258,20 +258,10 @@ contract MorphoBlueGatewayView is Ownable {
         // Calculate LTV and health factor using oracle
         if (params.oracle != address(0) && pos.collateralBalance > 0) {
             try IMorphoOracle(params.oracle).price() returns (uint256 oraclePrice) {
-                // Oracle price is collateral/loan with 36 decimals
-                // collateralValue (in loan token) = collateral * oraclePrice / 1e36
-                uint8 collateralDecimals = _getDecimals(params.collateralToken);
-                uint8 loanDecimals = _getDecimals(params.loanToken);
-                
-                // Normalize to loan token decimals
-                // collateralValue = collateral * price / 10^36 * 10^loanDecimals / 10^collateralDecimals
+                // Morpho oracle price is already scaled by 10^(36 + loanDecimals - collateralDecimals)
+                // So we only need to divide by 1e36 to get collateral value in loan token units
                 uint256 collateralValue = (pos.collateralBalance * oraclePrice) / 1e36;
-                if (collateralDecimals > loanDecimals) {
-                    collateralValue = collateralValue / (10 ** (collateralDecimals - loanDecimals));
-                } else if (loanDecimals > collateralDecimals) {
-                    collateralValue = collateralValue * (10 ** (loanDecimals - collateralDecimals));
-                }
-                
+
                 pos.collateralValueUsd = collateralValue;
                 pos.borrowValueUsd = pos.borrowBalance;
 
@@ -402,6 +392,103 @@ contract MorphoBlueGatewayView is Ownable {
                     configs[i].oraclePrice = p;
                 } catch {}
             }
+        }
+    }
+
+    // ============ LTV Queries (for ADL) ============
+
+    /// @notice Returns the current LTV (debt/collateral) in basis points
+    /// @dev Uses the market's oracle to price collateral in loan token terms
+    /// @param params The market parameters
+    /// @param user The user address
+    /// @return Current LTV in basis points (e.g., 6500 = 65%), or 0 if no collateral
+    function getCurrentLtvBps(MarketParams calldata params, address user) external view returns (uint256) {
+        bytes32 marketId = params.id();
+        Position memory rawPos = morpho.position(marketId, user);
+        Market memory mkt = morpho.market(marketId);
+
+        if (rawPos.collateral == 0) return 0;
+
+        // Convert borrow shares to assets
+        uint256 borrowBalance = 0;
+        if (rawPos.borrowShares > 0 && mkt.totalBorrowShares > 0) {
+            borrowBalance = (uint256(rawPos.borrowShares) * uint256(mkt.totalBorrowAssets)) / uint256(mkt.totalBorrowShares);
+        }
+        if (borrowBalance == 0) return 0;
+
+        // Get collateral value in loan token terms using oracle
+        if (params.oracle == address(0)) return 0;
+
+        try IMorphoOracle(params.oracle).price() returns (uint256 oraclePrice) {
+            // Morpho oracle price is already scaled by 10^(36 + loanDecimals - collateralDecimals)
+            // So we only need to divide by 1e36 to get collateral value in loan token units
+            uint256 collateralValue = (rawPos.collateral * oraclePrice) / 1e36;
+
+            if (collateralValue == 0) return 0;
+
+            // LTV in basis points = (borrow / collateralValue) * 10000
+            return (borrowBalance * 10000) / collateralValue;
+        } catch {
+            return 0;
+        }
+    }
+
+    /// @notice Returns the liquidation LTV threshold in basis points
+    /// @dev This is the LLTV from market params, converted from WAD to bps
+    /// @param params The market parameters
+    /// @return Liquidation threshold in basis points
+    function getLiquidationLtvBps(MarketParams calldata params) external pure returns (uint256) {
+        // params.lltv is in WAD (1e18), convert to basis points
+        return params.lltv / 1e14;
+    }
+
+    /// @notice Get position value (collateral and debt) for ADL calculations
+    /// @dev Returns values normalized to 8 decimals USD (consistent with other protocols)
+    ///      Morpho has no native USD oracle, so we treat the loan token as the unit of account
+    ///      and scale to 8 decimals to match the LtvTrigger interface expectations.
+    /// @param params The market parameters
+    /// @param user The user address
+    /// @return collateralValueUsd Collateral value in 8 decimals (loan token as unit of account)
+    /// @return debtValueUsd Debt value in 8 decimals (loan token as unit of account)
+    function getPositionValue(
+        MarketParams calldata params,
+        address user
+    ) external view returns (uint256 collateralValueUsd, uint256 debtValueUsd) {
+        bytes32 marketId = params.id();
+        Position memory rawPos = morpho.position(marketId, user);
+        Market memory mkt = morpho.market(marketId);
+
+        // Get loan token decimals for scaling to 8 decimals
+        uint8 loanDecimals = _getDecimals(params.loanToken);
+
+        // Convert borrow shares to assets (debt in loan token units)
+        uint256 debtInLoanUnits = 0;
+        if (rawPos.borrowShares > 0 && mkt.totalBorrowShares > 0) {
+            debtInLoanUnits = (uint256(rawPos.borrowShares) * uint256(mkt.totalBorrowAssets)) / uint256(mkt.totalBorrowShares);
+        }
+
+        // Calculate collateral value in loan token terms using oracle
+        uint256 collateralInLoanUnits = 0;
+        if (rawPos.collateral > 0 && params.oracle != address(0)) {
+            try IMorphoOracle(params.oracle).price() returns (uint256 oraclePrice) {
+                // Morpho oracle price is already scaled by 10^(36 + loanDecimals - collateralDecimals)
+                // So we only need to divide by 1e36 to get collateral value in loan token units
+                collateralInLoanUnits = (rawPos.collateral * oraclePrice) / 1e36;
+            } catch {
+                // Oracle failed, leave collateralInLoanUnits as 0
+            }
+        }
+
+        // Scale from loan token decimals to 8 decimals
+        // This ensures consistency with LtvTrigger which expects 8 decimal values
+        if (loanDecimals >= 8) {
+            uint256 divisor = 10 ** (loanDecimals - 8);
+            collateralValueUsd = collateralInLoanUnits / divisor;
+            debtValueUsd = debtInLoanUnits / divisor;
+        } else {
+            uint256 multiplier = 10 ** (8 - loanDecimals);
+            collateralValueUsd = collateralInLoanUnits * multiplier;
+            debtValueUsd = debtInLoanUnits * multiplier;
         }
     }
 

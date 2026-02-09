@@ -100,6 +100,72 @@ export interface LimitOrderConfigProps {
  * - Controlled: Pass useFlashLoan/setUseFlashLoan and numChunks/setNumChunks
  * - Uncontrolled: Omit these props, component manages its own state
  */
+/** Fetch liquidity for a single flash loan provider. */
+async function fetchProviderLiquidity(
+  publicClient: any,
+  provider: CowFlashLoanProvider,
+  tokenAddress: string,
+  chainId: number,
+): Promise<bigint> {
+  if (provider.provider === "morpho") {
+    const morphoAddr = MORPHO_BLUE[chainId];
+    if (!morphoAddr) return 0n;
+    return await publicClient.readContract({
+      address: tokenAddress as Address,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [morphoAddr as Address],
+    }) as bigint;
+  }
+
+  if (provider.provider === "balancerV2") {
+    return await publicClient.readContract({
+      address: tokenAddress as Address,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [BALANCER_V2_VAULT as Address],
+    }) as bigint;
+  }
+
+  if (provider.provider === "balancerV3") {
+    return await publicClient.readContract({
+      address: tokenAddress as Address,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [BALANCER_V3_VAULT as Address],
+    }) as bigint;
+  }
+
+  if (provider.provider === "aaveV3") {
+    return await fetchAaveLiquidity(publicClient, tokenAddress, chainId);
+  }
+
+  return 0n;
+}
+
+/** Fetch Aave V3 liquidity by resolving the aToken address first. */
+async function fetchAaveLiquidity(publicClient: any, tokenAddress: string, chainId: number): Promise<bigint> {
+  const aavePool = AAVE_V3_POOLS[chainId];
+  if (!aavePool) return 0n;
+  try {
+    const reserveData = await publicClient.readContract({
+      address: aavePool as Address,
+      abi: AAVE_POOL_ABI,
+      functionName: "getReserveData",
+      args: [tokenAddress as Address],
+    }) as readonly unknown[];
+    const aTokenAddr = reserveData[8] as Address;
+    return await publicClient.readContract({
+      address: tokenAddress as Address,
+      abi: ERC20_ABI,
+      functionName: "balanceOf",
+      args: [aTokenAddr],
+    }) as bigint;
+  } catch {
+    return 0n;
+  }
+}
+
 export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
   chainId,
   sellToken,
@@ -162,74 +228,11 @@ export const LimitOrderConfig: FC<LimitOrderConfigProps> = ({
 
       for (const provider of providers) {
         try {
-          let liquidity = 0n;
-
-          if (provider.provider === "morpho") {
-            // Morpho: check token balance at Morpho singleton
-            const morphoAddr = MORPHO_BLUE[chainId];
-            if (morphoAddr) {
-              liquidity = await publicClient.readContract({
-                address: sellToken.address as Address,
-                abi: ERC20_ABI,
-                functionName: "balanceOf",
-                args: [morphoAddr as Address],
-              }) as bigint;
-            }
-          } else if (provider.provider === "balancerV2") {
-            // Balancer V2: check token balance at Vault
-            liquidity = await publicClient.readContract({
-              address: sellToken.address as Address,
-              abi: ERC20_ABI,
-              functionName: "balanceOf",
-              args: [BALANCER_V2_VAULT as Address],
-            }) as bigint;
-          } else if (provider.provider === "balancerV3") {
-            // Balancer V3: check token balance at Vault
-            liquidity = await publicClient.readContract({
-              address: sellToken.address as Address,
-              abi: ERC20_ABI,
-              functionName: "balanceOf",
-              args: [BALANCER_V3_VAULT as Address],
-            }) as bigint;
-          } else if (provider.provider === "aaveV3") {
-            // Aave: get aToken address and check underlying balance
-            const aavePool = AAVE_V3_POOLS[chainId];
-            if (aavePool) {
-              try {
-                const reserveData = await publicClient.readContract({
-                  address: aavePool as Address,
-                  abi: AAVE_POOL_ABI,
-                  functionName: "getReserveData",
-                  args: [sellToken.address as Address],
-                }) as readonly unknown[];
-                const aTokenAddr = reserveData[8] as Address;
-                liquidity = await publicClient.readContract({
-                  address: sellToken.address as Address,
-                  abi: ERC20_ABI,
-                  functionName: "balanceOf",
-                  args: [aTokenAddr],
-                }) as bigint;
-              } catch {
-                // Token not supported on Aave
-                liquidity = 0n;
-              }
-            }
-          }
-
-          results.push({
-            provider,
-            liquidity,
-            hasLiquidity: liquidity >= totalAmount,
-            isLoading: false,
-          });
+          const liquidity = await fetchProviderLiquidity(publicClient, provider, sellToken.address, chainId);
+          results.push({ provider, liquidity, hasLiquidity: liquidity >= totalAmount, isLoading: false });
         } catch (err) {
           console.warn(`Failed to fetch liquidity for ${provider.name}:`, err);
-          results.push({
-            provider,
-            liquidity: 0n,
-            hasLiquidity: false,
-            isLoading: false,
-          });
+          results.push({ provider, liquidity: 0n, hasLiquidity: false, isLoading: false });
         }
       }
 

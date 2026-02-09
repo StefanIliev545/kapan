@@ -109,21 +109,6 @@ const deployKapanCowAdapter: DeployFunction = async function (hre: HardhatRuntim
     console.log(`   ✅ Balancer V3 configured`);
   }
 
-  // Set OrderManager on CowAdapter (required for fundOrderBySalt)
-  const orderManagerDeployment = await hre.deployments.getOrNull("KapanOrderManager");
-  if (orderManagerDeployment) {
-    console.log(`   Setting OrderManager ${orderManagerDeployment.address} on CowAdapter...`);
-    await safeExecute(hre, deployer, "KapanCowAdapter", "setOrderManager", [orderManagerDeployment.address], { log: true, gasLimit: 150000, waitConfirmations: WAIT });
-    console.log(`   ✅ OrderManager configured on CowAdapter`);
-
-    // Also set CowAdapter on OrderManager
-    console.log(`   Setting CowAdapter on OrderManager...`);
-    await safeExecute(hre, deployer, "KapanOrderManager", "setCowAdapter", [result.address], { log: true, gasLimit: 150000, waitConfirmations: WAIT });
-    console.log(`   ✅ CowAdapter configured on OrderManager`);
-  } else {
-    console.log(`   ⚠️ KapanOrderManager not deployed yet, skipping bidirectional link setup`);
-  }
-
   await waitForPendingTxs(hre, deployer);
 };
 

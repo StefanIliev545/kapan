@@ -17,6 +17,7 @@ export interface PendleMarket {
     symbol: string;
     name: string;
     decimals: number;
+    price?: { usd: number };
   };
   yt: {
     address: string;
@@ -30,6 +31,7 @@ export interface PendleMarket {
     address: string;
     symbol: string;
     name: string;
+    price?: { usd: number };
   };
   impliedApy: number; // The fixed APY for holding PT to maturity
   underlyingApy: number;
@@ -46,8 +48,38 @@ export interface PTYield {
   expiry: Date;
   daysToExpiry: number;
   underlyingSymbol: string;
+  underlyingAddress: string;
   marketAddress: string;
   liquidity: number;
+  /** PT price in USD from Pendle API */
+  ptPriceUsd: number;
+  /** Underlying asset price in USD from Pendle API */
+  underlyingPriceUsd: number;
+}
+
+/**
+ * Calculate fixed APY from PT and underlying prices.
+ * Use this to calculate APY consistent with displayed balance values.
+ *
+ * @param ptPriceUsd - Current PT price in USD
+ * @param underlyingPriceUsd - Current underlying asset price in USD
+ * @param daysToMaturity - Days until PT matures
+ * @returns Annualized APY as percentage (e.g., 15.5 for 15.5%)
+ */
+export function calculateFixedApy(
+  ptPriceUsd: number,
+  underlyingPriceUsd: number,
+  daysToMaturity: number
+): number {
+  if (ptPriceUsd <= 0 || underlyingPriceUsd <= 0 || daysToMaturity <= 0) {
+    return 0;
+  }
+  // At maturity, 1 PT = 1 underlying
+  // Return = (underlying / pt) - 1
+  // Annualized = return * (365 / days)
+  const returnToMaturity = (underlyingPriceUsd / ptPriceUsd) - 1;
+  const annualizedReturn = returnToMaturity * (365 / daysToMaturity);
+  return annualizedReturn * 100; // As percentage
 }
 
 // Map chain IDs to Pendle API chain names
@@ -288,6 +320,80 @@ export function extractPTBaseToken(symbol: string): string {
   return parsed.baseToken.toLowerCase();
 }
 
+/**
+ * Try to match a symbol by exact lookup, then by normalized lookup (strips chain suffix).
+ * Returns the matched PTYield or undefined.
+ */
+function findYieldBySymbol(
+  symbol: string,
+  yieldsBySymbol: Map<string, PTYield>,
+): PTYield | undefined {
+  const bySymbol = yieldsBySymbol.get(symbol.toLowerCase());
+  if (bySymbol) return bySymbol;
+
+  // Try normalized symbol (strips chain suffix like "(UNI)", "(ETH)")
+  const normalizedSymbol = normalizePTSymbolForLookup(symbol);
+  if (normalizedSymbol !== symbol.toLowerCase()) {
+    return yieldsBySymbol.get(normalizedSymbol);
+  }
+  return undefined;
+}
+
+/**
+ * Parse the PT symbol into base token + maturity, then find a yield whose
+ * parsed components match (base token substring match + maturity within 2 days).
+ */
+function findYieldByParsedComponents(
+  symbol: string,
+  allYields: PTYield[] | undefined,
+): PTYield | undefined {
+  const parsed = parsePTToken(symbol);
+  if (!parsed.isPT) return undefined;
+
+  const baseToken = parsed.baseToken.toLowerCase();
+  const maturityDate = parsed.maturityDate;
+
+  return allYields?.find(y => {
+    const yParsed = parsePTToken(y.symbol);
+    if (!yParsed.isPT) return false;
+
+    const yBaseToken = yParsed.baseToken.toLowerCase();
+
+    // Match if base tokens are similar (one contains the other)
+    const baseTokenMatch =
+      baseToken.includes(yBaseToken) ||
+      yBaseToken.includes(baseToken) ||
+      baseToken === yBaseToken;
+
+    if (!baseTokenMatch) return false;
+
+    // If we have maturity dates, they should be close (within 2 days to handle timezone issues)
+    if (maturityDate && yParsed.maturityDate) {
+      const daysDiff = Math.abs(maturityDate.getTime() - yParsed.maturityDate.getTime()) / (1000 * 60 * 60 * 24);
+      return daysDiff <= 2;
+    }
+
+    // If no maturity date to compare, just match on base token
+    return true;
+  });
+}
+
+/**
+ * Fallback: fuzzy match on underlying symbol or yield symbol using the base token substring.
+ */
+function findYieldByFuzzyMatch(
+  symbol: string,
+  allYields: PTYield[] | undefined,
+): PTYield | undefined {
+  const baseToken = extractPTBaseToken(symbol);
+  if (!baseToken) return undefined;
+
+  return allYields?.find(y =>
+    y.underlyingSymbol.toLowerCase().includes(baseToken) ||
+    y.symbol.toLowerCase().includes(baseToken)
+  );
+}
+
 // All chains where Pendle is deployed - we fetch from all to support bridged tokens
 const ALL_PENDLE_CHAINS = Object.keys(PENDLE_CHAIN_MAP).map(Number);
 
@@ -330,17 +436,22 @@ export function usePendlePTYields(
         .map(m => {
           const expiry = new Date(m.expiry);
           const daysToExpiry = Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+          const ptPriceUsd = m.pt.price?.usd || 0;
+          const underlyingPriceUsd = m.underlyingAsset?.price?.usd || 0;
 
           return {
             address: m.pt.address.toLowerCase() as Address,
             symbol: m.pt.symbol,
             name: m.pt.name,
-            fixedApy: m.impliedApy * 100, // Convert to percentage
+            fixedApy: m.impliedApy * 100, // Convert to percentage (from Pendle API)
             expiry,
             daysToExpiry,
             underlyingSymbol: m.underlyingAsset?.symbol || "",
+            underlyingAddress: m.underlyingAsset?.address?.toLowerCase() || "",
             marketAddress: m.address,
             liquidity: m.liquidity?.usd || 0,
+            ptPriceUsd,
+            underlyingPriceUsd,
           };
         })
         .filter(y => {
@@ -411,68 +522,26 @@ export function usePendlePTYields(
         if (byAddress) return byAddress;
       }
 
-      if (symbol) {
-        // Debug: log lookup attempt
-        if (isPTToken(symbol) && process.env.NODE_ENV === "development") {
-          console.log(`[PT Yield Lookup] Searching for: ${symbol}`);
-          console.log(`[PT Yield Lookup] Available symbols:`, query.data?.map(y => y.symbol).slice(0, 20));
-        }
+      if (!symbol) return undefined;
 
-        // Try exact symbol match
-        const bySymbol = yieldsBySymbol.get(symbol.toLowerCase());
-        if (bySymbol) return bySymbol;
-
-        // Try normalized symbol (strips chain suffix like "(UNI)", "(ETH)")
-        const normalizedSymbol = normalizePTSymbolForLookup(symbol);
-        if (normalizedSymbol !== symbol.toLowerCase()) {
-          const byNormalized = yieldsBySymbol.get(normalizedSymbol);
-          if (byNormalized) return byNormalized;
-        }
-
-        // Parse the input symbol to get components for flexible matching
-        if (isPTToken(symbol)) {
-          const parsed = parsePTToken(symbol);
-          if (parsed.isPT) {
-            const baseToken = parsed.baseToken.toLowerCase();
-            const maturityDate = parsed.maturityDate;
-
-            // Try to find a match by comparing parsed components
-            const match = query.data?.find(y => {
-              const yParsed = parsePTToken(y.symbol);
-              if (!yParsed.isPT) return false;
-
-              const yBaseToken = yParsed.baseToken.toLowerCase();
-
-              // Match if base tokens are similar (one contains the other)
-              const baseTokenMatch =
-                baseToken.includes(yBaseToken) ||
-                yBaseToken.includes(baseToken) ||
-                baseToken === yBaseToken;
-
-              if (!baseTokenMatch) return false;
-
-              // If we have maturity dates, they should be close (within 2 days to handle timezone issues)
-              if (maturityDate && yParsed.maturityDate) {
-                const daysDiff = Math.abs(maturityDate.getTime() - yParsed.maturityDate.getTime()) / (1000 * 60 * 60 * 24);
-                return daysDiff <= 2;
-              }
-
-              // If no maturity date to compare, just match on base token
-              return true;
-            });
-            if (match) return match;
-
-            // Fallback: fuzzy match on underlying symbol
-            const fuzzyMatch = query.data?.find(y =>
-              y.underlyingSymbol.toLowerCase().includes(baseToken) ||
-              y.symbol.toLowerCase().includes(baseToken)
-            );
-            if (fuzzyMatch) return fuzzyMatch;
-          }
-        }
+      // Debug: log lookup attempt
+      if (isPTToken(symbol) && process.env.NODE_ENV === "development") {
+        console.log(`[PT Yield Lookup] Searching for: ${symbol}`);
+        console.log(`[PT Yield Lookup] Available symbols:`, query.data?.map(y => y.symbol).slice(0, 20));
       }
 
-      return undefined;
+      // Strategy 1: exact or normalized symbol match
+      const bySymbol = findYieldBySymbol(symbol, yieldsBySymbol);
+      if (bySymbol) return bySymbol;
+
+      if (!isPTToken(symbol)) return undefined;
+
+      // Strategy 2: parse into base token + maturity, match by proximity
+      const byComponents = findYieldByParsedComponents(symbol, query.data);
+      if (byComponents) return byComponents;
+
+      // Strategy 3: substring matching fallback on base token
+      return findYieldByFuzzyMatch(symbol, query.data);
     };
   }, [yieldsByAddress, yieldsBySymbol, query.data]);
 

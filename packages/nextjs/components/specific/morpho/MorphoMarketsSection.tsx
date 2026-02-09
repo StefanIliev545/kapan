@@ -40,7 +40,7 @@ import { MultiplyEvmModal } from "~~/components/modals/MultiplyEvmModal";
 import { useAccount } from "wagmi";
 import { notification } from "~~/utils/scaffold-eth/notification";
 import { parseUnits } from "viem";
-import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
+import { useExternalYields, hasExternalYield } from "~~/hooks/useExternalYields";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { createTextChangeHandler } from "~~/utils/handlers";
 import {
@@ -91,23 +91,6 @@ interface MarketRow {
 
 const columnHelper = createColumnHelper<MarketRow>();
 
-// Minimal utilization indicator - just bar, no text
-function UtilizationBar({ value }: { value: number }) {
-  const percent = Math.min(100, Math.max(0, value * 100));
-  const color = value >= 0.95 ? "bg-error" : value >= 0.85 ? "bg-warning" : "bg-primary/70";
-  const barStyle = React.useMemo(() => ({ width: `${percent}%` }), [percent]);
-
-  return (
-    <Tooltip content={`${percent.toFixed(1)}% utilized`}>
-      <div className="bg-base-content/10 mx-auto h-1.5 w-14 overflow-hidden rounded-full">
-        <div
-          className={`h-full ${color} rounded-full`}
-          style={barStyle}
-        />
-      </div>
-    </Tooltip>
-  );
-}
 
 function TokenPairAvatars(props: { collateralSymbol?: string; loanSymbol: string }) {
   const collateralSymbol = (props.collateralSymbol ?? "").toLowerCase();
@@ -148,7 +131,9 @@ const TOKEN_CATEGORIES: Record<TokenCategory, { label: string; patterns: string[
 };
 
 function matchesCategory(symbol: string, category: TokenCategory): boolean {
-  if (category === "all") return true;
+  if (category === "all") {
+    return true;
+  }
   const lowerSymbol = symbol.toLowerCase();
   return TOKEN_CATEGORIES[category].patterns.some(pattern => lowerSymbol.includes(pattern));
 }
@@ -171,20 +156,21 @@ function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
       className="bg-base-300 relative flex-shrink-0 overflow-hidden rounded-full"
       style={containerStyle}
     >
-      <Image
-        src={src}
-        alt={symbol}
-        width={size}
-        height={size}
-        className="object-cover"
-        onError={handleImageError}
-      />
+      {/* Fallback initials — only visible when the image fails to load */}
       <span
         className="text-base-content/70 absolute inset-0 flex items-center justify-center text-xs font-medium"
         style={fontStyle}
       >
         {symbol.slice(0, 2).toUpperCase()}
       </span>
+      <Image
+        src={src}
+        alt={symbol}
+        width={size}
+        height={size}
+        className="relative z-10 object-cover"
+        onError={handleImageError}
+      />
     </div>
   );
 }
@@ -203,7 +189,11 @@ function CategoryButton({
   return (
     <button
       onClick={handleClick}
-      className={`btn btn-xs ${isActive ? 'btn-primary' : 'btn-ghost'}`}
+      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+        isActive
+          ? 'bg-primary text-primary-content'
+          : 'text-base-content/60 hover:text-base-content hover:bg-base-200/50'
+      }`}
     >
       {TOKEN_CATEGORIES[category].label}
     </button>
@@ -232,7 +222,7 @@ function OptionButton({
         isSelected ? 'bg-primary/10' : 'hover:bg-base-200'
       }`}
     >
-      <div className={`flex size-4 flex-shrink-0 items-center justify-center rounded border-2${
+      <div className={`flex size-4 flex-shrink-0 items-center justify-center rounded border-2 ${
         isSelected
           ? 'bg-primary border-primary'
           : 'border-base-content/30'
@@ -296,7 +286,9 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   }, [isOpen, updatePosition]);
 
   React.useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
@@ -325,8 +317,12 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   }, [options, searchTerm, activeCategory]);
 
   const displayValue = React.useMemo(() => {
-    if (isAllSelected) return allLabel;
-    if (value.length === 1) return value[0];
+    if (isAllSelected) {
+      return allLabel;
+    }
+    if (value.length === 1) {
+      return value[0];
+    }
     return `${value.length} selected`;
   }, [isAllSelected, value, allLabel]);
 
@@ -362,20 +358,20 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   const dropdownContent = isOpen && position && typeof document !== "undefined" ? (
     <div
       ref={dropdownRef}
-      className="bg-base-100 border-base-300 fixed z-[9999] w-80 rounded-xl border shadow-2xl"
+      className="bg-base-100 ring-base-content/5 fixed z-[9999] w-80 rounded-xl shadow-xl ring-1"
       style={dropdownStyle}
       onClick={handleStopPropagation}
     >
-      <div className="border-base-300 border-b p-3">
+      <div className="p-4 pb-3">
         <div className="relative">
-          <Search className="text-base-content/50 absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+          <Search className="text-base-content/40 absolute left-3 top-1/2 size-4 -translate-y-1/2" />
           <input
             ref={inputRef}
             type="text"
-            placeholder={`Search for ${placeholder.toLowerCase()} asset`}
+            placeholder={`Search ${placeholder.toLowerCase()}...`}
             value={searchTerm}
             onChange={createTextChangeHandler(setSearchTerm)}
-            className="input input-sm input-bordered bg-base-200/50 w-full pl-9 pr-8"
+            className="input input-sm bg-base-200/30 focus:bg-base-200/50 w-full border-0 pl-9 pr-8 focus:outline-none"
           />
           {searchTerm && (
             <button
@@ -387,8 +383,8 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
           )}
         </div>
       </div>
-      <div className="border-base-300 border-b px-3 py-2">
-        <div className="flex flex-wrap items-center gap-1">
+      <div className="px-4 pb-3">
+        <div className="flex flex-wrap items-center gap-1.5">
           {(Object.keys(TOKEN_CATEGORIES) as TokenCategory[]).map(category => (
             <CategoryButton
               key={category}
@@ -398,23 +394,30 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
             />
           ))}
           <div className="flex-1" />
-          <button onClick={handleClear} className="btn btn-xs btn-ghost text-base-content/60">Clear</button>
+          <button onClick={handleClear} className="text-base-content/50 hover:text-base-content/70 text-xs transition-colors">Clear</button>
         </div>
       </div>
-      <div className="max-h-72 overflow-y-auto p-2">
+      <div className="max-h-72 overflow-y-auto px-2 pb-2">
         <OptionButton option="all" isSelected={isAllSelected} onSelect={handleSelect} displayLabel={allLabel} />
         {filteredOptions.length === 0 ? (
           <div className="text-base-content/50 py-8 text-center text-sm">No matches found</div>
         ) : (
-          filteredOptions.map(option => (
-            <OptionButton
-              key={option}
-              option={option}
-              isSelected={selectedSet.has(option)}
-              onSelect={handleSelect}
-              showIcon
-            />
-          ))
+          <>
+            {filteredOptions.slice(0, 50).map(option => (
+              <OptionButton
+                key={option}
+                option={option}
+                isSelected={selectedSet.has(option)}
+                onSelect={handleSelect}
+                showIcon
+              />
+            ))}
+            {filteredOptions.length > 50 && (
+              <div className="text-base-content/40 py-2 text-center text-xs">
+                {filteredOptions.length - 50} more — search to find
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -425,7 +428,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
       <button
         ref={triggerRef}
         type="button"
-        className="btn btn-sm btn-ghost border-base-300 hover:border-base-content/30 min-w-[140px] justify-between gap-2 border font-normal"
+        className="bg-base-200/40 hover:bg-base-200/70 flex min-w-[140px] items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors"
         onClick={handleToggleOpen}
       >
         <div className="flex items-center gap-2 overflow-hidden">
@@ -439,11 +442,11 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
               ))}
             </div>
           )}
-          <span className="truncate text-sm">{displayValue}</span>
+          <span className="truncate">{displayValue}</span>
         </div>
-        <ChevronDown className={`size-4 flex-shrink-0 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`size-4 flex-shrink-0 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      {typeof document !== "undefined" && ReactDOM.createPortal(dropdownContent, document.body)}
+      {dropdownContent && typeof document !== "undefined" && ReactDOM.createPortal(dropdownContent, document.body)}
     </>
   );
 }
@@ -601,8 +604,8 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   const [loopMarket, setLoopMarket] = React.useState<MorphoMarket | null>(null);
   const { address: walletAddress, chainId: walletChainId } = useAccount();
 
-  // Fetch Pendle PT yields for PT tokens
-  const { findYield } = usePendlePTYields(chainId);
+  // Fetch external yields (Pendle PT tokens, Maple syrup tokens, etc.)
+  const { findYield } = useExternalYields(chainId);
 
   // Memoize filter sets for performance
   const collateralFilterSet = React.useMemo(() => new Set(selectedCollaterals), [selectedCollaterals]);
@@ -614,9 +617,13 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       .filter(m => Boolean(m.collateralAsset))
       .filter(m => {
         // Collateral filter - empty array means all
-        if (collateralFilterSet.size > 0 && !collateralFilterSet.has(m.collateralAsset?.symbol ?? "")) return false;
+        if (collateralFilterSet.size > 0 && !collateralFilterSet.has(m.collateralAsset?.symbol ?? "")) {
+          return false;
+        }
         // Debt filter - empty array means all
-        if (debtFilterSet.size > 0 && !debtFilterSet.has(m.loanAsset?.symbol ?? "")) return false;
+        if (debtFilterSet.size > 0 && !debtFilterSet.has(m.loanAsset?.symbol ?? "")) {
+          return false;
+        }
         return true;
       })
       .map(m => {
@@ -642,17 +649,18 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           ? liquidityAssetsUsd
           : (denom > 0 ? (liquidityAssetsRaw / denom) * loanPriceUsd : 0);
 
-        // Look up PT implied yield for collateral token
+        // Look up external yield for collateral token (PT tokens, syrupUSDC, etc.)
         const collateralSymbol = m.collateralAsset?.symbol ?? "";
         const collateralAddress = (m.collateralAsset?.address ?? "").toLowerCase();
         let impliedApy: number | null = null;
 
-        if (isPTToken(collateralSymbol)) {
-          const ptYield = findYield(collateralAddress, collateralSymbol);
-          if (ptYield) {
-            impliedApy = ptYield.fixedApy;
+        if (hasExternalYield(collateralSymbol)) {
+          const externalYield = findYield(collateralAddress, collateralSymbol);
+          if (externalYield) {
+            impliedApy = externalYield.fixedApy;
           }
         }
+        // Note: impliedApy is intentionally mutable because it's conditionally assigned above
 
         return {
           market: m,
@@ -676,8 +684,12 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
     const collateralSet = new Set<string>();
     const debtSet = new Set<string>();
     markets.forEach(m => {
-      if (m.collateralAsset?.symbol) collateralSet.add(m.collateralAsset.symbol);
-      if (m.loanAsset?.symbol) debtSet.add(m.loanAsset.symbol);
+      if (m.collateralAsset?.symbol) {
+        collateralSet.add(m.collateralAsset.symbol);
+      }
+      if (m.loanAsset?.symbol) {
+        debtSet.add(m.loanAsset.symbol);
+      }
     });
     return {
       collateralAssets: Array.from(collateralSet).sort(),
@@ -731,7 +743,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
     columnHelper.accessor("utilization01", {
       id: "util",
       header: "Util",
-      cell: info => <UtilizationBar value={info.getValue()} />,
+      cell: info => formatPercent(info.getValue(), 0),
       sortingFn: "basic",
     }),
     columnHelper.accessor("impliedApy", {
@@ -743,7 +755,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       ),
       cell: info => {
         const value = info.getValue();
-        if (value === null) return <span className="text-base-content/30">—</span>;
+        if (value === null) {
+          return <span className="text-base-content/30">—</span>;
+        }
         return <span className="text-info">{formatPercent(value / 100, 2)}</span>;
       },
       sortingFn: (rowA, rowB) => {
@@ -766,13 +780,19 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       id: "actions",
       header: "",
       cell: info => (
-        <Flex gap="1">
-          <Button size="1" variant="soft" onClick={() => handleSupplyClick(info.row.original.market)}>
+        <Flex gap="6" align="center" justify="end" className="ml-6">
+          <button
+            onClick={() => handleSupplyClick(info.row.original.market)}
+            className="text-base-content hover:text-primary text-sm font-medium transition-colors"
+          >
             Supply
-          </Button>
-          <Button size="1" variant="outline" onClick={() => handleLoopClick(info.row.original.market)}>
+          </button>
+          <button
+            onClick={() => handleLoopClick(info.row.original.market)}
+            className="text-base-content hover:text-primary text-sm font-medium transition-colors"
+          >
             Loop
-          </Button>
+          </button>
         </Flex>
       ),
     }),
@@ -792,7 +812,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     globalFilterFn: (row, _columnId, filterValue) => {
-      if (!filterValue) return true;
+      if (!filterValue) {
+        return true;
+      }
       const r = row.original;
       const searchable = `${r.collateralSymbol}/${r.loanSymbol} ${r.collateralSymbol} ${r.loanSymbol} ${r.market.uniqueKey}`.toLowerCase();
       return searchable.includes(filterValue.toLowerCase());
@@ -863,9 +885,12 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   );
 
   // Reset to first page when filters change
+  // Note: table is intentionally excluded from deps - it's a new object every render
+  // but table.setPageIndex is stable via closure
   React.useEffect(() => {
     table.setPageIndex(0);
-  }, [table, globalFilter, selectedCollaterals, selectedDebtAssets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalFilter, selectedCollaterals, selectedDebtAssets]);
 
   const handleCloseDepositModal = React.useCallback(() => {
     depositModal.close();
@@ -879,7 +904,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
 
   // Memoized props for DepositModal
   const depositModalToken = React.useMemo(() => {
-    if (!selectedMarket) return null;
+    if (!selectedMarket) {
+      return null;
+    }
     return {
       name: selectedMarket.collateralAsset?.symbol ?? "",
       icon: tokenNameToLogo(selectedMarket.collateralAsset?.symbol ?? ""),
@@ -891,7 +918,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   }, [selectedMarket]);
 
   const depositModalContext = React.useMemo(() => {
-    if (!selectedMarket) return "";
+    if (!selectedMarket) {
+      return "";
+    }
     return encodeMorphoContext({
       marketId: selectedMarket.uniqueKey,
       loanToken: selectedMarket.loanAsset.address,
@@ -904,7 +933,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
 
   // Memoized props for MultiplyEvmModal
   const loopModalCollaterals = React.useMemo(() => {
-    if (!loopMarket?.collateralAsset) return [];
+    if (!loopMarket?.collateralAsset) {
+      return [];
+    }
     return [{
       symbol: loopMarket.collateralAsset.symbol,
       address: loopMarket.collateralAsset.address as `0x${string}`,
@@ -919,7 +950,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   }, [loopMarket]);
 
   const loopModalDebtOptions = React.useMemo(() => {
-    if (!loopMarket) return [];
+    if (!loopMarket) {
+      return [];
+    }
     return [{
       symbol: loopMarket.loanAsset.symbol,
       address: loopMarket.loanAsset.address as `0x${string}`,
@@ -934,7 +967,9 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   }, [loopMarket]);
 
   const loopModalMorphoContext = React.useMemo(() => {
-    if (!loopMarket?.collateralAsset) return null;
+    if (!loopMarket?.collateralAsset) {
+      return null;
+    }
     return {
       marketId: loopMarket.uniqueKey,
       loanToken: loopMarket.loanAsset.address,
@@ -946,23 +981,31 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   }, [loopMarket]);
 
   const loopModalMaxLtvBps = React.useMemo(() => {
-    if (!loopMarket) return 0n;
+    if (!loopMarket) {
+      return 0n;
+    }
     return BigInt(Math.floor(toNumberSafe(loopMarket.lltv) / 1e14));
   }, [loopMarket]);
 
   const loopModalSupplyApyMap = React.useMemo(() => {
-    if (!loopMarket?.collateralAsset) return {};
+    if (!loopMarket?.collateralAsset) {
+      return {};
+    }
     const collateralAddr = loopMarket.collateralAsset.address.toLowerCase();
     let apy = 0;
-    if (isPTToken(loopMarket.collateralAsset.symbol)) {
-      const ptYield = findYield(collateralAddr, loopMarket.collateralAsset.symbol);
-      if (ptYield) apy = ptYield.fixedApy;
+    if (hasExternalYield(loopMarket.collateralAsset.symbol)) {
+      const externalYield = findYield(collateralAddr, loopMarket.collateralAsset.symbol);
+      if (externalYield) {
+        apy = externalYield.fixedApy;
+      }
     }
     return { [collateralAddr]: apy };
   }, [loopMarket, findYield]);
 
   const loopModalBorrowApyMap = React.useMemo(() => {
-    if (!loopMarket) return {};
+    if (!loopMarket) {
+      return {};
+    }
     return { [loopMarket.loanAsset.address.toLowerCase()]: toNumberSafe(loopMarket.state?.borrowApy) * 100 };
   }, [loopMarket]);
 
@@ -1089,10 +1132,10 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                           key={header.id}
                           className={`label-text-xs pb-2 ${
                             header.id === "market" ? "text-left" :
-                            header.id === "util" ? "w-20 text-center" :
-                            header.id === "actions" ? "w-28" :
+                            header.id === "util" ? "text-center" :
+                            header.id === "actions" ? "" :
                             "text-right"
-                          } ${header.column.getCanSort() ? "cursor-pointer transition-colors hover:text-base-content/60" : ""}`}
+                          } ${header.column.getCanSort() ? "hover:text-base-content/60 cursor-pointer transition-colors" : ""}`}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <span className={`inline-flex items-center gap-1 ${header.column.getIsSorted() ? "text-primary" : ""}`}>
@@ -1118,10 +1161,10 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                         return (
                           <td
                             key={cell.id}
-                            className={`py-2.5 transition-colors group-hover:bg-base-200/30 ${
+                            className={`group-hover:bg-base-200/30 py-2.5 transition-colors ${
                               cell.column.id === "market" ? "pl-3" :
                               cell.column.id === "util" ? "text-center" :
-                              cell.column.id === "actions" ? "pr-3 text-right" :
+                              cell.column.id === "actions" ? "pr-3" :
                               "text-right tabular-nums"
                             } ${isFirst ? "rounded-l-lg" : ""} ${isLast ? "rounded-r-lg" : ""}`}
                           >

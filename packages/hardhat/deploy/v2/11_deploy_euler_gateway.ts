@@ -1,4 +1,4 @@
-// Deploy EulerGatewayWrite v2
+// Deploy EulerGatewayWrite and EulerGatewayView
 
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
@@ -9,7 +9,7 @@ import { safeExecute, safeDeploy, waitForPendingTxs, getWaitConfirmations } from
 
 /**
  * Euler V2 deployment script.
- * Deploys Write gateway only (positions fetched via subgraph, no View gateway needed).
+ * Deploys Write gateway (for transactions) and View gateway (for LTV calculations/triggers).
  *
  * Euler V2 EVC deployments (different per chain):
  * - Ethereum (1):     0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383
@@ -90,10 +90,23 @@ const deployEulerGateway: DeployFunction = async function (hre: HardhatRuntimeEn
 
   console.log(`EulerGatewayWrite deployed to: ${eulerGatewayWrite.address}`);
 
+  // ============ Deploy View Gateway ============
+  const eulerGatewayView = await safeDeploy(hre, deployer, "EulerGatewayView", {
+    from: deployer,
+    args: [EVC_ADDRESS],
+    log: true,
+    autoMine: true,
+    deterministicDeployment: deterministicSalt(hre, "EulerGatewayView"),
+    waitConfirmations: WAIT,
+  });
+
+  console.log(`EulerGatewayView deployed to: ${eulerGatewayView.address}`);
+
   // ============ Register Gateway with Router ============
   await safeExecute(hre, deployer, "KapanRouter", "addGateway", ["euler", eulerGatewayWrite.address], { waitConfirmations: 1 });
   console.log(`EulerGatewayWrite registered with KapanRouter as "euler"`);
   // Gateway sync with AuthorizationHelper is handled by 99_sync_authorization_helper.ts to avoid nonce race conditions
+  // View gateway registration with KapanViewRouter is handled by 12_deploy_view_router.ts
 
   // No market registration needed - vaults are discovered via Euler's subgraph
   console.log(`✓ Euler V2 setup complete (vaults discovered via subgraph)`);
@@ -105,10 +118,12 @@ const deployEulerGateway: DeployFunction = async function (hre: HardhatRuntimeEn
     EVC_ADDRESS,
   ]);
 
+  await verifyContract(hre, eulerGatewayView.address, [EVC_ADDRESS]);
+
   await waitForPendingTxs(hre, deployer);
 };
 
 export default deployEulerGateway;
 
-deployEulerGateway.tags = ["EulerGateway", "v2"];
+deployEulerGateway.tags = ["EulerGateway", "EulerGatewayView", "v2"];
 deployEulerGateway.dependencies = ["KapanRouter"];

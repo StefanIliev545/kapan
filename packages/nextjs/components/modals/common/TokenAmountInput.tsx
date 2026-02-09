@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useCallback } from "react";
+import { type FC, useCallback } from "react";
 import Image from "next/image";
 import { formatUnits } from "viem";
 import type { SwapAsset } from "../SwapModalShell";
@@ -111,9 +111,9 @@ export const TokenAmountInput: FC<TokenAmountInputProps> = ({
                     {isOutput ? (
                         <div className="border-base-300 flex min-h-[32px] w-full items-center justify-end border-0 border-b-2 bg-transparent px-2 py-1 text-right font-medium outline-none">
                             {isLoading ? (
-                                <span className="loading loading-dots loading-xs"></span>
+                                <span className="loading loading-dots loading-xs" />
                             ) : (
-                                parseFloat(amount || "0").toFixed(6)
+                                Number.parseFloat(amount || "0").toFixed(6)
                             )}
                         </div>
                     ) : (

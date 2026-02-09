@@ -59,7 +59,9 @@ export type KapanOperationType =
   | "leverage-up"
   | "close-position"
   | "debt-swap"
-  | "collateral-swap";
+  | "collateral-swap"
+  | "adl"
+  | "auto-leverage";
 
 /**
  * Lending protocol identifiers for appCode
@@ -68,7 +70,8 @@ export type KapanProtocol =
   | "aave"
   | "compound"
   | "venus"
-  | "morpho";
+  | "morpho"
+  | "euler";
 
 /**
  * Build the appCode string with operation type and optional protocol
@@ -76,8 +79,12 @@ export type KapanProtocol =
  * Examples: "kapan:collateral-swap/morpho", "kapan:debt-swap/aave", "kapan:leverage-up"
  */
 export function buildAppCode(operationType?: KapanOperationType, protocol?: KapanProtocol): string {
-  if (!operationType) return "kapan";
-  if (!protocol) return `kapan:${operationType}`;
+  if (!operationType) {
+    return "kapan";
+  }
+  if (!protocol) {
+    return `kapan:${operationType}`;
+  }
   return `kapan:${operationType}/${protocol}`;
 }
 
@@ -86,10 +93,21 @@ export function buildAppCode(operationType?: KapanOperationType, protocol?: Kapa
  */
 export function normalizeProtocolForAppCode(protocolName: string): KapanProtocol | undefined {
   const lower = protocolName.toLowerCase();
-  if (lower.includes("morpho")) return "morpho";
-  if (lower.includes("aave")) return "aave";
-  if (lower.includes("compound")) return "compound";
-  if (lower.includes("venus")) return "venus";
+  if (lower.includes("morpho")) {
+    return "morpho";
+  }
+  if (lower.includes("aave")) {
+    return "aave";
+  }
+  if (lower.includes("compound")) {
+    return "compound";
+  }
+  if (lower.includes("venus")) {
+    return "venus";
+  }
+  if (lower.includes("euler")) {
+    return "euler";
+  }
   return undefined;
 }
 
@@ -98,11 +116,13 @@ export function normalizeProtocolForAppCode(protocolName: string): KapanProtocol
  * Returns undefined if not a kapan appCode or no operation type encoded
  */
 export function parseOperationTypeFromAppCode(appCode: string): KapanOperationType | undefined {
-  if (!appCode.startsWith("kapan:")) return undefined;
+  if (!appCode.startsWith("kapan:")) {
+    return undefined;
+  }
   // Handle format "kapan:operation-type/protocol" or "kapan:operation-type"
   const rest = appCode.slice(6);
   const type = rest.split("/")[0] as KapanOperationType;
-  const validTypes: KapanOperationType[] = ["leverage-up", "close-position", "debt-swap", "collateral-swap"];
+  const validTypes: KapanOperationType[] = ["leverage-up", "close-position", "debt-swap", "collateral-swap", "adl", "auto-leverage"];
   return validTypes.includes(type) ? type : undefined;
 }
 
@@ -111,12 +131,16 @@ export function parseOperationTypeFromAppCode(appCode: string): KapanOperationTy
  * Returns undefined if not present
  */
 export function parseProtocolFromAppCode(appCode: string): KapanProtocol | undefined {
-  if (!appCode.startsWith("kapan:")) return undefined;
+  if (!appCode.startsWith("kapan:")) {
+    return undefined;
+  }
   const rest = appCode.slice(6);
   const parts = rest.split("/");
-  if (parts.length < 2) return undefined;
+  if (parts.length < 2) {
+    return undefined;
+  }
   const protocol = parts[1] as KapanProtocol;
-  const validProtocols: KapanProtocol[] = ["aave", "compound", "venus", "morpho"];
+  const validProtocols: KapanProtocol[] = ["aave", "compound", "venus", "morpho", "euler"];
   return validProtocols.includes(protocol) ? protocol : undefined;
 }
 
@@ -173,6 +197,7 @@ const ERC20_ABI = [
 const KAPAN_ADAPTER_ABI = [
   "function fundOrder(bytes32 orderHash, address token, address recipient, uint256 amount) external",
   "function fundOrderBySalt(address user, bytes32 salt, address token, address recipient, uint256 amount) external",
+  "function fundOrderWithBalance(address user, bytes32 salt, address token, address recipient) external",
 ];
 
 const borrowerIface = new Interface(BORROWER_ABI);
@@ -294,6 +319,27 @@ export function encodeAdapterFundOrderBySalt(
 }
 
 /**
+ * Encode a call to KapanCowAdapter.fundOrderWithBalance()
+ * Transfers the ENTIRE balance of flash-loaned tokens to OrderManager.
+ *
+ * Use this for ADL/conditional orders where the flash loan amount is fixed
+ * but the actual swap amount is dynamic (determined by trigger at execution time).
+ *
+ * @param user - The order owner address
+ * @param salt - The order salt (known before order creation)
+ * @param token - Token to transfer (the flash-loaned token)
+ * @param recipient - Recipient address (OrderManager)
+ */
+export function encodeAdapterFundOrderWithBalance(
+  user: string,
+  salt: string,
+  token: string,
+  recipient: string
+): string {
+  return kapanAdapterIface.encodeFunctionData("fundOrderWithBalance", [user, salt, token, recipient]);
+}
+
+/**
  * Encode a pre-hook call for KapanOrderManager using (user, salt) lookup
  * This allows pre-computing appData before order creation
  * The pre-hook withdraws collateral and prepares tokens for the swap
@@ -375,6 +421,12 @@ export function buildKapanAppData(
       token: string;
       /** Amount to borrow */
       amount: bigint;
+      /**
+       * Use balance-based transfer (fundOrderWithBalance) instead of fixed amount.
+       * Required for ADL/conditional orders where flash loan is fixed but actual
+       * swap amount is dynamic (determined by trigger at execution time).
+       */
+      useBalanceTransfer?: boolean;
     };
   }
 ): AppDataDocument {
@@ -404,24 +456,34 @@ export function buildKapanAppData(
 
     if (kapanAdapter) {
       // Use KapanCowAdapter - our custom borrower that works with HooksTrampoline
-      // NOTE: Using fundOrderBySalt which looks up orderHash from (user, salt)
-      // This allows pre-computing hook calldata before order creation
-      const fundOrderCalldata = encodeAdapterFundOrderBySalt(
-        user,
-        salt,
-        options.flashLoan.token,
-        orderManagerAddress,
-        options.flashLoan.amount
-      );
+      // For ADL/conditional orders, use fundOrderWithBalance (transfers entire balance)
+      // For regular orders, use fundOrderBySalt (transfers fixed amount)
+      const fundOrderCalldata = options.flashLoan.useBalanceTransfer
+        ? encodeAdapterFundOrderWithBalance(
+            user,
+            salt,
+            options.flashLoan.token,
+            orderManagerAddress
+          )
+        : encodeAdapterFundOrderBySalt(
+            user,
+            salt,
+            options.flashLoan.token,
+            orderManagerAddress,
+            options.flashLoan.amount
+          );
 
       preHooks = [
         // First: Transfer flash-loaned tokens from Adapter to OrderManager
-        // fundOrderBySalt looks up orderHash from OrderManager.userSaltToOrderHash
+        // fundOrderWithBalance transfers entire balance (for dynamic ADL amounts)
+        // fundOrderBySalt transfers fixed amount (for regular orders)
         {
           target: kapanAdapter,
           callData: fundOrderCalldata,
           gasLimit: "150000", // Increased for storage read + transfer
-          dappId: "kapan://flashloans/adapter/fund",
+          dappId: options.flashLoan.useBalanceTransfer
+            ? "kapan://flashloans/adapter/fund-balance"
+            : "kapan://flashloans/adapter/fund",
         },
         // Second: Execute any pre-hook logic on OrderManager
         {
@@ -664,9 +726,13 @@ export async function registerAppData(
         baseDelay: 1000,
         isRetryable: (error) => {
           // Retry on network errors and rate limits
-          if (isNetworkError(error) || isRateLimitError(error)) return true;
+          if (isNetworkError(error) || isRateLimitError(error)) {
+            return true;
+          }
           // Retry on server errors (wrapped in Error objects from our throw above)
-          if (error instanceof Error && error.message.startsWith("API error 5")) return true;
+          if (error instanceof Error && error.message.startsWith("API error 5")) {
+            return true;
+          }
           return false;
         },
         onRetry: (attempt, error, delay) => {
@@ -712,13 +778,19 @@ export async function buildAndRegisterAppData(
   
   // Use the hash computed by the API if available, otherwise fall back to local computation
   const appDataHash = result.computedHash || computeAppDataHash(appDataDoc);
-  
-  if (result.computedHash) {
-    console.log("[buildAndRegisterAppData] Using API-computed hash:", result.computedHash);
+
+  if (result.success) {
+    console.log("[buildAndRegisterAppData] ✅ AppData REGISTERED successfully!");
+    console.log("[buildAndRegisterAppData] Hash:", appDataHash);
+    if (result.computedHash) {
+      console.log("[buildAndRegisterAppData] (API-computed hash)");
+    }
   } else {
-    console.log("[buildAndRegisterAppData] Using locally-computed hash:", appDataHash);
+    console.error("[buildAndRegisterAppData] ❌ AppData registration FAILED!");
+    console.error("[buildAndRegisterAppData] Error:", result.error);
+    console.error("[buildAndRegisterAppData] Local hash:", appDataHash);
   }
-  
+
   return {
     appDataDoc,
     appDataHash,
@@ -810,7 +882,9 @@ export async function fetchOperationTypeFromAppData(
   appDataHash: string
 ): Promise<KapanOperationType | undefined> {
   const appData = await fetchAppData(chainId, appDataHash);
-  if (!appData) return undefined;
+  if (!appData) {
+    return undefined;
+  }
 
   return parseOperationTypeFromAppCode(appData.appCode);
 }

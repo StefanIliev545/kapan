@@ -5,6 +5,7 @@ import {IPoolAddressesProvider} from "../../../interfaces/aave/IPoolAddressesPro
 import {IUiPoolDataProviderV3} from "../../../interfaces/aave/IUiDataProvider.sol";
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {IPoolDataProvider} from "@aave/core-v3/contracts/interfaces/IPoolDataProvider.sol";
+import {IAaveOracle} from "@aave/core-v3/contracts/interfaces/IAaveOracle.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -306,6 +307,27 @@ contract AaveGatewayView {
         return ltv;
     }
 
+    /// @notice Returns the current LTV (debt/collateral) in basis points
+    /// @dev This is the actual current LTV = totalDebt / totalCollateral * 10000
+    /// @param user The user address
+    /// @return Current LTV in basis points (e.g., 6500 = 65%)
+    function getCurrentLtvBps(address /* market */, address user) external view returns (uint256) {
+        IPool pool = IPool(poolAddressesProvider.getPool());
+        (uint256 totalCollateralBase, uint256 totalDebtBase,,,,) = pool.getUserAccountData(user);
+        if (totalCollateralBase == 0) return 0;
+        return (totalDebtBase * 10000) / totalCollateralBase;
+    }
+
+    /// @notice Returns the liquidation LTV threshold in basis points
+    /// @dev Position is liquidatable when currentLTV >= liquidationLtvBps
+    /// @param user The user address
+    /// @return Liquidation threshold in basis points
+    function getLiquidationLtvBps(address /* market */, address user) external view returns (uint256) {
+        IPool pool = IPool(poolAddressesProvider.getPool());
+        (, , , uint256 liquidationThreshold,,) = pool.getUserAccountData(user);
+        return liquidationThreshold;
+    }
+
     /// @notice Returns full user account data from Aave
     /// @param user The user address
     /// @return totalCollateralBase Total collateral in base currency
@@ -520,5 +542,34 @@ contract AaveGatewayView {
         }
         
         return collateralAddresses;
+    }
+
+    // ============ Price Queries (for ADL) ============
+
+    /// @notice Get the price of an asset in USD (8 decimals)
+    /// @param token The asset address
+    /// @return price Price in 8 decimals (e.g., 300000000000 for $3000)
+    function getAssetPrice(address token) external view returns (uint256 price) {
+        IAaveOracle oracle = IAaveOracle(poolAddressesProvider.getPriceOracle());
+        try oracle.getAssetPrice(token) returns (uint256 p) {
+            return p;
+        } catch {
+            return 0;
+        }
+    }
+
+    /// @notice Get prices for multiple assets
+    /// @param tokens Array of asset addresses
+    /// @return prices Array of prices in 8 decimals
+    function getAssetPrices(address[] calldata tokens) external view returns (uint256[] memory prices) {
+        IAaveOracle oracle = IAaveOracle(poolAddressesProvider.getPriceOracle());
+        prices = new uint256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            try oracle.getAssetPrice(tokens[i]) returns (uint256 p) {
+                prices[i] = p;
+            } catch {
+                prices[i] = 0;
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePublicClient } from "wagmi";
 import { type Address, type Abi } from "viem";
 import { ERC20ABI } from "~~/contracts/externalContracts";
@@ -68,14 +68,42 @@ export function useTokenInfo(
   const publicClient = usePublicClient({ chainId });
   const [tokenInfoMap, setTokenInfoMap] = useState<Map<string, TokenInfo>>(new Map());
 
+  // Stabilize tokenAddresses by serializing to a string key
+  // This prevents infinite loops when callers pass new array references
+  const addressesKey = useMemo(
+    () => tokenAddresses.map(a => a.toLowerCase()).sort().join(","),
+    [tokenAddresses]
+  );
+
+  // Memoize the normalized addresses to use in the effect
+  const normalizedAddresses = useMemo(
+    () => tokenAddresses.map(a => a as Address),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [addressesKey]
+  );
+
   useEffect(() => {
-    if (!publicClient || tokenAddresses.length === 0) return;
+    if (!publicClient || normalizedAddresses.length === 0) return;
 
     const fetchTokenInfo = async () => {
-      const { cachedMap: newMap, uncached: uncachedAddresses } = partitionByCache(tokenAddresses, chainId);
+      const { cachedMap: newMap, uncached: uncachedAddresses } = partitionByCache(normalizedAddresses, chainId);
 
       if (uncachedAddresses.length === 0) {
-        setTokenInfoMap(newMap);
+        // Only update state if the map content is different
+        setTokenInfoMap(prev => {
+          if (prev.size === newMap.size) {
+            let isSame = true;
+            for (const [key, value] of newMap) {
+              const prevValue = prev.get(key);
+              if (!prevValue || prevValue.symbol !== value.symbol || prevValue.decimals !== value.decimals) {
+                isSame = false;
+                break;
+              }
+            }
+            if (isSame) return prev;
+          }
+          return newMap;
+        });
         return;
       }
 
@@ -99,16 +127,20 @@ export function useTokenInfo(
     };
 
     fetchTokenInfo();
-  }, [publicClient, tokenAddresses, chainId]);
+  }, [publicClient, normalizedAddresses, chainId]);
 
   return tokenInfoMap;
 }
 
 // Single token helper hook
 export function useSingleTokenInfo(tokenAddress: Address | undefined, chainId?: number): TokenInfo | null {
-  const addresses = tokenAddress ? [tokenAddress] : [];
+  // Memoize the addresses array to prevent recreating on every render
+  const addresses = useMemo(
+    () => (tokenAddress ? [tokenAddress] : []),
+    [tokenAddress]
+  );
   const infoMap = useTokenInfo(addresses as Address[], chainId);
-  
+
   if (!tokenAddress) return null;
   return infoMap.get(tokenAddress.toLowerCase()) ?? null;
 }

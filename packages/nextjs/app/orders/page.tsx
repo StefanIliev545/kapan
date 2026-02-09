@@ -1,151 +1,133 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import Link from "next/link";
+import { useMemo, useCallback } from "react";
 import Image from "next/image";
 import { useAccount, useChainId } from "wagmi";
-import { formatUnits, type Address } from "viem";
-import { useCowOrder } from "~~/hooks/useCowOrder";
-import { useMultipleChunkExecutedEvents } from "~~/hooks/useChunkExecutedEvents";
+import { type Address } from "viem";
 import { useTokenInfo } from "~~/hooks/useTokenInfo";
-import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
-import { OrderStatus, calculateExecutionSummary, fetchAppData, parseOperationTypeFromAppCode, type KapanOperationType } from "~~/utils/cow";
-import type { OrderContext } from "~~/utils/cow";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { getOrderNote, getOperationLabel, getOperationColorClass, findPendingNoteForOrder, linkNoteToOrderHash, type OperationType } from "~~/utils/orderNotes";
-import { getProtocolLogo } from "~~/utils/protocol";
-import { LoadingOverlay } from "~~/components/common/Loading";
+import { tokenNameToLogo, PROTOCOL_ICONS } from "~~/contracts/externalContracts";
 import { timeAgo } from "~~/utils/deadline";
 import { truncateAddress } from "~~/utils/address";
+import {
+  useConditionalOrders,
+  ConditionalOrderStatus,
+  formatLtvPercent,
+  type ConditionalOrder,
+  PROTOCOL_IDS,
+} from "~~/hooks/useConditionalOrders";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { LoadingOverlay } from "~~/components/common/Loading";
+import { ShieldCheckIcon, ArrowTrendingUpIcon, ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import { type KapanProtocol } from "~~/utils/cow/appData";
+import { decodeAbiParameters } from "viem";
 
-function formatAmount(amount: bigint, decimals: number): string {
-  const formatted = formatUnits(amount, decimals);
-  const num = parseFloat(formatted);
-  if (num >= 1000) return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  if (num >= 1) return num.toLocaleString(undefined, { maximumFractionDigits: 4 });
-  return num.toLocaleString(undefined, { maximumFractionDigits: 6 });
+// ============ Limit Price Trigger Decoding ============
+
+interface DecodedLimitPriceParams {
+  protocolId: `0x${string}`;
+  sellToken: Address;
+  buyToken: Address;
+  sellDecimals: number;
+  buyDecimals: number;
+  limitPrice: bigint;
+  triggerAbovePrice: boolean;
+  totalSellAmount: bigint;
+  totalBuyAmount: bigint;
+  numChunks: number;
+  isKindBuy: boolean;
 }
 
-function formatUsd(amount: number): string {
-  if (amount < 0.01) return "<$0.01";
-  if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}k`;
-  return `$${amount.toFixed(2)}`;
-}
-
-interface OrderWithHash {
-  orderHash: string;
-  context: OrderContext;
-}
-
-/**
- * Map KapanOperationType to OperationType for display
- */
-function mapKapanOperationType(kapanType: KapanOperationType): OperationType {
-  switch (kapanType) {
-    case "leverage-up": return "leverage_up";
-    case "close-position": return "close_position";
-    case "debt-swap": return "debt_swap";
-    case "collateral-swap": return "collateral_swap";
+function decodeLimitPriceTriggerParams(data: `0x${string}`): DecodedLimitPriceParams | undefined {
+  try {
+    const decoded = decodeAbiParameters(
+      [{
+        type: "tuple",
+        components: [
+          { name: "protocolId", type: "bytes4" },
+          { name: "protocolContext", type: "bytes" },
+          { name: "sellToken", type: "address" },
+          { name: "buyToken", type: "address" },
+          { name: "sellDecimals", type: "uint8" },
+          { name: "buyDecimals", type: "uint8" },
+          { name: "limitPrice", type: "uint256" },
+          { name: "triggerAbovePrice", type: "bool" },
+          { name: "totalSellAmount", type: "uint256" },
+          { name: "totalBuyAmount", type: "uint256" },
+          { name: "numChunks", type: "uint8" },
+          { name: "maxSlippageBps", type: "uint256" },
+          { name: "isKindBuy", type: "bool" },
+        ],
+      }],
+      data,
+    );
+    const p = decoded[0];
+    return {
+      protocolId: p.protocolId as `0x${string}`,
+      sellToken: p.sellToken,
+      buyToken: p.buyToken,
+      sellDecimals: p.sellDecimals,
+      buyDecimals: p.buyDecimals,
+      limitPrice: p.limitPrice,
+      triggerAbovePrice: p.triggerAbovePrice,
+      totalSellAmount: p.totalSellAmount,
+      totalBuyAmount: p.totalBuyAmount,
+      numChunks: p.numChunks,
+      isKindBuy: p.isKindBuy,
+    };
+  } catch {
+    return undefined;
   }
 }
 
-/**
- * Hook to fetch operation types from appData for multiple orders
- * Returns a map of orderHash -> OperationType
- */
-function useAppDataOperationTypes(orders: OrderWithHash[], chainId: number): Map<string, OperationType> {
-  const [operationTypes, setOperationTypes] = useState<Map<string, OperationType>>(new Map());
+// ============ Protocol ID to Name Mapping ============
 
-  useEffect(() => {
-    if (orders.length === 0) return;
-
-    const fetchTypes = async () => {
-      const newTypes = new Map<string, OperationType>();
-
-      // Fetch appData for each order that has an appDataHash
-      await Promise.all(
-        orders.map(async ({ orderHash, context }) => {
-          const appDataHash = context.params.appDataHash;
-          if (!appDataHash || appDataHash === "0x0000000000000000000000000000000000000000000000000000000000000000") {
-            return;
-          }
-
-          try {
-            const appData = await fetchAppData(chainId, appDataHash);
-            if (appData) {
-              const kapanType = parseOperationTypeFromAppCode(appData.appCode);
-              if (kapanType) {
-                newTypes.set(orderHash, mapKapanOperationType(kapanType));
-              }
-            }
-          } catch {
-            // Silently ignore fetch errors - will fall back to localStorage
-          }
-        })
-      );
-
-      if (newTypes.size > 0) {
-        setOperationTypes(prev => {
-          const merged = new Map(prev);
-          newTypes.forEach((value, key) => merged.set(key, value));
-          return merged;
-        });
-      }
-    };
-
-    fetchTypes();
-  }, [orders, chainId]);
-
-  return operationTypes;
+function getProtocolNameFromId(protocolId: `0x${string}`): KapanProtocol | undefined {
+  if (protocolId === PROTOCOL_IDS.AAVE_V3) { return "aave"; }
+  if (protocolId === PROTOCOL_IDS.COMPOUND_V3) { return "compound"; }
+  if (protocolId === PROTOCOL_IDS.MORPHO_BLUE) { return "morpho"; }
+  if (protocolId === PROTOCOL_IDS.EULER_V2) { return "euler"; }
+  if (protocolId === PROTOCOL_IDS.VENUS) { return "venus"; }
+  return undefined;
 }
 
-function UsdValue({ symbol, amount }: { symbol: string; amount: number }) {
-  const priceData = useTokenPriceApi(symbol);
-  const price = priceData.isSuccess ? (priceData as { price: number }).price : undefined;
-  if (!price) return null;
-  return <span className="text-base-content/40">{formatUsd(amount * price)}</span>;
+type OrderType = "adl" | "autoLeverage" | "limit";
+
+/** Format a limit price (token-to-token exchange rate) for display. */
+function formatLimitPrice(value: number): string {
+  if (value === 0) return "0";
+  const abs = Math.abs(value);
+  let maxFrac = 4;
+  if (abs < 0.0001) maxFrac = 8;
+  else if (abs < 0.01) maxFrac = 6;
+  else if (abs < 1) maxFrac = 5;
+  return value.toLocaleString(undefined, { maximumFractionDigits: maxFrac });
 }
 
 export default function OrdersPage() {
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
-  const { getUserOrdersWithDetails, isAvailable } = useCowOrder();
-  
-  const [orders, setOrders] = useState<OrderWithHash[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchOrders = useCallback(async () => {
-    if (!userAddress || !isAvailable) {
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const userOrders = await getUserOrdersWithDetails();
-      // Sort by createdAt descending (newest first)
-      userOrders.sort((a, b) => Number(b.context.createdAt) - Number(a.context.createdAt));
-      setOrders(userOrders);
-    } catch (error) {
-      console.error("Failed to fetch orders:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userAddress, isAvailable, getUserOrdersWithDetails]);
+  // Fetch conditional orders
+  const {
+    orders,
+    isLoading,
+    isAvailable,
+    refetch,
+    cancelOrder,
+    isCancelling,
+  } = useConditionalOrders({ fetchTriggerStatus: true });
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+  // Get trigger contract addresses to differentiate order types
+  const { data: autoLeverageTriggerInfo } = useDeployedContractInfo({ contractName: "AutoLeverageTrigger", chainId } as any);
+  const autoLeverageTriggerAddress = autoLeverageTriggerInfo?.address?.toLowerCase();
+  const { data: limitPriceTriggerInfo } = useDeployedContractInfo({ contractName: "LimitPriceTrigger", chainId } as any);
+  const limitPriceTriggerAddress = limitPriceTriggerInfo?.address?.toLowerCase();
+  const { data: ltvTriggerInfo } = useDeployedContractInfo({ contractName: "LtvTrigger", chainId } as any);
+  const ltvTriggerAddress = ltvTriggerInfo?.address?.toLowerCase();
 
-  const ordersForEvents = useMemo(() => 
-    orders.map(o => ({
-      orderHash: o.orderHash,
-      isComplete: o.context.status === OrderStatus.Completed,
-    })),
-    [orders]
-  );
+  const triggersLoaded = !!(autoLeverageTriggerAddress || limitPriceTriggerAddress || ltvTriggerAddress);
 
-  const executionDataMap = useMultipleChunkExecutedEvents(ordersForEvents);
-
+  // Token addresses for fetching info
   const tokenAddresses = useMemo(() => {
     const addresses = new Set<Address>();
     orders.forEach(o => {
@@ -157,27 +139,45 @@ export default function OrdersPage() {
 
   const tokenInfoMap = useTokenInfo(tokenAddresses, chainId);
 
-  // Fetch operation types from appData (falls back to localStorage notes in OrderRow)
-  const appDataOperationTypes = useAppDataOperationTypes(orders, chainId);
+  const getTokenSymbol = useCallback((address: string): string => {
+    const info = tokenInfoMap.get(address.toLowerCase());
+    return info?.symbol ?? truncateAddress(address);
+  }, [tokenInfoMap]);
+
+  // Categorize orders by type
+  const getOrderType = useCallback((order: ConditionalOrder): OrderType => {
+    const triggerAddress = order.context.params.trigger.toLowerCase();
+    if (autoLeverageTriggerAddress && triggerAddress === autoLeverageTriggerAddress) {
+      return "autoLeverage";
+    } else if (limitPriceTriggerAddress && triggerAddress === limitPriceTriggerAddress) {
+      return "limit";
+    } else if (ltvTriggerAddress && triggerAddress === ltvTriggerAddress) {
+      return "adl";
+    }
+    return "adl"; // Default fallback
+  }, [autoLeverageTriggerAddress, limitPriceTriggerAddress, ltvTriggerAddress]);
+
+  // Get protocol from order
+  const getOrderProtocol = useCallback((order: ConditionalOrder): KapanProtocol | undefined => {
+    const triggerAddr = order.context.params.trigger.toLowerCase();
+    if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) {
+      const params = decodeLimitPriceTriggerParams(order.context.params.triggerStaticData as `0x${string}`);
+      return params ? getProtocolNameFromId(params.protocolId) : undefined;
+    }
+    if (order.triggerParams) {
+      return getProtocolNameFromId(order.triggerParams.protocolId);
+    }
+    return undefined;
+  }, [limitPriceTriggerAddress]);
+
+  // Group orders by status
+  const activeOrders = orders.filter(o => o.context.status === ConditionalOrderStatus.Active);
+  const completedOrders = orders.filter(o => o.context.status === ConditionalOrderStatus.Completed);
+  const cancelledOrders = orders.filter(o => o.context.status === ConditionalOrderStatus.Cancelled);
 
   const handleBack = useCallback(() => {
     window.history.back();
   }, []);
-
-  const getTokenSymbol = (address: string): string => {
-    const info = tokenInfoMap.get(address.toLowerCase());
-    return info?.symbol ?? truncateAddress(address);
-  };
-
-  const getTokenDecimals = (address: string): number => {
-    const info = tokenInfoMap.get(address.toLowerCase());
-    return info?.decimals ?? 18;
-  };
-
-  // Group orders by status
-  const activeOrders = orders.filter(o => o.context.status === OrderStatus.Active);
-  const completedOrders = orders.filter(o => o.context.status === OrderStatus.Completed);
-  const cancelledOrders = orders.filter(o => o.context.status === OrderStatus.Cancelled);
 
   if (!userAddress) {
     return (
@@ -195,7 +195,7 @@ export default function OrdersPage() {
       <div className="min-h-screen px-4 py-12 md:px-8 lg:px-16">
         <div className="mx-auto max-w-5xl py-20 text-center">
           <h1 className="mb-4 text-3xl font-bold">Orders</h1>
-          <p className="text-base-content/50">Limit orders are not available on this chain</p>
+          <p className="text-base-content/50">Conditional orders are not available on this chain</p>
         </div>
       </div>
     );
@@ -215,7 +215,7 @@ export default function OrdersPage() {
             </svg>
             Back
           </button>
-          
+
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold">Your Orders</h1>
@@ -223,24 +223,24 @@ export default function OrdersPage() {
                 {orders.length} total · {activeOrders.length} active
               </p>
             </div>
-            <button 
-              onClick={fetchOrders}
+            <button
+              onClick={() => refetch()}
               disabled={isLoading}
               className="hover:bg-base-200 rounded-lg p-2 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`text-base-content/50 size-5${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className={`text-base-content/50 size-5${isLoading ? ' animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
           </div>
         </div>
 
-        {isLoading && orders.length === 0 ? (
+        {(isLoading && orders.length === 0) || !triggersLoaded ? (
           <LoadingOverlay size="lg" label="Loading orders..." />
         ) : orders.length === 0 ? (
           <div className="py-20 text-center">
             <p className="text-base-content/50 text-lg">No orders found</p>
-            <p className="text-base-content/40 mt-2 text-sm">Create a limit order from the Multiply modal</p>
+            <p className="text-base-content/40 mt-2 text-sm">Create an ADL or Auto-Leverage order from a position</p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -255,11 +255,11 @@ export default function OrdersPage() {
                     <OrderRow
                       key={order.orderHash}
                       order={order}
-                      executionDataMap={executionDataMap}
+                      orderType={getOrderType(order)}
+                      protocol={getOrderProtocol(order)}
                       getTokenSymbol={getTokenSymbol}
-                      getTokenDecimals={getTokenDecimals}
-                      chainId={chainId}
-                      appDataOperationType={appDataOperationTypes.get(order.orderHash)}
+                      onCancel={cancelOrder}
+                      isCancelling={isCancelling}
                     />
                   ))}
                 </div>
@@ -277,11 +277,10 @@ export default function OrdersPage() {
                     <OrderRow
                       key={order.orderHash}
                       order={order}
-                      executionDataMap={executionDataMap}
+                      orderType={getOrderType(order)}
+                      protocol={getOrderProtocol(order)}
                       getTokenSymbol={getTokenSymbol}
-                      getTokenDecimals={getTokenDecimals}
-                      chainId={chainId}
-                      appDataOperationType={appDataOperationTypes.get(order.orderHash)}
+                      dimmed
                     />
                   ))}
                 </div>
@@ -299,11 +298,9 @@ export default function OrdersPage() {
                     <OrderRow
                       key={order.orderHash}
                       order={order}
-                      executionDataMap={executionDataMap}
+                      orderType={getOrderType(order)}
+                      protocol={getOrderProtocol(order)}
                       getTokenSymbol={getTokenSymbol}
-                      getTokenDecimals={getTokenDecimals}
-                      chainId={chainId}
-                      appDataOperationType={appDataOperationTypes.get(order.orderHash)}
                       dimmed
                     />
                   ))}
@@ -317,168 +314,175 @@ export default function OrdersPage() {
   );
 }
 
+/** Map order type to display label, icon component, and badge CSS class. */
+function getOrderTypeStyling(orderType: OrderType): {
+  label: string;
+  icon: typeof ArrowTrendingUpIcon;
+  badgeClass: string;
+} {
+  if (orderType === "autoLeverage") {
+    return { label: "Auto Leverage", icon: ArrowTrendingUpIcon, badgeClass: "bg-info/20 text-info" };
+  }
+  if (orderType === "limit") {
+    return { label: "Limit Order", icon: ArrowsRightLeftIcon, badgeClass: "bg-primary/20 text-primary" };
+  }
+  return { label: "Auto Deleverage", icon: ShieldCheckIcon, badgeClass: "bg-success/20 text-success" };
+}
+
+/** Get the status badge CSS class and label for a conditional order status. */
+function getStatusDisplay(status: ConditionalOrderStatus): { className: string; label: string } {
+  if (status === ConditionalOrderStatus.Active) {
+    return { className: "bg-success/20 text-success", label: "Active" };
+  }
+  if (status === ConditionalOrderStatus.Completed) {
+    return { className: "bg-base-200 text-base-content/60", label: "Completed" };
+  }
+  return { className: "bg-error/20 text-error", label: "Cancelled" };
+}
+
 function OrderRow({
   order,
-  executionDataMap,
+  orderType,
+  protocol,
   getTokenSymbol,
-  getTokenDecimals,
-  chainId,
-  appDataOperationType,
-  dimmed = false
+  onCancel,
+  isCancelling,
+  dimmed = false,
 }: {
-  order: OrderWithHash;
-  executionDataMap: Map<string, any>;
+  order: ConditionalOrder;
+  orderType: OrderType;
+  protocol?: KapanProtocol;
   getTokenSymbol: (address: string) => string;
-  getTokenDecimals: (address: string) => number;
-  chainId: number;
-  appDataOperationType?: OperationType;
+  onCancel?: (orderHash: `0x${string}`) => Promise<boolean>;
+  isCancelling?: boolean;
   dimmed?: boolean;
 }) {
-  const { orderHash, context } = order;
-  const { params, status, iterationCount, createdAt } = context;
-  
-  const isActive = status === OrderStatus.Active;
-  const isCompleted = status === OrderStatus.Completed;
-  
-  const sellSymbol = getTokenSymbol(params.sellToken);
-  const buySymbol = getTokenSymbol(params.buyToken);
-  const sellDecimals = getTokenDecimals(params.sellToken);
-  const buyDecimals = getTokenDecimals(params.buyToken);
-  
-  const totalChunks = Number(params.targetValue);
-  const completedChunks = Number(iterationCount);
-  const progressPercent = totalChunks > 0 ? (completedChunks / totalChunks) * 100 : 0;
+  const { orderHash, context, triggerParams, isTriggerMet } = order;
+  const { status, iterationCount, createdAt } = context;
+  const isActive = status === ConditionalOrderStatus.Active;
+  const statusDisplay = getStatusDisplay(status);
 
-  // Memoize style object to avoid creating new object on each render
-  const progressBarStyle = useMemo(() => ({ width: `${progressPercent}%` }), [progressPercent]);
+  const sellSymbol = getTokenSymbol(context.params.sellToken);
+  const buySymbol = getTokenSymbol(context.params.buyToken);
 
-  const executionData = executionDataMap.get(orderHash);
-  const hasExecutionData = executionData && executionData.chunks.length > 0;
-  const executionSummary = hasExecutionData
-    ? calculateExecutionSummary(executionData, params.minBuyPerChunk, sellDecimals, buyDecimals)
-    : null;
-  
-  const totalReceived = executionData?.totalReceived ?? 0n;
-  const hasSurplus = executionSummary && executionSummary.surplusAmount > 0n;
-  
-  const receivedAmountNum = parseFloat(formatUnits(totalReceived, buyDecimals));
+  const maxIterations = Number(context.params.maxIterations);
+  const completedIterations = Number(iterationCount);
+  const progressPercent = maxIterations > 0 ? (completedIterations / maxIterations) * 100 : 0;
 
-  // Determine operation type:
-  // 1. First try appData (derived from on-chain appDataHash)
-  // 2. Fall back to localStorage notes
-  let orderNote = getOrderNote(orderHash);
-
-  // If no note found, try to find and link a pending note
-  if (!orderNote) {
-    const pendingNote = findPendingNoteForOrder(
-      sellSymbol,
-      buySymbol,
-      chainId,
-      Number(createdAt)
-    );
-
-    if (pendingNote && pendingNote.salt) {
-      // Link the pending note to this orderHash for future lookups
-      linkNoteToOrderHash(pendingNote.salt, orderHash);
-      orderNote = pendingNote;
-    }
+  // Decode limit price params if applicable
+  let limitPriceParams: DecodedLimitPriceParams | undefined;
+  if (orderType === "limit") {
+    limitPriceParams = decodeLimitPriceTriggerParams(context.params.triggerStaticData as `0x${string}`);
   }
 
-  // Prefer appData-derived type, fall back to localStorage note, then "unknown"
-  const operationType: OperationType = appDataOperationType ?? orderNote?.operationType ?? "unknown";
-  const operationLabel = getOperationLabel(operationType);
-  const operationColorClass = getOperationColorClass(operationType);
-  const protocolName = orderNote?.protocol;
-  const protocolLogo = protocolName ? getProtocolLogo(protocolName) : null;
+  const { label: orderTypeLabel, icon: OrderIcon, badgeClass } = getOrderTypeStyling(orderType);
+
+  const protocolIcon = protocol ? PROTOCOL_ICONS[protocol] : undefined;
 
   return (
-    <Link 
-      href={`/orders/${orderHash}`}
-      className={`border-base-200 hover:border-base-300 hover:bg-base-100/50 block rounded-lg border p-4 transition-all ${dimmed ? 'opacity-50' : ''}`}
-    >
-      <div className="flex items-center justify-between gap-4">
-        {/* Left: Token pair and progress */}
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="flex flex-shrink-0 items-center -space-x-2">
-            <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={32} height={32} className="ring-base-100 rounded-full ring-2" />
-            <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={32} height={32} className="ring-base-100 rounded-full ring-2" />
-          </div>
-          
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Operation type badge */}
-              {operationType !== "unknown" && (
-                <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${operationColorClass}`}>
-                  {operationLabel}
-                </span>
-              )}
-              {/* Protocol with icon */}
-              {protocolName && (
-                <div className="flex items-center gap-1">
-                  {protocolLogo && (
-                    <Image 
-                      src={protocolLogo} 
-                      alt={protocolName} 
-                      width={14} 
-                      height={14} 
-                      className="rounded-sm"
-                    />
-                  )}
-                  <span className="text-base-content/40 text-xs">{protocolName}</span>
-                </div>
-              )}
-              {/* Token pair */}
-              <span className="font-semibold">{sellSymbol} → {buySymbol}</span>
-              {/* Status badge */}
-              <span className={`rounded px-1.5 py-0.5 text-xs ${
-                isActive ? 'bg-warning/20 text-warning' :
-                isCompleted ? 'bg-success/20 text-success' :
-                'bg-error/20 text-error'
-              }`}>
-                {isActive ? 'Active' : isCompleted ? 'Completed' : 'Cancelled'}
-              </span>
-            </div>
-            <div className="text-base-content/50 mt-1 flex items-center gap-3 text-sm">
-              <span>{formatAmount(params.preTotalAmount, sellDecimals)} {sellSymbol}</span>
-              <span>·</span>
-              <span>{completedChunks}/{totalChunks} chunks</span>
-              <span>·</span>
-              <span>{timeAgo(createdAt)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Amounts */}
-        <div className="flex-shrink-0 text-right">
-          {hasExecutionData ? (
-            <>
-              <div className="text-success font-semibold">
-                {formatAmount(totalReceived, buyDecimals)} {buySymbol}
-              </div>
-              <div className="text-sm">
-                <UsdValue symbol={buySymbol} amount={receivedAmountNum} />
-                {hasSurplus && executionSummary && (
-                  <span className="text-success ml-2">+{executionSummary.surplusPercentage.toFixed(1)}%</span>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="text-base-content/40">-</div>
+    <div className={`border-base-200 hover:border-base-300 hover:bg-base-100/50 rounded-lg border p-4 transition-all ${dimmed ? 'opacity-50' : ''}`}>
+      {/* Row 1: Type badge, protocol, status */}
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${badgeClass}`}>
+            <OrderIcon className="size-3.5" />
+            {orderTypeLabel}
+          </span>
+          {protocolIcon && (
+            <span className="bg-base-200 flex items-center gap-1 rounded px-2 py-1 text-xs font-medium">
+              <Image src={protocolIcon} alt={protocol || ""} width={14} height={14} className="rounded-full" />
+              {protocol?.charAt(0).toUpperCase()}{protocol?.slice(1)}
+            </span>
+          )}
+          {isTriggerMet && (
+            <span className="bg-warning/20 text-warning rounded px-2 py-1 text-xs font-medium">
+              Trigger Met
+            </span>
           )}
         </div>
+        <span className={`rounded px-2 py-1 text-xs font-medium ${statusDisplay.className}`}>{statusDisplay.label}</span>
       </div>
 
-      {/* Progress bar */}
-      {isActive && (
-        <div className="mt-3">
-          <div className="bg-base-200 h-1 w-full">
-            <div
-              className="bg-primary h-full transition-all"
-              style={progressBarStyle}
-            />
+      {/* Row 2: Token pair */}
+      <div className="mb-3 flex items-center gap-3">
+        <div className="flex items-center -space-x-2">
+          <Image src={tokenNameToLogo(sellSymbol)} alt={sellSymbol} width={28} height={28} className="ring-base-100 rounded-full ring-2" />
+          <Image src={tokenNameToLogo(buySymbol)} alt={buySymbol} width={28} height={28} className="ring-base-100 rounded-full ring-2" />
+        </div>
+        <span className="text-lg font-semibold">{sellSymbol} → {buySymbol}</span>
+        <span className="text-base-content/40 text-sm">{timeAgo(createdAt)}</span>
+      </div>
+
+      {/* Row 3: LTV info for ADL/Auto-Leverage */}
+      {triggerParams && orderType !== "limit" && (
+        <div className="bg-base-200/50 mb-3 rounded-lg p-3">
+          <div className="flex items-center gap-6 text-sm">
+            <div>
+              <span className="text-base-content/60">Trigger LTV: </span>
+              <span className="text-warning font-medium">{formatLtvPercent(triggerParams.triggerLtvBps)}</span>
+            </div>
+            <div>
+              <span className="text-base-content/60">Target LTV: </span>
+              <span className="text-success font-medium">{formatLtvPercent(triggerParams.targetLtvBps)}</span>
+            </div>
+            <div>
+              <span className="text-base-content/60">Chunks: </span>
+              <span className="font-medium">{triggerParams.numChunks}</span>
+            </div>
           </div>
         </div>
       )}
-    </Link>
+
+      {/* Row 3b: Limit order details */}
+      {orderType === "limit" && limitPriceParams && (
+        <div className="bg-base-200/50 mb-3 rounded-lg p-3">
+          <div className="flex items-center gap-6 text-sm">
+            <div>
+              <span className="text-base-content/60">
+                {limitPriceParams.triggerAbovePrice ? "When price ≥ " : "When price ≤ "}
+              </span>
+              <span className="font-medium">{formatLimitPrice(Number(limitPriceParams.limitPrice) / 1e8)} {limitPriceParams.isKindBuy ? `${buySymbol}/${sellSymbol}` : `${sellSymbol}/${buySymbol}`}</span>
+            </div>
+            <div>
+              <span className="text-base-content/60">Chunks: </span>
+              <span className="font-medium">{limitPriceParams.numChunks}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Row 4: Progress */}
+      {maxIterations > 0 && (
+        <div className="mb-3">
+          <div className="bg-base-200 h-1.5 w-full rounded-full">
+            <div
+              className={`h-full rounded-full transition-all ${isActive ? 'bg-primary' : 'bg-base-300'}`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <div className="mt-1 flex justify-between text-xs">
+            <span className="text-base-content/40">{completedIterations}/{maxIterations} iterations</span>
+            <span className="text-base-content/50 font-medium">{progressPercent.toFixed(0)}%</span>
+          </div>
+        </div>
+      )}
+
+      {/* Row 5: Actions */}
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-base-content/40 font-mono">{truncateAddress(orderHash)}</span>
+        {isActive && onCancel && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              onCancel(orderHash);
+            }}
+            disabled={isCancelling}
+            className="text-error hover:underline disabled:opacity-50"
+          >
+            {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

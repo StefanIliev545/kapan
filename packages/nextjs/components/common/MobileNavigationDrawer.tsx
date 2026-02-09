@@ -9,9 +9,9 @@ const BACKDROP_INITIAL = { opacity: 0 };
 const BACKDROP_ANIMATE = { opacity: 1 };
 const BACKDROP_EXIT = { opacity: 0 };
 
-const DRAWER_INITIAL = { opacity: 0, x: -20 };
-const DRAWER_ANIMATE = { opacity: 1, x: 0 };
-const DRAWER_EXIT = { opacity: 0, x: -20 };
+const DRAWER_INITIAL = { opacity: 0, y: -10 };
+const DRAWER_ANIMATE = { opacity: 1, y: 0 };
+const DRAWER_EXIT = { opacity: 0, y: -10 };
 const DRAWER_TRANSITION = { duration: 0.2 };
 
 interface MobileNavigationDrawerProps {
@@ -51,10 +51,10 @@ export const MobileNavigationDrawer = ({
             animate={DRAWER_ANIMATE}
             exit={DRAWER_EXIT}
             transition={DRAWER_TRANSITION}
-            className="fixed left-4 top-16 z-50 w-72 rounded-lg shadow-2xl"
+            className="bg-base-100 fixed inset-0 top-16 z-50 flex flex-col overflow-y-auto"
             onClick={handleDrawerClick}
           >
-            <div className="bg-base-200/95 border-base-content/10 rounded-xl border p-6 shadow-lg backdrop-blur-md">
+            <div className="flex flex-1 flex-col p-6">
               {/* Logo header */}
               <div className="border-base-content/10 mb-6 border-b pb-3">
                 <div className="flex items-center gap-3">
@@ -73,10 +73,10 @@ export const MobileNavigationDrawer = ({
               </div>
 
               {/* Menu links */}
-              <ul className="space-y-2">{menuLinks}</ul>
+              <ul className="space-y-3 text-lg">{menuLinks}</ul>
 
               {/* Wallet buttons */}
-              <div className="border-base-content/10 mt-6 border-t pt-4">
+              <div className="border-base-content/10 mt-auto border-t pt-6">
                 <div className="relative z-50 flex flex-col items-stretch space-y-3">
                   {walletButtons}
                 </div>

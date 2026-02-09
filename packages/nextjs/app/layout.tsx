@@ -1,6 +1,6 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Metadata } from "next";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithProviders";
@@ -47,7 +47,7 @@ const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
   const initialHost = headersList.get("host");
 
   return (
-    <html suppressHydrationWarning data-theme="kapan" className="dark">
+    <html lang="en" suppressHydrationWarning data-theme="kapan" className="dark">
       <head>
         {/* Preconnect to external APIs - saves 100-300ms per connection */}
         <link rel="preconnect" href="https://blue-api.morpho.org" />

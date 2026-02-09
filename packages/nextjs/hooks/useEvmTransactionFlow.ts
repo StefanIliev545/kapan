@@ -3,6 +3,7 @@ import { useAccount, useSwitchChain } from "wagmi";
 
 import { useBatchingPreference } from "./useBatchingPreference";
 import { useKapanRouterV2 } from "./useKapanRouterV2";
+import { useHasActiveConditionalOrders } from "./useConditionalOrders";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import type { ProtocolInstruction } from "~~/utils/v2/instructionHelpers";
 
@@ -38,6 +39,7 @@ export const useEvmTransactionFlow = ({
   const { switchChain } = useSwitchChain();
   const batchingPreference = useBatchingPreference();
   const { executeFlowBatchedIfPossible, isAnyConfirmed, simulateInstructions } = useKapanRouterV2();
+  const { hasActiveOrders: hasActiveADLOrders } = useHasActiveConditionalOrders();
 
   // Skip chain switching for hardhat (31337) - user manages wallet connection manually in dev mode
   const isHardhat = chainId === 31337;
@@ -85,11 +87,12 @@ export const useEvmTransactionFlow = ({
       }
 
       // Auto-enable revokePermissions when batching is enabled (for security - clean up permissions atomically)
-      const shouldRevoke = revokePermissions || batchingPreference.enabled;
+      // BUT: Never revoke if user has active ADL orders - they need router permissions to execute
+      const shouldRevoke = !hasActiveADLOrders && (revokePermissions || batchingPreference.enabled);
       await executeFlowBatchedIfPossible(instructions, batchingPreference.enabled, { revokePermissions: shouldRevoke });
       // Transaction toast notifications are handled by executeFlowBatchedIfPossible
     },
-    [ensureCorrectChain, buildFlow, executeFlowBatchedIfPossible, batchingPreference.enabled, simulateInstructions, chainSwitchErrorMessage, emptyFlowErrorMessage, simulateWhenBatching, revokePermissions],
+    [ensureCorrectChain, buildFlow, executeFlowBatchedIfPossible, batchingPreference.enabled, simulateInstructions, chainSwitchErrorMessage, emptyFlowErrorMessage, simulateWhenBatching, revokePermissions, hasActiveADLOrders],
   );
 
   useEffect(() => {

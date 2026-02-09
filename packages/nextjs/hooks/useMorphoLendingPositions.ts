@@ -215,7 +215,7 @@ export function useMorphoLendingPositions(
   } = useQuery({
     queryKey: qk.morpho.markets(chainId),
     queryFn: () => fetchMorphoMarketsApi(chainId),
-    staleTime: 10_000, // 1 minute
+    staleTime: 10_000, // 10 seconds
     refetchOnWindowFocus: false,
     enabled: chainId > 0,
   });

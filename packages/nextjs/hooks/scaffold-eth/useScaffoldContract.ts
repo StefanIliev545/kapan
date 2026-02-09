@@ -1,8 +1,7 @@
 import { Account, Address, Chain, Client, Transport, getContract } from "viem";
 import { usePublicClient } from "wagmi";
-import { GetWalletClientReturnType } from "wagmi/actions";
-import { useSelectedNetwork } from "~~/hooks/scaffold-eth";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import type { GetWalletClientReturnType } from "wagmi/actions";
+import { useDeployedContractInfo, useSelectedNetwork } from "~~/hooks/scaffold-eth";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
 import { Contract, ContractName } from "~~/utils/scaffold-eth/contract";
 
@@ -34,9 +33,8 @@ export const useScaffoldContract = <
 
   const publicClient = usePublicClient({ chainId: selectedNetwork?.id });
 
-  let contract = undefined;
-  if (deployedContractData && publicClient) {
-    contract = getContract<
+  const contract = deployedContractData && publicClient
+    ? getContract<
       Transport,
       Address,
       Contract<TContractName>["abi"],
@@ -51,12 +49,13 @@ export const useScaffoldContract = <
     >({
       address: deployedContractData.address,
       abi: deployedContractData.abi as Contract<TContractName>["abi"],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- viem's getContract has complex generic types
       client: {
         public: publicClient,
-        wallet: walletClient ? walletClient : undefined,
+        wallet: walletClient ?? undefined,
       } as any,
-    });
-  }
+    })
+    : undefined;
 
   return {
     data: contract,

@@ -31,42 +31,60 @@ import { ProtocolInstruction } from "~~/utils/v2/instructionHelpers";
 import { logger } from "~~/utils/logger";
 
 /**
- * Flatten per-iteration instructions to a single array (for authorization)
- * Deduplicates by combining all unique instructions across iterations
+ * Deduplicate instructions by protocolName + data, preserving order.
+ */
+function deduplicateInstructions(instructions: ProtocolInstruction[]): ProtocolInstruction[] {
+  const seen = new Set<string>();
+  return instructions.filter(inst => {
+    const key = `${inst.protocolName}:${inst.data}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isPerIterationInstructions(
+  instructions: ProtocolInstruction[] | ProtocolInstruction[][]
+): instructions is ProtocolInstruction[][] {
+  return instructions.length > 0 && Array.isArray(instructions[0]);
+}
+
+/**
+ * Flatten per-iteration instructions to a single array (for authorization).
+ * Deduplicates by combining all unique instructions across iterations.
  */
 function flattenInstructions(
   instructions: ProtocolInstruction[] | ProtocolInstruction[][] | undefined
 ): ProtocolInstruction[] {
   if (!instructions || instructions.length === 0) return [];
-  
-  // Check if it's per-iteration (array of arrays)
-  if (Array.isArray(instructions[0]) && Array.isArray((instructions[0] as ProtocolInstruction[])[0]?.protocolName ? [] : instructions[0])) {
-    // It's ProtocolInstruction[][] - flatten all iterations
-    const perIteration = instructions as ProtocolInstruction[][];
-    const flattened: ProtocolInstruction[] = [];
-    const seen = new Set<string>();
-    
-    for (const iteration of perIteration) {
-      for (const inst of iteration) {
-        // Deduplicate by protocolName + data hash
-        const key = `${inst.protocolName}:${inst.data}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          flattened.push(inst);
-        }
-      }
-    }
-    return flattened;
+  if (isPerIterationInstructions(instructions)) {
+    return deduplicateInstructions(instructions.flat());
   }
-  
-  // It's a single ProtocolInstruction[] - check if elements are ProtocolInstruction or arrays
-  if (instructions.length > 0 && typeof (instructions[0] as any).protocolName === 'string') {
+  if (typeof (instructions[0] as ProtocolInstruction).protocolName === 'string') {
     return instructions as ProtocolInstruction[];
   }
-  
-  // Fallback: assume per-iteration
-  const perIteration = instructions as ProtocolInstruction[][];
-  return perIteration.flat();
+  return (instructions as any).flat();
+}
+
+/**
+ * Extract order hash from receipt logs.
+ * OrderCreated: Topic[0] = event sig, Topic[1] = indexed orderHash.
+ */
+function extractOrderHashFromReceipt(
+  logs: readonly { topics: readonly string[] }[]
+): string | undefined {
+  for (const log of logs) {
+    if (log.topics[0] && log.topics[1]) return log.topics[1];
+  }
+  return undefined;
+}
+
+/** Format error from a caught exception for user display. */
+function formatTransactionError(error: unknown): { message: string; isRejection: boolean } {
+  const err = error as { shortMessage?: string; message?: string };
+  const message = err?.shortMessage || err?.message || "Failed to create order";
+  const lower = message.toLowerCase();
+  return { message, isRejection: lower.includes("rejected") || lower.includes("denied") };
 }
 
 // Minimal ABI for functions not in deployed contract (fallback)
@@ -308,10 +326,11 @@ export function useCowOrder() {
       );
       
       return txHash;
-    } catch (error: any) {
+    } catch (error) {
       notification.remove(notificationId);
       logger.error("[useCowOrder] Error setting delegation:", error);
-      notification.error(`Failed to set delegation: ${error.shortMessage || error.message}`);
+      const err = error as { shortMessage?: string; message?: string };
+      notification.error(`Failed to set delegation: ${err.shortMessage || err.message}`);
       return undefined;
     }
   }, [userAddress, orderManagerAddress, walletClient, routerContract, publicClient, chainId]);
@@ -480,230 +499,107 @@ export function useCowOrder() {
     let notificationId: string | number | null = null;
 
     try {
-      // 1. Generate salt first - this is our deterministic order ID before on-chain creation
       const salt = generateOrderSalt();
-      
       logger.debug("[useCowOrder] Creating order with salt:", salt);
 
-      // 2. Build and register appData with CoW API BEFORE order creation
-      // This is critical: appData uses (user, salt) to reference the order
-      // which gets mapped to orderHash when createOrder is called
-      // Note: chunkIndex is NOT needed - the contract reads it from iterationCount
-      // This allows the same appData to work for ALL chunks
-      logger.debug("[useCowOrder] Registering AppData for (user, salt):", userAddress, salt);
-      const appDataResult = await buildAndRegisterAppData(
-        chainId,
-        orderManagerAddress,
-        userAddress,
-        salt,
-      );
-
+      // 1. Register appData and build order params
+      const appDataResult = await buildAndRegisterAppData(chainId, orderManagerAddress, userAddress, salt);
       if (!appDataResult.registered) {
         throw new Error(`AppData registration failed: ${appDataResult.error}`);
       }
-      
       logger.debug("[useCowOrder] AppData registered:", appDataResult.appDataHash);
 
-      // 3. Build order parameters with the registered appDataHash
-      // Note: isFlashLoanOrder is set based on flashLoan config in CreateOrderInput
       const orderParams = buildOrderParams({
-        ...input,
-        appDataHash: appDataResult.appDataHash,
-        isFlashLoanOrder: !!input.flashLoan,
-      });
-      
-      logger.debug("[useCowOrder] Order params:", {
-        user: orderParams.user,
-        sellToken: orderParams.sellToken,
-        buyToken: orderParams.buyToken,
-        chunkSize: orderParams.chunkSize.toString(),
-        completion: orderParams.completion,
-        appDataHash: orderParams.appDataHash,
+        ...input, appDataHash: appDataResult.appDataHash, isFlashLoanOrder: !!input.flashLoan,
       });
 
-      // 4. Check and set delegation to OrderManager (required for CoW hooks)
+      // 2. Ensure delegation
       const isDelegated = await checkDelegation();
       if (!isDelegated) {
-        logger.debug("[useCowOrder] Setting up delegation to OrderManager");
         const delegationTx = await setDelegation(true);
-        if (!delegationTx) {
-          throw new Error("Failed to set delegation - CoW orders require router delegation");
-        }
+        if (!delegationTx) throw new Error("Failed to set delegation - CoW orders require router delegation");
       }
 
-      // 5. Get authorizations for pre/post instructions
-      // Flatten per-iteration instructions for authorization check
+      // 3. Execute authorization calls
       const allInstructions = [
         ...flattenInstructions(input.preInstructions),
         ...flattenInstructions(input.postInstructions),
       ];
-      
-      let authCalls: { target: Address; data: `0x${string}` }[] = [];
       if (allInstructions.length > 0) {
-        authCalls = await getAuthorizations(allInstructions);
-        logger.debug("[useCowOrder] Authorization calls needed:", authCalls.length);
-      }
-
-      // 6. Execute authorization calls (e.g., credit delegation)
-      if (authCalls.length > 0) {
-        notificationId = notification.loading(
-          <TransactionToast step="pending" message="Setting up authorizations..." />
-        );
-
-        for (const authCall of authCalls) {
-          if (!authCall.target || !authCall.data) continue;
-
-          const authHash = await walletClient.sendTransaction({
-            account: userAddress,
-            to: authCall.target,
-            data: authCall.data,
-          });
-
-          await publicClient.waitForTransactionReceipt({ hash: authHash });
+        const authCalls = await getAuthorizations(allInstructions);
+        if (authCalls.length > 0) {
+          notificationId = notification.loading(
+            <TransactionToast step="pending" message="Setting up authorizations..." />
+          );
+          for (const ac of authCalls) {
+            if (!ac.target || !ac.data) continue;
+            const h = await walletClient.sendTransaction({ account: userAddress, to: ac.target, data: ac.data });
+            await publicClient.waitForTransactionReceipt({ hash: h });
+          }
+          notification.remove(notificationId);
+          notification.success(<TransactionToast step="confirmed" message="Authorizations set" />);
         }
-
-        notification.remove(notificationId);
-        notification.success(
-          <TransactionToast step="confirmed" message="Authorizations set" />
-        );
       }
 
-      // 7. Approve and transfer seed tokens if provided
+      // 4. Seed token approval (non-flash-loan mode)
       const seedAmount = input.seedAmount ?? 0n;
-      
       if (seedAmount > 0n) {
         notificationId = notification.loading(
           <TransactionToast step="pending" message="Approving seed tokens..." />
         );
-
-        const ERC20_APPROVE_ABI = [{
-          inputs: [
-            { name: "spender", type: "address" },
-            { name: "amount", type: "uint256" },
-          ],
-          name: "approve",
-          outputs: [{ name: "", type: "bool" }],
-          stateMutability: "nonpayable",
-          type: "function",
-        }];
-
-        const approveCalldata = encodeFunctionData({
-          abi: ERC20_APPROVE_ABI,
-          functionName: "approve",
-          args: [orderManagerAddress, seedAmount],
-        });
-
+        const ERC20_ABI = [{ inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }], name: "approve", outputs: [{ name: "", type: "bool" }], stateMutability: "nonpayable", type: "function" }];
         const approveHash = await walletClient.sendTransaction({
-          account: userAddress,
-          to: input.sellToken as Address,
-          data: approveCalldata,
+          account: userAddress, to: input.sellToken as Address,
+          data: encodeFunctionData({ abi: ERC20_ABI, functionName: "approve", args: [orderManagerAddress, seedAmount] }),
         });
-
         await publicClient.waitForTransactionReceipt({ hash: approveHash });
         notification.remove(notificationId);
-        logger.debug("[useCowOrder] Seed token approval confirmed");
       }
 
-      // 8. Create the order on-chain with appDataHash and seedAmount
-      notificationId = notification.loading(
-        <TransactionToast step="pending" message="Creating CoW order..." />
-      );
-
+      // 5. Create the order on-chain
+      notificationId = notification.loading(<TransactionToast step="pending" message="Creating CoW order..." />);
       const createCalldata = encodeFunctionData({
         abi: orderManagerContract?.abi ?? ORDER_MANAGER_ABI,
         functionName: "createOrder",
         args: [orderParams as any, salt as `0x${string}`, seedAmount],
       });
-
-      const txHash = await walletClient.sendTransaction({
-        account: userAddress,
-        to: orderManagerAddress,
-        data: createCalldata,
-      });
+      const txHash = await walletClient.sendTransaction({ account: userAddress, to: orderManagerAddress, data: createCalldata });
 
       notification.remove(notificationId);
       const blockExplorerUrl = getBlockExplorerTxLink(chainId, txHash);
-      
       notificationId = notification.loading(
-        <TransactionToast 
-          step="sent" 
-          txHash={txHash} 
-          message="Waiting for confirmation..."
-          blockExplorerLink={blockExplorerUrl}
-        />
+        <TransactionToast step="sent" txHash={txHash} message="Waiting for confirmation..." blockExplorerLink={blockExplorerUrl} />
       );
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-      // 8. Extract order hash from OrderCreated event
-      let orderHash: string | undefined;
-      for (const log of receipt.logs) {
-        try {
-          // OrderCreated event signature: OrderCreated(bytes32 indexed orderHash, address indexed user, ...)
-          // Topic 0 is event signature, Topic 1 is indexed orderHash
-          if (log.topics[0] && log.topics[1]) {
-            orderHash = log.topics[1]; // First indexed param is orderHash
-            break;
-          }
-        } catch {
-          // Skip logs that don't match
-        }
-      }
-
-      if (!orderHash) {
+      // 6. Extract order hash and show success
+      const orderHash = extractOrderHashFromReceipt(receipt.logs) ?? salt;
+      if (orderHash === salt) {
         logger.warn("[useCowOrder] Could not extract orderHash from event, using salt as identifier");
-        orderHash = salt;
       }
 
-      // Log order details for debugging
-      logger.info("[useCowOrder] Order created successfully!");
-      logger.info(`  Order Hash: ${orderHash}`);
-      logger.info(`  Salt: ${salt}`);
-      logger.info(`  Tx Hash: ${txHash}`);
-      logger.info(`  User: ${userAddress}`);
-      logger.info(`  AppData Hash: ${appDataResult.appDataHash}`);
+      logger.info("[useCowOrder] Order created:", { orderHash, salt, txHash, user: userAddress, appDataHash: appDataResult.appDataHash });
 
       notification.remove(notificationId);
-      
-      // Build CoW Explorer link - use orderManagerAddress since orders are created by the contract
-      const cowExplorerUrl = orderManagerAddress 
-        ? getCowExplorerAddressUrl(chainId, orderManagerAddress)
-        : undefined;
-      const shortOrderHash = orderHash ? `${orderHash.slice(0, 10)}...${orderHash.slice(-8)}` : "";
-      
+      const cowExplorerUrl = getCowExplorerAddressUrl(chainId, orderManagerAddress);
+      const shortHash = `${orderHash.slice(0, 10)}...${orderHash.slice(-8)}`;
       notification.success(
-        <TransactionToast 
-          step="confirmed" 
-          txHash={txHash}
-          message={`Limit order created! Order: ${shortOrderHash}`}
-          blockExplorerLink={blockExplorerUrl}
-          secondaryLink={cowExplorerUrl}
-          secondaryLinkText="View on CoW Explorer"
-        />
+        <TransactionToast step="confirmed" txHash={txHash} message={`Limit order created! Order: ${shortHash}`}
+          blockExplorerLink={blockExplorerUrl} secondaryLink={cowExplorerUrl} secondaryLinkText="View on CoW Explorer" />
       );
 
-      // Refresh queries
       queryClient.invalidateQueries({ queryKey: ["cow-orders"] });
-
       return orderHash;
 
-    } catch (error: any) {
+    } catch (error) {
       if (notificationId) notification.remove(notificationId);
-      
-      const message = error?.shortMessage || error?.message || "Failed to create order";
-      const isRejection = message.toLowerCase().includes("rejected") || 
-                          message.toLowerCase().includes("denied");
-      
+      const { message, isRejection } = formatTransactionError(error);
       notification.error(
-        <TransactionToast 
-          step="failed" 
-          message={isRejection ? "User rejected request" : message}
-        />
+        <TransactionToast step="failed" message={isRejection ? "User rejected request" : message} />
       );
-      
       logger.error("[useCowOrder] Create order failed:", error);
       return undefined;
-
     } finally {
       setIsCreating(false);
     }
@@ -765,14 +661,15 @@ export function useCowOrder() {
       queryClient.invalidateQueries({ queryKey: ["cow-orders"] });
       return true;
 
-    } catch (error: any) {
+    } catch (error) {
       if (notificationId) notification.remove(notificationId);
-      
-      const message = error?.shortMessage || error?.message || "Failed to cancel order";
+
+      const err = error as { shortMessage?: string; message?: string };
+      const message = err?.shortMessage || err?.message || "Failed to cancel order";
       notification.error(
         <TransactionToast step="failed" message={message} />
       );
-      
+
       logger.error("[useCowOrder] Cancel order failed:", error);
       return false;
 
@@ -795,7 +692,7 @@ export function useCowOrder() {
         args: [orderHash as `0x${string}`],
       });
 
-      return parseOrderContext(result);
+      return parseOrderContext(result as any);
     } catch (error) {
       logger.error("[useCowOrder] Get order failed:", error);
       return undefined;

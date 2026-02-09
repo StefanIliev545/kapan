@@ -1,0 +1,1688 @@
+{
+  "address": "0x7E83287F7d63Bfa5C60B57E8A4b796dC07A3c665",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "protocolName",
+          "type": "string"
+        }
+      ],
+      "name": "GatewayNotSet",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "protocolName",
+          "type": "string"
+        }
+      ],
+      "name": "UnsupportedProtocol",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        }
+      ],
+      "name": "UnsupportedProtocolId",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroAddress",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "string",
+          "name": "protocolName",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "gateway",
+          "type": "address"
+        }
+      ],
+      "name": "GatewayUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "AAVE_V3",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "COMPOUND_V3",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "EULER_V2",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MORPHO_BLUE",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VENUS",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        },
+        {
+          "internalType": "uint256",
+          "name": "sellAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxSlippageBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "collateralToken",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "debtToken",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "collateralDecimals",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "debtDecimals",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes",
+          "name": "context",
+          "type": "bytes"
+        }
+      ],
+      "name": "calculateMinBuy",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "minBuyAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "sellAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxSlippageBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "sellPriceUsd",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "buyPriceUsd",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "sellDecimals",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "buyDecimals",
+          "type": "uint8"
+        }
+      ],
+      "name": "calculateMinBuyAmount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "minBuyAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "sellAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxSlippageBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "exchangeRate18",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "sellDecimals",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "buyDecimals",
+          "type": "uint8"
+        }
+      ],
+      "name": "calculateMinBuyFromRate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "minBuyAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "sellAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "maxSlippageBps",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "morphoOraclePrice",
+          "type": "uint256"
+        }
+      ],
+      "name": "calculateMorphoMinBuyAmount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "minBuyAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "name": "gateways",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getAaveLiquidationLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getAaveLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "ltvBps",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "getAavePrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "tokens",
+          "type": "address[]"
+        }
+      ],
+      "name": "getAavePrices",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getAaveUserAccountData",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "totalCollateralBase",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalDebtBase",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "availableBorrowsBase",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "currentLiquidationThreshold",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "ltv",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "healthFactor",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        },
+        {
+          "internalType": "address",
+          "name": "collateralToken",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "context",
+          "type": "bytes"
+        }
+      ],
+      "name": "getCollateralPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "baseToken",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getCompoundLiquidationLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "baseToken",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getCompoundLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "baseToken",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getCompoundPositionValue",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "collateralValueUsd",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "debtValueUsd",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "baseToken",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "getCompoundPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "context",
+          "type": "bytes"
+        }
+      ],
+      "name": "getCurrentLtv",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "ltvBps",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        },
+        {
+          "internalType": "address",
+          "name": "debtToken",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "context",
+          "type": "bytes"
+        }
+      ],
+      "name": "getDebtPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "collateralVault",
+          "type": "address"
+        }
+      ],
+      "name": "getEulerExchangeRate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "vault",
+          "type": "address"
+        }
+      ],
+      "name": "getEulerLiquidationLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "vault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "subAccountIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "getEulerLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "vault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "getEulerPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "loanToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "oracle",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "irm",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lltv",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MarketParams",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "name": "getMorphoLiquidationLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "loanToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "oracle",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "irm",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lltv",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MarketParams",
+          "name": "params",
+          "type": "tuple"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getMorphoLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "loanToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "oracle",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "irm",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lltv",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MarketParams",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "name": "getMorphoOraclePrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "loanToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "oracle",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "irm",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lltv",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MarketParams",
+          "name": "params",
+          "type": "tuple"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getMorphoPositionValue",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "collateralValueUsd",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "debtValueUsd",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "context",
+          "type": "bytes"
+        }
+      ],
+      "name": "getPositionValue",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "collateralValueUsd",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "debtValueUsd",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getVenusLiquidationLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getVenusLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "underlyingToken",
+          "type": "address"
+        }
+      ],
+      "name": "getVenusPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getVenusUserAccountData",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "totalCollateralUsd",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalDebtUsd",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "bufferBps",
+          "type": "uint256"
+        }
+      ],
+      "name": "isAaveAtRisk",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "atRisk",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "baseToken",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "bufferBps",
+          "type": "uint256"
+        }
+      ],
+      "name": "isCompoundAtRisk",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "loanToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "oracle",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "irm",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lltv",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MarketParams",
+          "name": "params",
+          "type": "tuple"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "bufferBps",
+          "type": "uint256"
+        }
+      ],
+      "name": "isMorphoAtRisk",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "protocolName",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "gateway",
+          "type": "address"
+        }
+      ],
+      "name": "setGateway",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string[]",
+          "name": "protocolNames",
+          "type": "string[]"
+        },
+        {
+          "internalType": "address[]",
+          "name": "gatewayAddresses",
+          "type": "address[]"
+        }
+      ],
+      "name": "setGateways",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "sellPriceUsd",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "buyPriceUsd",
+          "type": "uint256"
+        }
+      ],
+      "name": "usdPricesToExchangeRate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "exchangeRate18",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0xb3139833d17de4908c107c842df4280bf83f7d30b240d20e7e673abd4d8ccc7d",
+  "receipt": {
+    "to": "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+    "from": "0x0BE61223F99E57b8b8B7033a77B54Adc7f7cF027",
+    "contractAddress": null,
+    "transactionIndex": 2,
+    "gasUsed": "2647869",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0xe4f05472fe98c9acf1a409203a59e7e738bb58a2ee905d86efc760118876d82d",
+    "transactionHash": "0xb3139833d17de4908c107c842df4280bf83f7d30b240d20e7e673abd4d8ccc7d",
+    "logs": [],
+    "blockNumber": 13646436,
+    "cumulativeGasUsed": "5622472",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0x0BE61223F99E57b8b8B7033a77B54Adc7f7cF027"
+  ],
+  "numDeployments": 1,
+  "solcInputHash": "a7e06d54e242f35f8a7096171b164f9f",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_owner\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"protocolName\",\"type\":\"string\"}],\"name\":\"GatewayNotSet\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"protocolName\",\"type\":\"string\"}],\"name\":\"UnsupportedProtocol\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"}],\"name\":\"UnsupportedProtocolId\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ZeroAddress\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"string\",\"name\":\"protocolName\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"gateway\",\"type\":\"address\"}],\"name\":\"GatewayUpdated\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"AAVE_V3\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"COMPOUND_V3\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"EULER_V2\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MORPHO_BLUE\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"VENUS\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"uint256\",\"name\":\"sellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"maxSlippageBps\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"debtToken\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"collateralDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"debtDecimals\",\"type\":\"uint8\"},{\"internalType\":\"bytes\",\"name\":\"context\",\"type\":\"bytes\"}],\"name\":\"calculateMinBuy\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"minBuyAmount\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"sellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"maxSlippageBps\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"sellPriceUsd\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"buyPriceUsd\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"sellDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"buyDecimals\",\"type\":\"uint8\"}],\"name\":\"calculateMinBuyAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"minBuyAmount\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"sellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"maxSlippageBps\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"exchangeRate18\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"sellDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"buyDecimals\",\"type\":\"uint8\"}],\"name\":\"calculateMinBuyFromRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"minBuyAmount\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"sellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"maxSlippageBps\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"morphoOraclePrice\",\"type\":\"uint256\"}],\"name\":\"calculateMorphoMinBuyAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"minBuyAmount\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"name\":\"gateways\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getAaveLiquidationLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getAaveLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"ltvBps\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"getAavePrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"tokens\",\"type\":\"address[]\"}],\"name\":\"getAavePrices\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getAaveUserAccountData\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"totalCollateralBase\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"totalDebtBase\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"availableBorrowsBase\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"currentLiquidationThreshold\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"ltv\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"healthFactor\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"context\",\"type\":\"bytes\"}],\"name\":\"getCollateralPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"baseToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getCompoundLiquidationLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"baseToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getCompoundLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"baseToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getCompoundPositionValue\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"collateralValueUsd\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"debtValueUsd\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"baseToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"asset\",\"type\":\"address\"}],\"name\":\"getCompoundPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"context\",\"type\":\"bytes\"}],\"name\":\"getCurrentLtv\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"ltvBps\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"address\",\"name\":\"debtToken\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"context\",\"type\":\"bytes\"}],\"name\":\"getDebtPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"collateralVault\",\"type\":\"address\"}],\"name\":\"getEulerExchangeRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"}],\"name\":\"getEulerLiquidationLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"subAccountIndex\",\"type\":\"uint8\"}],\"name\":\"getEulerLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"getEulerPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"loanToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"oracle\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"irm\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"lltv\",\"type\":\"uint256\"}],\"internalType\":\"struct MarketParams\",\"name\":\"params\",\"type\":\"tuple\"}],\"name\":\"getMorphoLiquidationLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"loanToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"oracle\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"irm\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"lltv\",\"type\":\"uint256\"}],\"internalType\":\"struct MarketParams\",\"name\":\"params\",\"type\":\"tuple\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getMorphoLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"loanToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"oracle\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"irm\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"lltv\",\"type\":\"uint256\"}],\"internalType\":\"struct MarketParams\",\"name\":\"params\",\"type\":\"tuple\"}],\"name\":\"getMorphoOraclePrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"loanToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"oracle\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"irm\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"lltv\",\"type\":\"uint256\"}],\"internalType\":\"struct MarketParams\",\"name\":\"params\",\"type\":\"tuple\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getMorphoPositionValue\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"collateralValueUsd\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"debtValueUsd\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"context\",\"type\":\"bytes\"}],\"name\":\"getPositionValue\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"collateralValueUsd\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"debtValueUsd\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getVenusLiquidationLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getVenusLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"underlyingToken\",\"type\":\"address\"}],\"name\":\"getVenusPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getVenusUserAccountData\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"totalCollateralUsd\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"totalDebtUsd\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"bufferBps\",\"type\":\"uint256\"}],\"name\":\"isAaveAtRisk\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"atRisk\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"baseToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"bufferBps\",\"type\":\"uint256\"}],\"name\":\"isCompoundAtRisk\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"loanToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"oracle\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"irm\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"lltv\",\"type\":\"uint256\"}],\"internalType\":\"struct MarketParams\",\"name\":\"params\",\"type\":\"tuple\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"bufferBps\",\"type\":\"uint256\"}],\"name\":\"isMorphoAtRisk\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"protocolName\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"gateway\",\"type\":\"address\"}],\"name\":\"setGateway\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string[]\",\"name\":\"protocolNames\",\"type\":\"string[]\"},{\"internalType\":\"address[]\",\"name\":\"gatewayAddresses\",\"type\":\"address[]\"}],\"name\":\"setGateways\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"sellPriceUsd\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"buyPriceUsd\",\"type\":\"uint256\"}],\"name\":\"usdPricesToExchangeRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"exchangeRate18\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Aggregates gateway view contracts to provide protocol-agnostic LTV queries for ADL Supported protocols:   - \\\"aave-v3\\\": Aave V3 (context: empty)   - \\\"compound-v3\\\": Compound V3 (context: abi.encode(baseToken address))   - \\\"morpho-blue\\\": Morpho Blue (context: abi.encode(MarketParams))   - \\\"euler-v2\\\": Euler V2 (context: abi.encode(borrowVault address, collateralVaults address[], subAccountIndex uint8))   - \\\"venus\\\": Venus (context: empty)\",\"kind\":\"dev\",\"methods\":{\"calculateMinBuy(bytes4,uint256,uint256,address,address,uint8,uint8,bytes)\":{\"params\":{\"collateralDecimals\":\"Collateral token decimals\",\"collateralToken\":\"Collateral token\",\"context\":\"Protocol-specific context (see getCurrentLtv)\",\"debtDecimals\":\"Debt token decimals\",\"debtToken\":\"Debt token\",\"maxSlippageBps\":\"Maximum slippage in basis points\",\"protocolId\":\"Protocol identifier\",\"sellAmount\":\"Amount to sell\"},\"returns\":{\"minBuyAmount\":\"Minimum acceptable buy amount\"}},\"calculateMinBuyAmount(uint256,uint256,uint256,uint256,uint8,uint8)\":{\"details\":\"Convenience function that takes USD prices and converts to exchange rate internally\",\"params\":{\"buyDecimals\":\"Decimals of buy token\",\"buyPriceUsd\":\"Price of buyToken (same decimals as sellPriceUsd)\",\"maxSlippageBps\":\"Maximum slippage in basis points (e.g., 100 = 1%)\",\"sellAmount\":\"Amount of sellToken\",\"sellDecimals\":\"Decimals of sell token\",\"sellPriceUsd\":\"Price of sellToken (any decimals)\"},\"returns\":{\"minBuyAmount\":\"Minimum acceptable buy amount\"}},\"calculateMinBuyFromRate(uint256,uint256,uint256,uint8,uint8)\":{\"details\":\"Exchange rate = how many buyTokens per sellToken, scaled by 1e18\",\"params\":{\"buyDecimals\":\"Decimals of buy token\",\"exchangeRate18\":\"Exchange rate with 18 decimals (sellToken \\u2192 buyToken)\",\"maxSlippageBps\":\"Maximum slippage in basis points (e.g., 100 = 1%)\",\"sellAmount\":\"Amount of sellToken (in sellToken decimals)\",\"sellDecimals\":\"Decimals of sell token\"},\"returns\":{\"minBuyAmount\":\"Minimum acceptable buy amount\"}},\"calculateMorphoMinBuyAmount(uint256,uint256,uint256)\":{\"details\":\"Morpho oracles return the exchange rate scaled by 1e36      Formula: loanAmount = collateralAmount * price / 1e36      The oracle price already accounts for token decimals\",\"params\":{\"maxSlippageBps\":\"Maximum slippage in basis points\",\"morphoOraclePrice\":\"Price from Morpho oracle (36 decimals scale)\",\"sellAmount\":\"Amount of collateral to sell (in collateral token decimals)\"},\"returns\":{\"minBuyAmount\":\"Minimum acceptable loan tokens to receive\"}},\"getAaveLtvBps(address)\":{\"params\":{\"user\":\"The user's address\"},\"returns\":{\"ltvBps\":\"Current LTV in basis points\"}},\"getAavePrice(address)\":{\"params\":{\"token\":\"The asset address\"},\"returns\":{\"_0\":\"price Price in 8 decimals USD\"}},\"getAaveUserAccountData(address)\":{\"params\":{\"user\":\"The user address\"},\"returns\":{\"availableBorrowsBase\":\"Available borrows in 8 decimals USD\",\"currentLiquidationThreshold\":\"Liquidation threshold in basis points\",\"healthFactor\":\"Health factor (1e18 scale)\",\"ltv\":\"Loan-to-value ratio in basis points\",\"totalCollateralBase\":\"Total collateral in 8 decimals USD\",\"totalDebtBase\":\"Total debt in 8 decimals USD\"}},\"getCollateralPrice(bytes4,address,bytes)\":{\"params\":{\"collateralToken\":\"Collateral token address\",\"context\":\"Protocol-specific context (see getCurrentLtv)\",\"protocolId\":\"Protocol identifier\"},\"returns\":{\"price\":\"Price in 8 decimals USD (or 1e8 for protocols using exchange rates)\"}},\"getCompoundLtvBps(address,address)\":{\"params\":{\"baseToken\":\"The base token of the Comet market (e.g., USDC)\",\"user\":\"The user's address\"}},\"getCompoundPositionValue(address,address)\":{\"params\":{\"baseToken\":\"The Comet base token (e.g., USDC)\",\"user\":\"The user address\"},\"returns\":{\"collateralValueUsd\":\"Total collateral in 8 decimals USD\",\"debtValueUsd\":\"Total debt in 8 decimals USD\"}},\"getCompoundPrice(address,address)\":{\"params\":{\"asset\":\"The asset to price (collateral or base token)\",\"baseToken\":\"The Comet base token (e.g., USDC)\"},\"returns\":{\"_0\":\"price Price in 8 decimals USD\"}},\"getCurrentLtv(bytes4,address,bytes)\":{\"params\":{\"context\":\"Protocol-specific context:   - AAVE_V3: empty bytes   - COMPOUND_V3: abi.encode(baseToken address)   - MORPHO_BLUE: abi.encode(MarketParams)   - EULER_V2: abi.encode(borrowVault address, collateralVaults address[], subAccountIndex uint8)   - VENUS: empty bytes\",\"protocolId\":\"Protocol identifier (AAVE_V3, COMPOUND_V3, etc.)\",\"user\":\"User address\"},\"returns\":{\"ltvBps\":\"Current LTV in basis points\"}},\"getDebtPrice(bytes4,address,bytes)\":{\"params\":{\"context\":\"Protocol-specific context (see getCurrentLtv)\",\"debtToken\":\"Debt token address\",\"protocolId\":\"Protocol identifier\"},\"returns\":{\"price\":\"Price in 8 decimals USD (or 1e8 for protocols using exchange rates)\"}},\"getEulerExchangeRate(address,address)\":{\"details\":\"Returns 18-decimal exchange rate ready for calculateMinBuyFromRate()\",\"params\":{\"borrowVault\":\"The borrow vault (debt side)\",\"collateralVault\":\"The collateral vault\"},\"returns\":{\"_0\":\"rate18 Exchange rate with 18 decimals\"}},\"getEulerLtvBps(address,address,uint8)\":{\"params\":{\"subAccountIndex\":\"The sub-account index (0-255)\",\"user\":\"The user's address\",\"vault\":\"The borrow vault address\"}},\"getEulerPrice(address,address)\":{\"params\":{\"token\":\"The token to price\",\"vault\":\"The Euler vault address (determines oracle)\"},\"returns\":{\"_0\":\"price Price in unit of account decimals\"}},\"getMorphoLtvBps((address,address,address,address,uint256),address)\":{\"params\":{\"params\":\"The Morpho market parameters\",\"user\":\"The user's address\"}},\"getMorphoOraclePrice((address,address,address,address,uint256))\":{\"details\":\"This is NOT a USD price - it's the exchange rate from collateral to loan token\",\"params\":{\"params\":\"The Morpho market parameters\"},\"returns\":{\"_0\":\"price Price ratio with 36 decimals\"}},\"getMorphoPositionValue((address,address,address,address,uint256),address)\":{\"params\":{\"params\":\"The Morpho market parameters\",\"user\":\"The user address\"},\"returns\":{\"collateralValueUsd\":\"Total collateral in 8 decimals USD\",\"debtValueUsd\":\"Total debt in 8 decimals USD\"}},\"getPositionValue(bytes4,address,bytes)\":{\"params\":{\"context\":\"Protocol-specific context (see getCurrentLtv)\",\"protocolId\":\"Protocol identifier\",\"user\":\"User address\"},\"returns\":{\"collateralValueUsd\":\"Total collateral in 8 decimals USD\",\"debtValueUsd\":\"Total debt in 8 decimals USD\"}},\"getVenusLtvBps(address)\":{\"params\":{\"user\":\"The user's address\"}},\"getVenusPrice(address)\":{\"params\":{\"underlyingToken\":\"The underlying asset address\"},\"returns\":{\"_0\":\"price Price in 8 decimals USD\"}},\"getVenusUserAccountData(address)\":{\"params\":{\"user\":\"The user address\"},\"returns\":{\"totalCollateralUsd\":\"Total collateral in 8 decimals USD\",\"totalDebtUsd\":\"Total debt in 8 decimals USD\"}},\"isAaveAtRisk(address,uint256)\":{\"params\":{\"bufferBps\":\"Safety buffer in basis points (e.g., 500 = 5%)\",\"user\":\"The user's address\"},\"returns\":{\"atRisk\":\"True if current LTV + buffer >= liquidation LTV\"}},\"setGateway(string,address)\":{\"params\":{\"gateway\":\"Gateway view contract address\",\"protocolName\":\"Protocol name (e.g., \\\"aave-v3\\\", \\\"morpho-blue\\\")\"}},\"setGateways(string[],address[])\":{\"params\":{\"gatewayAddresses\":\"Array of gateway addresses\",\"protocolNames\":\"Array of protocol names\"}},\"transferOwnership(address)\":{\"params\":{\"newOwner\":\"New owner address\"}},\"usdPricesToExchangeRate(uint256,uint256)\":{\"details\":\"exchangeRate18 = sellPriceUsd * 1e18 / buyPriceUsd\",\"params\":{\"buyPriceUsd\":\"USD price of buy token (any decimals, but same as sellPriceUsd)\",\"sellPriceUsd\":\"USD price of sell token (any decimals, but same as buyPriceUsd)\"},\"returns\":{\"exchangeRate18\":\"Exchange rate with 18 decimals\"}}},\"title\":\"KapanViewRouter\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"AAVE_V3()\":{\"notice\":\"Protocol identifiers (bytes4 for unified interface)\"},\"calculateMinBuy(bytes4,uint256,uint256,address,address,uint8,uint8,bytes)\":{\"notice\":\"Calculate minimum buy amount with slippage for any protocol (unified interface)\"},\"calculateMinBuyAmount(uint256,uint256,uint256,uint256,uint8,uint8)\":{\"notice\":\"Calculate minimum buy amount for ADL order with slippage protection\"},\"calculateMinBuyFromRate(uint256,uint256,uint256,uint8,uint8)\":{\"notice\":\"Calculate minimum buy amount using exchange rate\"},\"calculateMorphoMinBuyAmount(uint256,uint256,uint256)\":{\"notice\":\"Calculate minimum buy amount for Morpho ADL orders\"},\"gateways(string)\":{\"notice\":\"Protocol name => gateway view address (consistent with KapanRouter)\"},\"getAaveLiquidationLtvBps(address)\":{\"notice\":\"Get liquidation LTV for Aave V3\"},\"getAaveLtvBps(address)\":{\"notice\":\"Get current LTV for Aave V3\"},\"getAavePrice(address)\":{\"notice\":\"Get asset price via Aave oracle (8 decimals)\"},\"getAavePrices(address[])\":{\"notice\":\"Get multiple asset prices via Aave oracle\"},\"getAaveUserAccountData(address)\":{\"notice\":\"Get Aave user account data (collateral and debt in USD)\"},\"getCollateralPrice(bytes4,address,bytes)\":{\"notice\":\"Get collateral price for any protocol (unified interface)\"},\"getCompoundLiquidationLtvBps(address,address)\":{\"notice\":\"Get liquidation LTV for Compound V3\"},\"getCompoundLtvBps(address,address)\":{\"notice\":\"Get current LTV for Compound V3\"},\"getCompoundPositionValue(address,address)\":{\"notice\":\"Get Compound position value (collateral and debt in USD)\"},\"getCompoundPrice(address,address)\":{\"notice\":\"Get asset price via Compound (8 decimals)\"},\"getCurrentLtv(bytes4,address,bytes)\":{\"notice\":\"Get current LTV for any protocol (unified interface)\"},\"getDebtPrice(bytes4,address,bytes)\":{\"notice\":\"Get debt price for any protocol (unified interface)\"},\"getEulerExchangeRate(address,address)\":{\"notice\":\"Get exchange rate for Euler position (collateral \\u2192 debt)\"},\"getEulerLiquidationLtvBps(address)\":{\"notice\":\"Get liquidation LTV for Euler V2\"},\"getEulerLtvBps(address,address,uint8)\":{\"notice\":\"Get current LTV for Euler V2\"},\"getEulerPrice(address,address)\":{\"notice\":\"Get asset price via Euler oracle (in vault's unit of account)\"},\"getMorphoLiquidationLtvBps((address,address,address,address,uint256))\":{\"notice\":\"Get liquidation LTV for Morpho Blue\"},\"getMorphoLtvBps((address,address,address,address,uint256),address)\":{\"notice\":\"Get current LTV for Morpho Blue\"},\"getMorphoOraclePrice((address,address,address,address,uint256))\":{\"notice\":\"Get Morpho oracle price (36 decimals, collateral/loan ratio)\"},\"getMorphoPositionValue((address,address,address,address,uint256),address)\":{\"notice\":\"Get Morpho position value (collateral and debt in USD)\"},\"getPositionValue(bytes4,address,bytes)\":{\"notice\":\"Get position value for any protocol (unified interface)\"},\"getVenusLiquidationLtvBps(address)\":{\"notice\":\"Get liquidation LTV for Venus\"},\"getVenusLtvBps(address)\":{\"notice\":\"Get current LTV for Venus\"},\"getVenusPrice(address)\":{\"notice\":\"Get asset price via Venus oracle (8 decimals normalized)\"},\"getVenusUserAccountData(address)\":{\"notice\":\"Get Venus user account data (collateral and debt in USD)\"},\"isAaveAtRisk(address,uint256)\":{\"notice\":\"Check if Aave position is at liquidation risk\"},\"isCompoundAtRisk(address,address,uint256)\":{\"notice\":\"Check if Compound position is at liquidation risk\"},\"isMorphoAtRisk((address,address,address,address,uint256),address,uint256)\":{\"notice\":\"Check if Morpho position is at liquidation risk\"},\"owner()\":{\"notice\":\"Owner who can update gateway addresses\"},\"setGateway(string,address)\":{\"notice\":\"Set or update a gateway view address\"},\"setGateways(string[],address[])\":{\"notice\":\"Batch set multiple gateways\"},\"transferOwnership(address)\":{\"notice\":\"Transfer ownership\"},\"usdPricesToExchangeRate(uint256,uint256)\":{\"notice\":\"Convert two USD prices (same decimals) to an 18-decimal exchange rate\"}},\"notice\":\"Unified read-only router for querying position data across lending protocols\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/v2/KapanViewRouter.sol\":\"KapanViewRouter\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":10},\"remappings\":[],\"viaIR\":true},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/IERC20.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Interface of the ERC20 standard as defined in the EIP.\\n */\\ninterface IERC20 {\\n    /**\\n     * @dev Emitted when `value` tokens are moved from one account (`from`) to\\n     * another (`to`).\\n     *\\n     * Note that `value` may be zero.\\n     */\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\n\\n    /**\\n     * @dev Emitted when the allowance of a `spender` for an `owner` is set by\\n     * a call to {approve}. `value` is the new allowance.\\n     */\\n    event Approval(address indexed owner, address indexed spender, uint256 value);\\n\\n    /**\\n     * @dev Returns the value of tokens in existence.\\n     */\\n    function totalSupply() external view returns (uint256);\\n\\n    /**\\n     * @dev Returns the value of tokens owned by `account`.\\n     */\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from the caller's account to `to`.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transfer(address to, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Returns the remaining number of tokens that `spender` will be\\n     * allowed to spend on behalf of `owner` through {transferFrom}. This is\\n     * zero by default.\\n     *\\n     * This value changes when {approve} or {transferFrom} are called.\\n     */\\n    function allowance(address owner, address spender) external view returns (uint256);\\n\\n    /**\\n     * @dev Sets a `value` amount of tokens as the allowance of `spender` over the\\n     * caller's tokens.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * IMPORTANT: Beware that changing an allowance with this method brings the risk\\n     * that someone may use both the old and the new allowance by unfortunate\\n     * transaction ordering. One possible solution to mitigate this race\\n     * condition is to first reduce the spender's allowance to 0 and set the\\n     * desired value afterwards:\\n     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729\\n     *\\n     * Emits an {Approval} event.\\n     */\\n    function approve(address spender, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from `from` to `to` using the\\n     * allowance mechanism. `value` is then deducted from the caller's\\n     * allowance.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transferFrom(address from, address to, uint256 value) external returns (bool);\\n}\\n\",\"keccak256\":\"0xc6a8ff0ea489379b61faa647490411b80102578440ab9d84e9a957cc12164e70\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/extensions/IERC20Metadata.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IERC20} from \\\"../IERC20.sol\\\";\\n\\n/**\\n * @dev Interface for the optional metadata functions from the ERC20 standard.\\n */\\ninterface IERC20Metadata is IERC20 {\\n    /**\\n     * @dev Returns the name of the token.\\n     */\\n    function name() external view returns (string memory);\\n\\n    /**\\n     * @dev Returns the symbol of the token.\\n     */\\n    function symbol() external view returns (string memory);\\n\\n    /**\\n     * @dev Returns the decimals places of the token.\\n     */\\n    function decimals() external view returns (uint8);\\n}\\n\",\"keccak256\":\"0xaa761817f6cd7892fcf158b3c776b34551cde36f48ff9703d53898bc45a94ea2\",\"license\":\"MIT\"},\"contracts/v2/KapanViewRouter.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport { MarketParams } from \\\"./interfaces/morpho/IMorphoBlue.sol\\\";\\nimport { IERC20Metadata } from \\\"@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol\\\";\\n\\n/**\\n * @title Gateway View Interfaces\\n * @notice Minimal interfaces for LTV queries on each protocol's gateway view\\n */\\n\\ninterface IAaveGatewayView {\\n    function getCurrentLtvBps(address market, address user) external view returns (uint256);\\n    function getLiquidationLtvBps(address market, address user) external view returns (uint256);\\n    function getAssetPrice(address token) external view returns (uint256);\\n    function getAssetPrices(address[] calldata tokens) external view returns (uint256[] memory);\\n    function getUserAccountData(\\n        address user\\n    )\\n        external\\n        view\\n        returns (\\n            uint256 totalCollateralBase,\\n            uint256 totalDebtBase,\\n            uint256 availableBorrowsBase,\\n            uint256 currentLiquidationThreshold,\\n            uint256 ltv,\\n            uint256 healthFactor\\n        );\\n}\\n\\ninterface ICompoundGatewayView {\\n    function getCurrentLtvBps(address token, address user) external view returns (uint256);\\n    function getLiquidationLtvBps(address token, address user) external view returns (uint256);\\n    function getPrice(address token) external view returns (uint256);\\n    function getCollateralPrice(address market, address asset) external view returns (uint256);\\n    function getPositionValue(\\n        address market,\\n        address user\\n    ) external view returns (uint256 collateralValueUsd, uint256 debtValueUsd);\\n}\\n\\ninterface IMorphoBlueGatewayView {\\n    function getCurrentLtvBps(MarketParams calldata params, address user) external view returns (uint256);\\n    function getLiquidationLtvBps(MarketParams calldata params) external view returns (uint256);\\n    function getOraclePrice(MarketParams calldata params) external view returns (uint256);\\n    function getPositionValue(\\n        MarketParams calldata params,\\n        address user\\n    ) external view returns (uint256 collateralValueUsd, uint256 debtValueUsd);\\n}\\n\\ninterface IEulerGatewayView {\\n    function getCurrentLtvBps(address vault, address user, uint8 subAccountIndex) external view returns (uint256);\\n    function getLiquidationLtvBps(address vault) external view returns (uint256);\\n    function getAssetPrice(address vault, address token) external view returns (uint256);\\n    function getCollateralToDebtRate(address borrowVault, address collateralVault) external view returns (uint256);\\n    function getUserAccountData(address borrowVault, address user, uint8 subAccountIndex) external view returns (uint256 totalCollateralUsd, uint256 totalDebtUsd);\\n    function getVaultAsset(address vault) external view returns (address);\\n}\\n\\ninterface IEulerVaultUoA {\\n    function unitOfAccount() external view returns (address);\\n}\\n\\ninterface IVenusGatewayView {\\n    function getCurrentLtvBps(address market, address user) external view returns (uint256);\\n    function getLiquidationLtvBps(address market, address user) external view returns (uint256);\\n    function getAssetPrice(address underlyingToken) external view returns (uint256);\\n    function getAssetPrice8(address underlyingToken) external view returns (uint256);\\n    function getUserAccountData(address user) external view returns (uint256 totalCollateralUsd, uint256 totalDebtUsd);\\n}\\n\\n/**\\n * @title KapanViewRouter\\n * @notice Unified read-only router for querying position data across lending protocols\\n * @dev Aggregates gateway view contracts to provide protocol-agnostic LTV queries for ADL\\n *\\n * Supported protocols:\\n *   - \\\"aave-v3\\\": Aave V3 (context: empty)\\n *   - \\\"compound-v3\\\": Compound V3 (context: abi.encode(baseToken address))\\n *   - \\\"morpho-blue\\\": Morpho Blue (context: abi.encode(MarketParams))\\n *   - \\\"euler-v2\\\": Euler V2 (context: abi.encode(borrowVault address, collateralVaults address[], subAccountIndex uint8))\\n *   - \\\"venus\\\": Venus (context: empty)\\n */\\ncontract KapanViewRouter {\\n    // ============ Errors ============\\n\\n    error UnsupportedProtocol(string protocolName);\\n    error UnsupportedProtocolId(bytes4 protocolId);\\n    error GatewayNotSet(string protocolName);\\n    error ZeroAddress();\\n\\n    // ============ Events ============\\n\\n    event GatewayUpdated(string indexed protocolName, address gateway);\\n\\n    // ============ Constants ============\\n\\n    /// @notice Protocol identifiers (bytes4 for unified interface)\\n    bytes4 public constant AAVE_V3 = bytes4(keccak256(\\\"aave-v3\\\"));\\n    bytes4 public constant COMPOUND_V3 = bytes4(keccak256(\\\"compound-v3\\\"));\\n    bytes4 public constant MORPHO_BLUE = bytes4(keccak256(\\\"morpho-blue\\\"));\\n    bytes4 public constant EULER_V2 = bytes4(keccak256(\\\"euler-v2\\\"));\\n    bytes4 public constant VENUS = bytes4(keccak256(\\\"venus\\\"));\\n\\n    // ============ State ============\\n\\n    /// @notice Owner who can update gateway addresses\\n    address public owner;\\n\\n    /// @notice Protocol name => gateway view address (consistent with KapanRouter)\\n    mapping(string => address) public gateways;\\n\\n    // ============ Modifiers ============\\n\\n    modifier onlyOwner() {\\n        require(msg.sender == owner, \\\"Not owner\\\");\\n        _;\\n    }\\n\\n    // ============ Constructor ============\\n\\n    constructor(address _owner) {\\n        if (_owner == address(0)) revert ZeroAddress();\\n        owner = _owner;\\n    }\\n\\n    // ============ Admin ============\\n\\n    /// @notice Set or update a gateway view address\\n    /// @param protocolName Protocol name (e.g., \\\"aave-v3\\\", \\\"morpho-blue\\\")\\n    /// @param gateway Gateway view contract address\\n    function setGateway(string calldata protocolName, address gateway) external onlyOwner {\\n        if (gateway == address(0)) revert ZeroAddress();\\n        gateways[protocolName] = gateway;\\n        emit GatewayUpdated(protocolName, gateway);\\n    }\\n\\n    /// @notice Batch set multiple gateways\\n    /// @param protocolNames Array of protocol names\\n    /// @param gatewayAddresses Array of gateway addresses\\n    function setGateways(string[] calldata protocolNames, address[] calldata gatewayAddresses) external onlyOwner {\\n        require(protocolNames.length == gatewayAddresses.length, \\\"Length mismatch\\\");\\n        for (uint256 i = 0; i < protocolNames.length; i++) {\\n            if (gatewayAddresses[i] == address(0)) revert ZeroAddress();\\n            gateways[protocolNames[i]] = gatewayAddresses[i];\\n            emit GatewayUpdated(protocolNames[i], gatewayAddresses[i]);\\n        }\\n    }\\n\\n    /// @notice Transfer ownership\\n    /// @param newOwner New owner address\\n    function transferOwnership(address newOwner) external onlyOwner {\\n        if (newOwner == address(0)) revert ZeroAddress();\\n        owner = newOwner;\\n    }\\n\\n    // ============ LTV Queries ============\\n\\n    /// @notice Get current LTV for Aave V3\\n    /// @param user The user's address\\n    /// @return ltvBps Current LTV in basis points\\n    function getAaveLtvBps(address user) external view returns (uint256 ltvBps) {\\n        address gateway = gateways[\\\"aave-v3\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"aave-v3\\\");\\n        return IAaveGatewayView(gateway).getCurrentLtvBps(address(0), user);\\n    }\\n\\n    /// @notice Get liquidation LTV for Aave V3\\n    function getAaveLiquidationLtvBps(address user) external view returns (uint256) {\\n        address gateway = gateways[\\\"aave-v3\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"aave-v3\\\");\\n        return IAaveGatewayView(gateway).getLiquidationLtvBps(address(0), user);\\n    }\\n\\n    /// @notice Get current LTV for Compound V3\\n    /// @param baseToken The base token of the Comet market (e.g., USDC)\\n    /// @param user The user's address\\n    function getCompoundLtvBps(address baseToken, address user) external view returns (uint256) {\\n        address gateway = gateways[\\\"compound-v3\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"compound-v3\\\");\\n        return ICompoundGatewayView(gateway).getCurrentLtvBps(baseToken, user);\\n    }\\n\\n    /// @notice Get liquidation LTV for Compound V3\\n    function getCompoundLiquidationLtvBps(address baseToken, address user) external view returns (uint256) {\\n        address gateway = gateways[\\\"compound-v3\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"compound-v3\\\");\\n        return ICompoundGatewayView(gateway).getLiquidationLtvBps(baseToken, user);\\n    }\\n\\n    /// @notice Get current LTV for Morpho Blue\\n    /// @param params The Morpho market parameters\\n    /// @param user The user's address\\n    function getMorphoLtvBps(MarketParams calldata params, address user) external view returns (uint256) {\\n        address gateway = gateways[\\\"morpho-blue\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"morpho-blue\\\");\\n        return IMorphoBlueGatewayView(gateway).getCurrentLtvBps(params, user);\\n    }\\n\\n    /// @notice Get liquidation LTV for Morpho Blue\\n    function getMorphoLiquidationLtvBps(MarketParams calldata params) external view returns (uint256) {\\n        address gateway = gateways[\\\"morpho-blue\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"morpho-blue\\\");\\n        return IMorphoBlueGatewayView(gateway).getLiquidationLtvBps(params);\\n    }\\n\\n    /// @notice Get current LTV for Euler V2\\n    /// @param vault The borrow vault address\\n    /// @param user The user's address\\n    /// @param subAccountIndex The sub-account index (0-255)\\n    function getEulerLtvBps(address vault, address user, uint8 subAccountIndex) external view returns (uint256) {\\n        address gateway = gateways[\\\"euler-v2\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"euler-v2\\\");\\n        return IEulerGatewayView(gateway).getCurrentLtvBps(vault, user, subAccountIndex);\\n    }\\n\\n    /// @notice Get liquidation LTV for Euler V2\\n    function getEulerLiquidationLtvBps(address vault) external view returns (uint256) {\\n        address gateway = gateways[\\\"euler-v2\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"euler-v2\\\");\\n        return IEulerGatewayView(gateway).getLiquidationLtvBps(vault);\\n    }\\n\\n    /// @notice Get current LTV for Venus\\n    /// @param user The user's address\\n    function getVenusLtvBps(address user) external view returns (uint256) {\\n        address gateway = gateways[\\\"venus\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"venus\\\");\\n        return IVenusGatewayView(gateway).getCurrentLtvBps(address(0), user);\\n    }\\n\\n    /// @notice Get liquidation LTV for Venus\\n    function getVenusLiquidationLtvBps(address user) external view returns (uint256) {\\n        address gateway = gateways[\\\"venus\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"venus\\\");\\n        return IVenusGatewayView(gateway).getLiquidationLtvBps(address(0), user);\\n    }\\n\\n    // ============ Risk Assessment ============\\n\\n    /// @notice Check if Aave position is at liquidation risk\\n    /// @param user The user's address\\n    /// @param bufferBps Safety buffer in basis points (e.g., 500 = 5%)\\n    /// @return atRisk True if current LTV + buffer >= liquidation LTV\\n    function isAaveAtRisk(address user, uint256 bufferBps) external view returns (bool atRisk) {\\n        uint256 currentLtv = this.getAaveLtvBps(user);\\n        uint256 liquidationLtv = this.getAaveLiquidationLtvBps(user);\\n        if (currentLtv == 0 || liquidationLtv == 0) return false;\\n        return currentLtv + bufferBps >= liquidationLtv;\\n    }\\n\\n    /// @notice Check if Compound position is at liquidation risk\\n    function isCompoundAtRisk(address baseToken, address user, uint256 bufferBps) external view returns (bool) {\\n        uint256 currentLtv = this.getCompoundLtvBps(baseToken, user);\\n        uint256 liquidationLtv = this.getCompoundLiquidationLtvBps(baseToken, user);\\n        if (currentLtv == 0 || liquidationLtv == 0) return false;\\n        return currentLtv + bufferBps >= liquidationLtv;\\n    }\\n\\n    /// @notice Check if Morpho position is at liquidation risk\\n    function isMorphoAtRisk(\\n        MarketParams calldata params,\\n        address user,\\n        uint256 bufferBps\\n    ) external view returns (bool) {\\n        uint256 currentLtv = this.getMorphoLtvBps(params, user);\\n        uint256 liquidationLtv = this.getMorphoLiquidationLtvBps(params);\\n        if (currentLtv == 0 || liquidationLtv == 0) return false;\\n        return currentLtv + bufferBps >= liquidationLtv;\\n    }\\n\\n    // ============ Price Queries (for ADL floor pricing) ============\\n    // All prices normalized to 8 decimals USD\\n\\n    /// @notice Get asset price via Aave oracle (8 decimals)\\n    /// @param token The asset address\\n    /// @return price Price in 8 decimals USD\\n    function getAavePrice(address token) external view returns (uint256) {\\n        address gateway = gateways[\\\"aave-v3\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"aave-v3\\\");\\n        return IAaveGatewayView(gateway).getAssetPrice(token);\\n    }\\n\\n    /// @notice Get multiple asset prices via Aave oracle\\n    function getAavePrices(address[] calldata tokens) external view returns (uint256[] memory) {\\n        address gateway = gateways[\\\"aave-v3\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"aave-v3\\\");\\n        return IAaveGatewayView(gateway).getAssetPrices(tokens);\\n    }\\n\\n    /// @notice Get asset price via Compound (8 decimals)\\n    /// @param baseToken The Comet base token (e.g., USDC)\\n    /// @param asset The asset to price (collateral or base token)\\n    /// @return price Price in 8 decimals USD\\n    function getCompoundPrice(address baseToken, address asset) external view returns (uint256) {\\n        address gateway = gateways[\\\"compound-v3\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"compound-v3\\\");\\n        // If pricing the base token, use getPrice; otherwise use getCollateralPrice\\n        if (asset == baseToken) {\\n            return ICompoundGatewayView(gateway).getPrice(asset);\\n        }\\n        return ICompoundGatewayView(gateway).getCollateralPrice(baseToken, asset);\\n    }\\n\\n    /// @notice Get Morpho oracle price (36 decimals, collateral/loan ratio)\\n    /// @dev This is NOT a USD price - it's the exchange rate from collateral to loan token\\n    /// @param params The Morpho market parameters\\n    /// @return price Price ratio with 36 decimals\\n    function getMorphoOraclePrice(MarketParams calldata params) external view returns (uint256) {\\n        address gateway = gateways[\\\"morpho-blue\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"morpho-blue\\\");\\n        return IMorphoBlueGatewayView(gateway).getOraclePrice(params);\\n    }\\n\\n    /// @notice Get asset price via Venus oracle (8 decimals normalized)\\n    /// @param underlyingToken The underlying asset address\\n    /// @return price Price in 8 decimals USD\\n    function getVenusPrice(address underlyingToken) external view returns (uint256) {\\n        address gateway = gateways[\\\"venus\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"venus\\\");\\n        return IVenusGatewayView(gateway).getAssetPrice8(underlyingToken);\\n    }\\n\\n    /// @notice Get asset price via Euler oracle (in vault's unit of account)\\n    /// @param vault The Euler vault address (determines oracle)\\n    /// @param token The token to price\\n    /// @return price Price in unit of account decimals\\n    function getEulerPrice(address vault, address token) external view returns (uint256) {\\n        address gateway = gateways[\\\"euler-v2\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"euler-v2\\\");\\n        return IEulerGatewayView(gateway).getAssetPrice(vault, token);\\n    }\\n\\n    /// @notice Get exchange rate for Euler position (collateral \\u2192 debt)\\n    /// @dev Returns 18-decimal exchange rate ready for calculateMinBuyFromRate()\\n    /// @param borrowVault The borrow vault (debt side)\\n    /// @param collateralVault The collateral vault\\n    /// @return rate18 Exchange rate with 18 decimals\\n    function getEulerExchangeRate(address borrowVault, address collateralVault) external view returns (uint256) {\\n        address gateway = gateways[\\\"euler-v2\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"euler-v2\\\");\\n        return IEulerGatewayView(gateway).getCollateralToDebtRate(borrowVault, collateralVault);\\n    }\\n\\n    // ============ Position Value Queries (for ADL) ============\\n    // All values in 8 decimals USD\\n\\n    /// @notice Get Aave user account data (collateral and debt in USD)\\n    /// @param user The user address\\n    /// @return totalCollateralBase Total collateral in 8 decimals USD\\n    /// @return totalDebtBase Total debt in 8 decimals USD\\n    /// @return availableBorrowsBase Available borrows in 8 decimals USD\\n    /// @return currentLiquidationThreshold Liquidation threshold in basis points\\n    /// @return ltv Loan-to-value ratio in basis points\\n    /// @return healthFactor Health factor (1e18 scale)\\n    function getAaveUserAccountData(\\n        address user\\n    )\\n        external\\n        view\\n        returns (\\n            uint256 totalCollateralBase,\\n            uint256 totalDebtBase,\\n            uint256 availableBorrowsBase,\\n            uint256 currentLiquidationThreshold,\\n            uint256 ltv,\\n            uint256 healthFactor\\n        )\\n    {\\n        address gateway = gateways[\\\"aave-v3\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"aave-v3\\\");\\n        return IAaveGatewayView(gateway).getUserAccountData(user);\\n    }\\n\\n    /// @notice Get Compound position value (collateral and debt in USD)\\n    /// @param baseToken The Comet base token (e.g., USDC)\\n    /// @param user The user address\\n    /// @return collateralValueUsd Total collateral in 8 decimals USD\\n    /// @return debtValueUsd Total debt in 8 decimals USD\\n    function getCompoundPositionValue(\\n        address baseToken,\\n        address user\\n    ) external view returns (uint256 collateralValueUsd, uint256 debtValueUsd) {\\n        address gateway = gateways[\\\"compound-v3\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"compound-v3\\\");\\n        return ICompoundGatewayView(gateway).getPositionValue(baseToken, user);\\n    }\\n\\n    /// @notice Get Morpho position value (collateral and debt in USD)\\n    /// @param params The Morpho market parameters\\n    /// @param user The user address\\n    /// @return collateralValueUsd Total collateral in 8 decimals USD\\n    /// @return debtValueUsd Total debt in 8 decimals USD\\n    function getMorphoPositionValue(\\n        MarketParams calldata params,\\n        address user\\n    ) external view returns (uint256 collateralValueUsd, uint256 debtValueUsd) {\\n        address gateway = gateways[\\\"morpho-blue\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"morpho-blue\\\");\\n        return IMorphoBlueGatewayView(gateway).getPositionValue(params, user);\\n    }\\n\\n    /// @notice Get Venus user account data (collateral and debt in USD)\\n    /// @param user The user address\\n    /// @return totalCollateralUsd Total collateral in 8 decimals USD\\n    /// @return totalDebtUsd Total debt in 8 decimals USD\\n    function getVenusUserAccountData(\\n        address user\\n    ) external view returns (uint256 totalCollateralUsd, uint256 totalDebtUsd) {\\n        address gateway = gateways[\\\"venus\\\"];\\n        if (gateway == address(0)) revert GatewayNotSet(\\\"venus\\\");\\n        return IVenusGatewayView(gateway).getUserAccountData(user);\\n    }\\n\\n    // ============ ADL Floor Price Calculation ============\\n\\n    /// @notice Calculate minimum buy amount using exchange rate\\n    /// @dev Exchange rate = how many buyTokens per sellToken, scaled by 1e18\\n    /// @param sellAmount Amount of sellToken (in sellToken decimals)\\n    /// @param maxSlippageBps Maximum slippage in basis points (e.g., 100 = 1%)\\n    /// @param exchangeRate18 Exchange rate with 18 decimals (sellToken \\u2192 buyToken)\\n    /// @param sellDecimals Decimals of sell token\\n    /// @param buyDecimals Decimals of buy token\\n    /// @return minBuyAmount Minimum acceptable buy amount\\n    function calculateMinBuyFromRate(\\n        uint256 sellAmount,\\n        uint256 maxSlippageBps,\\n        uint256 exchangeRate18,\\n        uint8 sellDecimals,\\n        uint8 buyDecimals\\n    ) external pure returns (uint256 minBuyAmount) {\\n        if (exchangeRate18 == 0) return 0;\\n\\n        // buyAmount = sellAmount * exchangeRate / 1e18\\n        // Then adjust for decimal difference between tokens\\n\\n        // Step 1: Apply exchange rate (result has sellDecimals precision)\\n        uint256 rawBuyAmount = (sellAmount * exchangeRate18) / 1e18;\\n\\n        // Step 2: Adjust for decimal difference\\n        if (buyDecimals >= sellDecimals) {\\n            minBuyAmount = rawBuyAmount * (10 ** (buyDecimals - sellDecimals));\\n        } else {\\n            minBuyAmount = rawBuyAmount / (10 ** (sellDecimals - buyDecimals));\\n        }\\n\\n        // Step 3: Apply slippage tolerance\\n        minBuyAmount = (minBuyAmount * (10000 - maxSlippageBps)) / 10000;\\n    }\\n\\n    /// @notice Convert two USD prices (same decimals) to an 18-decimal exchange rate\\n    /// @dev exchangeRate18 = sellPriceUsd * 1e18 / buyPriceUsd\\n    /// @param sellPriceUsd USD price of sell token (any decimals, but same as buyPriceUsd)\\n    /// @param buyPriceUsd USD price of buy token (any decimals, but same as sellPriceUsd)\\n    /// @return exchangeRate18 Exchange rate with 18 decimals\\n    function usdPricesToExchangeRate(\\n        uint256 sellPriceUsd,\\n        uint256 buyPriceUsd\\n    ) external pure returns (uint256 exchangeRate18) {\\n        if (buyPriceUsd == 0) return 0;\\n        return (sellPriceUsd * 1e18) / buyPriceUsd;\\n    }\\n\\n    /// @notice Calculate minimum buy amount for ADL order with slippage protection\\n    /// @dev Convenience function that takes USD prices and converts to exchange rate internally\\n    /// @param sellAmount Amount of sellToken\\n    /// @param maxSlippageBps Maximum slippage in basis points (e.g., 100 = 1%)\\n    /// @param sellPriceUsd Price of sellToken (any decimals)\\n    /// @param buyPriceUsd Price of buyToken (same decimals as sellPriceUsd)\\n    /// @param sellDecimals Decimals of sell token\\n    /// @param buyDecimals Decimals of buy token\\n    /// @return minBuyAmount Minimum acceptable buy amount\\n    function calculateMinBuyAmount(\\n        uint256 sellAmount,\\n        uint256 maxSlippageBps,\\n        uint256 sellPriceUsd,\\n        uint256 buyPriceUsd,\\n        uint8 sellDecimals,\\n        uint8 buyDecimals\\n    ) external view returns (uint256 minBuyAmount) {\\n        if (sellPriceUsd == 0 || buyPriceUsd == 0) return 0;\\n\\n        // Convert USD prices to exchange rate\\n        uint256 exchangeRate18 = (sellPriceUsd * 1e18) / buyPriceUsd;\\n\\n        // Use the exchange rate calculation\\n        return this.calculateMinBuyFromRate(sellAmount, maxSlippageBps, exchangeRate18, sellDecimals, buyDecimals);\\n    }\\n\\n    /// @notice Calculate minimum buy amount for Morpho ADL orders\\n    /// @dev Morpho oracles return the exchange rate scaled by 1e36\\n    ///      Formula: loanAmount = collateralAmount * price / 1e36\\n    ///      The oracle price already accounts for token decimals\\n    /// @param sellAmount Amount of collateral to sell (in collateral token decimals)\\n    /// @param maxSlippageBps Maximum slippage in basis points\\n    /// @param morphoOraclePrice Price from Morpho oracle (36 decimals scale)\\n    /// @return minBuyAmount Minimum acceptable loan tokens to receive\\n    function calculateMorphoMinBuyAmount(\\n        uint256 sellAmount,\\n        uint256 maxSlippageBps,\\n        uint256 morphoOraclePrice\\n    ) external pure returns (uint256 minBuyAmount) {\\n        if (morphoOraclePrice == 0) return 0;\\n\\n        // Morpho oracle: loanAmount = collateralAmount * price / ORACLE_PRICE_SCALE\\n        // The oracle price already incorporates the decimal difference between tokens\\n        // ORACLE_PRICE_SCALE = 1e36\\n\\n        minBuyAmount = (sellAmount * morphoOraclePrice) / 1e36;\\n\\n        // Apply slippage tolerance\\n        minBuyAmount = (minBuyAmount * (10000 - maxSlippageBps)) / 10000;\\n    }\\n\\n    // ============ Unified Interface (Protocol-Agnostic) ============\\n    // These functions allow callers to interact with any protocol using a bytes4 protocolId\\n    // and protocol-specific context data, without needing to know protocol internals.\\n\\n    /// @notice Get the protocol name for a protocol ID\\n    /// @param protocolId The bytes4 protocol identifier\\n    /// @return protocolName The string protocol name for gateway lookup\\n    function _getProtocolName(bytes4 protocolId) internal pure returns (string memory protocolName) {\\n        if (protocolId == AAVE_V3) return \\\"aave-v3\\\";\\n        if (protocolId == COMPOUND_V3) return \\\"compound-v3\\\";\\n        if (protocolId == MORPHO_BLUE) return \\\"morpho-blue\\\";\\n        if (protocolId == EULER_V2) return \\\"euler-v2\\\";\\n        if (protocolId == VENUS) return \\\"venus\\\";\\n        revert UnsupportedProtocolId(protocolId);\\n    }\\n\\n    /// @notice Get current LTV for any protocol (unified interface)\\n    /// @param protocolId Protocol identifier (AAVE_V3, COMPOUND_V3, etc.)\\n    /// @param user User address\\n    /// @param context Protocol-specific context:\\n    ///   - AAVE_V3: empty bytes\\n    ///   - COMPOUND_V3: abi.encode(baseToken address)\\n    ///   - MORPHO_BLUE: abi.encode(MarketParams)\\n    ///   - EULER_V2: abi.encode(borrowVault address, collateralVaults address[], subAccountIndex uint8)\\n    ///   - VENUS: empty bytes\\n    /// @return ltvBps Current LTV in basis points\\n    function getCurrentLtv(\\n        bytes4 protocolId,\\n        address user,\\n        bytes calldata context\\n    ) external view returns (uint256 ltvBps) {\\n        string memory protocolName = _getProtocolName(protocolId);\\n        address gateway = gateways[protocolName];\\n        if (gateway == address(0)) revert GatewayNotSet(protocolName);\\n\\n        if (protocolId == AAVE_V3) {\\n            return IAaveGatewayView(gateway).getCurrentLtvBps(address(0), user);\\n        }\\n        if (protocolId == COMPOUND_V3) {\\n            address baseToken = abi.decode(context, (address));\\n            return ICompoundGatewayView(gateway).getCurrentLtvBps(baseToken, user);\\n        }\\n        if (protocolId == MORPHO_BLUE) {\\n            MarketParams memory params = abi.decode(context, (MarketParams));\\n            return IMorphoBlueGatewayView(gateway).getCurrentLtvBps(params, user);\\n        }\\n        if (protocolId == EULER_V2) {\\n            // Context format: (borrowVault, collateralVaults[], subAccountIndex)\\n            (address vault, , uint8 subAccountIndex) = abi.decode(context, (address, address[], uint8));\\n            return IEulerGatewayView(gateway).getCurrentLtvBps(vault, user, subAccountIndex);\\n        }\\n        if (protocolId == VENUS) {\\n            return IVenusGatewayView(gateway).getCurrentLtvBps(address(0), user);\\n        }\\n\\n        revert UnsupportedProtocolId(protocolId);\\n    }\\n\\n    /// @notice Get position value for any protocol (unified interface)\\n    /// @param protocolId Protocol identifier\\n    /// @param user User address\\n    /// @param context Protocol-specific context (see getCurrentLtv)\\n    /// @return collateralValueUsd Total collateral in 8 decimals USD\\n    /// @return debtValueUsd Total debt in 8 decimals USD\\n    function getPositionValue(\\n        bytes4 protocolId,\\n        address user,\\n        bytes calldata context\\n    ) external view returns (uint256 collateralValueUsd, uint256 debtValueUsd) {\\n        string memory protocolName = _getProtocolName(protocolId);\\n        address gateway = gateways[protocolName];\\n        if (gateway == address(0)) revert GatewayNotSet(protocolName);\\n\\n        if (protocolId == AAVE_V3) {\\n            (uint256 totalCollateral, uint256 totalDebt, , , , ) = IAaveGatewayView(gateway).getUserAccountData(user);\\n            return (totalCollateral, totalDebt);\\n        }\\n        if (protocolId == COMPOUND_V3) {\\n            address baseToken = abi.decode(context, (address));\\n            return ICompoundGatewayView(gateway).getPositionValue(baseToken, user);\\n        }\\n        if (protocolId == MORPHO_BLUE) {\\n            MarketParams memory params = abi.decode(context, (MarketParams));\\n            return IMorphoBlueGatewayView(gateway).getPositionValue(params, user);\\n        }\\n        if (protocolId == VENUS) {\\n            return IVenusGatewayView(gateway).getUserAccountData(user);\\n        }\\n        if (protocolId == EULER_V2) {\\n            // Context format: (borrowVault, collateralVaults[], subAccountIndex)\\n            (address vault, , uint8 subAccountIndex) = abi.decode(context, (address, address[], uint8));\\n            return IEulerGatewayView(gateway).getUserAccountData(vault, user, subAccountIndex);\\n        }\\n\\n        revert UnsupportedProtocolId(protocolId);\\n    }\\n\\n    /// @notice Get collateral price for any protocol (unified interface)\\n    /// @param protocolId Protocol identifier\\n    /// @param collateralToken Collateral token address\\n    /// @param context Protocol-specific context (see getCurrentLtv)\\n    /// @return price Price in 8 decimals USD (or 1e8 for protocols using exchange rates)\\n    function getCollateralPrice(\\n        bytes4 protocolId,\\n        address collateralToken,\\n        bytes calldata context\\n    ) external view returns (uint256 price) {\\n        string memory protocolName = _getProtocolName(protocolId);\\n        address gateway = gateways[protocolName];\\n        if (gateway == address(0)) revert GatewayNotSet(protocolName);\\n\\n        if (protocolId == AAVE_V3) {\\n            return IAaveGatewayView(gateway).getAssetPrice(collateralToken);\\n        }\\n        if (protocolId == COMPOUND_V3) {\\n            address baseToken = abi.decode(context, (address));\\n            if (collateralToken == baseToken) {\\n                return ICompoundGatewayView(gateway).getPrice(collateralToken);\\n            }\\n            return ICompoundGatewayView(gateway).getCollateralPrice(baseToken, collateralToken);\\n        }\\n        if (protocolId == VENUS) {\\n            return IVenusGatewayView(gateway).getAssetPrice8(collateralToken);\\n        }\\n        if (protocolId == MORPHO_BLUE) {\\n            // For Morpho, derive collateral price from the oracle\\n            // Oracle returns collateral/loan exchange rate scaled by 10^(36 + loanDecimals - collateralDecimals)\\n            // We want price in 8 decimals, so divide by 10^(36 + loanDecimals - collateralDecimals - 8)\\n            // = 10^(28 + loanDecimals - collateralDecimals)\\n            MarketParams memory params = abi.decode(context, (MarketParams));\\n            uint256 oraclePrice = IMorphoBlueGatewayView(gateway).getOraclePrice(params);\\n            if (oraclePrice > 0) {\\n                uint8 loanDecimals = _getDecimals(params.loanToken);\\n                uint8 collateralDecimals = _getDecimals(params.collateralToken);\\n                // exponent = 28 + loanDecimals - collateralDecimals\\n                // Examples:\\n                //   WBTC(8)/USDC(6):  28 + 6 - 8  = 26\\n                //   ETH(18)/USDC(6):  28 + 6 - 18 = 16\\n                //   USDC(6)/ETH(18):  28 + 18 - 6 = 40\\n                //   USDC(6)/USDT(6):  28 + 6 - 6  = 28\\n                int16 exponent = 28 + int16(uint16(loanDecimals)) - int16(uint16(collateralDecimals));\\n                if (exponent >= 0) {\\n                    return oraclePrice / (10 ** uint16(exponent));\\n                } else {\\n                    // Negative exponent means multiply instead of divide\\n                    // This would only happen if collateralDecimals > 28 + loanDecimals\\n                    // (e.g., a token with 35+ decimals, which doesn't exist in practice)\\n                    return oraclePrice * (10 ** uint16(-exponent));\\n                }\\n            }\\n        }\\n        if (protocolId == EULER_V2) {\\n            // Euler: get price via vault's oracle\\n            // Context format: (borrowVault, collateralVaults[], subAccountIndex)\\n            (address borrowVault, , ) = abi.decode(context, (address, address[], uint8));\\n            // Get collateral price in unit of account\\n            uint256 priceInUoa = IEulerGatewayView(gateway).getAssetPrice(borrowVault, collateralToken);\\n            if (priceInUoa == 0) return 0;\\n            // Euler prices are in unit of account decimals (usually 18 for USD)\\n            // Convert to 8 decimals for consistency with other protocols\\n            address unitOfAccount = IEulerVaultUoA(borrowVault).unitOfAccount();\\n            uint8 uoaDecimals = 18;\\n            if (unitOfAccount != address(0) && unitOfAccount.code.length > 0) {\\n                try IERC20Metadata(unitOfAccount).decimals() returns (uint8 d) {\\n                    uoaDecimals = d;\\n                } catch {}\\n            }\\n            if (uoaDecimals > 8) {\\n                return priceInUoa / (10 ** (uoaDecimals - 8));\\n            } else if (uoaDecimals < 8) {\\n                return priceInUoa * (10 ** (8 - uoaDecimals));\\n            }\\n            return priceInUoa;\\n        }\\n        // Fallback: return placeholder (caller should handle)\\n        return 1e8;\\n    }\\n\\n    /// @notice Get debt price for any protocol (unified interface)\\n    /// @param protocolId Protocol identifier\\n    /// @param debtToken Debt token address\\n    /// @param context Protocol-specific context (see getCurrentLtv)\\n    /// @return price Price in 8 decimals USD (or 1e8 for protocols using exchange rates)\\n    function getDebtPrice(\\n        bytes4 protocolId,\\n        address debtToken,\\n        bytes calldata context\\n    ) external view returns (uint256 price) {\\n        string memory protocolName = _getProtocolName(protocolId);\\n        address gateway = gateways[protocolName];\\n        if (gateway == address(0)) revert GatewayNotSet(protocolName);\\n\\n        if (protocolId == AAVE_V3) {\\n            return IAaveGatewayView(gateway).getAssetPrice(debtToken);\\n        }\\n        if (protocolId == COMPOUND_V3) {\\n            address baseToken = abi.decode(context, (address));\\n            if (debtToken == baseToken) {\\n                return ICompoundGatewayView(gateway).getPrice(debtToken);\\n            }\\n            return ICompoundGatewayView(gateway).getCollateralPrice(baseToken, debtToken);\\n        }\\n        if (protocolId == VENUS) {\\n            return IVenusGatewayView(gateway).getAssetPrice8(debtToken);\\n        }\\n        if (protocolId == MORPHO_BLUE) {\\n            // For Morpho, the loan token is the unit of account, so its price is 1.0\\n            // This is consistent with how getPositionValue calculates debt in \\\"loan token terms\\\"\\n            return 1e8;\\n        }\\n        if (protocolId == EULER_V2) {\\n            // Euler: get price via vault's oracle\\n            // Context format: (borrowVault, collateralVaults[], subAccountIndex)\\n            (address borrowVault, , ) = abi.decode(context, (address, address[], uint8));\\n            // Get debt price in unit of account\\n            uint256 priceInUoa = IEulerGatewayView(gateway).getAssetPrice(borrowVault, debtToken);\\n            if (priceInUoa == 0) return 0;\\n            // Convert to 8 decimals\\n            address unitOfAccount = IEulerVaultUoA(borrowVault).unitOfAccount();\\n            uint8 uoaDecimals = 18;\\n            if (unitOfAccount != address(0) && unitOfAccount.code.length > 0) {\\n                try IERC20Metadata(unitOfAccount).decimals() returns (uint8 d) {\\n                    uoaDecimals = d;\\n                } catch {}\\n            }\\n            if (uoaDecimals > 8) {\\n                return priceInUoa / (10 ** (uoaDecimals - 8));\\n            } else if (uoaDecimals < 8) {\\n                return priceInUoa * (10 ** (8 - uoaDecimals));\\n            }\\n            return priceInUoa;\\n        }\\n        // Fallback: return placeholder (caller should handle)\\n        return 1e8;\\n    }\\n\\n    /// @notice Calculate minimum buy amount with slippage for any protocol (unified interface)\\n    /// @param protocolId Protocol identifier\\n    /// @param sellAmount Amount to sell\\n    /// @param maxSlippageBps Maximum slippage in basis points\\n    /// @param collateralToken Collateral token\\n    /// @param debtToken Debt token\\n    /// @param collateralDecimals Collateral token decimals\\n    /// @param debtDecimals Debt token decimals\\n    /// @param context Protocol-specific context (see getCurrentLtv)\\n    /// @return minBuyAmount Minimum acceptable buy amount\\n    function calculateMinBuy(\\n        bytes4 protocolId,\\n        uint256 sellAmount,\\n        uint256 maxSlippageBps,\\n        address collateralToken,\\n        address debtToken,\\n        uint8 collateralDecimals,\\n        uint8 debtDecimals,\\n        bytes calldata context\\n    ) external view returns (uint256 minBuyAmount) {\\n        string memory protocolName = _getProtocolName(protocolId);\\n        address gateway = gateways[protocolName];\\n        if (gateway == address(0)) revert GatewayNotSet(protocolName);\\n\\n        if (protocolId == MORPHO_BLUE) {\\n            // For Morpho, use the Morpho oracle which gives collateral/loan exchange rate\\n            // This is consistent with how getPositionValue and getCollateralPrice work\\n            MarketParams memory params = abi.decode(context, (MarketParams));\\n            uint256 morphoPrice = IMorphoBlueGatewayView(gateway).getOraclePrice(params);\\n            return _calculateMorphoMinBuy(sellAmount, maxSlippageBps, morphoPrice);\\n        }\\n\\n        if (protocolId == EULER_V2) {\\n            // Euler uses 18-decimal exchange rate\\n            // Context format: (borrowVault, collateralVaults[], subAccountIndex)\\n            (address borrowVault, address[] memory collateralVaults, ) = abi.decode(context, (address, address[], uint8));\\n\\n            // Find the collateral vault that matches the collateralToken\\n            address collateralVault = address(0);\\n            for (uint256 i = 0; i < collateralVaults.length; i++) {\\n                if (IEulerGatewayView(gateway).getVaultAsset(collateralVaults[i]) == collateralToken) {\\n                    collateralVault = collateralVaults[i];\\n                    break;\\n                }\\n            }\\n            if (collateralVault == address(0)) return 0;\\n\\n            uint256 eulerExchangeRate = IEulerGatewayView(gateway).getCollateralToDebtRate(\\n                borrowVault,\\n                collateralVault\\n            );\\n            return\\n                _calculateMinBuyFromRate(\\n                    sellAmount,\\n                    maxSlippageBps,\\n                    eulerExchangeRate,\\n                    collateralDecimals,\\n                    debtDecimals\\n                );\\n        }\\n\\n        // For Aave, Compound, Venus - use USD prices\\n        uint256 collateralPrice = this.getCollateralPrice(protocolId, collateralToken, context);\\n        uint256 debtPrice = this.getDebtPrice(protocolId, debtToken, context);\\n\\n        if (collateralPrice == 0 || debtPrice == 0) {\\n            return 0;\\n        }\\n\\n        uint256 exchangeRate18 = (collateralPrice * 1e18) / debtPrice;\\n        return _calculateMinBuyFromRate(sellAmount, maxSlippageBps, exchangeRate18, collateralDecimals, debtDecimals);\\n    }\\n\\n    /// @dev Internal helper for calculating min buy from exchange rate\\n    function _calculateMinBuyFromRate(\\n        uint256 sellAmount,\\n        uint256 maxSlippageBps,\\n        uint256 exchangeRate18,\\n        uint8 sellDecimals,\\n        uint8 buyDecimals\\n    ) internal pure returns (uint256 minBuyAmount) {\\n        if (exchangeRate18 == 0) return 0;\\n\\n        // buyAmount = sellAmount * exchangeRate / 1e18\\n        uint256 rawBuyAmount = (sellAmount * exchangeRate18) / 1e18;\\n\\n        // Adjust for decimal difference\\n        if (buyDecimals >= sellDecimals) {\\n            minBuyAmount = rawBuyAmount * (10 ** (buyDecimals - sellDecimals));\\n        } else {\\n            minBuyAmount = rawBuyAmount / (10 ** (sellDecimals - buyDecimals));\\n        }\\n\\n        // Apply slippage tolerance\\n        minBuyAmount = (minBuyAmount * (10000 - maxSlippageBps)) / 10000;\\n    }\\n\\n    /// @dev Internal helper for calculating min buy from Morpho oracle price\\n    function _calculateMorphoMinBuy(\\n        uint256 sellAmount,\\n        uint256 maxSlippageBps,\\n        uint256 morphoOraclePrice\\n    ) internal pure returns (uint256 minBuyAmount) {\\n        if (morphoOraclePrice == 0) return 0;\\n\\n        // Morpho oracle: loanAmount = collateralAmount * price / 1e36\\n        minBuyAmount = (sellAmount * morphoOraclePrice) / 1e36;\\n\\n        // Apply slippage tolerance\\n        minBuyAmount = (minBuyAmount * (10000 - maxSlippageBps)) / 10000;\\n    }\\n\\n    /// @dev Get token decimals with fallback to 18\\n    function _getDecimals(address token) internal view returns (uint8) {\\n        try IERC20Metadata(token).decimals() returns (uint8 d) {\\n            return d;\\n        } catch {\\n            return 18;\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0x985cbe818fb2ad843d53f09260d2e45df1d5109538671fd359044661322b8ee2\",\"license\":\"MIT\"},\"contracts/v2/interfaces/morpho/IMorphoBlue.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\n/// @title IMorphoBlue Interface\\n/// @notice Interface for Morpho Blue lending protocol\\n/// @dev See https://github.com/morpho-org/morpho-blue\\n\\nstruct MarketParams {\\n    address loanToken;\\n    address collateralToken;\\n    address oracle;\\n    address irm;\\n    uint256 lltv;\\n}\\n\\nstruct Market {\\n    uint128 totalSupplyAssets;\\n    uint128 totalSupplyShares;\\n    uint128 totalBorrowAssets;\\n    uint128 totalBorrowShares;\\n    uint128 lastUpdate;\\n    uint128 fee;\\n}\\n\\nstruct Position {\\n    uint256 supplyShares;\\n    uint128 borrowShares;\\n    uint128 collateral;\\n}\\n\\ninterface IMorphoBlue {\\n    /// @notice The state of a market (by id)\\n    function market(bytes32 id) external view returns (Market memory);\\n\\n    /// @notice The position of a user in a market\\n    function position(bytes32 id, address user) external view returns (Position memory);\\n\\n    /// @notice Whether an address is authorized to act on behalf of another\\n    function isAuthorized(address authorizer, address authorized) external view returns (bool);\\n\\n    /// @notice The nonce of an authorizer for EIP-712 signatures\\n    function nonce(address authorizer) external view returns (uint256);\\n\\n    /// @notice Compute market ID from market params\\n    function idToMarketParams(bytes32 id) external view returns (MarketParams memory);\\n\\n    // ============ Write Functions ============\\n\\n    /// @notice Supply assets to a market (lender side - earns yield)\\n    /// @param marketParams The market to supply to\\n    /// @param assets The amount of assets to supply (use 0 if using shares)\\n    /// @param shares The amount of shares to mint (use 0 if using assets)\\n    /// @param onBehalf The address to supply on behalf of\\n    /// @param data Callback data (empty for no callback)\\n    /// @return assetsSupplied The actual amount of assets supplied\\n    /// @return sharesSupplied The actual amount of shares minted\\n    function supply(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        uint256 shares,\\n        address onBehalf,\\n        bytes memory data\\n    ) external returns (uint256 assetsSupplied, uint256 sharesSupplied);\\n\\n    /// @notice Withdraw assets from a market (lender side)\\n    /// @param marketParams The market to withdraw from\\n    /// @param assets The amount of assets to withdraw (use 0 if using shares)\\n    /// @param shares The amount of shares to burn (use 0 if using assets)\\n    /// @param onBehalf The address to withdraw on behalf of\\n    /// @param receiver The address to receive the withdrawn assets\\n    /// @return assetsWithdrawn The actual amount of assets withdrawn\\n    /// @return sharesWithdrawn The actual amount of shares burned\\n    function withdraw(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        uint256 shares,\\n        address onBehalf,\\n        address receiver\\n    ) external returns (uint256 assetsWithdrawn, uint256 sharesWithdrawn);\\n\\n    /// @notice Borrow assets from a market\\n    /// @param marketParams The market to borrow from\\n    /// @param assets The amount of assets to borrow (use 0 if using shares)\\n    /// @param shares The amount of borrow shares to mint (use 0 if using assets)\\n    /// @param onBehalf The address to borrow on behalf of\\n    /// @param receiver The address to receive the borrowed assets\\n    /// @return assetsBorrowed The actual amount of assets borrowed\\n    /// @return sharesBorrowed The actual amount of borrow shares minted\\n    function borrow(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        uint256 shares,\\n        address onBehalf,\\n        address receiver\\n    ) external returns (uint256 assetsBorrowed, uint256 sharesBorrowed);\\n\\n    /// @notice Repay borrowed assets\\n    /// @param marketParams The market to repay to\\n    /// @param assets The amount of assets to repay (use 0 if using shares)\\n    /// @param shares The amount of borrow shares to burn (use 0 if using assets)\\n    /// @param onBehalf The address to repay on behalf of\\n    /// @param data Callback data (empty for no callback)\\n    /// @return assetsRepaid The actual amount of assets repaid\\n    /// @return sharesRepaid The actual amount of borrow shares burned\\n    function repay(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        uint256 shares,\\n        address onBehalf,\\n        bytes memory data\\n    ) external returns (uint256 assetsRepaid, uint256 sharesRepaid);\\n\\n    /// @notice Supply collateral to a market\\n    /// @param marketParams The market to supply collateral to\\n    /// @param assets The amount of collateral assets to supply\\n    /// @param onBehalf The address to supply on behalf of\\n    /// @param data Callback data (empty for no callback)\\n    function supplyCollateral(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        address onBehalf,\\n        bytes memory data\\n    ) external;\\n\\n    /// @notice Withdraw collateral from a market\\n    /// @param marketParams The market to withdraw collateral from\\n    /// @param assets The amount of collateral assets to withdraw\\n    /// @param onBehalf The address to withdraw on behalf of\\n    /// @param receiver The address to receive the withdrawn collateral\\n    function withdrawCollateral(\\n        MarketParams memory marketParams,\\n        uint256 assets,\\n        address onBehalf,\\n        address receiver\\n    ) external;\\n\\n    /// @notice Set authorization for an address to act on behalf of the caller\\n    /// @param authorized The address to authorize/deauthorize\\n    /// @param newIsAuthorized Whether to authorize (true) or deauthorize (false)\\n    function setAuthorization(address authorized, bool newIsAuthorized) external;\\n\\n    /// @notice Set authorization with signature (EIP-712)\\n    function setAuthorizationWithSig(\\n        address authorizer,\\n        address authorized,\\n        bool newIsAuthorized,\\n        uint256 deadline,\\n        uint8 v,\\n        bytes32 r,\\n        bytes32 s\\n    ) external;\\n\\n    /// @notice Accrue interest for a market\\n    function accrueInterest(MarketParams memory marketParams) external;\\n\\n    /// @notice Executes a flash loan.\\n    /// @dev Flash loans have access to the whole balance of the contract (all markets combined).\\n    /// @dev Zero fees - flashFee is always zero.\\n    /// @param token The token to flash loan.\\n    /// @param assets The amount of assets to flash loan.\\n    /// @param data Arbitrary data to pass to the `onMorphoFlashLoan` callback.\\n    function flashLoan(address token, uint256 assets, bytes calldata data) external;\\n}\\n\\n/// @title IMorphoFlashLoanCallback\\n/// @notice Interface that users willing to use `flashLoan`'s callback must implement.\\ninterface IMorphoFlashLoanCallback {\\n    /// @notice Callback called when a flash loan occurs.\\n    /// @param assets The amount of assets that was flash loaned.\\n    /// @param data Arbitrary data passed to the `flashLoan` function.\\n    function onMorphoFlashLoan(uint256 assets, bytes calldata data) external;\\n}\\n\\n/// @notice Library for computing Morpho Blue market IDs\\nlibrary MorphoLib {\\n    /// @notice Compute the market ID from market params\\n    function id(MarketParams memory params) internal pure returns (bytes32) {\\n        return keccak256(abi.encode(params));\\n    }\\n}\\n\\n\",\"keccak256\":\"0x7f96e16bf077fee48200f7f68a77421daed157a7a36a1f2743c3a4892cf861b5\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x608034608357601f612eee38819003918201601f19168301916001600160401b03831184841017608757808492602094604052833981010312608357516001600160a01b0381169081900360835780156074575f80546001600160a01b031916919091179055604051612e52908161009c8239f35b63d92e233d60e01b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe60806040526004361015610011575f80fd5b5f3560e01c80630794e503146114d15780630bb5e4a81461146d5780630ee90783146114515780630ff219cc146113cd578063168be4db1461136b57806318b0933d146112e05780631a78ccc1146112be57806324a35ff2146112435780633131489f1461122157806332139496146111ff57806332801a0d1461111e57806337594ea1146110985780633872bbd11461106c57806339199bfb14610ff957806359407d6f14610fd55780635b29bdfe14610f5f57806362d068c414610eeb57806364971cfa14610e855780636812cc5d14610df35780636f61dc1114610d49578063755b0ea914610caf57806376e10cba14610c7457806377ba651014610c025780637ad4005114610b9c5780638da5cb5b14610b755780638ea6b12714610b4e57806390359bcc14610b2c5780639152cfd114610af45780639680b446146109fc57806399fec7a0146109da5780639aa743e4146109b25780639de7308514610996578063a389d4c2146107c1578063a6a1f1621461073a578063a6b6f7a014610711578063b626e7661461069e578063c2c3215d14610536578063c54a8af714610486578063d016e72714610457578063d66eb92d14610348578063d76b12601461030f578063db236a1f146102545763f2fde38b146101f2575f80fd5b346102505760203660031901126102505761020b6114ed565b5f5490610222336001600160a01b03841614612a67565b6001600160a01b0316908115610241576001600160a01b031916175f55005b63d92e233d60e01b5f5260045ffd5b5f80fd5b34610250576020366003190112610250576004356001600160401b03811161025057366023820112156102505760048101356001600160401b0381116102fb57604051906102ac601f8201601f191660200183611617565b80825260208201903660248286010111610250576020815f92602483970185378401015260405191518091835e600190820190815281900382019020546040516001600160a01b039091168152f35b634e487b7160e01b5f52604160045260245ffd5b3461025057366003190160e081126102505760a01361025057602061033e610335611519565b60c43590612bbb565b6040519015158152f35b34610250576060366003190112610250576103616114ed565b610369611503565b9060443560ff81168103610250576040516732bab632b916bb1960c11b81526001600882015260289020546001600160a01b03168015610421576103c793602093604051958694859384936348ca991560e11b855260048501612632565b03915afa8015610416575f906103e3575b602090604051908152f35b506020813d60201161040e575b816103fd60209383611617565b8101031261025057602090516103d8565b3d91506103f0565b6040513d5f823e3d90fd5b604051630c54731360e01b815260206004820152600860248201526732bab632b916bb1960c11b604482015280606481015b0390fd5b3461025057606036600319011261025057602061033e6104756114ed565b61047d611503565b60443591612b04565b34610250576040366003190112610250576004356001600160401b038111610250576104b6903690600401611543565b6104be611503565b6104d260018060a01b035f54163314612a67565b6001600160a01b0316918215610241575f516020612dfd5f395f51905f52916020916040518282823760018382019081528190038401902080546001600160a01b031916861790556040519182918190833781015f815203902092604051908152a2005b34610250576040366003190112610250576004356001600160401b038111610250576105669036906004016115e7565b6024356001600160401b038111610250576105859036906004016115e7565b9261059a60018060a01b035f54163314612a67565b838303610667575f5b8381106105ac57005b6001600160a01b036105c76105c2838887612a9f565b612aaf565b161561024157806105de6105c26001938887612a9f565b60206105eb838887612ac3565b919082604051938492833781018681520301902090838060a01b0316838060a01b031982541617905560205f516020612dfd5f395f51905f5261062f838887612ac3565b6106406105c2868c8b979597612a9f565b9381604051928392833781015f81520390209260405190868060a01b03168152a2016105a3565b60405162461bcd60e51b815260206004820152600f60248201526e098cadccee8d040dad2e6dac2e8c6d608b1b6044820152606490fd5b34610250576040366003190112610250576106b76114ed565b6106bf611503565b6040516732bab632b916bb1960c11b81526001600882015260289020546001600160a01b03169190821561042157604051635ab55e5b60e11b8152926020928492839182916103c7916004840161167d565b34610250576040366003190112610250576020610732602435600435612a36565b604051908152f35b34610250576020366003190112610250576107536114ed565b6040516732bab632b916bb1960c11b81526001600882015260289020546001600160a01b03169081156104215760405163288f7ccf60e21b81526001600160a01b03909116600482015290602090829060249082905afa8015610416575f906103e357602090604051908152f35b34610250576020366003190112610250576004356001600160401b038111610250576107f19036906004016115e7565b9060405166616176652d763360c81b815260016007820152602760018060a01b03912054169081156109665760405163053c81b560e01b8152602060048201526024810184905292839160448301915f5b818110610938575050509181805f9403915afa908115610416575f916108a8575b506040518091602082016020835281518091526020604084019201905f5b81811061088f575050500390f35b8251845285945060209384019390920191600101610881565b90503d805f833e6108b98183611617565b810190602081830312610250578051906001600160401b03821161025057019080601f830112156102505781516108ef816117a1565b926108fd6040519485611617565b81845260208085019260051b82010192831161025057602001905b8282106109285750505081610863565b8151815260209182019101610918565b9193509160019060209081906001600160a01b036109558861152f565b168152019401910191859392610842565b604051630c54731360e01b8152602060048201526007602482015266616176652d763360c81b6044820152606490fd5b346102505760206107326109a936611570565b9291909161288a565b346102505760406109ce6109c536611570565b92919091612656565b82519182526020820152f35b34610250575f36600319011261025057604051633028125760e01b8152602090f35b3461025057366003190160c081126102505760a01361025057610a1d611519565b6040516a6d6f7270686f2d626c756560a81b81526001600b820152602b9020546001600160a01b03168015610ac057610a6d916040918251808095819463025f7ec160e01b835260048301612478565b03915afa908115610416576040915f915f91610a91575b5082519182526020820152f35b9050610ab39150823d8411610ab9575b610aab8183611617565b810190611f2e565b83610a84565b503d610aa1565b604051630c54731360e01b815260206004820152600b60248201526a6d6f7270686f2d626c756560a81b6044820152606490fd5b346102505760c0366003190112610250576020610732610b126115d7565b610b1a6115c7565b90606435604435602435600435612593565b34610250575f36600319011261025057604051633c724fef60e11b8152602090f35b3461025057604036600319011261025057602061033e610b6c6114ed565b602435906124a5565b34610250575f366003190112610250575f546040516001600160a01b039091168152602090f35b3461025057602036600319011261025057610bb56114ed565b60405166616176652d763360c81b81526001600782015260279020546001600160a01b03168015610966576103c7916020916040518080958194630951afe960e41b835260048301611664565b3461025057366003190160c081126102505760a01361025057610c23611519565b6040516a6d6f7270686f2d626c756560a81b81526001600b820152602b9020546001600160a01b03168015610ac0576103c7916020916040518080958194631f1d38c760e11b835260048301612478565b346102505760a03660031901126102505760643560ff8116810361025057610732602091610ca06115d7565b90604435602435600435612400565b3461025057610100366003190112610250576004356001600160e01b03198116810361025057606435906001600160a01b038216820361025057608435916001600160a01b038316830361025057610d056115c7565b9160c43560ff811681036102505760e435936001600160401b03851161025057602095610d39610732963690600401611543565b9590946044359060243590612092565b3461025057604036600319011261025057610d626114ed565b610d6a611503565b6040516a636f6d706f756e642d763360a81b81526001600b820152602b9020546001600160a01b031691908215610dbf57604051630951afe960e41b8152926020928492839182916103c7916004840161167d565b604051630c54731360e01b815260206004820152600b60248201526a636f6d706f756e642d763360a81b6044820152606490fd5b3461025057602036600319011261025057610e0c6114ed565b6040516476656e757360d81b81526001600582015260259020546001600160a01b03168015610e57576103c7916020916040518080958194633b9025c560e01b835260048301611664565b604051630c54731360e01b815260206004820152600560248201526476656e757360d81b6044820152606490fd5b3461025057602036600319011261025057610e9e6114ed565b60405166616176652d763360c81b81526001600782015260279020546001600160a01b03168015610966576103c7916020916040518080958194633b9025c560e01b835260048301611664565b3461025057604036600319011261025057610f046114ed565b610f0c611503565b6040516a636f6d706f756e642d763360a81b81526001600b820152602b9020546001600160a01b031691908215610dbf57610a6d9260409283518095819482936377b57b0760e01b84526004840161167d565b3461025057604036600319011261025057610f786114ed565b610f80611503565b6040516a636f6d706f756e642d763360a81b81526001600b820152602b9020546001600160a01b031691908215610dbf57604051633b9025c560e01b8152926020928492839182916103c7916004840161167d565b34610250576060366003190112610250576020610732604435602435600435611fdd565b34610250576040366003190112610250576110126114ed565b61101a611503565b6040516732bab632b916bb1960c11b81526001600882015260289020546001600160a01b03169190821561042157604051631d6a900960e31b8152926020928492839182916103c7916004840161167d565b3461025057604036600319011261025057602061073261108a6114ed565b611092611503565b90611f72565b34610250576020366003190112610250576110b16114ed565b60405166616176652d763360c81b81526001600782015260279020546001600160a01b03169081156109665760405163b3596f0760e01b81526001600160a01b03909116600482015290602090829060249082905afa8015610416575f906103e357602090604051908152f35b34610250576020366003190112610250576111376114ed565b60405166616176652d763360c81b81526001600782015260279020546001600160a01b031690811561096657604051632fe4a15f60e21b81526001600160a01b0390911660048201529060c090829060249082905afa9081156104165760c0915f915f5f5f915f935f956111c8575b50604051958652602086015260408501526060840152608083015260a0820152f35b9450505050506111ee9150823d84116111f8575b6111e68183611617565b810190611f44565b93909290876111a6565b503d6111dc565b34610250575f3660031901126102505760405163bbbf88eb60e01b8152602090f35b34610250575f36600319011261025057604051633af167ff60e01b8152602090f35b346102505760a0366003190112610250576040516a6d6f7270686f2d626c756560a81b81526001600b820152602b9020546001600160a01b03168015610ac057602060a49160405192838092636ac0c36b60e11b82526112a560048301611e51565b5afa8015610416575f906103e357602090604051908152f35b34610250575f366003190112610250576040516308ee5f0360e31b8152602090f35b34610250576020366003190112610250576112f96114ed565b6040516476656e757360d81b81526001600582015260259020546001600160a01b0316908115610e575760408051632fe4a15f60e21b81526001600160a01b0390921660048301529091829060249082905afa908115610416576040915f915f91610a91575082519182526020820152f35b346102505760a0366003190112610250576040516a6d6f7270686f2d626c756560a81b81526001600b820152602b9020546001600160a01b03168015610ac057602060a49160405192838092632725131160e01b82526112a560048301611e51565b34610250576020366003190112610250576113e66114ed565b6040516476656e757360d81b81526001600582015260259020546001600160a01b0316908115610e5757604051639f91846160e01b81526001600160a01b03909116600482015290602090829060249082905afa8015610416575f906103e357602090604051908152f35b3461025057602061073261146436611570565b92919091611daf565b34610250576020366003190112610250576114866114ed565b6040516476656e757360d81b81526001600582015260259020546001600160a01b03168015610e57576103c7916020916040518080958194630951afe960e41b835260048301611664565b346102505760206107326114e436611570565b929190916118d9565b600435906001600160a01b038216820361025057565b602435906001600160a01b038216820361025057565b60a435906001600160a01b038216820361025057565b35906001600160a01b038216820361025057565b9181601f84011215610250578235916001600160401b038311610250576020838186019501011161025057565b6060600319820112610250576004356001600160e01b03198116810361025057916024356001600160a01b03811681036102505791604435906001600160401b038211610250576115c391600401611543565b9091565b60a4359060ff8216820361025057565b6084359060ff8216820361025057565b9181601f84011215610250578235916001600160401b038311610250576020808501948460051b01011161025057565b601f909101601f19168101906001600160401b038211908210176102fb57604052565b602060409281835280519182918282860152018484015e5f828201840152601f01601f1916010190565b5f81526001600160a01b03909116602082015260400190565b6001600160a01b0391821681529116602082015260400190565b908160a0910312610250576040519060a08201906001600160401b038211838310176102fb576080916040526116cc8161152f565b83526116da6020820161152f565b60208401526116eb6040820161152f565b60408401526116fc6060820161152f565b60608401520135608082015290565b80516001600160a01b03908116835260208083015182169084015260408083015182169084015260608083015190911690830152608090810151910152565b61ffff16604d811161175c57600a0a90565b634e487b7160e01b5f52601160045260245ffd5b8181029291811591840414171561175c57565b811561178d570490565b634e487b7160e01b5f52601260045260245ffd5b6001600160401b0381116102fb5760051b60200190565b9091606082840312610250576117cd8261152f565b9260208301356001600160401b0381116102505783019080601f830112156102505781356117fa816117a1565b926118086040519485611617565b81845260208085019260051b82010192831161025057602001905b8282106118405750505060409092013560ff811681036102505790565b6020809161184d8461152f565b815201910190611823565b9081602091031261025057516001600160a01b03811681036102505790565b90816020910312610250575160ff811681036102505790565b60ff166008039060ff821161175c57565b60ff6007199116019060ff821161175c57565b9060ff8091169116039060ff821161175c57565b60ff16604d811161175c57600a0a90565b91906118e483612c77565b9260405184518060208701835e60019082019081528190036020019020546001600160a01b0316938415611d9257506001600160e01b03191663bbbf88eb60e01b8114611d5457633af167ff60e01b8114611cb5576308ee5f0360e31b8114611c4857633028125760e01b8114611b27575b633c724fef60e11b1461196f57505050506305f5e10090565b611981826119a89560209401906117b8565b505060018060a01b0316926040518080968194631d6a900960e31b8352876004840161167d565b03915afa918215610416575f92611af3575b508115611aed57602060049160405192838092630fa0ccd960e21b82525afa908115610416575f91611abe575b506012906001600160a01b038116908115159081611ab3575b50611a54575b5060ff81166008811115611a33575090611a2a611a25611a30936118a1565b6118c8565b90611783565b90565b600811611a3e575090565b90611a4e611a25611a3093611890565b90611770565b60206004916040519283809263313ce56760e01b82525afa5f9181611a82575b5015611a065790505f611a06565b611aa591925060203d602011611aac575b611a9d8183611617565b810190611877565b905f611a74565b503d611a93565b90503b15155f611a00565b611ae0915060203d602011611ae6575b611ad88183611617565b810190611858565b5f6119e7565b503d611ace565b50505f90565b9091506020813d602011611b1f575b81611b0f60209383611617565b810103126102505751905f6119ba565b3d9150611b02565b611b3385840184611697565b604051632725131160e01b815290611b4e600483018261170b565b60208260a481895afa918215610416575f92611c14575b5081611b72575050611956565b9450945050505060ff611ba4611b9060018060a01b03845116612da5565b6020909301516001600160a01b0316612da5565b911660010b601c0190617fff198212617fff83131761175c5760ff1660010b9060010b0390617fff8213617fff1983121761175c57600182900b5f8112611bf65750611a2a611a309261ffff1661174a565b9150617fff19821461175c57611a4e611a30925f0361ffff1661174a565b9091506020813d602011611c40575b81611c3060209383611617565b810103126102505751905f611b65565b3d9150611c23565b50604051639f91846160e01b81526001600160a01b039091166004820152925060209183915060249082905afa908115610416575f91611c86575090565b90506020813d602011611cad575b81611ca160209383611617565b81010312610250575190565b3d9150611c94565b5091928160209181010312610250576001600160a01b0390611cd69061152f565b166001600160a01b038216808214611d235750604051630f2dbd0760e41b815292602092849283918291611d0e91906004840161167d565b03915afa908115610416575f91611c86575090565b9050602091506024604051809481936341976e0960e01b835260048301525afa908115610416575f91611c86575090565b5060405163b3596f0760e01b81526001600160a01b039091166004820152925060209183915060249082905afa908115610416575f91611c86575090565b604051630c54731360e01b8152908190610453906004830161163a565b9190611dba83612c77565b9260405184518060208701835e60019082019081528190036020019020546001600160a01b0316938415611d9257506001600160e01b03191663bbbf88eb60e01b8114611d5457633af167ff60e01b8114611cb5576308ee5f0360e31b8114611c4857633028125760e01b8114611e4457633c724fef60e11b1461196f57505050506305f5e10090565b50505050506305f5e10090565b6004356001600160a01b038116908190036102505781526024356001600160a01b038116908190036102505760208201526044356001600160a01b038116908190036102505760408201526064356001600160a01b038116908190036102505760608201526080608435910152565b60809081906001600160a01b03611ed68261152f565b1684526001600160a01b03611eed6020830161152f565b1660208501526001600160a01b03611f076040830161152f565b1660408501526001600160a01b03611f216060830161152f565b1660608501520135910152565b9190826040910312610250576020825192015190565b91908260c09103126102505781519160208101519160408201519160608101519160a0608083015192015190565b6040516a636f6d706f756e642d763360a81b81526001600b820152602b9020546001600160a01b031691908215610dbf576001600160a01b038281169082168114611d235750604051630f2dbd0760e41b815292602092849283918291611d0e91906004840161167d565b90918015612020576a0c097ce7bc90715b34b9f160241b91611fff9190611770565b04906127100390612710821161175c576127109161201c91611770565b0490565b5050505f90565b805182101561203b5760209160051b010190565b634e487b7160e01b5f52603260045260245ffd5b9284926080959263ffffffff60e01b16855260018060a01b0316602085015260606040850152816060850152848401375f828201840152601f01601f1916010190565b979192979390936120a281612c77565b60405181518060208401835e60019082019081528190036020019020546001600160a01b0316908115611d9257506001600160e01b03198216633028125760e01b811461237557633c724fef60e11b1461222657506020888495969798999a6121206040519687938493630794e50360e01b8552876004860161204f565b0381305afa928315610416575f936121f0575b50612156602093946040519a8b948594630ee9078360e01b86526004860161204f565b0381305afa958615610416575f966121bc575b5080158080156121b4575b6121a957670de0b6b3a76400008202918204670de0b6b3a764000014171561175c57611a30956121a391611783565b91612400565b505050505050505f90565b508615612174565b9095506020813d6020116121e8575b816121d860209383611617565b810103126102505751945f612169565b3d91506121cb565b92506020833d60201161221e575b8161220b60209383611617565b8101031261025057915191612156612133565b3d91506121fe565b97612236938101925090506117b8565b505f975f5b8251811015612367576001600160a01b036122568285612027565b51604051631953acf960e31b8152911660048201526020816024818d5afa908115610416575f91612349575b506001600160a01b0383811691161461229d5760010161223b565b90506122b891929394959697985060018060a01b0392612027565b51165b6001600160a01b038116156121a957604051635ab55e5b60e11b8152966020928892839182916122f7916001600160a01b03166004840161167d565b03915afa918215610416575f92612313575b611a309550612400565b91506020853d602011612341575b8161232e60209383611617565b8101031261025057611a30945191612309565b3d9150612321565b612361915060203d8111611ae657611ad88183611617565b5f612282565b5050509091929394956122bb565b509850505060a49194506020935085612394916123b094970190611697565b604051632725131160e01b81529687938492600484019061170b565b5afa918215610416575f926123ca575b611a309350611fdd565b91506020833d6020116123f8575b816123e560209383611617565b8101031261025057611a309251916123c0565b3d91506123d8565b93919093811561246f57670de0b6b3a76400009161241d91611770565b049060ff8381169082161061245957611a2561243c93611a4e926118b4565b905b6127100390612710821161175c576127109161201c91611770565b611a25611a2a91612469946118b4565b9061243e565b50505050505f90565b60c08101929160a09061248c836004611ec0565b600180831b0316910152565b9190820180921161175c57565b60405163324b8e7d60e11b81526001600160a01b039091166004820181905291602082602481305afa918215610416575f9261255f575b5060405192637ad4005160e01b84526004840152602083602481305afa928315610416575f9361252b575b5081158015612523575b6120205761251e91612498565b101590565b508215612511565b9092506020813d602011612557575b8161254760209383611617565b810103126102505751915f612507565b3d915061253a565b9091506020813d60201161258b575b8161257b60209383611617565b810103126102505751905f6124dc565b3d915061256e565b94929193908415808015612616575b6121a957670de0b6b3a76400008602958604670de0b6b3a764000014171561175c576125d260ff95938694611783565b9060405196633b70865d60e11b885260048801526024870152604486015216606484015216608482015260208160a481305afa908115610416575f91611c86575090565b5083156125a2565b90929160a09061248c8360c081019661170b565b6001600160a01b0391821681529116602082015260ff909116604082015260600190565b909193929361266482612c77565b9160405183518060208601835e60019082019081528190036020019020546001600160a01b0316928315611d9257506001600160e01b0319169463bbbf88eb60e01b861461282257633af167ff60e01b86146127db57633028125760e01b86146127aa576308ee5f0360e31b861461276a57633c724fef60e11b86146126f75785631f629a1b60e11b5f5260045260245ffd5b61273695508161270d91604095949301906117b8565b8551631a3c41d360e01b815297889586948594509192916001600160a01b031660048501612632565b03915afa918215610416575f905f9361274e57509190565b90506115c391925060403d604011610ab957610aab8183611617565b505060408051632fe4a15f60e21b81526001600160a01b039093166004840152919350839060249082905afa918215610416575f905f9361274e57509190565b6127369550816127c09160409594930190611697565b835180968194829363025f7ec160e01b84526004840161261e565b8193929550906020918101031261025057612736936040926001600160a01b03906128059061152f565b84516377b57b0760e01b815296879485938493166004840161167d565b5050604051632fe4a15f60e21b81526001600160a01b03909216600483015290925060c090839060249082905afa918215610416575f905f9361286457509190565b905061288091925060c03d60c0116111f8576111e68183611617565b5050505091909190565b909193929361289882612c77565b9160405183518060208601835e60019082019081528190036020019020546001600160a01b0316928315611d9257506001600160e01b0319169463bbbf88eb60e01b8614612a0f57633af167ff60e01b86146129c657633028125760e01b861461299357633c724fef60e11b86146129525750506308ee5f0360e31b841461292d5783631f629a1b60e11b5f5260045260245ffd5b611d0e929350906020916040518080958194633b9025c560e01b835260048301611664565b611d0e9495508161296991602095949301906117b8565b6040516348ca991560e11b815296879586948594509192916001600160a01b031660048501612632565b611d0e949550816129aa9160209594930190611697565b604051809581948293631f1d38c760e11b84526004840161261e565b819392949550906020918101031261025057611d0e926020926001600160a01b03906129f19061152f565b604051633b9025c560e01b815295869485938493166004840161167d565b5050611d0e929350906020916040518080958194633b9025c560e01b835260048301611664565b908015611aed57670de0b6b3a7640000820291808304670de0b6b3a7640000149015171561175c57611a3091611783565b15612a6e57565b60405162461bcd60e51b81526020600482015260096024820152682737ba1037bbb732b960b91b6044820152606490fd5b919081101561203b5760051b0190565b356001600160a01b03811681036102505790565b919081101561203b5760051b81013590601e19813603018212156102505701803591906001600160401b038311610250576020018236038113610250579190565b604051632d94deff60e11b815291929060208380612b2687856004840161167d565b0381305afa928315610416575f93612b85575b50604051636f61dc1160e01b81529360209185918291612b5d91906004840161167d565b0381305afa928315610416575f9361252b575081158015612523576120205761251e91612498565b9092506020813d602011612bb3575b81612ba160209383611617565b81010312610250575191612b5d612b39565b3d9150612b94565b60405163077ba65160e41b815290612bd7600480840190611ec0565b6001600160a01b031660a482015260208160c481305afa908115610416575f91612c45575b50604051631251aff960e11b815291612c19600480850190611ec0565b60208360a481305afa928315610416575f9361252b575081158015612523576120205761251e91612498565b90506020813d602011612c6f575b81612c6060209383611617565b8101031261025057515f612bfc565b3d9150612c53565b6001600160e01b0319169063bbbf88eb60e01b8214612d7e57633af167ff60e01b8214612d5357633028125760e01b8214612d2857633c724fef60e11b8214612d00576308ee5f0360e31b8214612cdb5750631f629a1b60e11b5f5260045260245ffd5b9050604051612ceb604082611617565b600581526476656e757360d81b602082015290565b9050604051612d10604082611617565b600881526732bab632b916bb1960c11b602082015290565b9050604051612d38604082611617565b600b81526a6d6f7270686f2d626c756560a81b602082015290565b9050604051612d63604082611617565b600b81526a636f6d706f756e642d763360a81b602082015290565b9050604051612d8e604082611617565b6007815266616176652d763360c81b602082015290565b60405163313ce56760e01b815290602090829060049082906001600160a01b03165afa5f9181612ddb575b50611a305750601290565b612df591925060203d602011611aac57611a9d8183611617565b905f612dd056febb3e5184c1abd837fdef964aa5dd5330db9956e5956074319da71072fb072d92a264697066735822122049a36330054561665beec37afd1047e8d23c63df34e0eecc23f0f113654e168364736f6c634300081e0033",
+  "deployedBytecode": "0x60806040526004361015610011575f80fd5b5f3560e01c80630794e503146114d15780630bb5e4a81461146d5780630ee90783146114515780630ff219cc146113cd578063168be4db1461136b57806318b0933d146112e05780631a78ccc1146112be57806324a35ff2146112435780633131489f1461122157806332139496146111ff57806332801a0d1461111e57806337594ea1146110985780633872bbd11461106c57806339199bfb14610ff957806359407d6f14610fd55780635b29bdfe14610f5f57806362d068c414610eeb57806364971cfa14610e855780636812cc5d14610df35780636f61dc1114610d49578063755b0ea914610caf57806376e10cba14610c7457806377ba651014610c025780637ad4005114610b9c5780638da5cb5b14610b755780638ea6b12714610b4e57806390359bcc14610b2c5780639152cfd114610af45780639680b446146109fc57806399fec7a0146109da5780639aa743e4146109b25780639de7308514610996578063a389d4c2146107c1578063a6a1f1621461073a578063a6b6f7a014610711578063b626e7661461069e578063c2c3215d14610536578063c54a8af714610486578063d016e72714610457578063d66eb92d14610348578063d76b12601461030f578063db236a1f146102545763f2fde38b146101f2575f80fd5b346102505760203660031901126102505761020b6114ed565b5f5490610222336001600160a01b03841614612a67565b6001600160a01b0316908115610241576001600160a01b031916175f55005b63d92e233d60e01b5f5260045ffd5b5f80fd5b34610250576020366003190112610250576004356001600160401b03811161025057366023820112156102505760048101356001600160401b0381116102fb57604051906102ac601f8201601f191660200183611617565b80825260208201903660248286010111610250576020815f92602483970185378401015260405191518091835e600190820190815281900382019020546040516001600160a01b039091168152f35b634e487b7160e01b5f52604160045260245ffd5b3461025057366003190160e081126102505760a01361025057602061033e610335611519565b60c43590612bbb565b6040519015158152f35b34610250576060366003190112610250576103616114ed565b610369611503565b9060443560ff81168103610250576040516732bab632b916bb1960c11b81526001600882015260289020546001600160a01b03168015610421576103c793602093604051958694859384936348ca991560e11b855260048501612632565b03915afa8015610416575f906103e3575b602090604051908152f35b506020813d60201161040e575b816103fd60209383611617565b8101031261025057602090516103d8565b3d91506103f0565b6040513d5f823e3d90fd5b604051630c54731360e01b815260206004820152600860248201526732bab632b916bb1960c11b604482015280606481015b0390fd5b3461025057606036600319011261025057602061033e6104756114ed565b61047d611503565b60443591612b04565b34610250576040366003190112610250576004356001600160401b038111610250576104b6903690600401611543565b6104be611503565b6104d260018060a01b035f54163314612a67565b6001600160a01b0316918215610241575f516020612dfd5f395f51905f52916020916040518282823760018382019081528190038401902080546001600160a01b031916861790556040519182918190833781015f815203902092604051908152a2005b34610250576040366003190112610250576004356001600160401b038111610250576105669036906004016115e7565b6024356001600160401b038111610250576105859036906004016115e7565b9261059a60018060a01b035f54163314612a67565b838303610667575f5b8381106105ac57005b6001600160a01b036105c76105c2838887612a9f565b612aaf565b161561024157806105de6105c26001938887612a9f565b60206105eb838887612ac3565b919082604051938492833781018681520301902090838060a01b0316838060a01b031982541617905560205f516020612dfd5f395f51905f5261062f838887612ac3565b6106406105c2868c8b979597612a9f565b9381604051928392833781015f81520390209260405190868060a01b03168152a2016105a3565b60405162461bcd60e51b815260206004820152600f60248201526e098cadccee8d040dad2e6dac2e8c6d608b1b6044820152606490fd5b34610250576040366003190112610250576106b76114ed565b6106bf611503565b6040516732bab632b916bb1960c11b81526001600882015260289020546001600160a01b03169190821561042157604051635ab55e5b60e11b8152926020928492839182916103c7916004840161167d565b34610250576040366003190112610250576020610732602435600435612a36565b604051908152f35b34610250576020366003190112610250576107536114ed565b6040516732bab632b916bb1960c11b81526001600882015260289020546001600160a01b03169081156104215760405163288f7ccf60e21b81526001600160a01b03909116600482015290602090829060249082905afa8015610416575f906103e357602090604051908152f35b34610250576020366003190112610250576004356001600160401b038111610250576107f19036906004016115e7565b9060405166616176652d763360c81b815260016007820152602760018060a01b03912054169081156109665760405163053c81b560e01b8152602060048201526024810184905292839160448301915f5b818110610938575050509181805f9403915afa908115610416575f916108a8575b506040518091602082016020835281518091526020604084019201905f5b81811061088f575050500390f35b8251845285945060209384019390920191600101610881565b90503d805f833e6108b98183611617565b810190602081830312610250578051906001600160401b03821161025057019080601f830112156102505781516108ef816117a1565b926108fd6040519485611617565b81845260208085019260051b82010192831161025057602001905b8282106109285750505081610863565b8151815260209182019101610918565b9193509160019060209081906001600160a01b036109558861152f565b168152019401910191859392610842565b604051630c54731360e01b8152602060048201526007602482015266616176652d763360c81b6044820152606490fd5b346102505760206107326109a936611570565b9291909161288a565b346102505760406109ce6109c536611570565b92919091612656565b82519182526020820152f35b34610250575f36600319011261025057604051633028125760e01b8152602090f35b3461025057366003190160c081126102505760a01361025057610a1d611519565b6040516a6d6f7270686f2d626c756560a81b81526001600b820152602b9020546001600160a01b03168015610ac057610a6d916040918251808095819463025f7ec160e01b835260048301612478565b03915afa908115610416576040915f915f91610a91575b5082519182526020820152f35b9050610ab39150823d8411610ab9575b610aab8183611617565b810190611f2e565b83610a84565b503d610aa1565b604051630c54731360e01b815260206004820152600b60248201526a6d6f7270686f2d626c756560a81b6044820152606490fd5b346102505760c0366003190112610250576020610732610b126115d7565b610b1a6115c7565b90606435604435602435600435612593565b34610250575f36600319011261025057604051633c724fef60e11b8152602090f35b3461025057604036600319011261025057602061033e610b6c6114ed565b602435906124a5565b34610250575f366003190112610250575f546040516001600160a01b039091168152602090f35b3461025057602036600319011261025057610bb56114ed565b60405166616176652d763360c81b81526001600782015260279020546001600160a01b03168015610966576103c7916020916040518080958194630951afe960e41b835260048301611664565b3461025057366003190160c081126102505760a01361025057610c23611519565b6040516a6d6f7270686f2d626c756560a81b81526001600b820152602b9020546001600160a01b03168015610ac0576103c7916020916040518080958194631f1d38c760e11b835260048301612478565b346102505760a03660031901126102505760643560ff8116810361025057610732602091610ca06115d7565b90604435602435600435612400565b3461025057610100366003190112610250576004356001600160e01b03198116810361025057606435906001600160a01b038216820361025057608435916001600160a01b038316830361025057610d056115c7565b9160c43560ff811681036102505760e435936001600160401b03851161025057602095610d39610732963690600401611543565b9590946044359060243590612092565b3461025057604036600319011261025057610d626114ed565b610d6a611503565b6040516a636f6d706f756e642d763360a81b81526001600b820152602b9020546001600160a01b031691908215610dbf57604051630951afe960e41b8152926020928492839182916103c7916004840161167d565b604051630c54731360e01b815260206004820152600b60248201526a636f6d706f756e642d763360a81b6044820152606490fd5b3461025057602036600319011261025057610e0c6114ed565b6040516476656e757360d81b81526001600582015260259020546001600160a01b03168015610e57576103c7916020916040518080958194633b9025c560e01b835260048301611664565b604051630c54731360e01b815260206004820152600560248201526476656e757360d81b6044820152606490fd5b3461025057602036600319011261025057610e9e6114ed565b60405166616176652d763360c81b81526001600782015260279020546001600160a01b03168015610966576103c7916020916040518080958194633b9025c560e01b835260048301611664565b3461025057604036600319011261025057610f046114ed565b610f0c611503565b6040516a636f6d706f756e642d763360a81b81526001600b820152602b9020546001600160a01b031691908215610dbf57610a6d9260409283518095819482936377b57b0760e01b84526004840161167d565b3461025057604036600319011261025057610f786114ed565b610f80611503565b6040516a636f6d706f756e642d763360a81b81526001600b820152602b9020546001600160a01b031691908215610dbf57604051633b9025c560e01b8152926020928492839182916103c7916004840161167d565b34610250576060366003190112610250576020610732604435602435600435611fdd565b34610250576040366003190112610250576110126114ed565b61101a611503565b6040516732bab632b916bb1960c11b81526001600882015260289020546001600160a01b03169190821561042157604051631d6a900960e31b8152926020928492839182916103c7916004840161167d565b3461025057604036600319011261025057602061073261108a6114ed565b611092611503565b90611f72565b34610250576020366003190112610250576110b16114ed565b60405166616176652d763360c81b81526001600782015260279020546001600160a01b03169081156109665760405163b3596f0760e01b81526001600160a01b03909116600482015290602090829060249082905afa8015610416575f906103e357602090604051908152f35b34610250576020366003190112610250576111376114ed565b60405166616176652d763360c81b81526001600782015260279020546001600160a01b031690811561096657604051632fe4a15f60e21b81526001600160a01b0390911660048201529060c090829060249082905afa9081156104165760c0915f915f5f5f915f935f956111c8575b50604051958652602086015260408501526060840152608083015260a0820152f35b9450505050506111ee9150823d84116111f8575b6111e68183611617565b810190611f44565b93909290876111a6565b503d6111dc565b34610250575f3660031901126102505760405163bbbf88eb60e01b8152602090f35b34610250575f36600319011261025057604051633af167ff60e01b8152602090f35b346102505760a0366003190112610250576040516a6d6f7270686f2d626c756560a81b81526001600b820152602b9020546001600160a01b03168015610ac057602060a49160405192838092636ac0c36b60e11b82526112a560048301611e51565b5afa8015610416575f906103e357602090604051908152f35b34610250575f366003190112610250576040516308ee5f0360e31b8152602090f35b34610250576020366003190112610250576112f96114ed565b6040516476656e757360d81b81526001600582015260259020546001600160a01b0316908115610e575760408051632fe4a15f60e21b81526001600160a01b0390921660048301529091829060249082905afa908115610416576040915f915f91610a91575082519182526020820152f35b346102505760a0366003190112610250576040516a6d6f7270686f2d626c756560a81b81526001600b820152602b9020546001600160a01b03168015610ac057602060a49160405192838092632725131160e01b82526112a560048301611e51565b34610250576020366003190112610250576113e66114ed565b6040516476656e757360d81b81526001600582015260259020546001600160a01b0316908115610e5757604051639f91846160e01b81526001600160a01b03909116600482015290602090829060249082905afa8015610416575f906103e357602090604051908152f35b3461025057602061073261146436611570565b92919091611daf565b34610250576020366003190112610250576114866114ed565b6040516476656e757360d81b81526001600582015260259020546001600160a01b03168015610e57576103c7916020916040518080958194630951afe960e41b835260048301611664565b346102505760206107326114e436611570565b929190916118d9565b600435906001600160a01b038216820361025057565b602435906001600160a01b038216820361025057565b60a435906001600160a01b038216820361025057565b35906001600160a01b038216820361025057565b9181601f84011215610250578235916001600160401b038311610250576020838186019501011161025057565b6060600319820112610250576004356001600160e01b03198116810361025057916024356001600160a01b03811681036102505791604435906001600160401b038211610250576115c391600401611543565b9091565b60a4359060ff8216820361025057565b6084359060ff8216820361025057565b9181601f84011215610250578235916001600160401b038311610250576020808501948460051b01011161025057565b601f909101601f19168101906001600160401b038211908210176102fb57604052565b602060409281835280519182918282860152018484015e5f828201840152601f01601f1916010190565b5f81526001600160a01b03909116602082015260400190565b6001600160a01b0391821681529116602082015260400190565b908160a0910312610250576040519060a08201906001600160401b038211838310176102fb576080916040526116cc8161152f565b83526116da6020820161152f565b60208401526116eb6040820161152f565b60408401526116fc6060820161152f565b60608401520135608082015290565b80516001600160a01b03908116835260208083015182169084015260408083015182169084015260608083015190911690830152608090810151910152565b61ffff16604d811161175c57600a0a90565b634e487b7160e01b5f52601160045260245ffd5b8181029291811591840414171561175c57565b811561178d570490565b634e487b7160e01b5f52601260045260245ffd5b6001600160401b0381116102fb5760051b60200190565b9091606082840312610250576117cd8261152f565b9260208301356001600160401b0381116102505783019080601f830112156102505781356117fa816117a1565b926118086040519485611617565b81845260208085019260051b82010192831161025057602001905b8282106118405750505060409092013560ff811681036102505790565b6020809161184d8461152f565b815201910190611823565b9081602091031261025057516001600160a01b03811681036102505790565b90816020910312610250575160ff811681036102505790565b60ff166008039060ff821161175c57565b60ff6007199116019060ff821161175c57565b9060ff8091169116039060ff821161175c57565b60ff16604d811161175c57600a0a90565b91906118e483612c77565b9260405184518060208701835e60019082019081528190036020019020546001600160a01b0316938415611d9257506001600160e01b03191663bbbf88eb60e01b8114611d5457633af167ff60e01b8114611cb5576308ee5f0360e31b8114611c4857633028125760e01b8114611b27575b633c724fef60e11b1461196f57505050506305f5e10090565b611981826119a89560209401906117b8565b505060018060a01b0316926040518080968194631d6a900960e31b8352876004840161167d565b03915afa918215610416575f92611af3575b508115611aed57602060049160405192838092630fa0ccd960e21b82525afa908115610416575f91611abe575b506012906001600160a01b038116908115159081611ab3575b50611a54575b5060ff81166008811115611a33575090611a2a611a25611a30936118a1565b6118c8565b90611783565b90565b600811611a3e575090565b90611a4e611a25611a3093611890565b90611770565b60206004916040519283809263313ce56760e01b82525afa5f9181611a82575b5015611a065790505f611a06565b611aa591925060203d602011611aac575b611a9d8183611617565b810190611877565b905f611a74565b503d611a93565b90503b15155f611a00565b611ae0915060203d602011611ae6575b611ad88183611617565b810190611858565b5f6119e7565b503d611ace565b50505f90565b9091506020813d602011611b1f575b81611b0f60209383611617565b810103126102505751905f6119ba565b3d9150611b02565b611b3385840184611697565b604051632725131160e01b815290611b4e600483018261170b565b60208260a481895afa918215610416575f92611c14575b5081611b72575050611956565b9450945050505060ff611ba4611b9060018060a01b03845116612da5565b6020909301516001600160a01b0316612da5565b911660010b601c0190617fff198212617fff83131761175c5760ff1660010b9060010b0390617fff8213617fff1983121761175c57600182900b5f8112611bf65750611a2a611a309261ffff1661174a565b9150617fff19821461175c57611a4e611a30925f0361ffff1661174a565b9091506020813d602011611c40575b81611c3060209383611617565b810103126102505751905f611b65565b3d9150611c23565b50604051639f91846160e01b81526001600160a01b039091166004820152925060209183915060249082905afa908115610416575f91611c86575090565b90506020813d602011611cad575b81611ca160209383611617565b81010312610250575190565b3d9150611c94565b5091928160209181010312610250576001600160a01b0390611cd69061152f565b166001600160a01b038216808214611d235750604051630f2dbd0760e41b815292602092849283918291611d0e91906004840161167d565b03915afa908115610416575f91611c86575090565b9050602091506024604051809481936341976e0960e01b835260048301525afa908115610416575f91611c86575090565b5060405163b3596f0760e01b81526001600160a01b039091166004820152925060209183915060249082905afa908115610416575f91611c86575090565b604051630c54731360e01b8152908190610453906004830161163a565b9190611dba83612c77565b9260405184518060208701835e60019082019081528190036020019020546001600160a01b0316938415611d9257506001600160e01b03191663bbbf88eb60e01b8114611d5457633af167ff60e01b8114611cb5576308ee5f0360e31b8114611c4857633028125760e01b8114611e4457633c724fef60e11b1461196f57505050506305f5e10090565b50505050506305f5e10090565b6004356001600160a01b038116908190036102505781526024356001600160a01b038116908190036102505760208201526044356001600160a01b038116908190036102505760408201526064356001600160a01b038116908190036102505760608201526080608435910152565b60809081906001600160a01b03611ed68261152f565b1684526001600160a01b03611eed6020830161152f565b1660208501526001600160a01b03611f076040830161152f565b1660408501526001600160a01b03611f216060830161152f565b1660608501520135910152565b9190826040910312610250576020825192015190565b91908260c09103126102505781519160208101519160408201519160608101519160a0608083015192015190565b6040516a636f6d706f756e642d763360a81b81526001600b820152602b9020546001600160a01b031691908215610dbf576001600160a01b038281169082168114611d235750604051630f2dbd0760e41b815292602092849283918291611d0e91906004840161167d565b90918015612020576a0c097ce7bc90715b34b9f160241b91611fff9190611770565b04906127100390612710821161175c576127109161201c91611770565b0490565b5050505f90565b805182101561203b5760209160051b010190565b634e487b7160e01b5f52603260045260245ffd5b9284926080959263ffffffff60e01b16855260018060a01b0316602085015260606040850152816060850152848401375f828201840152601f01601f1916010190565b979192979390936120a281612c77565b60405181518060208401835e60019082019081528190036020019020546001600160a01b0316908115611d9257506001600160e01b03198216633028125760e01b811461237557633c724fef60e11b1461222657506020888495969798999a6121206040519687938493630794e50360e01b8552876004860161204f565b0381305afa928315610416575f936121f0575b50612156602093946040519a8b948594630ee9078360e01b86526004860161204f565b0381305afa958615610416575f966121bc575b5080158080156121b4575b6121a957670de0b6b3a76400008202918204670de0b6b3a764000014171561175c57611a30956121a391611783565b91612400565b505050505050505f90565b508615612174565b9095506020813d6020116121e8575b816121d860209383611617565b810103126102505751945f612169565b3d91506121cb565b92506020833d60201161221e575b8161220b60209383611617565b8101031261025057915191612156612133565b3d91506121fe565b97612236938101925090506117b8565b505f975f5b8251811015612367576001600160a01b036122568285612027565b51604051631953acf960e31b8152911660048201526020816024818d5afa908115610416575f91612349575b506001600160a01b0383811691161461229d5760010161223b565b90506122b891929394959697985060018060a01b0392612027565b51165b6001600160a01b038116156121a957604051635ab55e5b60e11b8152966020928892839182916122f7916001600160a01b03166004840161167d565b03915afa918215610416575f92612313575b611a309550612400565b91506020853d602011612341575b8161232e60209383611617565b8101031261025057611a30945191612309565b3d9150612321565b612361915060203d8111611ae657611ad88183611617565b5f612282565b5050509091929394956122bb565b509850505060a49194506020935085612394916123b094970190611697565b604051632725131160e01b81529687938492600484019061170b565b5afa918215610416575f926123ca575b611a309350611fdd565b91506020833d6020116123f8575b816123e560209383611617565b8101031261025057611a309251916123c0565b3d91506123d8565b93919093811561246f57670de0b6b3a76400009161241d91611770565b049060ff8381169082161061245957611a2561243c93611a4e926118b4565b905b6127100390612710821161175c576127109161201c91611770565b611a25611a2a91612469946118b4565b9061243e565b50505050505f90565b60c08101929160a09061248c836004611ec0565b600180831b0316910152565b9190820180921161175c57565b60405163324b8e7d60e11b81526001600160a01b039091166004820181905291602082602481305afa918215610416575f9261255f575b5060405192637ad4005160e01b84526004840152602083602481305afa928315610416575f9361252b575b5081158015612523575b6120205761251e91612498565b101590565b508215612511565b9092506020813d602011612557575b8161254760209383611617565b810103126102505751915f612507565b3d915061253a565b9091506020813d60201161258b575b8161257b60209383611617565b810103126102505751905f6124dc565b3d915061256e565b94929193908415808015612616575b6121a957670de0b6b3a76400008602958604670de0b6b3a764000014171561175c576125d260ff95938694611783565b9060405196633b70865d60e11b885260048801526024870152604486015216606484015216608482015260208160a481305afa908115610416575f91611c86575090565b5083156125a2565b90929160a09061248c8360c081019661170b565b6001600160a01b0391821681529116602082015260ff909116604082015260600190565b909193929361266482612c77565b9160405183518060208601835e60019082019081528190036020019020546001600160a01b0316928315611d9257506001600160e01b0319169463bbbf88eb60e01b861461282257633af167ff60e01b86146127db57633028125760e01b86146127aa576308ee5f0360e31b861461276a57633c724fef60e11b86146126f75785631f629a1b60e11b5f5260045260245ffd5b61273695508161270d91604095949301906117b8565b8551631a3c41d360e01b815297889586948594509192916001600160a01b031660048501612632565b03915afa918215610416575f905f9361274e57509190565b90506115c391925060403d604011610ab957610aab8183611617565b505060408051632fe4a15f60e21b81526001600160a01b039093166004840152919350839060249082905afa918215610416575f905f9361274e57509190565b6127369550816127c09160409594930190611697565b835180968194829363025f7ec160e01b84526004840161261e565b8193929550906020918101031261025057612736936040926001600160a01b03906128059061152f565b84516377b57b0760e01b815296879485938493166004840161167d565b5050604051632fe4a15f60e21b81526001600160a01b03909216600483015290925060c090839060249082905afa918215610416575f905f9361286457509190565b905061288091925060c03d60c0116111f8576111e68183611617565b5050505091909190565b909193929361289882612c77565b9160405183518060208601835e60019082019081528190036020019020546001600160a01b0316928315611d9257506001600160e01b0319169463bbbf88eb60e01b8614612a0f57633af167ff60e01b86146129c657633028125760e01b861461299357633c724fef60e11b86146129525750506308ee5f0360e31b841461292d5783631f629a1b60e11b5f5260045260245ffd5b611d0e929350906020916040518080958194633b9025c560e01b835260048301611664565b611d0e9495508161296991602095949301906117b8565b6040516348ca991560e11b815296879586948594509192916001600160a01b031660048501612632565b611d0e949550816129aa9160209594930190611697565b604051809581948293631f1d38c760e11b84526004840161261e565b819392949550906020918101031261025057611d0e926020926001600160a01b03906129f19061152f565b604051633b9025c560e01b815295869485938493166004840161167d565b5050611d0e929350906020916040518080958194633b9025c560e01b835260048301611664565b908015611aed57670de0b6b3a7640000820291808304670de0b6b3a7640000149015171561175c57611a3091611783565b15612a6e57565b60405162461bcd60e51b81526020600482015260096024820152682737ba1037bbb732b960b91b6044820152606490fd5b919081101561203b5760051b0190565b356001600160a01b03811681036102505790565b919081101561203b5760051b81013590601e19813603018212156102505701803591906001600160401b038311610250576020018236038113610250579190565b604051632d94deff60e11b815291929060208380612b2687856004840161167d565b0381305afa928315610416575f93612b85575b50604051636f61dc1160e01b81529360209185918291612b5d91906004840161167d565b0381305afa928315610416575f9361252b575081158015612523576120205761251e91612498565b9092506020813d602011612bb3575b81612ba160209383611617565b81010312610250575191612b5d612b39565b3d9150612b94565b60405163077ba65160e41b815290612bd7600480840190611ec0565b6001600160a01b031660a482015260208160c481305afa908115610416575f91612c45575b50604051631251aff960e11b815291612c19600480850190611ec0565b60208360a481305afa928315610416575f9361252b575081158015612523576120205761251e91612498565b90506020813d602011612c6f575b81612c6060209383611617565b8101031261025057515f612bfc565b3d9150612c53565b6001600160e01b0319169063bbbf88eb60e01b8214612d7e57633af167ff60e01b8214612d5357633028125760e01b8214612d2857633c724fef60e11b8214612d00576308ee5f0360e31b8214612cdb5750631f629a1b60e11b5f5260045260245ffd5b9050604051612ceb604082611617565b600581526476656e757360d81b602082015290565b9050604051612d10604082611617565b600881526732bab632b916bb1960c11b602082015290565b9050604051612d38604082611617565b600b81526a6d6f7270686f2d626c756560a81b602082015290565b9050604051612d63604082611617565b600b81526a636f6d706f756e642d763360a81b602082015290565b9050604051612d8e604082611617565b6007815266616176652d763360c81b602082015290565b60405163313ce56760e01b815290602090829060049082906001600160a01b03165afa5f9181612ddb575b50611a305750601290565b612df591925060203d602011611aac57611a9d8183611617565b905f612dd056febb3e5184c1abd837fdef964aa5dd5330db9956e5956074319da71072fb072d92a264697066735822122049a36330054561665beec37afd1047e8d23c63df34e0eecc23f0f113654e168364736f6c634300081e0033",
+  "devdoc": {
+    "details": "Aggregates gateway view contracts to provide protocol-agnostic LTV queries for ADL Supported protocols:   - \"aave-v3\": Aave V3 (context: empty)   - \"compound-v3\": Compound V3 (context: abi.encode(baseToken address))   - \"morpho-blue\": Morpho Blue (context: abi.encode(MarketParams))   - \"euler-v2\": Euler V2 (context: abi.encode(borrowVault address, collateralVaults address[], subAccountIndex uint8))   - \"venus\": Venus (context: empty)",
+    "kind": "dev",
+    "methods": {
+      "calculateMinBuy(bytes4,uint256,uint256,address,address,uint8,uint8,bytes)": {
+        "params": {
+          "collateralDecimals": "Collateral token decimals",
+          "collateralToken": "Collateral token",
+          "context": "Protocol-specific context (see getCurrentLtv)",
+          "debtDecimals": "Debt token decimals",
+          "debtToken": "Debt token",
+          "maxSlippageBps": "Maximum slippage in basis points",
+          "protocolId": "Protocol identifier",
+          "sellAmount": "Amount to sell"
+        },
+        "returns": {
+          "minBuyAmount": "Minimum acceptable buy amount"
+        }
+      },
+      "calculateMinBuyAmount(uint256,uint256,uint256,uint256,uint8,uint8)": {
+        "details": "Convenience function that takes USD prices and converts to exchange rate internally",
+        "params": {
+          "buyDecimals": "Decimals of buy token",
+          "buyPriceUsd": "Price of buyToken (same decimals as sellPriceUsd)",
+          "maxSlippageBps": "Maximum slippage in basis points (e.g., 100 = 1%)",
+          "sellAmount": "Amount of sellToken",
+          "sellDecimals": "Decimals of sell token",
+          "sellPriceUsd": "Price of sellToken (any decimals)"
+        },
+        "returns": {
+          "minBuyAmount": "Minimum acceptable buy amount"
+        }
+      },
+      "calculateMinBuyFromRate(uint256,uint256,uint256,uint8,uint8)": {
+        "details": "Exchange rate = how many buyTokens per sellToken, scaled by 1e18",
+        "params": {
+          "buyDecimals": "Decimals of buy token",
+          "exchangeRate18": "Exchange rate with 18 decimals (sellToken → buyToken)",
+          "maxSlippageBps": "Maximum slippage in basis points (e.g., 100 = 1%)",
+          "sellAmount": "Amount of sellToken (in sellToken decimals)",
+          "sellDecimals": "Decimals of sell token"
+        },
+        "returns": {
+          "minBuyAmount": "Minimum acceptable buy amount"
+        }
+      },
+      "calculateMorphoMinBuyAmount(uint256,uint256,uint256)": {
+        "details": "Morpho oracles return the exchange rate scaled by 1e36      Formula: loanAmount = collateralAmount * price / 1e36      The oracle price already accounts for token decimals",
+        "params": {
+          "maxSlippageBps": "Maximum slippage in basis points",
+          "morphoOraclePrice": "Price from Morpho oracle (36 decimals scale)",
+          "sellAmount": "Amount of collateral to sell (in collateral token decimals)"
+        },
+        "returns": {
+          "minBuyAmount": "Minimum acceptable loan tokens to receive"
+        }
+      },
+      "getAaveLtvBps(address)": {
+        "params": {
+          "user": "The user's address"
+        },
+        "returns": {
+          "ltvBps": "Current LTV in basis points"
+        }
+      },
+      "getAavePrice(address)": {
+        "params": {
+          "token": "The asset address"
+        },
+        "returns": {
+          "_0": "price Price in 8 decimals USD"
+        }
+      },
+      "getAaveUserAccountData(address)": {
+        "params": {
+          "user": "The user address"
+        },
+        "returns": {
+          "availableBorrowsBase": "Available borrows in 8 decimals USD",
+          "currentLiquidationThreshold": "Liquidation threshold in basis points",
+          "healthFactor": "Health factor (1e18 scale)",
+          "ltv": "Loan-to-value ratio in basis points",
+          "totalCollateralBase": "Total collateral in 8 decimals USD",
+          "totalDebtBase": "Total debt in 8 decimals USD"
+        }
+      },
+      "getCollateralPrice(bytes4,address,bytes)": {
+        "params": {
+          "collateralToken": "Collateral token address",
+          "context": "Protocol-specific context (see getCurrentLtv)",
+          "protocolId": "Protocol identifier"
+        },
+        "returns": {
+          "price": "Price in 8 decimals USD (or 1e8 for protocols using exchange rates)"
+        }
+      },
+      "getCompoundLtvBps(address,address)": {
+        "params": {
+          "baseToken": "The base token of the Comet market (e.g., USDC)",
+          "user": "The user's address"
+        }
+      },
+      "getCompoundPositionValue(address,address)": {
+        "params": {
+          "baseToken": "The Comet base token (e.g., USDC)",
+          "user": "The user address"
+        },
+        "returns": {
+          "collateralValueUsd": "Total collateral in 8 decimals USD",
+          "debtValueUsd": "Total debt in 8 decimals USD"
+        }
+      },
+      "getCompoundPrice(address,address)": {
+        "params": {
+          "asset": "The asset to price (collateral or base token)",
+          "baseToken": "The Comet base token (e.g., USDC)"
+        },
+        "returns": {
+          "_0": "price Price in 8 decimals USD"
+        }
+      },
+      "getCurrentLtv(bytes4,address,bytes)": {
+        "params": {
+          "context": "Protocol-specific context:   - AAVE_V3: empty bytes   - COMPOUND_V3: abi.encode(baseToken address)   - MORPHO_BLUE: abi.encode(MarketParams)   - EULER_V2: abi.encode(borrowVault address, collateralVaults address[], subAccountIndex uint8)   - VENUS: empty bytes",
+          "protocolId": "Protocol identifier (AAVE_V3, COMPOUND_V3, etc.)",
+          "user": "User address"
+        },
+        "returns": {
+          "ltvBps": "Current LTV in basis points"
+        }
+      },
+      "getDebtPrice(bytes4,address,bytes)": {
+        "params": {
+          "context": "Protocol-specific context (see getCurrentLtv)",
+          "debtToken": "Debt token address",
+          "protocolId": "Protocol identifier"
+        },
+        "returns": {
+          "price": "Price in 8 decimals USD (or 1e8 for protocols using exchange rates)"
+        }
+      },
+      "getEulerExchangeRate(address,address)": {
+        "details": "Returns 18-decimal exchange rate ready for calculateMinBuyFromRate()",
+        "params": {
+          "borrowVault": "The borrow vault (debt side)",
+          "collateralVault": "The collateral vault"
+        },
+        "returns": {
+          "_0": "rate18 Exchange rate with 18 decimals"
+        }
+      },
+      "getEulerLtvBps(address,address,uint8)": {
+        "params": {
+          "subAccountIndex": "The sub-account index (0-255)",
+          "user": "The user's address",
+          "vault": "The borrow vault address"
+        }
+      },
+      "getEulerPrice(address,address)": {
+        "params": {
+          "token": "The token to price",
+          "vault": "The Euler vault address (determines oracle)"
+        },
+        "returns": {
+          "_0": "price Price in unit of account decimals"
+        }
+      },
+      "getMorphoLtvBps((address,address,address,address,uint256),address)": {
+        "params": {
+          "params": "The Morpho market parameters",
+          "user": "The user's address"
+        }
+      },
+      "getMorphoOraclePrice((address,address,address,address,uint256))": {
+        "details": "This is NOT a USD price - it's the exchange rate from collateral to loan token",
+        "params": {
+          "params": "The Morpho market parameters"
+        },
+        "returns": {
+          "_0": "price Price ratio with 36 decimals"
+        }
+      },
+      "getMorphoPositionValue((address,address,address,address,uint256),address)": {
+        "params": {
+          "params": "The Morpho market parameters",
+          "user": "The user address"
+        },
+        "returns": {
+          "collateralValueUsd": "Total collateral in 8 decimals USD",
+          "debtValueUsd": "Total debt in 8 decimals USD"
+        }
+      },
+      "getPositionValue(bytes4,address,bytes)": {
+        "params": {
+          "context": "Protocol-specific context (see getCurrentLtv)",
+          "protocolId": "Protocol identifier",
+          "user": "User address"
+        },
+        "returns": {
+          "collateralValueUsd": "Total collateral in 8 decimals USD",
+          "debtValueUsd": "Total debt in 8 decimals USD"
+        }
+      },
+      "getVenusLtvBps(address)": {
+        "params": {
+          "user": "The user's address"
+        }
+      },
+      "getVenusPrice(address)": {
+        "params": {
+          "underlyingToken": "The underlying asset address"
+        },
+        "returns": {
+          "_0": "price Price in 8 decimals USD"
+        }
+      },
+      "getVenusUserAccountData(address)": {
+        "params": {
+          "user": "The user address"
+        },
+        "returns": {
+          "totalCollateralUsd": "Total collateral in 8 decimals USD",
+          "totalDebtUsd": "Total debt in 8 decimals USD"
+        }
+      },
+      "isAaveAtRisk(address,uint256)": {
+        "params": {
+          "bufferBps": "Safety buffer in basis points (e.g., 500 = 5%)",
+          "user": "The user's address"
+        },
+        "returns": {
+          "atRisk": "True if current LTV + buffer >= liquidation LTV"
+        }
+      },
+      "setGateway(string,address)": {
+        "params": {
+          "gateway": "Gateway view contract address",
+          "protocolName": "Protocol name (e.g., \"aave-v3\", \"morpho-blue\")"
+        }
+      },
+      "setGateways(string[],address[])": {
+        "params": {
+          "gatewayAddresses": "Array of gateway addresses",
+          "protocolNames": "Array of protocol names"
+        }
+      },
+      "transferOwnership(address)": {
+        "params": {
+          "newOwner": "New owner address"
+        }
+      },
+      "usdPricesToExchangeRate(uint256,uint256)": {
+        "details": "exchangeRate18 = sellPriceUsd * 1e18 / buyPriceUsd",
+        "params": {
+          "buyPriceUsd": "USD price of buy token (any decimals, but same as sellPriceUsd)",
+          "sellPriceUsd": "USD price of sell token (any decimals, but same as buyPriceUsd)"
+        },
+        "returns": {
+          "exchangeRate18": "Exchange rate with 18 decimals"
+        }
+      }
+    },
+    "title": "KapanViewRouter",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "AAVE_V3()": {
+        "notice": "Protocol identifiers (bytes4 for unified interface)"
+      },
+      "calculateMinBuy(bytes4,uint256,uint256,address,address,uint8,uint8,bytes)": {
+        "notice": "Calculate minimum buy amount with slippage for any protocol (unified interface)"
+      },
+      "calculateMinBuyAmount(uint256,uint256,uint256,uint256,uint8,uint8)": {
+        "notice": "Calculate minimum buy amount for ADL order with slippage protection"
+      },
+      "calculateMinBuyFromRate(uint256,uint256,uint256,uint8,uint8)": {
+        "notice": "Calculate minimum buy amount using exchange rate"
+      },
+      "calculateMorphoMinBuyAmount(uint256,uint256,uint256)": {
+        "notice": "Calculate minimum buy amount for Morpho ADL orders"
+      },
+      "gateways(string)": {
+        "notice": "Protocol name => gateway view address (consistent with KapanRouter)"
+      },
+      "getAaveLiquidationLtvBps(address)": {
+        "notice": "Get liquidation LTV for Aave V3"
+      },
+      "getAaveLtvBps(address)": {
+        "notice": "Get current LTV for Aave V3"
+      },
+      "getAavePrice(address)": {
+        "notice": "Get asset price via Aave oracle (8 decimals)"
+      },
+      "getAavePrices(address[])": {
+        "notice": "Get multiple asset prices via Aave oracle"
+      },
+      "getAaveUserAccountData(address)": {
+        "notice": "Get Aave user account data (collateral and debt in USD)"
+      },
+      "getCollateralPrice(bytes4,address,bytes)": {
+        "notice": "Get collateral price for any protocol (unified interface)"
+      },
+      "getCompoundLiquidationLtvBps(address,address)": {
+        "notice": "Get liquidation LTV for Compound V3"
+      },
+      "getCompoundLtvBps(address,address)": {
+        "notice": "Get current LTV for Compound V3"
+      },
+      "getCompoundPositionValue(address,address)": {
+        "notice": "Get Compound position value (collateral and debt in USD)"
+      },
+      "getCompoundPrice(address,address)": {
+        "notice": "Get asset price via Compound (8 decimals)"
+      },
+      "getCurrentLtv(bytes4,address,bytes)": {
+        "notice": "Get current LTV for any protocol (unified interface)"
+      },
+      "getDebtPrice(bytes4,address,bytes)": {
+        "notice": "Get debt price for any protocol (unified interface)"
+      },
+      "getEulerExchangeRate(address,address)": {
+        "notice": "Get exchange rate for Euler position (collateral → debt)"
+      },
+      "getEulerLiquidationLtvBps(address)": {
+        "notice": "Get liquidation LTV for Euler V2"
+      },
+      "getEulerLtvBps(address,address,uint8)": {
+        "notice": "Get current LTV for Euler V2"
+      },
+      "getEulerPrice(address,address)": {
+        "notice": "Get asset price via Euler oracle (in vault's unit of account)"
+      },
+      "getMorphoLiquidationLtvBps((address,address,address,address,uint256))": {
+        "notice": "Get liquidation LTV for Morpho Blue"
+      },
+      "getMorphoLtvBps((address,address,address,address,uint256),address)": {
+        "notice": "Get current LTV for Morpho Blue"
+      },
+      "getMorphoOraclePrice((address,address,address,address,uint256))": {
+        "notice": "Get Morpho oracle price (36 decimals, collateral/loan ratio)"
+      },
+      "getMorphoPositionValue((address,address,address,address,uint256),address)": {
+        "notice": "Get Morpho position value (collateral and debt in USD)"
+      },
+      "getPositionValue(bytes4,address,bytes)": {
+        "notice": "Get position value for any protocol (unified interface)"
+      },
+      "getVenusLiquidationLtvBps(address)": {
+        "notice": "Get liquidation LTV for Venus"
+      },
+      "getVenusLtvBps(address)": {
+        "notice": "Get current LTV for Venus"
+      },
+      "getVenusPrice(address)": {
+        "notice": "Get asset price via Venus oracle (8 decimals normalized)"
+      },
+      "getVenusUserAccountData(address)": {
+        "notice": "Get Venus user account data (collateral and debt in USD)"
+      },
+      "isAaveAtRisk(address,uint256)": {
+        "notice": "Check if Aave position is at liquidation risk"
+      },
+      "isCompoundAtRisk(address,address,uint256)": {
+        "notice": "Check if Compound position is at liquidation risk"
+      },
+      "isMorphoAtRisk((address,address,address,address,uint256),address,uint256)": {
+        "notice": "Check if Morpho position is at liquidation risk"
+      },
+      "owner()": {
+        "notice": "Owner who can update gateway addresses"
+      },
+      "setGateway(string,address)": {
+        "notice": "Set or update a gateway view address"
+      },
+      "setGateways(string[],address[])": {
+        "notice": "Batch set multiple gateways"
+      },
+      "transferOwnership(address)": {
+        "notice": "Transfer ownership"
+      },
+      "usdPricesToExchangeRate(uint256,uint256)": {
+        "notice": "Convert two USD prices (same decimals) to an 18-decimal exchange rate"
+      }
+    },
+    "notice": "Unified read-only router for querying position data across lending protocols",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [
+      {
+        "astId": 417,
+        "contract": "contracts/v2/KapanViewRouter.sol:KapanViewRouter",
+        "label": "owner",
+        "offset": 0,
+        "slot": "0",
+        "type": "t_address"
+      },
+      {
+        "astId": 422,
+        "contract": "contracts/v2/KapanViewRouter.sol:KapanViewRouter",
+        "label": "gateways",
+        "offset": 0,
+        "slot": "1",
+        "type": "t_mapping(t_string_memory_ptr,t_address)"
+      }
+    ],
+    "types": {
+      "t_address": {
+        "encoding": "inplace",
+        "label": "address",
+        "numberOfBytes": "20"
+      },
+      "t_mapping(t_string_memory_ptr,t_address)": {
+        "encoding": "mapping",
+        "key": "t_string_memory_ptr",
+        "label": "mapping(string => address)",
+        "numberOfBytes": "32",
+        "value": "t_address"
+      },
+      "t_string_memory_ptr": {
+        "encoding": "bytes",
+        "label": "string",
+        "numberOfBytes": "32"
+      }
+    }
+  }
+}

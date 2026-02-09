@@ -3,8 +3,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { Abi, AbiEvent, ExtractAbiEventNames } from "abitype";
 import { BlockNumber, GetLogsParameters } from "viem";
 import { Config, UsePublicClientReturnType, usePublicClient } from "wagmi";
-import { useSelectedNetwork, useBlockNumberContext } from "~~/hooks/scaffold-eth";
-import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+import { useBlockNumberContext, useDeployedContractInfo, useSelectedNetwork } from "~~/hooks/scaffold-eth";
 import { qk } from "~~/lib/queryKeys";
 import { AllowedChainIds } from "~~/utils/scaffold-eth";
 import { replacer } from "~~/utils/scaffold-eth/common";
@@ -143,7 +142,7 @@ export const useScaffoldEventHistory = <
     },
     select: data => {
       const events = data.pages.flat();
-      const eventHistoryData = events?.map(addIndexedArgsToEvent) as UseScaffoldEventHistoryData<
+      const eventHistoryData = events?.map((e: any) => addIndexedArgsToEvent(e)) as UseScaffoldEventHistoryData<
         TContractName,
         TEventName,
         TBlockData,
@@ -183,7 +182,8 @@ export const useScaffoldEventHistory = <
   };
 };
 
-export const addIndexedArgsToEvent = (event: any) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- event type comes from viem logs
+export const addIndexedArgsToEvent = (event: { args?: Record<string, unknown>; [key: string]: unknown }) => {
   if (event.args && !Array.isArray(event.args)) {
     return { ...event, args: { ...event.args, ...Object.values(event.args) } };
   }

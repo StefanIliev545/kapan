@@ -20,7 +20,10 @@ import {
   ProtocolInstruction,
 } from "~~/utils/v2/instructionHelpers";
 import { calculateFlashLoanFee, getPreferredFlashLoanLender, type ChunkCalculationResult } from "~~/utils/cow";
-import { type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
+import { type FlashLoanProviderOption } from "~~/utils/flashLoan";
+
+// TODO: Migrate to new conditional order system - ChunkInstructions defined locally
+type ChunkInstructions = { preInstructions: ProtocolInstruction[]; postInstructions: ProtocolInstruction[]; flashLoanRepaymentUtxoIndex?: number };
 import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 
 // Protocol identifier constants
@@ -138,7 +141,7 @@ export function calculateMarketRate(
  * Calculate price impact from available quote data.
  */
 export function calculateQuotesPriceImpact(
-  swapRouter: "1inch" | "pendle",
+  swapRouter: "1inch" | "kyber" | "pendle",
   pendleQuote: QuoteData["pendleQuote"],
   oneInchQuote: QuoteData["oneInchQuote"]
 ): number | null {
@@ -146,8 +149,8 @@ export function calculateQuotesPriceImpact(
   if (swapRouter === "pendle" && pendleQuote?.data?.priceImpact !== undefined) {
     return Math.abs(pendleQuote.data.priceImpact * 100);
   }
-  // 1inch: calculate from USD values
-  if (swapRouter === "1inch" && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
+  // 1inch/Kyber: calculate from USD values
+  if ((swapRouter === "1inch" || swapRouter === "kyber") && oneInchQuote?.srcUSD && oneInchQuote?.dstUSD) {
     const srcUSD = parseFloat(oneInchQuote.srcUSD);
     const dstUSD = parseFloat(oneInchQuote.dstUSD);
     if (srcUSD > 0) {
@@ -175,10 +178,8 @@ export function calculatePositionMetrics(input: MetricsInput): PositionMetrics {
   // In zap mode, all collateral comes from the swap; otherwise margin + swap
   let totalCollateralTokens: number;
   if (zapMode) {
-    // All collateral is from the swap (deposit + flash loan -> collateral)
     totalCollateralTokens = Number(minCollateralFormatted);
   } else {
-    // Initial margin (in collateral) + swapped collateral
     const marginTokens = Number(formatUnits(marginAmountRaw, collateral.decimals));
     const swappedTokens = Number(minCollateralFormatted);
     totalCollateralTokens = marginTokens + swappedTokens;
@@ -192,7 +193,6 @@ export function calculatePositionMetrics(input: MetricsInput): PositionMetrics {
   const lltv = Number(effectiveLltvBps) / 10000;
   const healthFactor = debtUsd > 0 ? (totalCollateralUsd * lltv) / debtUsd : Infinity;
 
-  // Liquidation price: price at which collateral * lltv = debt
   const liquidationPrice = debtUsd > 0 && totalCollateralTokens > 0
     ? debtUsd / (totalCollateralTokens * lltv)
     : null;
@@ -217,16 +217,15 @@ export function calculateNetApyAndYield(
   const supplyApy = supplyApyMap[collateral.address.toLowerCase()] ?? 0;
   const borrowApy = borrowApyMap[debt.address.toLowerCase()] ?? 0;
 
-  // Weighted: (collateral * supplyAPY - debt * borrowAPY) / equity
   const equity = metrics.totalCollateralUsd - metrics.debtUsd;
   if (equity <= 0) return { netApy: null, netYield30d: null };
 
   const earnedYield = (metrics.totalCollateralUsd * supplyApy) / 100;
   const paidInterest = (metrics.debtUsd * borrowApy) / 100;
-  const netYieldUsd = earnedYield - paidInterest; // Annual yield in USD
+  const netYieldUsd = earnedYield - paidInterest;
 
-  const netApyValue = (netYieldUsd / equity) * 100; // as percentage
-  const netYield30dValue = netYieldUsd * (30 / 365); // 30 day yield in USD
+  const netApyValue = (netYieldUsd / equity) * 100;
+  const netYield30dValue = netYieldUsd * (30 / 365);
 
   return { netApy: netApyValue, netYield30d: netYield30dValue };
 }
@@ -238,38 +237,28 @@ export function calculateFeeBreakdown(
   shortAmount: number,
   debtPrice: number,
   selectedProviderName: string | undefined,
-  swapRouter: "1inch" | "pendle",
+  swapRouter: "1inch" | "kyber" | "pendle",
   pendlePriceImpact: number | undefined,
   totalCollateralUsd: number
 ): FeeBreakdown {
   const flashLoanAmountUsd = shortAmount * debtPrice;
 
-  // Flash loan fee: Aave = 0.05%, Balancer = 0%
   const isBalancer = selectedProviderName?.includes("Balancer");
   const flashLoanFeePercent = isBalancer ? 0 : 0.05;
   const flashLoanFeeUsd = flashLoanAmountUsd * (flashLoanFeePercent / 100);
 
-  // Swap price impact from Pendle (already a decimal like -0.0001)
   const priceImpact = swapRouter === "pendle" ? (pendlePriceImpact ?? 0) : 0;
-  const priceImpactPercent = Math.abs(priceImpact * 100); // Convert to positive percentage
+  const priceImpactPercent = Math.abs(priceImpact * 100);
   const priceImpactUsd = flashLoanAmountUsd * Math.abs(priceImpact);
 
-  // Total fee
   const totalFeePercent = flashLoanFeePercent + priceImpactPercent;
   const totalFeeUsd = flashLoanFeeUsd + priceImpactUsd;
 
-  // Fee as percentage of total position
   const feeOfPositionPercent = totalCollateralUsd > 0 ? (totalFeeUsd / totalCollateralUsd) * 100 : 0;
 
   return {
-    flashLoanFeePercent,
-    flashLoanFeeUsd,
-    priceImpactPercent,
-    priceImpactUsd,
-    totalFeePercent,
-    totalFeeUsd,
-    flashLoanAmountUsd,
-    feeOfPositionPercent,
+    flashLoanFeePercent, flashLoanFeeUsd, priceImpactPercent, priceImpactUsd,
+    totalFeePercent, totalFeeUsd, flashLoanAmountUsd, feeOfPositionPercent,
   };
 }
 
@@ -288,7 +277,7 @@ export function calculateMinCollateralOut(
   executionType: "market" | "limit",
   customMinPrice: string,
   bestQuote: { amount: bigint } | null,
-  swapRouter: "1inch" | "pendle",
+  swapRouter: "1inch" | "kyber" | "pendle",
   oneInchQuote: QuoteData["oneInchQuote"],
   pendleQuote: QuoteData["pendleQuote"],
   limitSlippage: number,
@@ -296,22 +285,19 @@ export function calculateMinCollateralOut(
 ): MinCollateralResult {
   if (!collateral) return { raw: 0n, formatted: "0" };
 
-  // For limit orders with custom min price
   if (executionType === "limit" && customMinPrice && customMinPrice !== "") {
     try {
       const customRaw = parseUnits(customMinPrice, collateral.decimals);
       return { raw: customRaw, formatted: customMinPrice };
     } catch {
-      // Invalid input, fall through to calculated value
+      // Invalid input, fall through
     }
   }
 
-  // Get the relevant quote
   let quoted = 0n;
   if (executionType === "limit") {
-    // For limit orders, use best quote from any source
     quoted = bestQuote?.amount ?? 0n;
-  } else if (swapRouter === "1inch" && oneInchQuote) {
+  } else if ((swapRouter === "1inch" || swapRouter === "kyber") && oneInchQuote) {
     quoted = BigInt(oneInchQuote.dstAmount || "0");
   } else if (swapRouter === "pendle" && pendleQuote) {
     const outAmount = pendleQuote.data.amountPtOut || pendleQuote.data.amountTokenOut || "0";
@@ -320,7 +306,6 @@ export function calculateMinCollateralOut(
 
   if (quoted === 0n) return { raw: 0n, formatted: "0" };
 
-  // Apply slippage tolerance
   const slippageToUse = executionType === "limit" ? limitSlippage : slippage;
   const bufferBps = BigInt(Math.round(slippageToUse * 100));
   const buffered = (quoted * (10000n - bufferBps)) / 10000n;
@@ -334,7 +319,6 @@ export interface ChunkParamsResult extends ChunkCalculationResult {
   useFlashLoan?: boolean;
   flashLoanFee?: bigint;
   flashLoanLender?: string;
-  /** The selected provider type (e.g., "morpho", "balancerV3", "aaveV3") for fee calculation */
   selectedProviderType?: string;
 }
 
@@ -350,14 +334,9 @@ export function calculateFlashLoanChunkParams(
 
   if (!useFlashLoan) {
     return {
-      numChunks: 1,
-      chunkSize: flashLoanAmountRaw,
-      chunkSizes: [flashLoanAmountRaw],
-      needsChunking: false,
-      initialBorrowCapacityUsd: 0n,
-      geometricRatio: 0,
-      recommendFlashLoan: false,
-      explanation: "",
+      numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw],
+      needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0,
+      recommendFlashLoan: false, explanation: "",
     };
   }
 
@@ -368,28 +347,21 @@ export function calculateFlashLoanChunkParams(
   if (!flashLoanLender) {
     console.warn("[Limit Order] Flash loans not available on this chain for CoW orders");
     return {
-      numChunks: 1,
-      chunkSize: flashLoanAmountRaw,
-      chunkSizes: [flashLoanAmountRaw],
-      needsChunking: false,
-      initialBorrowCapacityUsd: 0n,
-      geometricRatio: 0,
+      numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw],
+      needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0,
       recommendFlashLoan: false,
       explanation: "Flash loans not available for limit orders on this chain",
     };
   }
 
-  // Use user-specified chunk count
   const numChunks = flashLoanChunks;
   const baseChunkSize = flashLoanAmountRaw / BigInt(numChunks);
   const remainder = flashLoanAmountRaw % BigInt(numChunks);
 
-  // Build chunk sizes array - last chunk gets remainder
   const chunkSizes = Array(numChunks).fill(baseChunkSize).map((size, i) =>
     i === numChunks - 1 ? size + remainder : size
   ) as bigint[];
 
-  // Calculate fee per chunk
   const flashLoanFeePerChunk = limitOrderConfig?.flashLoanFee
     ?? calculateFlashLoanFee(baseChunkSize, providerType);
 
@@ -403,17 +375,10 @@ export function calculateFlashLoanChunkParams(
   });
 
   return {
-    numChunks,
-    chunkSize: baseChunkSize,
-    chunkSizes,
-    needsChunking: numChunks > 1,
-    initialBorrowCapacityUsd: 0n,
-    geometricRatio: 0,
-    recommendFlashLoan: true,
-    useFlashLoan: true,
-    flashLoanFee: flashLoanFeePerChunk,
-    flashLoanLender,
-    selectedProviderType: providerType,
+    numChunks, chunkSize: baseChunkSize, chunkSizes,
+    needsChunking: numChunks > 1, initialBorrowCapacityUsd: 0n, geometricRatio: 0,
+    recommendFlashLoan: true, useFlashLoan: true,
+    flashLoanFee: flashLoanFeePerChunk, flashLoanLender, selectedProviderType: providerType,
     explanation: numChunks === 1
       ? (flashLoanFeePerChunk > 0n
           ? `Flash loan: single tx execution (fee: ${formatUnits(flashLoanFeePerChunk, debt.decimals)} ${debt.symbol})`
@@ -438,9 +403,6 @@ export interface CowInstructionsBuildParams {
   chainId: number;
 }
 
-/**
- * Build deposit instructions for CoW orders.
- */
 function buildDepositInstructions(
   normalizedProtocol: string,
   collateralAddress: Address,
@@ -452,19 +414,14 @@ function buildDepositInstructions(
   const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
   return [
-    // 1. Approve collateral for lending protocol - amount comes from swap output (set as Output[0])
-    createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-    // 2. Deposit collateral received from swap
+    createRouterInstruction(encodeApprove(1, normalizedProtocol)),
     createProtocolInstruction(
       normalizedProtocol,
-      encodeLendingInstruction(depositOp, collateralAddress, userAddress, 0n, context, 0)
+      encodeLendingInstruction(depositOp, collateralAddress, userAddress, 0n, context, 1)
     ),
   ];
 }
 
-/**
- * Build flash loan mode chunk instructions.
- */
 function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInstructions[] {
   const { collateral, debt, userAddress, flashLoanAmountRaw, marginAmountRaw, protocolName, morphoContext, market, chunkParams } = params;
 
@@ -479,10 +436,8 @@ function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInst
   const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
   const numChunks = chunkParams.numChunks;
-  // Use the selected provider type from chunkParams for correct fee calculation
   const selectedProviderType = chunkParams.selectedProviderType ?? "morpho";
 
-  // Split margin across chunks (last chunk gets remainder)
   const baseMarginPerChunk = marginAmountRaw / BigInt(numChunks);
   const marginRemainder = marginAmountRaw % BigInt(numChunks);
 
@@ -496,32 +451,24 @@ function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInst
     const chunkRepayAmount = chunkSize + feeThisChunk;
 
     const postInstructions: ProtocolInstruction[] = [
-      // 1. Pull this chunk's margin -> UTXO[1]
       createRouterInstruction(encodePullToken(marginThisChunk, collateral.address, userAddress)),
-
-      // 2. Add swap output + margin -> UTXO[2]
-      createRouterInstruction(encodeAdd(0, 1)),
-
-      // 3. Approve total collateral for lending protocol -> UTXO[3]
-      createRouterInstruction(encodeApprove(2, normalizedProtocol)),
-
-      // 4. Deposit all collateral
+      createRouterInstruction(encodeAdd(1, 2)),
+      createRouterInstruction(encodeApprove(3, normalizedProtocol)),
       createProtocolInstruction(
         normalizedProtocol,
-        encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 2)
+        encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 3)
       ),
-
-      // 5. Borrow to repay this chunk's flash loan -> UTXO[4]
       createProtocolInstruction(
         normalizedProtocol,
         encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, chunkRepayAmount, context, 999)
       ),
+      createRouterInstruction(encodePushToken(5, params.orderManagerAddress)),
     ];
 
     chunks.push({
       preInstructions: [],
       postInstructions,
-      flashLoanRepaymentUtxoIndex: 4,
+      flashLoanRepaymentUtxoIndex: 5,
     });
   }
 
@@ -533,15 +480,12 @@ function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInst
     marginPerChunk: formatUnits(baseMarginPerChunk, collateral.decimals),
     totalMargin: formatUnits(marginAmountRaw, collateral.decimals),
     lender: chunkParams.flashLoanLender,
-    flow: "swap[0] + pull[1] -> add[2] -> approve[3] -> deposit -> borrow[4] -> (hook appends push)",
+    flow: "[0]=sellAmt, [1]=buyAmt, [2]=pull margin, [3]=add(1+2), [4]=approve, [5]=borrow -> push to OrderManager",
   });
 
   return chunks;
 }
 
-/**
- * Build multi-chunk mode (no flash loan) instructions.
- */
 function buildMultiChunkModeChunks(params: CowInstructionsBuildParams): ChunkInstructions[] {
   const { collateral, debt, userAddress, protocolName, morphoContext, market, orderManagerAddress, chunkParams } = params;
 
@@ -561,20 +505,18 @@ function buildMultiChunkModeChunks(params: CowInstructionsBuildParams): ChunkIns
 
   for (let i = 0; i < numChunks; i++) {
     if (i === numChunks - 1) {
-      // Last chunk - deposit only
       chunks.push({
         preInstructions: [],
         postInstructions: [...depositInstructions],
       });
     } else {
-      // Non-final chunk - deposit + borrow + push to OrderManager
       const postInstructionsWithBorrow: ProtocolInstruction[] = [
         ...depositInstructions,
         createProtocolInstruction(
           normalizedProtocol,
           encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, chunkSize, context, 999)
         ),
-        createRouterInstruction(encodePushToken(2, orderManagerAddress)),
+        createRouterInstruction(encodePushToken(3, orderManagerAddress)),
       ];
       chunks.push({
         preInstructions: [],
@@ -595,9 +537,6 @@ function buildMultiChunkModeChunks(params: CowInstructionsBuildParams): ChunkIns
   return chunks;
 }
 
-/**
- * Build per-iteration pre/post instructions for CoW limit order loop.
- */
 export function buildCowChunkInstructions(params: CowInstructionsBuildParams): ChunkInstructions[] {
   const { collateral, debt, userAddress, flashLoanAmountRaw, orderManagerAddress, chunkParams } = params;
 
@@ -605,7 +544,6 @@ export function buildCowChunkInstructions(params: CowInstructionsBuildParams): C
     return [{ preInstructions: [], postInstructions: [] }];
   }
 
-  // Flash loan mode vs multi-chunk mode
   if (chunkParams.useFlashLoan && chunkParams.flashLoanLender) {
     return buildFlashLoanModeChunks(params);
   }
@@ -613,9 +551,6 @@ export function buildCowChunkInstructions(params: CowInstructionsBuildParams): C
   return buildMultiChunkModeChunks(params);
 }
 
-/**
- * Build initial deposit flow for CoW limit orders (multi-chunk mode only).
- */
 export function buildInitialDepositInstructions(
   collateral: SwapAsset | undefined,
   userAddress: Address | undefined,
@@ -637,11 +572,8 @@ export function buildInitialDepositInstructions(
   const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
   return [
-    // Pull collateral from user
     createRouterInstruction(encodePullToken(marginAmountRaw, collateral.address, userAddress)),
-    // Approve lending protocol
     createRouterInstruction(encodeApprove(0, normalizedProtocol)),
-    // Deposit collateral
     createProtocolInstruction(
       normalizedProtocol,
       encodeLendingInstruction(depositOp, collateral.address, userAddress, 0n, context, 0)
@@ -651,41 +583,27 @@ export function buildInitialDepositInstructions(
 
 // ==================== Flash Loan Provider Helpers ====================
 
-// Re-export FlashLoanProviderOption from utils for convenience
 export type { FlashLoanProviderOption } from "~~/utils/flashLoan";
 
-/**
- * Get default flash loan providers for a chain.
- * Note: Import FlashLoanProviderOption from ~~/utils/flashLoan if needed
- */
 export function getDefaultFlashLoanProviders(
   chainId: number,
   isAaveV3Supported: (chainId: number) => boolean,
   isBalancerV2Supported: (chainId: number) => boolean
-) {
+): FlashLoanProviderOption[] {
   if (isAaveV3Supported(chainId) && !isBalancerV2Supported(chainId)) {
     return [{
-      name: "Aave",
-      icon: "/logos/aave.svg",
-      version: "aave" as const,
-      providerEnum: FlashLoanProvider.Aave,
-      feeBps: 5
+      name: "Aave", icon: "/logos/aave.svg", version: "aave" as const,
+      providerEnum: FlashLoanProvider.Aave, feeBps: 5,
     }];
   }
   return [{
-    name: "Balancer V2",
-    icon: "/logos/balancer.svg",
-    version: "v2" as const,
-    providerEnum: FlashLoanProvider.BalancerV2,
-    feeBps: 0
+    name: "Balancer V2", icon: "/logos/balancer.svg", version: "v2" as const,
+    providerEnum: FlashLoanProvider.BalancerV2, feeBps: 0,
   }];
 }
 
 // ==================== Wallet Balance Helpers ====================
 
-/**
- * Add wallet balances to assets and sort by balance descending.
- */
 export function addWalletBalancesAndSort<T extends { address: Address; decimals: number }>(
   assets: T[],
   walletBalances: Record<string, { balance: bigint }>
@@ -704,20 +622,10 @@ export function addWalletBalancesAndSort<T extends { address: Address; decimals:
 
 // ==================== Leverage Calculation Helpers ====================
 
-/**
- * Protocol default LTV values (in basis points).
- */
 const PROTOCOL_DEFAULT_LTV: Record<string, number> = {
-  aave: 8000,
-  compound: 7500,
-  venus: 7500,
-  euler: 8500,
-  default: 7500,
+  aave: 8000, compound: 7500, venus: 7500, euler: 8500, default: 7500,
 };
 
-/**
- * Get default LTV for a protocol.
- */
 export function getProtocolDefaultLtv(protocolName: string): bigint {
   const key = protocolName.toLowerCase();
   for (const [protocol, ltv] of Object.entries(PROTOCOL_DEFAULT_LTV)) {
@@ -726,9 +634,6 @@ export function getProtocolDefaultLtv(protocolName: string): bigint {
   return BigInt(PROTOCOL_DEFAULT_LTV.default);
 }
 
-/**
- * Calculate max leverage from LTV.
- */
 export function calculateMaxLeverageFromLtv(ltvBps: bigint, protocolName: string): number {
   const minReasonableLtv = 5000n;
   const effectiveLtvBps = ltvBps >= minReasonableLtv ? ltvBps : getProtocolDefaultLtv(protocolName);
@@ -738,9 +643,6 @@ export function calculateMaxLeverageFromLtv(ltvBps: bigint, protocolName: string
   return Math.round((1 / (1 - effectiveLtv)) * 100) / 100;
 }
 
-/**
- * Adjust max leverage for slippage.
- */
 export function adjustMaxLeverageForSlippage(baseLeverage: number, slippagePercent: number): number {
   const slippageDecimal = slippagePercent / 100;
   const targetLtv = (baseLeverage - 1) / baseLeverage;
@@ -751,9 +653,6 @@ export function adjustMaxLeverageForSlippage(baseLeverage: number, slippagePerce
   return Math.round(Math.min(adjustedLeverage, baseLeverage) * 100) / 100;
 }
 
-/**
- * Calculate flash loan amount based on leverage.
- */
 export function calculateFlashLoanAmount(
   marginCollateral: bigint,
   leverage: number,
@@ -787,25 +686,11 @@ export interface PreOrderInstructionsParams {
   seedBorrowInstruction?: ProtocolInstruction;
 }
 
-/**
- * Build pre-order instructions for authorization.
- * These are instructions that need user authorization (ERC20 approve, credit delegation)
- */
 export function buildPreOrderInstructions(params: PreOrderInstructionsParams): ProtocolInstruction[] {
   const {
-    isFlashLoanMode,
-    marginAmountRaw,
-    collateral,
-    debt,
-    userAddress,
-    flashLoanAmountRaw,
-    flashLoanFee,
-    numChunks,
-    protocolName,
-    morphoContext,
-    market,
-    buildInitialDepositFlow,
-    seedBorrowInstruction,
+    isFlashLoanMode, marginAmountRaw, collateral, debt, userAddress,
+    flashLoanAmountRaw, flashLoanFee, numChunks, protocolName,
+    morphoContext, market, buildInitialDepositFlow, seedBorrowInstruction,
   } = params;
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
@@ -818,36 +703,23 @@ export function buildPreOrderInstructions(params: PreOrderInstructionsParams): P
   const preOrderInstructions: ProtocolInstruction[] = [];
 
   if (isFlashLoanMode) {
-    // Flash loan mode: collateral is pulled in post-hook, so we need approval for that
     if (marginAmountRaw > 0n && collateral) {
-      const pullForAuth = createRouterInstruction(
-        encodePullToken(marginAmountRaw, collateral.address, userAddress)
+      preOrderInstructions.push(
+        createRouterInstruction(encodePullToken(marginAmountRaw, collateral.address, userAddress))
       );
-      preOrderInstructions.push(pullForAuth);
     }
-
-    // Credit delegation for flash loan repayment borrow
     const totalFlashLoanFee = flashLoanFee * BigInt(numChunks);
     const flashLoanRepayAmount = flashLoanAmountRaw + totalFlashLoanFee;
-    const borrowForAuth = createProtocolInstruction(
-      normalizedProtocol,
-      encodeLendingInstruction(
-        LendingOp.Borrow,
-        debt.address,
-        userAddress,
-        flashLoanRepayAmount,
-        context,
-        999
+    preOrderInstructions.push(
+      createProtocolInstruction(
+        normalizedProtocol,
+        encodeLendingInstruction(LendingOp.Borrow, debt.address, userAddress, flashLoanRepayAmount, context, 999)
       )
     );
-    preOrderInstructions.push(borrowForAuth);
   } else {
-    // Multi-chunk mode: initial deposit before order creation
     if (marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
       preOrderInstructions.push(buildInitialDepositFlow[0]);
     }
-
-    // Seed borrow (covers post-hook borrows too)
     if (seedBorrowInstruction) {
       preOrderInstructions.push(seedBorrowInstruction);
     }
@@ -856,9 +728,6 @@ export function buildPreOrderInstructions(params: PreOrderInstructionsParams): P
   return preOrderInstructions;
 }
 
-/**
- * Create a seed borrow instruction for multi-chunk mode.
- */
 export function createSeedBorrowInstruction(
   protocolName: string,
   debtAddress: Address,
@@ -876,22 +745,12 @@ export function createSeedBorrowInstruction(
 
   return createProtocolInstruction(
     normalizedProtocol,
-    encodeLendingInstruction(
-      LendingOp.Borrow,
-      debtAddress,
-      userAddress,
-      seedAmount,
-      context,
-      999 // No UTXO reference - fixed amount
-    )
+    encodeLendingInstruction(LendingOp.Borrow, debtAddress, userAddress, seedAmount, context, 999)
   );
 }
 
 // ==================== Limit Order Helpers ====================
 
-/**
- * Calculate min buy per chunk from total min collateral and chunk count.
- */
 export function calculateMinBuyPerChunk(
   minCollateralRaw: bigint,
   numChunks: number,
@@ -904,25 +763,14 @@ export function calculateMinBuyPerChunk(
   return { raw, formatted: formatUnits(raw, collateralDecimals) };
 }
 
-/**
- * Handle limit order build result errors.
- * Returns true if there was an error, false otherwise.
- */
 export function handleLimitOrderBuildError(
   result: { success: boolean; error?: string; errorDetails?: { apiResponse?: string } } | null | undefined
 ): string | null {
-  if (!result) {
-    return "Failed to build CoW order calls";
-  }
-  if (!result.success) {
-    return result.error || "Unknown error building order";
-  }
+  if (!result) return "Failed to build CoW order calls";
+  if (!result.success) return result.error || "Unknown error building order";
   return null;
 }
 
-/**
- * Prepare flash loan config for limit order.
- */
 export function prepareLimitOrderFlashLoanConfig(
   isFlashLoanMode: boolean,
   flashLoanLender: string | undefined,
@@ -930,32 +778,19 @@ export function prepareLimitOrderFlashLoanConfig(
   chunkSize: bigint
 ): { lender: Address; token: Address; amount: bigint } | undefined {
   if (!isFlashLoanMode || !flashLoanLender) return undefined;
-  return {
-    lender: flashLoanLender as Address,
-    token: debtAddress,
-    amount: chunkSize,
-  };
+  return { lender: flashLoanLender as Address, token: debtAddress, amount: chunkSize };
 }
 
 // ==================== Metrics Display Formatting Helpers ====================
 
-/**
- * Format LTV display value
- */
 export function formatLtvDisplay(ltv: number): string {
   return ltv > 0 ? `${ltv.toFixed(1)}%` : "-";
 }
 
-/**
- * Format price display value
- */
 export function formatPriceDisplay(price: number): string {
   return price > 0 ? `$${price.toFixed(2)}` : "-";
 }
 
-/**
- * Get CSS class for APY-based coloring
- */
 export function getApyColorClass(value: number | null): string {
   if (value === null) return "";
   if (value > 0) return "text-success";
@@ -963,20 +798,339 @@ export function getApyColorClass(value: number | null): string {
   return "";
 }
 
-/**
- * Format APY display value with sign
- */
 export function formatApyDisplay(apy: number | null): string {
   if (apy === null) return "-";
   const sign = apy > 0 ? "+" : "";
   return `${sign}${apy.toFixed(2)}%`;
 }
 
-/**
- * Format 30-day yield display value
- */
 export function formatYield30dDisplay(yield30d: number | null): string {
   if (yield30d === null) return "-";
   const sign = yield30d >= 0 ? "+" : "";
   return `${sign}$${Math.abs(yield30d).toFixed(2)}`;
+}
+
+// ==================== Swap Router Fallback Helper ====================
+
+/**
+ * Resolve the best available swap router when the current one is unavailable.
+ * Returns the new router to use, or null if no change is needed.
+ */
+export function resolveSwapRouterFallback(
+  currentRouter: string,
+  availability: { kyber: boolean; oneInch: boolean; pendle: boolean },
+): string | null {
+  const { kyber, oneInch, pendle } = availability;
+  if (currentRouter === "kyber" && !kyber) {
+    return oneInch ? "1inch" : pendle ? "pendle" : null;
+  }
+  if (currentRouter === "1inch" && !oneInch) {
+    return kyber ? "kyber" : pendle ? "pendle" : null;
+  }
+  if (currentRouter === "pendle" && !pendle) {
+    return kyber ? "kyber" : oneInch ? "1inch" : null;
+  }
+  return null;
+}
+
+// ==================== Limit Order Rate Calculation Helper ====================
+
+/**
+ * Calculate the effective rate for limit order min collateral output.
+ * Handles custom price input, price inversion, and fallback to market rate.
+ */
+export function calculateLimitOrderRate(
+  customMinPrice: string,
+  priceInputInverted: boolean,
+  collateralDecimals: number,
+  debtDecimals: number,
+  marketRateRaw: bigint | undefined,
+): bigint {
+  if (!customMinPrice || customMinPrice === "") {
+    return marketRateRaw ?? 0n;
+  }
+  try {
+    if (priceInputInverted) {
+      const inputRate = parseUnits(customMinPrice, debtDecimals);
+      if (inputRate === 0n) {
+        return marketRateRaw ?? 0n;
+      }
+      // Invert: collPerDebt = 10^collDecimals * 10^debtDecimals / inputRate
+      return (BigInt(10 ** collateralDecimals) * BigInt(10 ** debtDecimals)) / inputRate;
+    }
+    // Normal mode: "1 DEBT = X COLL"
+    return parseUnits(customMinPrice, collateralDecimals);
+  } catch {
+    return marketRateRaw ?? 0n;
+  }
+}
+
+/**
+ * Apply slippage to a rate and calculate total min collateral output.
+ */
+export function applySlippageToRate(
+  rateToUse: bigint,
+  swapQuoteAmount: bigint,
+  limitSlippage: number,
+  collateralDecimals: number,
+  debtDecimals: number,
+): MinCollateralResult {
+  if (rateToUse === 0n || swapQuoteAmount === 0n) {
+    return { raw: 0n, formatted: "0" };
+  }
+  const slippageBps = BigInt(Math.round(limitSlippage * 100));
+  const rateWithSlippage = (rateToUse * (10000n - slippageBps)) / 10000n;
+  const totalRaw = (rateWithSlippage * swapQuoteAmount) / BigInt(10 ** debtDecimals);
+  return { raw: totalRaw, formatted: formatUnits(totalRaw, collateralDecimals) };
+}
+
+// ==================== Protocol Name Normalization for CoW ====================
+
+const COW_PROTOCOL_NAMES = ["aave", "compound", "venus", "morpho"] as const;
+
+/**
+ * Normalize protocol name for CoW conditional order trigger.
+ */
+export function normalizeProtocolForCow(protocolName: string): string {
+  const lower = protocolName.toLowerCase();
+  for (const protocol of COW_PROTOCOL_NAMES) {
+    if (lower.includes(protocol)) return protocol;
+  }
+  return "aave";
+}
+
+// ==================== Limit Order Chunk Params Helper ====================
+
+/**
+ * Default chunk params result when chunking is not applicable.
+ */
+export function createDefaultChunkParams(flashLoanAmountRaw: bigint, explanation = ""): ChunkParamsResult {
+  return {
+    numChunks: 1,
+    chunkSize: flashLoanAmountRaw,
+    chunkSizes: [flashLoanAmountRaw],
+    needsChunking: false,
+    initialBorrowCapacityUsd: 0n,
+    geometricRatio: 0,
+    recommendFlashLoan: false,
+    explanation,
+  };
+}
+
+/**
+ * Resolve effective LTV basis points from collateral config, eMode, or default.
+ */
+export function resolveEffectiveLtvBps(
+  collateralConfig: { ltv?: string | number } | null | undefined,
+  isEModeActive: boolean,
+  eMode: { ltv: number } | null | undefined,
+  maxLtvBps: bigint,
+): number {
+  if (collateralConfig?.ltv) return Number(collateralConfig.ltv);
+  if (isEModeActive && eMode) return eMode.ltv;
+  return Number(maxLtvBps);
+}
+
+// ==================== Limit Order Validation Helper ====================
+
+/**
+ * Validate all prerequisites for submitting a limit order.
+ * Throws an error with a descriptive message if validation fails.
+ */
+export function validateLimitOrderPrerequisites(params: {
+  collateral: SwapAsset | undefined;
+  debt: SwapAsset | undefined;
+  userAddress: Address | undefined;
+  conditionalOrderManagerAddress: Address | undefined;
+  walletClient: unknown;
+  publicClient: unknown;
+  limitPriceTriggerAddress: Address | undefined;
+  conditionalOrderTriggerParams: unknown;
+  flashLoanAmountRaw: bigint;
+  minCollateralOutRaw: bigint;
+}): void {
+  const {
+    collateral, debt, userAddress, conditionalOrderManagerAddress,
+    walletClient, publicClient,
+    limitPriceTriggerAddress, conditionalOrderTriggerParams,
+    flashLoanAmountRaw, minCollateralOutRaw,
+  } = params;
+
+  if (!collateral || !debt || !userAddress || !conditionalOrderManagerAddress || !walletClient || !publicClient) {
+    throw new Error("Missing required data for conditional order");
+  }
+
+  if (!limitPriceTriggerAddress || !conditionalOrderTriggerParams) {
+    console.error("[Conditional Order] Missing config:", {
+      limitPriceTriggerAddress,
+      conditionalOrderTriggerParams: !!conditionalOrderTriggerParams,
+      flashLoanAmountRaw: flashLoanAmountRaw.toString(),
+      minCollateralOut: minCollateralOutRaw.toString(),
+    });
+    const reason = !limitPriceTriggerAddress ? "trigger not deployed" : "params not ready (check amounts)";
+    throw new Error("Missing trigger configuration: " + reason);
+  }
+}
+
+// ==================== Active Adapter Resolution ====================
+
+/**
+ * Resolve the active swap adapter based on the current swap router selection.
+ * Flattens a nested ternary into a clear lookup.
+ */
+export function resolveActiveAdapter<T>(
+  swapRouter: string,
+  adapters: { kyber: T; oneInch: T; pendle: T },
+): T {
+  if (swapRouter === "kyber") return adapters.kyber;
+  if (swapRouter === "pendle") return adapters.pendle;
+  return adapters.oneInch;
+}
+
+// ==================== Swap Data Resolution for Build Flow ====================
+
+interface SwapDataResult {
+  swapData: string;
+  minOut: string;
+}
+
+interface QuoteRefs {
+  oneInchQuote: { dstAmount?: string; tx: { data: string; to?: string; from?: string } } | null | undefined;
+  pendleQuote: { data: { minPtOut?: string; minTokenOut?: string }; transaction: { data: string } } | null | undefined;
+  activeAdapter: { address: string } | null | undefined;
+  pendleAdapter: { address: string } | null | undefined;
+}
+
+/**
+ * Resolve swap data and minOut from the current quotes based on the active swap router.
+ * Returns null if the required quote data is not available.
+ */
+export function resolveSwapDataForFlow(
+  swapRouter: string,
+  refs: QuoteRefs,
+  minCollateralOutFormatted: string,
+): SwapDataResult | null {
+  if (swapRouter === "1inch" || swapRouter === "kyber") {
+    if (!refs.oneInchQuote || !refs.activeAdapter) {
+      console.warn("[buildFlow] Swap not ready:", { oneInchQuote: !!refs.oneInchQuote, activeAdapter: !!refs.activeAdapter, swapRouter });
+      return null;
+    }
+    const swapData = refs.oneInchQuote.tx.data;
+    console.log("[buildFlow] Kyber/1inch swap params:", {
+      swapRouter,
+      adapterAddress: refs.activeAdapter.address,
+      swapDataLength: swapData?.length || 0,
+      swapDataPrefix: swapData?.slice(0, 20) || "empty",
+      minOut: minCollateralOutFormatted,
+      dstAmount: refs.oneInchQuote.dstAmount,
+      txTo: refs.oneInchQuote.tx?.to,
+      txFrom: refs.oneInchQuote.tx?.from,
+    });
+    return { swapData, minOut: minCollateralOutFormatted };
+  }
+  // Pendle router
+  if (!refs.pendleQuote || !refs.pendleAdapter) {
+    console.warn("[buildFlow] Pendle not ready:", { pendleQuote: !!refs.pendleQuote, pendleAdapter: !!refs.pendleAdapter });
+    return null;
+  }
+  return {
+    swapData: refs.pendleQuote.transaction.data,
+    minOut: refs.pendleQuote.data.minPtOut || refs.pendleQuote.data.minTokenOut || minCollateralOutFormatted,
+  };
+}
+
+// ==================== Swap Router Mapping ====================
+
+/**
+ * Map the UI swap router name to the flow parameter format.
+ */
+export function mapSwapRouterToFlowParam(swapRouter: string): "oneinch" | "kyber" | "pendle" {
+  if (swapRouter === "1inch") return "oneinch";
+  if (swapRouter === "kyber") return "kyber";
+  return "pendle";
+}
+
+// ==================== Max Leverage Computation ====================
+
+/**
+ * Compute the effective max leverage from predictive data or LTV-based fallback,
+ * then adjust for slippage.
+ */
+export function computeMaxLeverage(
+  predictiveMaxLeverage: number,
+  collateralConfig: unknown,
+  isEModeActive: boolean,
+  maxLtvBps: bigint,
+  protocolName: string,
+  slippage: number,
+  calculateMaxLeverageFromLtvFn: (maxLtvBps: bigint, protocolName: string) => number,
+  adjustMaxLeverageForSlippageFn: (baseLeverage: number, slippage: number) => number,
+): number {
+  let baseLeverage: number;
+  if (predictiveMaxLeverage > 1 && (collateralConfig || isEModeActive)) {
+    baseLeverage = predictiveMaxLeverage;
+  } else {
+    baseLeverage = calculateMaxLeverageFromLtvFn(maxLtvBps, protocolName);
+  }
+  return adjustMaxLeverageForSlippageFn(baseLeverage, slippage);
+}
+
+// ==================== Provider Options Resolution ====================
+
+/**
+ * Resolve flash loan provider options from available sources.
+ */
+export function resolveProviderOptions(
+  flashLoanProviders: FlashLoanProviderOption[] | undefined,
+  defaultFlashLoanProvider: FlashLoanProviderOption | undefined,
+  chainId: number,
+  isAaveV3SupportedFn: (chainId: number) => boolean,
+  isBalancerV2SupportedFn: (chainId: number) => boolean,
+  getDefaultFlashLoanProvidersFn: (
+    chainId: number,
+    isAaveV3Supported: (chainId: number) => boolean,
+    isBalancerV2Supported: (chainId: number) => boolean,
+  ) => FlashLoanProviderOption[],
+): FlashLoanProviderOption[] {
+  if (flashLoanProviders?.length) return flashLoanProviders;
+  if (defaultFlashLoanProvider) return [defaultFlashLoanProvider];
+  return getDefaultFlashLoanProvidersFn(chainId, isAaveV3SupportedFn, isBalancerV2SupportedFn);
+}
+
+// ==================== Submit State Flags ====================
+
+/**
+ * Compute derived submit-related flags (hasQuote, hasAdapter, canSubmit, etc.)
+ * to flatten nested ternary expressions in the component body.
+ */
+export function computeSubmitFlags(params: {
+  swapRouter: string;
+  pendleQuote: unknown;
+  oneInchQuote: unknown;
+  kyberAdapter: unknown;
+  oneInchAdapter: unknown;
+  pendleAdapter: unknown;
+  executionType: "market" | "limit";
+  collateral: unknown;
+  debt: unknown;
+  marginAmountRaw: bigint;
+  leverage: number;
+  isSwapQuoteLoading: boolean;
+  conditionalOrderReady: boolean;
+  conditionalOrderTriggerParams: unknown;
+}): { hasQuote: boolean; hasAdapter: boolean; canSubmit: boolean } {
+  const hasQuote = params.swapRouter === "pendle" ? !!params.pendleQuote : !!params.oneInchQuote;
+  const hasAdapter = params.swapRouter === "kyber"
+    ? !!params.kyberAdapter
+    : params.swapRouter === "1inch"
+      ? !!params.oneInchAdapter
+      : !!params.pendleAdapter;
+
+  const baseValid = !!params.collateral && !!params.debt && params.marginAmountRaw > 0n && params.leverage > 1;
+
+  const canSubmitMarket = baseValid && hasQuote && hasAdapter && !params.isSwapQuoteLoading;
+  const canSubmitLimit = baseValid && params.conditionalOrderReady && !!params.conditionalOrderTriggerParams;
+  const canSubmit = params.executionType === "limit" ? canSubmitLimit : canSubmitMarket;
+
+  return { hasQuote, hasAdapter, canSubmit };
 }

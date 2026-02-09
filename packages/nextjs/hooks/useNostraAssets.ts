@@ -2,8 +2,7 @@ import { useMemo } from "react";
 
 import { feltToString } from "~~/utils/protocols";
 import { useScaffoldReadContract } from "./scaffold-stark";
-
-const toHexAddress = (value: bigint) => `0x${value.toString(16).padStart(64, "0")}`;
+import { toHexAddress } from "./useProtocolPositions/utils";
 
 export type NostraAsset = {
   address: string;

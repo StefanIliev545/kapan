@@ -1,12 +1,13 @@
 "use client";
 
-import { ChangeEvent, FocusEvent, ReactNode, useCallback, useEffect, useRef } from "react";
-import { CommonInputProps } from "./utils";
+import type { ChangeEvent, FocusEvent, ReactNode } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import type { CommonInputProps } from "./utils";
 
-export type InputBaseStyleConfig = {
+export interface InputBaseStyleConfig {
   container: string;
   input: string;
-};
+}
 
 type InputBaseProps<T> = CommonInputProps<T> & {
   error?: boolean;
@@ -59,7 +60,7 @@ export const InputBase = <T extends { toString: () => string } | undefined = str
   );
 
   // Runs only when reFocus prop is passed, useful for setting the cursor
-  // at the end of the input. Example AddressInput
+  // At the end of the input. Example AddressInput
   const onFocus = useCallback((e: FocusEvent<HTMLInputElement, Element>) => {
     if (reFocus !== undefined) {
       e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length);
@@ -67,7 +68,9 @@ export const InputBase = <T extends { toString: () => string } | undefined = str
   }, [reFocus]);
 
   useEffect(() => {
-    if (reFocus !== undefined && reFocus === true) inputRef.current?.focus();
+    if (reFocus !== undefined && reFocus === true) {
+      inputRef.current?.focus();
+    }
   }, [reFocus]);
 
   return (

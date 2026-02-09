@@ -135,14 +135,13 @@ function getGatewayConfig(chainId: number) {
 
 // ============ GraphQL Queries ============
 
-// Query to get all whitelisted markets (these should include the major ones)
 const WHITELISTED_MARKETS_QUERY = `
   query WhitelistedMarkets($chainId: Int!, $first: Int!) {
     markets(
       first: $first
       orderBy: SupplyAssetsUsd
       orderDirection: Desc
-      where: { 
+      where: {
         chainId_in: [$chainId]
         whitelisted: true
       }
@@ -250,20 +249,16 @@ function convertOnChainToPosition(
   rawPos: OnChainPosition,
   market: MorphoMarket,
 ): MorphoPosition | null {
-  // Normalize in case viem returns array instead of object
   const pos = normalizePosition(rawPos);
-  
-  // Convert to BigInt to handle both bigint and string returns from viem
+
   const collateralBalance = BigInt(pos.collateralBalance || 0);
   const borrowBalance = BigInt(pos.borrowBalance || 0);
   const supplyBalance = BigInt(pos.supplyBalance || 0);
 
-  // Skip positions with no balance
   if (collateralBalance === 0n && borrowBalance === 0n && supplyBalance === 0n) {
     return null;
   }
 
-  // Health factor: max value means no debt (infinite health)
   let healthFactor: number | null = null;
   const hf = BigInt(pos.healthFactor || 0);
   if (hf !== MAX_HEALTH_FACTOR && borrowBalance > 0n) {
@@ -272,7 +267,7 @@ function convertOnChainToPosition(
 
   return {
     market,
-    supplyShares: "0", // Not available from on-chain call, but not needed for display
+    supplyShares: "0",
     supplyAssets: Number(supplyBalance),
     borrowShares: "0",
     borrowAssets: Number(borrowBalance),
@@ -285,8 +280,6 @@ function convertOnChainToPosition(
 
 async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
   try {
-    // Fetch whitelisted markets from GraphQL (filters out spam like GMORPHO)
-    // The whitelisted filter ensures we get the real, legitimate markets
     const response = await fetch(MORPHO_GRAPHQL_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -294,7 +287,7 @@ async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
         query: WHITELISTED_MARKETS_QUERY,
         variables: { chainId, first: 500 },
       }),
-      next: { revalidate: 60 }, // Cache for 1 minute
+      next: { revalidate: 60 },
     });
 
     const data = await response.json();
@@ -363,23 +356,18 @@ async function fetchOnChainPositions(
   });
 
   const positionsMap = new Map<string, OnChainPosition>();
-
-  // Batch markets into chunks
   const chunks = chunkArray(markets, BATCH_SIZE);
 
-  // Process chunks in parallel
   const results = await Promise.allSettled(
     chunks.map(async (chunk) => {
       try {
         const marketParams = chunk.map(marketToParams);
-        
         const positions = await client.readContract({
           address: gatewayConfig.address,
           abi: gatewayConfig.abi,
           functionName: "getPositionsForMarkets",
           args: [marketParams, userAddress as Address],
         }) as OnChainPosition[];
-
         return { chunk, positions };
       } catch (error) {
         console.error(`[positions-onchain] Batch failed:`, error);
@@ -388,15 +376,12 @@ async function fetchOnChainPositions(
     })
   );
 
-  // Collect results
   for (const result of results) {
     if (result.status === "fulfilled" && result.value.positions) {
       const { chunk, positions } = result.value;
-      
       positions.forEach((pos, i) => {
         const market = chunk[i];
         if (market) {
-          // Use the returned marketId as key since it's computed on-chain
           const normalized = normalizePosition(pos);
           positionsMap.set(normalized.marketId.toLowerCase(), pos);
         }
@@ -405,6 +390,70 @@ async function fetchOnChainPositions(
   }
 
   return positionsMap;
+}
+
+// ============ Main Handler Helpers ============
+
+/** Build a combined market lookup from whitelisted markets and user GraphQL positions. */
+function buildMarketLookup(
+  markets: MorphoMarket[],
+  graphQLPositions: MorphoPosition[],
+): Map<string, MorphoMarket> {
+  const marketByKey = new Map<string, MorphoMarket>();
+  for (const m of markets) {
+    marketByKey.set(m.uniqueKey.toLowerCase(), m);
+  }
+  // Add markets from GraphQL positions that aren't in our main list
+  // This ensures we query on-chain for markets the user has positions in
+  for (const pos of graphQLPositions) {
+    const key = pos.market.uniqueKey.toLowerCase();
+    if (!marketByKey.has(key)) {
+      marketByKey.set(key, pos.market);
+    }
+  }
+  return marketByKey;
+}
+
+/** Log debug info about non-zero on-chain positions. */
+function logDebugPositions(onChainPositions: Map<string, OnChainPosition>): void {
+  let nonZeroCount = 0;
+  for (const [key, pos] of onChainPositions) {
+    const normalized = normalizePosition(pos);
+    const col = BigInt(normalized.collateralBalance || 0);
+    const bor = BigInt(normalized.borrowBalance || 0);
+    const sup = BigInt(normalized.supplyBalance || 0);
+    if (col > 0n || bor > 0n || sup > 0n) {
+      nonZeroCount++;
+      console.log(`[positions-onchain] Position: ${key.slice(0, 20)}... col=${col}, bor=${bor}, sup=${sup}`);
+    }
+  }
+  console.log(`[positions-onchain] Found ${nonZeroCount} non-zero positions from ${onChainPositions.size} markets`);
+}
+
+/** Merge on-chain positions (source of truth) with GraphQL fallback positions. */
+function mergePositions(
+  onChainPositions: Map<string, OnChainPosition>,
+  graphQLPositions: MorphoPosition[],
+  marketByKey: Map<string, MorphoMarket>,
+): MorphoPosition[] {
+  const merged = new Map<string, MorphoPosition>();
+
+  for (const [uniqueKey, onChainPos] of onChainPositions) {
+    const market = marketByKey.get(uniqueKey);
+    if (!market) continue;
+    const position = convertOnChainToPosition(onChainPos, market);
+    if (position) merged.set(uniqueKey, position);
+  }
+
+  for (const gqlPos of graphQLPositions) {
+    const uniqueKey = gqlPos.market.uniqueKey.toLowerCase();
+    if (merged.has(uniqueKey)) continue;
+    if (gqlPos.collateral > 0 || gqlPos.borrowAssets > 0 || gqlPos.supplyAssets > 0) {
+      merged.set(uniqueKey, gqlPos);
+    }
+  }
+
+  return Array.from(merged.values());
 }
 
 // ============ Main Handler ============
@@ -428,90 +477,29 @@ export async function GET(
   const debug = request.nextUrl.searchParams.get("debug") === "true";
 
   try {
-    // Fetch whitelisted markets and GraphQL positions in parallel
     const [markets, graphQLPositions] = await Promise.all([
       fetchMarkets(chainId),
       fetchGraphQLPositions(chainId, userAddress),
     ]);
-    
+
     if (debug) {
       console.log(`[positions-onchain] Fetched ${markets.length} whitelisted markets, ${graphQLPositions.length} GraphQL positions`);
     }
-    
-    // Build market lookup by uniqueKey (lowercase for consistent matching)
-    const marketByKey = new Map<string, MorphoMarket>();
-    for (const m of markets) {
-      marketByKey.set(m.uniqueKey.toLowerCase(), m);
-    }
-    
-    // Add markets from GraphQL positions that aren't in our main list
-    // This ensures we query on-chain for markets the user has positions in
-    for (const pos of graphQLPositions) {
-      const key = pos.market.uniqueKey.toLowerCase();
-      if (!marketByKey.has(key)) {
-        marketByKey.set(key, pos.market);
-      }
-    }
-    
-    // Use the combined markets list for on-chain query
-    const allMarkets = Array.from(marketByKey.values());
 
-    // Fetch on-chain positions for all markets
+    const marketByKey = buildMarketLookup(markets, graphQLPositions);
+    const allMarkets = Array.from(marketByKey.values());
     const onChainPositions = await fetchOnChainPositions(chainId, userAddress, allMarkets);
 
-    if (debug) {
-      // Count non-zero positions
-      let nonZeroCount = 0;
-      for (const [key, pos] of onChainPositions) {
-        const normalized = normalizePosition(pos);
-        const col = BigInt(normalized.collateralBalance || 0);
-        const bor = BigInt(normalized.borrowBalance || 0);
-        const sup = BigInt(normalized.supplyBalance || 0);
-        if (col > 0n || bor > 0n || sup > 0n) {
-          nonZeroCount++;
-          console.log(`[positions-onchain] Position: ${key.slice(0, 20)}... col=${col}, bor=${bor}, sup=${sup}`);
-        }
-      }
-      console.log(`[positions-onchain] Found ${nonZeroCount} non-zero positions from ${onChainPositions.size} markets`);
-    }
+    if (debug) logDebugPositions(onChainPositions);
 
-    // Merge positions: on-chain takes priority, GraphQL fills gaps
-    const mergedPositions = new Map<string, MorphoPosition>();
+    const positions = mergePositions(onChainPositions, graphQLPositions, marketByKey);
 
-    // First, add all on-chain positions (source of truth for balances)
-    for (const [uniqueKey, onChainPos] of onChainPositions) {
-      const market = marketByKey.get(uniqueKey);
-      if (!market) continue;
-
-      const position = convertOnChainToPosition(onChainPos, market);
-      if (position) {
-        mergedPositions.set(uniqueKey, position);
-      }
-    }
-
-    // Then, add GraphQL positions for markets we don't have on-chain data for
-    for (const gqlPos of graphQLPositions) {
-      const uniqueKey = gqlPos.market.uniqueKey.toLowerCase();
-      
-      // Skip if we already have on-chain data for this market
-      if (mergedPositions.has(uniqueKey)) continue;
-
-      // Only add if there's actually a position
-      if (gqlPos.collateral > 0 || gqlPos.borrowAssets > 0 || gqlPos.supplyAssets > 0) {
-        mergedPositions.set(uniqueKey, gqlPos);
-      }
-    }
-
-    const positions = Array.from(mergedPositions.values());
-
-    // Return in the same format as the existing GraphQL endpoint
     return NextResponse.json({
       userByAddress: {
         address: userAddress.toLowerCase(),
         marketPositions: positions,
       },
     });
-
   } catch (error) {
     console.error("[positions-onchain] Error:", error);
     return NextResponse.json(

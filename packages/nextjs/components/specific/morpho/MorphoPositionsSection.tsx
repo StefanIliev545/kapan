@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState, useCallback, useMemo } from "react";
+import { FC, useState, useCallback, useMemo, memo } from "react";
 import { formatUnits } from "viem";
 import Image from "next/image";
 import type { MorphoPositionRow, MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
@@ -13,12 +13,27 @@ import formatPercentage from "~~/utils/formatPercentage";
 import { encodeMorphoContext, type MorphoMarketContextForEncoding } from "~~/utils/v2/instructionHelpers";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
 import { ExternalLink } from "lucide-react";
-import { isPTToken, PTYield } from "~~/hooks/usePendlePTYields";
+import { Cog6ToothIcon, ShieldCheckIcon, ArrowTrendingUpIcon } from "@heroicons/react/24/outline";
+import {
+  formatLtvPercent,
+  useConditionalOrders,
+  PROTOCOL_IDS,
+  decodeMorphoContext,
+  ConditionalOrderStatus,
+  type ConditionalOrder,
+} from "~~/hooks/useConditionalOrders";
+import { hasExternalYield, type ExternalYield } from "~~/hooks/useExternalYields";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { formatSignedPercent } from "../utils";
+import { IsolatedPositionLayout } from "~~/components/positions/IsolatedPositionLayout";
+import { useMorphoPositionGroups } from "~~/hooks/adapters/useMorphoPositionGroups";
+import type { PositionGroup } from "~~/types/positions";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
 import { DebtSwapEvmModal } from "~~/components/modals/DebtSwapEvmModal";
+import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
+import { useADLContracts } from "~~/hooks/useADLOrder";
+import { useAutoLeverageContracts } from "~~/hooks/useAutoLeverageOrder";
 import type { Address } from "viem";
 
 interface MorphoPositionsSectionProps {
@@ -32,7 +47,7 @@ interface MorphoPositionsSectionProps {
   onBorrowRequest?: (params: { market: MorphoMarket; collateralAddress: string }) => void;
   onDepositRequest?: () => void;
   /** Smart PT yield lookup function that handles bridged tokens */
-  findYield?: (address?: string, symbol?: string) => PTYield | undefined;
+  findYield?: (address?: string, symbol?: string) => ExternalYield | undefined;
 }
 
 // Static image error handler at module level
@@ -50,6 +65,34 @@ const TEXT_ERROR = "text-error";
 // Static available actions objects (can be reused across renders)
 const SUPPLY_ACTIONS_WITH_MOVE = { deposit: true, withdraw: true, move: true, swap: true } as const;
 const SUPPLY_ACTIONS_WITHOUT_MOVE = { deposit: true, withdraw: true, move: false, swap: true } as const;
+
+// ADL info type for position automation status
+interface ADLInfo {
+  hasActiveADL: boolean;
+  hasActiveAutoLev: boolean;
+  adlTriggerLtvBps: bigint | undefined;
+  adlTargetLtvBps: bigint | undefined;
+  isAboveTrigger: boolean;
+  isTriggerMet: boolean | undefined;
+  autoLevTriggerLtvBps: bigint | undefined;
+  autoLevTargetLtvBps: bigint | undefined;
+  isBelowAutoLevTrigger: boolean;
+  isAutoLevTriggerMet: boolean | undefined;
+}
+
+// Stable empty ADL info object to avoid creating new objects on every render
+const EMPTY_ADL_INFO: ADLInfo = {
+  hasActiveADL: false,
+  hasActiveAutoLev: false,
+  adlTriggerLtvBps: undefined,
+  adlTargetLtvBps: undefined,
+  isAboveTrigger: false,
+  isTriggerMet: undefined,
+  autoLevTriggerLtvBps: undefined,
+  autoLevTargetLtvBps: undefined,
+  isBelowAutoLevTrigger: false,
+  isAutoLevTriggerMet: undefined,
+};
 
 // Collateral Swap modal state for a position
 interface SwapModalState {
@@ -81,32 +124,102 @@ interface DebtSwapModalState {
   collateralDecimals: number;
 }
 
+// ADL modal state for a position
+interface ADLModalState {
+  isOpen: boolean;
+  morphoContext: MorphoMarketContextForEncoding | null;
+  currentLtvBps: number;
+  liquidationLtvBps: number;
+  collateralTokenAddress: string;
+  collateralTokenSymbol: string;
+  collateralDecimals: number;
+  collateralBalance: bigint;
+  collateralBalanceUsd: number;
+  collateralPrice: bigint;
+  debtTokenAddress: string;
+  debtTokenSymbol: string;
+  debtTokenDecimals: number;
+  debtBalance: bigint;
+  debtBalanceUsd: number;
+}
+
+// Shadow glow constants for automation status indicators
+const SHADOW_RED = "shadow-[0_0_6px_rgba(239,68,68,0.25),0_0_12px_rgba(239,68,68,0.15)]";
+const SHADOW_BLUE = "shadow-[0_0_6px_rgba(56,189,248,0.25),0_0_12px_rgba(56,189,248,0.15)]";
+const SHADOW_GREEN = "shadow-[0_0_6px_rgba(74,222,128,0.3),0_0_12px_rgba(74,222,128,0.18)]";
+
+/** Get shadow class based on automation status. Red = ADL trigger met, Blue = auto-lev trigger met, Green = protected */
+function getAutomationShadowClass(
+  hasActiveADL: boolean | undefined,
+  isAboveTrigger: boolean | undefined,
+  hasActiveAutoLev: boolean | undefined,
+  isBelowAutoLevTrigger: boolean | undefined,
+): string {
+  if (hasActiveADL && isAboveTrigger) return SHADOW_RED;
+  if (hasActiveAutoLev && isBelowAutoLevTrigger) return SHADOW_BLUE;
+  if (hasActiveADL || hasActiveAutoLev) return SHADOW_GREEN;
+  return "";
+}
+
+/** Convert a USD price number to 1e8 bigint format */
+function priceToRaw(priceUsd: number | undefined): bigint {
+  return BigInt(Math.floor((priceUsd || 0) * 1e8));
+}
+
 // Memoized position row component to avoid recreating inline objects on each render
 interface MorphoPositionRowProps {
   row: MorphoPositionRow;
+  /** Unified PositionGroup from the adapter hook (drives the layout component) */
+  positionGroup: PositionGroup;
   chainId: number;
   isExpanded: boolean;
   onToggleExpanded: () => void;
-  findYield?: (address?: string, symbol?: string) => PTYield | undefined;
+  findYield?: (address?: string, symbol?: string) => ExternalYield | undefined;
   onSwapRequest?: (state: SwapModalState) => void;
   onDebtSwapRequest?: (state: DebtSwapModalState) => void;
+  onADLRequest?: (state: ADLModalState) => void;
+  isADLSupported?: boolean;
+  hasActiveADL?: boolean;
+  adlTriggerLtvBps?: bigint;
+  adlTargetLtvBps?: bigint;
+  /** True if current LTV is at or above ADL trigger threshold */
+  isAboveTrigger?: boolean;
+  /** Auto-leverage props */
+  hasActiveAutoLev?: boolean;
+  autoLevTriggerLtvBps?: bigint;
+  autoLevTargetLtvBps?: bigint;
+  /** True if current LTV is below auto-leverage trigger threshold */
+  isBelowAutoLevTrigger?: boolean;
 }
 
-const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
+const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = memo(function MorphoPositionRowComponent({
   row,
+  positionGroup,
   chainId,
   isExpanded,
   onToggleExpanded,
   findYield,
   onSwapRequest,
   onDebtSwapRequest,
-}) => {
+  onADLRequest,
+  isADLSupported,
+  hasActiveADL,
+  adlTriggerLtvBps,
+  adlTargetLtvBps,
+  isAboveTrigger,
+  hasActiveAutoLev,
+  autoLevTriggerLtvBps,
+  autoLevTargetLtvBps,
+  isBelowAutoLevTrigger,
+}) {
   // Pre-encode the Morpho market context for modals
   const protocolContext = useMemo(() => encodeMorphoContext(row.context), [row.context]);
 
   // Calculate collateral rate (PT tokens have fixed yield)
   const collateralRate = useMemo(() => {
-    if (!isPTToken(row.collateralSymbol)) return 0;
+    if (!hasExternalYield(row.collateralSymbol)) {
+      return 0;
+    }
     const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
     const ptYield = findYield?.(collateralAddr, row.collateralSymbol);
     return ptYield?.fixedApy ?? 0;
@@ -121,14 +234,16 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
     currentRate: collateralRate,
     tokenAddress: row.market.collateralAsset?.address || "",
     tokenDecimals: row.collateralDecimals,
-    tokenPrice: BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8)),
+    tokenPrice: priceToRaw(row.market.collateralAsset?.priceUsd ?? undefined),
     tokenSymbol: row.collateralSymbol,
     protocolContext,
   }), [row.collateralSymbol, row.collateralBalanceUsd, row.collateralBalance, row.collateralDecimals, row.market.collateralAsset, collateralRate, protocolContext]);
 
   // Memoized borrow position object
   const borrowPosition = useMemo(() => {
-    if (!row.hasCollateral) return null;
+    if (!row.hasCollateral) {
+      return null;
+    }
     return {
       icon: tokenNameToLogo(row.loanSymbol.toLowerCase()),
       name: row.loanSymbol,
@@ -137,7 +252,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
       currentRate: row.borrowApy,
       tokenAddress: row.market.loanAsset.address,
       tokenDecimals: row.borrowDecimals,
-      tokenPrice: BigInt(Math.floor((row.market.loanAsset.priceUsd || 0) * 1e8)),
+      tokenPrice: priceToRaw(row.market.loanAsset.priceUsd ?? undefined),
       tokenSymbol: row.loanSymbol,
       protocolContext,
     };
@@ -175,7 +290,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
     rawBalance: row.collateralBalance,
     balance: row.collateralBalanceUsd,
     icon: tokenNameToLogo(row.collateralSymbol.toLowerCase()),
-    price: BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8)),
+    price: priceToRaw(row.market.collateralAsset?.priceUsd ?? undefined),
   }], [row.collateralSymbol, row.collateralDecimals, row.collateralBalance, row.collateralBalanceUsd, row.market.collateralAsset]);
 
   // Memoized borrow available actions
@@ -189,7 +304,9 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
 
   // Handle debt swap button click - opens debt swap modal
   const handleDebtSwapClick = useCallback(() => {
-    if (!onDebtSwapRequest || !row.hasDebt || !row.hasCollateral) return;
+    if (!onDebtSwapRequest || !row.hasDebt || !row.hasCollateral) {
+      return;
+    }
     onDebtSwapRequest({
       isOpen: true,
       morphoContext: row.context,
@@ -198,7 +315,7 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
       debtTokenDecimals: row.borrowDecimals,
       debtBalance: row.borrowBalance,
       debtBalanceUsd: row.borrowBalanceUsd,
-      debtTokenPrice: BigInt(Math.floor((row.market.loanAsset?.priceUsd || 0) * 1e8)),
+      debtTokenPrice: priceToRaw(row.market.loanAsset?.priceUsd ?? undefined),
       collateralTokenAddress: row.market.collateralAsset?.address || "",
       collateralTokenSymbol: row.collateralSymbol,
       collateralBalance: row.collateralBalance,
@@ -229,9 +346,11 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
 
   // Handle swap button click - opens collateral swap modal
   const handleSwapClick = useCallback(() => {
-    if (!onSwapRequest || !row.hasCollateral) return;
+    if (!onSwapRequest || !row.hasCollateral) {
+      return;
+    }
     // Convert price to 1e8 format for SwapAsset compatibility
-    const priceIn1e8 = BigInt(Math.floor((row.market.collateralAsset?.priceUsd || 0) * 1e8));
+    const priceIn1e8 = priceToRaw(row.market.collateralAsset?.priceUsd ?? undefined);
     onSwapRequest({
       isOpen: true,
       morphoContext: row.context,
@@ -246,101 +365,185 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
     });
   }, [onSwapRequest, row]);
 
-  const containerColumns = "grid-cols-1 md:grid-cols-2 md:divide-x";
+  // Handle ADL button click - opens ADL automation modal
+  const handleADLClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onADLRequest || !row.hasDebt || !row.hasCollateral) {
+      return;
+    }
+    const priceIn1e8 = priceToRaw(row.market.collateralAsset?.priceUsd ?? undefined);
+    onADLRequest({
+      isOpen: true,
+      morphoContext: row.context,
+      currentLtvBps: Math.round((row.currentLtv || 0) * 100),
+      liquidationLtvBps: Math.round(row.lltv * 100),
+      collateralTokenAddress: row.market.collateralAsset?.address || "",
+      collateralTokenSymbol: row.collateralSymbol,
+      collateralDecimals: row.collateralDecimals,
+      collateralBalance: row.collateralBalance,
+      collateralBalanceUsd: row.collateralBalanceUsd,
+      collateralPrice: priceIn1e8,
+      debtTokenAddress: row.market.loanAsset.address,
+      debtTokenSymbol: row.loanSymbol,
+      debtTokenDecimals: row.borrowDecimals,
+      debtBalance: row.borrowBalance,
+      debtBalanceUsd: row.borrowBalanceUsd,
+    });
+  }, [onADLRequest, row]);
+
+  // Combined automation status for visual indicator
+  const hasAnyAutomation = hasActiveADL || hasActiveAutoLev;
+
+  const adlShadowClass = getAutomationShadowClass(hasActiveADL, isAboveTrigger, hasActiveAutoLev, isBelowAutoLevTrigger);
 
   return (
-    <div
-      key={row.key}
-      className="border-base-300 hover:border-base-content/15 relative rounded-md border transition-all duration-200"
-    >
-      {/* Market pair header */}
-      <div
-        className="bg-base-200/50 border-base-300 hover:bg-base-200/70 flex cursor-pointer flex-col gap-2 border-b px-3 py-2 transition-colors sm:flex-row sm:items-center sm:justify-between"
-        onClick={onToggleExpanded}
-      >
-        {/* Market name row */}
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex flex-shrink-0 -space-x-2">
-            <Image
-              src={tokenNameToLogo(row.collateralSymbol.toLowerCase())}
-              alt={row.collateralSymbol}
-              width={20}
-              height={20}
-              className="border-base-100 bg-base-200 rounded-full border"
-              onError={handleImageError}
-            />
-            <Image
-              src={tokenNameToLogo(row.loanSymbol.toLowerCase())}
-              alt={row.loanSymbol}
-              width={20}
-              height={20}
-              className="border-base-100 bg-base-200 rounded-full border"
-              onError={handleImageError}
-            />
-          </div>
-          <span className="truncate text-sm font-medium" title={`${row.collateralSymbol}/${row.loanSymbol}`}>
-            {row.collateralSymbol}/{row.loanSymbol}
-          </span>
-          {morphoUrl && (
-            <a
-              href={morphoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={stopPropagation}
-              className="inline-flex flex-shrink-0 items-center gap-0.5 opacity-50 transition-opacity hover:opacity-100"
-              title="View on Morpho"
-            >
+    <IsolatedPositionLayout
+      group={positionGroup}
+      className={`border-base-300 hover:border-base-content/15 relative rounded-md border transition-all duration-200 ${adlShadowClass}`}
+      gridClassName="divide-base-300 grid grid-cols-1 divide-y md:grid-cols-2 md:divide-x md:divide-y-0"
+      header={
+        <div
+          className="bg-base-200/50 border-base-300 hover:bg-base-200/70 flex cursor-pointer flex-col gap-2 border-b px-3 py-2 transition-colors sm:flex-row sm:items-center sm:justify-between"
+          onClick={onToggleExpanded}
+        >
+          {/* Market name row */}
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex flex-shrink-0 -space-x-2">
               <Image
-                src="/logos/morpho.svg"
-                alt="Morpho"
-                width={14}
-                height={14}
-                className="rounded-sm"
+                src={tokenNameToLogo(row.collateralSymbol.toLowerCase())}
+                alt={row.collateralSymbol}
+                width={20}
+                height={20}
+                className="border-base-100 bg-base-200 rounded-full border"
+                onError={handleImageError}
               />
-              <ExternalLink width={10} height={10} />
-            </a>
-          )}
-        </div>
-        {/* Stats row - wraps on mobile */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-          {/* Net Value */}
-          <span className="text-base-content/60">
-            Net:{" "}
-            <span className={positionYieldMetrics.netBalance >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
-              {formatCurrencyCompact(positionYieldMetrics.netBalance)}
+              <Image
+                src={tokenNameToLogo(row.loanSymbol.toLowerCase())}
+                alt={row.loanSymbol}
+                width={20}
+                height={20}
+                className="border-base-100 bg-base-200 rounded-full border"
+                onError={handleImageError}
+              />
+            </div>
+            <span className="truncate text-sm font-medium" title={`${row.collateralSymbol}/${row.loanSymbol}`}>
+              {row.collateralSymbol}/{row.loanSymbol}
             </span>
-          </span>
-          {/* Net APY */}
-          <span className="text-base-content/60">
-            APY:{" "}
-            <span className={positionYieldMetrics.netApyPercent == null ? "text-base-content/40" : positionYieldMetrics.netApyPercent >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
-              {positionYieldMetrics.netApyPercent != null ? formatSignedPercent(positionYieldMetrics.netApyPercent) : "—"}
-            </span>
-          </span>
-          {/* LTV - show first on mobile since it's important */}
-          {row.hasDebt && (
+            {morphoUrl && (
+              <a
+                href={morphoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={stopPropagation}
+                className="inline-flex flex-shrink-0 items-center gap-0.5 opacity-50 transition-opacity hover:opacity-100"
+                title="View on Morpho"
+              >
+                <Image
+                  src="/logos/morpho.svg"
+                  alt="Morpho"
+                  width={14}
+                  height={14}
+                  className="rounded-sm"
+                />
+                <ExternalLink width={10} height={10} />
+              </a>
+            )}
+          </div>
+          {/* Right side: ADL indicator + Stats */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+            {/* LTV Automation Settings/Status - show before stats */}
+            {isADLSupported && row.hasDebt && row.hasCollateral && (
+              <button
+                onClick={handleADLClick}
+                className={`group relative flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors ${
+                  hasAnyAutomation
+                    ? "bg-success/10 text-success hover:bg-success/20"
+                    : "text-base-content/50 hover:bg-base-200 hover:text-base-content"
+                }`}
+              >
+                {hasAnyAutomation ? (
+                  <div className="flex items-center gap-2">
+                    {/* ADL badge */}
+                    {hasActiveADL && (
+                      <div className="flex items-center gap-1">
+                        <ShieldCheckIcon className="size-3.5" />
+                        <span className="text-[10px] font-medium">
+                          {formatLtvPercent(adlTriggerLtvBps!)}↓{formatLtvPercent(adlTargetLtvBps!)}
+                        </span>
+                      </div>
+                    )}
+                    {/* Auto-leverage badge */}
+                    {hasActiveAutoLev && (
+                      <div className="text-info flex items-center gap-1">
+                        <ArrowTrendingUpIcon className="size-3.5" />
+                        <span className="text-[10px] font-medium">
+                          {formatLtvPercent(autoLevTriggerLtvBps!)}↑{formatLtvPercent(autoLevTargetLtvBps!)}
+                        </span>
+                      </div>
+                    )}
+                    {/* Hover tooltip */}
+                    <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                      {hasActiveADL && (
+                        <>
+                          <span className="text-success">ADL:</span> {formatLtvPercent(adlTriggerLtvBps!)} → {formatLtvPercent(adlTargetLtvBps!)}
+                          {hasActiveAutoLev && <br />}
+                        </>
+                      )}
+                      {hasActiveAutoLev && (
+                        <>
+                          <span className="text-info">Auto-Lev:</span> {formatLtvPercent(autoLevTriggerLtvBps!)} → {formatLtvPercent(autoLevTargetLtvBps!)}
+                        </>
+                      )}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <Cog6ToothIcon className="size-3.5" />
+                    <span className="text-[10px]">Automate</span>
+                    {/* Hover tooltip for inactive */}
+                    <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                      Set up LTV Automation
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
+            {/* Net Value */}
             <span className="text-base-content/60">
-              LTV:{" "}
-              <span className={row.currentLtv && row.currentLtv > row.lltv * 0.9 ? TEXT_ERROR : TEXT_SUCCESS}>{ltvDisplayValue}</span>
-              <span className="text-base-content/50">/{row.lltv.toFixed(0)}%</span>
+              Net:{" "}
+              <span className={positionYieldMetrics.netBalance >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
+                {formatCurrencyCompact(positionYieldMetrics.netBalance)}
+              </span>
             </span>
-          )}
-          {/* 30D Yield - hidden on very small screens */}
-          <span className="text-base-content/60 group relative hidden cursor-help min-[400px]:inline">
-            30D:{" "}
-            <span className={positionYieldMetrics.netYield30d >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
-              {formatCurrencyCompact(positionYieldMetrics.netYield30d)}
+            {/* Net APY */}
+            <span className="text-base-content/60">
+              APY:{" "}
+              <span className={positionYieldMetrics.netApyPercent == null ? "text-base-content/40" : positionYieldMetrics.netApyPercent >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
+                {positionYieldMetrics.netApyPercent != null ? formatSignedPercent(positionYieldMetrics.netApyPercent) : "—"}
+              </span>
             </span>
-            <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-              Est. annual: <span className={positionYieldMetrics.netAnnualYield >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>{formatCurrencyCompact(positionYieldMetrics.netAnnualYield)}</span>
+            {/* LTV - show first on mobile since it's important */}
+            {row.hasDebt && (
+              <span className="text-base-content/60">
+                LTV:{" "}
+                <span className={row.currentLtv && row.currentLtv > row.lltv * 0.9 ? TEXT_ERROR : TEXT_SUCCESS}>{ltvDisplayValue}</span>
+                <span className="text-base-content/50">/{row.lltv.toFixed(0)}%</span>
+              </span>
+            )}
+            {/* 30D Yield - hidden on very small screens */}
+            <span className="text-base-content/60 group relative hidden cursor-help min-[400px]:inline">
+              30D:{" "}
+              <span className={positionYieldMetrics.netYield30d >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>
+                {formatCurrencyCompact(positionYieldMetrics.netYield30d)}
+              </span>
+              <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                Est. annual: <span className={positionYieldMetrics.netAnnualYield >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>{formatCurrencyCompact(positionYieldMetrics.netAnnualYield)}</span>
+              </span>
             </span>
-          </span>
+          </div>
         </div>
-      </div>
-
-      {/* Side-by-side positions */}
-      <div className={`divide-base-300 grid divide-y md:divide-y-0 ${containerColumns}`}>
-        {/* Left: Collateral (Supply) */}
+      }
+      collateralContent={
         <SupplyPosition
           {...supplyPosition}
           protocolName="morpho-blue"
@@ -355,10 +558,11 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
           extraStats={extraStats}
           showExpandIndicator={false}
           onSwap={row.hasCollateral ? handleSwapClick : undefined}
+          adlActive={hasAnyAutomation}
         />
-
-        {/* Right: Debt (Borrow) */}
-        {borrowPosition ? (
+      }
+      debtContent={
+        borrowPosition ? (
           <BorrowPosition
             {...borrowPosition}
             protocolName="morpho-blue"
@@ -374,11 +578,11 @@ const MorphoPositionRowComponent: FC<MorphoPositionRowProps> = ({
             onToggleExpanded={onToggleExpanded}
             onSwap={row.hasDebt && row.hasCollateral ? handleDebtSwapClick : undefined}
           />
-        ) : null}
-      </div>
-    </div>
+        ) : null
+      }
+    />
   );
-};
+});
 
 export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   title,
@@ -396,14 +600,106 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   // Debt Swap modal state
   const [debtSwapModalState, setDebtSwapModalState] = useState<DebtSwapModalState | null>(null);
 
+  // ADL modal state
+  const [adlModalState, setAdlModalState] = useState<ADLModalState | null>(null);
+
+  // Adapter hook: convert rows to unified PositionGroup[] for topology layout
+  const positionGroups = useMorphoPositionGroups(chainId, rows);
+
+  // Check if ADL/Auto-Leverage is supported on this chain
+  const { isSupported: isADLSupported, ltvTriggerAddress } = useADLContracts(chainId);
+  const { autoLeverageTriggerAddress } = useAutoLeverageContracts(chainId);
+
+  // Fetch all conditional orders to find ADL/Auto-Leverage for each position
+  const { orders: conditionalOrders } = useConditionalOrders({
+    activeOnly: true,
+    fetchTriggerStatus: true,
+  });
+
+  // Build maps of market ID -> order for quick lookup (separate ADL and Auto-Leverage)
+  const { adlByMarketId, autoLevByMarketId } = useMemo(() => {
+    const adlMap = new Map<string, ConditionalOrder>();
+    const autoLevMap = new Map<string, ConditionalOrder>();
+
+    for (const order of conditionalOrders) {
+      if (order.context.status !== ConditionalOrderStatus.Active) {
+        continue;
+      }
+      if (!order.triggerParams) {
+        continue;
+      }
+
+      // Only match Morpho orders
+      if (order.triggerParams.protocolId !== PROTOCOL_IDS.MORPHO_BLUE) {
+        continue;
+      }
+
+      // Decode the protocol context to get market params
+      const morphoContext = decodeMorphoContext(order.triggerParams.protocolContext);
+      if (!morphoContext) {
+        continue;
+      }
+
+      const marketId = morphoContext.marketId.toLowerCase();
+      const triggerAddr = order.context.params.trigger.toLowerCase();
+
+      // Separate by trigger type - only compare if addresses are loaded
+      if (autoLeverageTriggerAddress && triggerAddr === autoLeverageTriggerAddress.toLowerCase()) {
+        autoLevMap.set(marketId, order);
+      } else if (ltvTriggerAddress && triggerAddr === ltvTriggerAddress.toLowerCase()) {
+        adlMap.set(marketId, order);
+      }
+    }
+
+    return { adlByMarketId: adlMap, autoLevByMarketId: autoLevMap };
+  }, [conditionalOrders, ltvTriggerAddress, autoLeverageTriggerAddress]);
+
+  // Pre-compute ADL info for all rows to avoid creating new objects on each render
+  const adlInfoByMarketId = useMemo(() => {
+    const infoMap = new Map<string, ADLInfo>();
+
+    for (const row of rows) {
+      const marketId = row.market.uniqueKey?.toLowerCase();
+      if (!marketId) {
+        continue;
+      }
+
+      const currentLtvBps = Math.round((row.currentLtv || 0) * 100);
+
+      // Check for ADL order
+      const adlOrder = adlByMarketId.get(marketId);
+      const adlTriggerLtvBps = adlOrder?.triggerParams?.triggerLtvBps;
+      const adlTargetLtvBps = adlOrder?.triggerParams?.targetLtvBps;
+      const hasActiveADL = adlTriggerLtvBps !== undefined && adlTargetLtvBps !== undefined;
+      const isAboveTrigger = hasActiveADL && currentLtvBps >= Number(adlTriggerLtvBps);
+
+      // Check for Auto-Leverage order
+      const autoLevOrder = autoLevByMarketId.get(marketId);
+      const autoLevTriggerLtvBps = autoLevOrder?.triggerParams?.triggerLtvBps;
+      const autoLevTargetLtvBps = autoLevOrder?.triggerParams?.targetLtvBps;
+      const hasActiveAutoLev = autoLevTriggerLtvBps !== undefined && autoLevTargetLtvBps !== undefined;
+      const isBelowAutoLevTrigger = hasActiveAutoLev && currentLtvBps < Number(autoLevTriggerLtvBps);
+
+      infoMap.set(marketId, {
+        hasActiveADL,
+        adlTriggerLtvBps,
+        adlTargetLtvBps,
+        isAboveTrigger,
+        isTriggerMet: adlOrder?.isTriggerMet,
+        hasActiveAutoLev,
+        autoLevTriggerLtvBps,
+        autoLevTargetLtvBps,
+        isBelowAutoLevTrigger,
+        isAutoLevTriggerMet: autoLevOrder?.isTriggerMet,
+      });
+    }
+
+    return infoMap;
+  }, [rows, adlByMarketId, autoLevByMarketId]);
+
   const toggleRowExpanded = useCallback((key: string) => {
     setExpandedRows((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
-
-  // Memoize toggle handlers for each row to avoid creating new functions on each render
-  const getToggleHandler = useCallback((key: string) => {
-    return () => toggleRowExpanded(key);
-  }, [toggleRowExpanded]);
 
   // Handle swap modal open request
   const handleSwapRequest = useCallback((state: SwapModalState) => {
@@ -423,6 +719,16 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
   // Handle debt swap modal close
   const handleCloseDebtSwapModal = useCallback(() => {
     setDebtSwapModalState(null);
+  }, []);
+
+  // Handle ADL modal open request
+  const handleADLRequest = useCallback((state: ADLModalState) => {
+    setAdlModalState(state);
+  }, []);
+
+  // Handle ADL modal close
+  const handleCloseADLModal = useCallback(() => {
+    setAdlModalState(null);
   }, []);
 
   const renderPositions = () => {
@@ -450,23 +756,40 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
       );
     }
 
-    return rows.map((row) => (
-      <MorphoPositionRowComponent
-        key={row.key}
-        row={row}
-        chainId={chainId}
-        isExpanded={!!expandedRows[row.key]}
-        onToggleExpanded={getToggleHandler(row.key)}
-        findYield={findYield}
-        onSwapRequest={handleSwapRequest}
-        onDebtSwapRequest={handleDebtSwapRequest}
-      />
-    ));
+    return rows.map((row, idx) => {
+      const marketId = row.market.uniqueKey?.toLowerCase();
+      const adlInfo = marketId ? adlInfoByMarketId.get(marketId) ?? EMPTY_ADL_INFO : EMPTY_ADL_INFO;
+      return (
+        <MorphoPositionRowComponent
+          key={row.key}
+          row={row}
+          positionGroup={positionGroups[idx]}
+          chainId={chainId}
+          isExpanded={!!expandedRows[row.key]}
+          onToggleExpanded={() => toggleRowExpanded(row.key)}
+          findYield={findYield}
+          onSwapRequest={handleSwapRequest}
+          onDebtSwapRequest={handleDebtSwapRequest}
+          onADLRequest={handleADLRequest}
+          isADLSupported={isADLSupported}
+          hasActiveADL={adlInfo.hasActiveADL}
+          adlTriggerLtvBps={adlInfo.adlTriggerLtvBps}
+          adlTargetLtvBps={adlInfo.adlTargetLtvBps}
+          isAboveTrigger={adlInfo.isAboveTrigger}
+          hasActiveAutoLev={adlInfo.hasActiveAutoLev}
+          autoLevTriggerLtvBps={adlInfo.autoLevTriggerLtvBps}
+          autoLevTargetLtvBps={adlInfo.autoLevTargetLtvBps}
+          isBelowAutoLevTrigger={adlInfo.isBelowAutoLevTrigger}
+        />
+      );
+    });
   };
 
   // Build available assets for swap modal from current position
   const swapAvailableAssets = useMemo(() => {
-    if (!swapModalState) return [];
+    if (!swapModalState) {
+      return [];
+    }
     // Convert raw balance to human-readable number
     const humanBalance = Number(formatUnits(swapModalState.collateralBalance, swapModalState.collateralDecimals));
     return [{
@@ -482,7 +805,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
   // Build position prop for swap modal
   const swapPosition = useMemo(() => {
-    if (!swapModalState) return null;
+    if (!swapModalState) {
+      return null;
+    }
     return {
       name: swapModalState.collateralSymbol,
       tokenAddress: swapModalState.collateralAddress,
@@ -494,7 +819,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
 
   // Build available assets for debt swap modal from current position
   const debtSwapAvailableAssets = useMemo(() => {
-    if (!debtSwapModalState) return [];
+    if (!debtSwapModalState) {
+      return [];
+    }
     // Convert raw balance to human-readable number
     const humanBalance = Number(formatUnits(debtSwapModalState.debtBalance, debtSwapModalState.debtTokenDecimals));
     return [{
@@ -564,6 +891,37 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
           collateralTokenSymbol={debtSwapModalState.collateralTokenSymbol}
           collateralBalance={debtSwapModalState.collateralBalance}
           collateralDecimals={debtSwapModalState.collateralDecimals}
+        />
+      )}
+
+      {/* LTV Automation Modal (ADL + Auto-Leverage) */}
+      {adlModalState && (
+        <LTVAutomationModal
+          isOpen={adlModalState.isOpen}
+          onClose={handleCloseADLModal}
+          protocolName="morpho-blue"
+          chainId={chainId}
+          currentLtvBps={adlModalState.currentLtvBps}
+          liquidationLtvBps={adlModalState.liquidationLtvBps}
+          collateralTokens={[{
+            symbol: adlModalState.collateralTokenSymbol,
+            address: adlModalState.collateralTokenAddress,
+            decimals: adlModalState.collateralDecimals,
+            rawBalance: adlModalState.collateralBalance,
+            balance: Number(formatUnits(adlModalState.collateralBalance, adlModalState.collateralDecimals)),
+            icon: tokenNameToLogo(adlModalState.collateralTokenSymbol.toLowerCase()),
+            price: adlModalState.collateralPrice,
+            usdValue: adlModalState.collateralBalanceUsd,
+          }]}
+          debtToken={{
+            address: adlModalState.debtTokenAddress,
+            symbol: adlModalState.debtTokenSymbol,
+            decimals: adlModalState.debtTokenDecimals,
+            balance: adlModalState.debtBalance,
+          }}
+          morphoContext={adlModalState.morphoContext ?? undefined}
+          totalCollateralUsd={BigInt(Math.round(adlModalState.collateralBalanceUsd * 1e8))}
+          totalDebtUsd={BigInt(Math.round(adlModalState.debtBalanceUsd * 1e8))}
         />
       )}
     </>

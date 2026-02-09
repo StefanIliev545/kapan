@@ -1,5 +1,5 @@
 import { AbiCoder, keccak256, toUtf8Bytes, parseUnits } from "ethers";
-import { ProtocolInstruction } from "../v2/instructionHelpers";
+import type { ProtocolInstruction } from "../v2/instructionHelpers";
 
 /**
  * Completion types for Kapan CoW orders
@@ -157,7 +157,9 @@ export function encodeInstructions(instructions: ProtocolInstruction[] | undefin
 function isPerIterationInstructions(
   instructions: ProtocolInstruction[] | ProtocolInstruction[][] | undefined
 ): instructions is ProtocolInstruction[][] {
-  if (!instructions || instructions.length === 0) return false;
+  if (!instructions || instructions.length === 0) {
+    return false;
+  }
   // Check if first element is an array (per-iteration) or an object (single set)
   return Array.isArray(instructions[0]);
 }
@@ -204,7 +206,7 @@ export function decodeInstructions(data: string): ProtocolInstruction[] {
       ["tuple(string protocolName, bytes data)[]"],
       data
     );
-    return decoded.map((i: any) => ({
+    return decoded.map((i: { protocolName: string; data: string }) => ({
       protocolName: i.protocolName,
       data: i.data,
     }));
@@ -259,7 +261,7 @@ export function buildOrderParams(input: KapanOrderInput): KapanOrderParams {
 export function generateOrderSalt(): string {
   const randomBytes = new Uint8Array(32);
   crypto.getRandomValues(randomBytes);
-  return "0x" + Array.from(randomBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+  return "0x" + [...randomBytes].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -286,20 +288,44 @@ export function computeOrderHashPreview(
   );
 }
 
+/** Raw order context structure returned from contract */
+interface RawOrderContext {
+  params: {
+    user: string;
+    preInstructionsPerIteration?: readonly string[] | string[];
+    preTotalAmount: bigint | string | number;
+    sellToken: string;
+    buyToken: string;
+    chunkSize: bigint | string | number;
+    minBuyPerChunk: bigint | string | number;
+    postInstructionsPerIteration?: readonly string[] | string[];
+    completion: number;
+    targetValue: bigint | string | number;
+    minHealthFactor: bigint | string | number;
+    appDataHash: string;
+    isFlashLoanOrder?: boolean;
+    isKindBuy?: boolean;
+  };
+  status: number;
+  executedAmount: bigint | string | number;
+  iterationCount: bigint | string | number;
+  createdAt: bigint | string | number;
+}
+
 /**
  * Parse order context from contract response
  */
-export function parseOrderContext(rawContext: any): OrderContext {
+export function parseOrderContext(rawContext: RawOrderContext): OrderContext {
   return {
     params: {
       user: rawContext.params.user,
-      preInstructionsPerIteration: rawContext.params.preInstructionsPerIteration || [],
+      preInstructionsPerIteration: rawContext.params.preInstructionsPerIteration ? [...rawContext.params.preInstructionsPerIteration] : [],
       preTotalAmount: BigInt(rawContext.params.preTotalAmount),
       sellToken: rawContext.params.sellToken,
       buyToken: rawContext.params.buyToken,
       chunkSize: BigInt(rawContext.params.chunkSize),
       minBuyPerChunk: BigInt(rawContext.params.minBuyPerChunk),
-      postInstructionsPerIteration: rawContext.params.postInstructionsPerIteration || [],
+      postInstructionsPerIteration: rawContext.params.postInstructionsPerIteration ? [...rawContext.params.postInstructionsPerIteration] : [],
       completion: Number(rawContext.params.completion),
       targetValue: BigInt(rawContext.params.targetValue),
       minHealthFactor: BigInt(rawContext.params.minHealthFactor),
@@ -322,17 +348,23 @@ export function calculateOrderProgress(context: OrderContext): number {
   
   switch (params.completion) {
     case CompletionType.Iterations:
-      if (params.targetValue === 0n) return 100;
+      if (params.targetValue === 0n) {
+        return 100;
+      }
       return Number((iterationCount * 100n) / params.targetValue);
-    
+
     case CompletionType.TargetBalance:
-      if (params.preTotalAmount === 0n) return 100;
+      if (params.preTotalAmount === 0n) {
+        return 100;
+      }
       return Number((executedAmount * 100n) / params.preTotalAmount);
-    
+
     case CompletionType.TargetLTV:
       // LTV progress requires reading from lending protocol
       // Return execution-based progress as fallback
-      if (params.preTotalAmount === 0n) return 100;
+      if (params.preTotalAmount === 0n) {
+        return 100;
+      }
       return Number((executedAmount * 100n) / params.preTotalAmount);
     
     case CompletionType.UntilCancelled:

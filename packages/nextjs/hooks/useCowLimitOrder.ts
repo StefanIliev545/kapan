@@ -225,15 +225,53 @@ const ERC20_APPROVE_ABI = [
 ] as const;
 
 /**
+ * Prepend dummy ToOutput UTXOs to simulate OrderManager behavior at execution time.
+ * KIND_BUY: two ToOutput(sellToken) - actual sell + leftover
+ * KIND_SELL: one ToOutput(buyToken) - swap output
+ */
+function prependDummyUtxos(
+  flattened: ProtocolInstruction[],
+  isKindBuy?: boolean,
+  sellToken?: Address,
+  buyToken?: Address,
+  totalAmount?: bigint,
+  totalBuyAmount?: bigint
+): void {
+  if (isKindBuy && sellToken && totalAmount !== undefined) {
+    flattened.push(createRouterInstruction(encodeToOutput(totalAmount, sellToken)));
+    flattened.push(createRouterInstruction(encodeToOutput(0n, sellToken)));
+    return;
+  }
+  if (!isKindBuy && buyToken && totalBuyAmount !== undefined) {
+    flattened.push(createRouterInstruction(encodeToOutput(totalBuyAmount, buyToken)));
+  }
+}
+
+/** Add unique instructions to flattened array, deduplicating by protocolName:data. */
+function addUniqueInstructions(
+  flattened: ProtocolInstruction[],
+  seen: Set<string>,
+  instructions: ProtocolInstruction[]
+): void {
+  for (const inst of instructions) {
+    const key = `${inst.protocolName}:${inst.data}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    flattened.push(inst);
+  }
+}
+
+/** Get the post-instructions that need authorization (respecting authInstructionCount). */
+function getAuthPostInstructions(chunk: ChunkInstructions): ProtocolInstruction[] {
+  if (chunk.authInstructionCount !== undefined) {
+    return chunk.postInstructions.slice(0, chunk.authInstructionCount);
+  }
+  return chunk.postInstructions;
+}
+
+/**
  * Flatten per-iteration instructions to a single array for authorization.
- * Deduplicates by combining all unique instructions across iterations.
- *
- * Prepends dummy ToOutput instructions to simulate the UTXOs that OrderManager
- * will prepend at execution time. This ensures authorization correctly resolves
- * inputIndex references for instructions like WithdrawCollateral.
- *
- * For KIND_BUY: prepends ToOutput(sellToken) x2 (actual sell + leftover)
- * For KIND_SELL: prepends ToOutput(buyToken) x1 (swap output)
+ * Deduplicates and prepends dummy UTXOs matching OrderManager behavior.
  */
 function flattenInstructions(
   chunks: ChunkInstructions[],
@@ -247,49 +285,54 @@ function flattenInstructions(
   const flattened: ProtocolInstruction[] = [];
   const seen = new Set<string>();
 
-  // Prepend dummy ToOutput instructions matching what OrderManager prepends at execution time.
-  // This ensures inputIndex references resolve correctly during authorization.
-  if (isKindBuy && sellToken && totalAmount !== undefined) {
-    // KIND_BUY: OrderManager prepends two ToOutput instructions (sellToken)
-    // UTXO[0] = actual sell amount (assume full totalAmount = max collateral)
-    flattened.push(createRouterInstruction(encodeToOutput(totalAmount, sellToken)));
-    // UTXO[1] = leftover (assume 0 - no surplus)
-    flattened.push(createRouterInstruction(encodeToOutput(0n, sellToken)));
-  } else if (!isKindBuy && buyToken && totalBuyAmount !== undefined) {
-    // KIND_SELL: OrderManager prepends one ToOutput instruction (buyToken = swap output)
-    // UTXO[0] = swap output (new collateral for collateral swap)
-    flattened.push(createRouterInstruction(encodeToOutput(totalBuyAmount, buyToken)));
-  }
+  prependDummyUtxos(flattened, isKindBuy, sellToken, buyToken, totalAmount, totalBuyAmount);
 
-  // Include pre-order instructions first
   if (preOrderInstructions) {
-    for (const inst of preOrderInstructions) {
-      const key = `${inst.protocolName}:${inst.data}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        flattened.push(inst);
-      }
-    }
+    addUniqueInstructions(flattened, seen, preOrderInstructions);
   }
 
-  // Include chunk instructions (respecting authInstructionCount for authorization)
   for (const chunk of chunks) {
-    // For postInstructions, only include those needed for authorization
-    // Instructions beyond authInstructionCount use dynamic input references and don't need auth
-    const authPostInstructions = chunk.authInstructionCount !== undefined
-      ? chunk.postInstructions.slice(0, chunk.authInstructionCount)
-      : chunk.postInstructions;
-
-    for (const inst of [...chunk.preInstructions, ...authPostInstructions]) {
-      const key = `${inst.protocolName}:${inst.data}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        flattened.push(inst);
-      }
-    }
+    addUniqueInstructions(flattened, seen, [
+      ...chunk.preInstructions,
+      ...getAuthPostInstructions(chunk),
+    ]);
   }
 
   return flattened;
+}
+
+/** Deduplicate raw auth calls and return as Call[]. */
+function deduplicateAuthCalls(
+  rawAuthCalls: { target: Address; data: `0x${string}` }[]
+): Call[] {
+  const seen = new Set<string>();
+  const calls: Call[] = [];
+  for (const { target, data } of rawAuthCalls) {
+    if (!target || !data || data.length === 0) continue;
+    const key = `${target.toLowerCase()}:${data.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    calls.push({ to: target as Address, data: data as Hex });
+  }
+  return calls;
+}
+
+/** Build appData options, including flash loan config if provided. */
+function buildLimitOrderAppDataOptions(
+  input: CowLimitOrderInput
+): Parameters<typeof buildAndRegisterAppData>[4] {
+  const options: Parameters<typeof buildAndRegisterAppData>[4] = {
+    operationType: input.operationType,
+    protocol: input.protocolName ? normalizeProtocolForAppCode(input.protocolName) : undefined,
+  };
+  if (input.flashLoan) {
+    options.flashLoan = {
+      lender: input.flashLoan.lender,
+      token: input.flashLoan.token,
+      amount: input.flashLoan.amount,
+    };
+  }
+  return options;
 }
 
 /**
@@ -397,23 +440,9 @@ export function useCowLimitOrder() {
       logger.debug("[useCowLimitOrder] Generated salt:", salt);
 
       // 2. Build and register appData
-      const appDataOptions: Parameters<typeof buildAndRegisterAppData>[4] = {
-        operationType: input.operationType,
-        protocol: input.protocolName ? normalizeProtocolForAppCode(input.protocolName) : undefined,
-      };
-      if (input.flashLoan) {
-        appDataOptions.flashLoan = {
-          lender: input.flashLoan.lender,
-          token: input.flashLoan.token,
-          amount: input.flashLoan.amount,
-        };
-      }
       const appDataResult = await buildAndRegisterAppData(
-        chainId,
-        orderManagerAddress,
-        userAddress,
-        salt,
-        appDataOptions
+        chainId, orderManagerAddress, userAddress, salt,
+        buildLimitOrderAppDataOptions(input)
       );
 
       if (!appDataResult.registered) {
@@ -495,17 +524,7 @@ export function useCowLimitOrder() {
       );
       if (allInstructions.length > 0) {
         const rawAuthCalls = await getAuthorizations(allInstructions);
-        // Deduplicate auth calls by (target, data) pair
-        const seenAuthCalls = new Set<string>();
-        for (const { target, data } of rawAuthCalls) {
-          if (target && data && data.length > 0) {
-            const key = `${target.toLowerCase()}:${data.toLowerCase()}`;
-            if (!seenAuthCalls.has(key)) {
-              seenAuthCalls.add(key);
-              calls.push({ to: target as Address, data: data as Hex });
-            }
-          }
-        }
+        calls.push(...deduplicateAuthCalls(rawAuthCalls));
       }
 
       // 4c. Seed token approval (for non-flash-loan mode)

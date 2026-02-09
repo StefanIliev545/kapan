@@ -136,7 +136,9 @@ function PoolPositionRow<T extends string>({
 
   const protocolName = version === "v1" ? "Vesu" : "vesu_v2";
 
-  if (!shouldRender) return null;
+  if (!shouldRender) {
+    return null;
+  }
 
   return (
     <div key={`${version}-${name}`} className="space-y-4">
@@ -377,7 +379,9 @@ export const VesuProtocolView: FC = () => {
     tokens: AssetWithRates[],
     options?: { vesuContext?: VesuContext; position?: PositionManager },
   ) => {
-    if (tokens.length === 0 || isViewingOtherAddress) return;
+    if (tokens.length === 0 || isViewingOtherAddress) {
+      return;
+    }
     const zeroCounterpart = normalizeStarknetAddress(0n);
     const inferredContext =
       options?.vesuContext ??
@@ -392,7 +396,9 @@ export const VesuProtocolView: FC = () => {
   const handleToggleMarketsV2 = useCallback(() => handleToggleMarkets("v2"), [handleToggleMarkets]);
 
   const handleDepositV1 = useCallback(() => {
-    if (isViewingOtherAddress) return;
+    if (isViewingOtherAddress) {
+      return;
+    }
     const allow = new Set(suppliablePositionsV1.map(p => p.tokenAddress.toLowerCase()));
     const filtered = assetsWithRatesV1.filter(a =>
       allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),
@@ -401,7 +407,9 @@ export const VesuProtocolView: FC = () => {
   }, [isViewingOtherAddress, suppliablePositionsV1, assetsWithRatesV1, openDepositModal]);
 
   const handleDepositV2 = useCallback(() => {
-    if (isViewingOtherAddress) return;
+    if (isViewingOtherAddress) {
+      return;
+    }
     const allow = new Set(suppliablePositionsV2.map(p => p.tokenAddress.toLowerCase()));
     const filtered = assetsWithRatesV2.filter(a =>
       allow.has(`0x${a.address.toString(16).padStart(64, "0")}`.toLowerCase()),

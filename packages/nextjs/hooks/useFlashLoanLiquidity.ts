@@ -28,6 +28,80 @@ const ROUTER_ABI = parseAbi([
 // Keys used in KapanRouter for aaveCompatiblePools mapping
 const AAVE_POOL_KEY = keccak256(toHex("aave"));
 const ZEROLEND_POOL_KEY = keccak256(toHex("zerolend"));
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FlashLoanPublicClient = NonNullable<ReturnType<typeof usePublicClient>>;
+
+/** Check if a provider address is valid (non-null, non-zero) */
+function isValidProviderAddress(addr: unknown): addr is string {
+    return typeof addr === "string" && addr !== ZERO_ADDRESS && addr.length > 0;
+}
+
+/** Build a FlashLoanLiquidity result entry */
+function makeLiquidityResult(provider: FlashLoanProvider, liquidity: bigint, amount: bigint): FlashLoanLiquidity {
+    return { provider, liquidity, hasLiquidity: liquidity >= amount };
+}
+
+/** Build a zero-liquidity result (used on errors) */
+function makeZeroLiquidity(provider: FlashLoanProvider): FlashLoanLiquidity {
+    return { provider, liquidity: 0n, hasLiquidity: false };
+}
+
+/** Fetch ERC20 balance at a given holder address */
+async function fetchTokenBalance(client: FlashLoanPublicClient, token: Address, holder: string): Promise<bigint> {
+    return await client.readContract({
+        address: token,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [holder as Address],
+    }) as bigint;
+}
+
+/** Check liquidity for a simple balance-based provider (Balancer V2, V3, Morpho) */
+async function checkBalanceBasedLiquidity(
+    client: FlashLoanPublicClient,
+    tokenAddress: Address,
+    providerAddr: string,
+    provider: FlashLoanProvider,
+    amount: bigint,
+): Promise<{ result: FlashLoanLiquidity; balance?: bigint }> {
+    try {
+        const balance = await fetchTokenBalance(client, tokenAddress, providerAddr);
+        return { result: makeLiquidityResult(provider, balance, amount), balance };
+    } catch {
+        return { result: makeZeroLiquidity(provider) };
+    }
+}
+
+/** Check Aave-compatible pool liquidity via aToken balance. */
+async function checkAaveCompatibleLiquidity(
+    client: FlashLoanPublicClient, tokenAddress: Address,
+    poolAddr: string, provider: FlashLoanProvider, amount: bigint,
+): Promise<FlashLoanLiquidity> {
+    try {
+        const reserveData = await client.readContract({
+            address: poolAddr as Address, abi: AAVE_POOL_ABI,
+            functionName: "getReserveData", args: [tokenAddress],
+        }) as readonly unknown[];
+        const balance = await fetchTokenBalance(client, tokenAddress, reserveData[8] as Address);
+        return makeLiquidityResult(provider, balance, amount);
+    } catch (err) {
+        console.error(`${FlashLoanProvider[provider]} check failed`, err);
+        return makeZeroLiquidity(provider);
+    }
+}
+
+/** V3 fallback to V2 balance when V3 insufficient. */
+function applyBalancerV3Fallback(
+    v3Result: FlashLoanLiquidity, v3Bal: bigint | undefined,
+    v2Bal: bigint | undefined, amount: bigint,
+): FlashLoanLiquidity {
+    if (v3Bal !== undefined && v3Bal < amount && v2Bal !== undefined && v2Bal >= amount) {
+        return makeLiquidityResult(FlashLoanProvider.BalancerV3, v2Bal, amount);
+    }
+    return v3Result;
+}
 
 export const useFlashLoanLiquidity = (
     tokenAddress: string | undefined,
@@ -52,194 +126,45 @@ export const useFlashLoanLiquidity = (
         setIsLoading(true);
         try {
             // 1. Get Provider Addresses from Router
-            // Note: Aave/ZeroLend pools are stored in aaveCompatiblePools mapping with string keys
             const [balancerV2Addr, balancerV3Addr, aaveV3PoolAddr, zeroLendPoolAddr, morphoBlueAddr] = await Promise.all([
-                publicClient.readContract({
-                    address: routerInfo.address,
-                    abi: ROUTER_ABI,
-                    functionName: "balancerV2Vault",
-                }).catch(() => "0x0000000000000000000000000000000000000000"),
-                publicClient.readContract({
-                    address: routerInfo.address,
-                    abi: ROUTER_ABI,
-                    functionName: "balancerV3Vault",
-                }).catch(() => "0x0000000000000000000000000000000000000000"),
-                publicClient.readContract({
-                    address: routerInfo.address,
-                    abi: ROUTER_ABI,
-                    functionName: "aaveCompatiblePools",
-                    args: [AAVE_POOL_KEY],
-                }).catch(() => "0x0000000000000000000000000000000000000000"),
-                publicClient.readContract({
-                    address: routerInfo.address,
-                    abi: ROUTER_ABI,
-                    functionName: "aaveCompatiblePools",
-                    args: [ZEROLEND_POOL_KEY],
-                }).catch(() => "0x0000000000000000000000000000000000000000"),
-                publicClient.readContract({
-                    address: routerInfo.address,
-                    abi: ROUTER_ABI,
-                    functionName: "morphoBlue",
-                }).catch(() => "0x0000000000000000000000000000000000000000"),
+                publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "balancerV2Vault" }).catch(() => ZERO_ADDRESS),
+                publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "balancerV3Vault" }).catch(() => ZERO_ADDRESS),
+                publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "aaveCompatiblePools", args: [AAVE_POOL_KEY] }).catch(() => ZERO_ADDRESS),
+                publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "aaveCompatiblePools", args: [ZEROLEND_POOL_KEY] }).catch(() => ZERO_ADDRESS),
+                publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "morphoBlue" }).catch(() => ZERO_ADDRESS),
             ]);
 
+            const token = tokenAddress as Address;
             const results: FlashLoanLiquidity[] = [];
 
-            // 2. Check Balancer V2 - Vault holds all pool tokens
-            let balancerV2Balance: bigint | undefined;
-            if (balancerV2Addr && balancerV2Addr !== "0x0000000000000000000000000000000000000000") {
-                try {
-                    balancerV2Balance = await publicClient.readContract({
-                        address: tokenAddress as Address,
-                        abi: ERC20_ABI,
-                        functionName: "balanceOf",
-                        args: [balancerV2Addr],
-                    }) as bigint;
-                    results.push({
-                        provider: FlashLoanProvider.BalancerV2,
-                        liquidity: balancerV2Balance,
-                        hasLiquidity: balancerV2Balance >= amount,
-                    });
-                } catch {
-                    results.push({
-                        provider: FlashLoanProvider.BalancerV2,
-                        liquidity: 0n,
-                        hasLiquidity: false,
-                    });
-                }
+            // 2. Check Balancer V2
+            let v2Balance: bigint | undefined;
+            if (isValidProviderAddress(balancerV2Addr)) {
+                const v2 = await checkBalanceBasedLiquidity(publicClient, token, balancerV2Addr, FlashLoanProvider.BalancerV2, amount);
+                v2Balance = v2.balance;
+                results.push(v2.result);
             }
 
-            // 3. Check Balancer V3
-            if (balancerV3Addr && balancerV3Addr !== "0x0000000000000000000000000000000000000000") {
-                try {
-                    let balancerV3Balance = await publicClient.readContract({
-                        address: tokenAddress as Address,
-                        abi: ERC20_ABI,
-                        functionName: "balanceOf",
-                        args: [balancerV3Addr],
-                    }) as bigint;
-
-                    // If V3 appears to have no balance but V2 does, and we suspect
-                    // V3 delegates to the same underlying vault, fall back to V2's
-                    // balance so we don't incorrectly mark "no liquidity".
-                    if (
-                        balancerV3Balance < amount &&
-                        balancerV2Balance !== undefined &&
-                        balancerV2Balance >= amount
-                    ) {
-                        balancerV3Balance = balancerV2Balance;
-                    }
-
-                    results.push({
-                        provider: FlashLoanProvider.BalancerV3,
-                        liquidity: balancerV3Balance,
-                        hasLiquidity: balancerV3Balance >= amount,
-                    });
-                } catch {
-                    results.push({
-                        provider: FlashLoanProvider.BalancerV3,
-                        liquidity: 0n,
-                        hasLiquidity: false,
-                    });
-                }
+            // 3. Check Balancer V3 (with V2 fallback for shared vaults)
+            if (isValidProviderAddress(balancerV3Addr)) {
+                const v3 = await checkBalanceBasedLiquidity(publicClient, token, balancerV3Addr, FlashLoanProvider.BalancerV3, amount);
+                results.push(applyBalancerV3Fallback(v3.result, v3.balance, v2Balance, amount));
             }
 
-            // 4. Check Aave V3 using aToken's underlying balance
-            if (aaveV3PoolAddr && aaveV3PoolAddr !== "0x0000000000000000000000000000000000000000") {
-                try {
-                    // ReserveData layout (Aave v3):
-                    // index 8 is the aTokenAddress
-                    const reserveData = await publicClient.readContract({
-                        address: aaveV3PoolAddr as Address,
-                        abi: AAVE_POOL_ABI,
-                        functionName: "getReserveData",
-                        args: [tokenAddress as Address],
-                    }) as readonly unknown[];
-
-                    const aTokenAddr = reserveData[8] as Address;
-
-                    // Aave stores the underlying asset on the aToken contract,
-                    // not on the Pool itself. The aToken's underlying balance
-                    // is the available liquidity for flash loans.
-                    const balance = await publicClient.readContract({
-                        address: tokenAddress as Address,
-                        abi: ERC20_ABI,
-                        functionName: "balanceOf",
-                        args: [aTokenAddr],
-                    }) as bigint;
-
-                    results.push({
-                        provider: FlashLoanProvider.Aave,
-                        liquidity: balance,
-                        hasLiquidity: balance >= amount,
-                    });
-                } catch (err) {
-                    console.error("Aave V3 liquidity check failed", err);
-                    // Likely token not supported on Aave or no reserve data
-                    results.push({
-                        provider: FlashLoanProvider.Aave,
-                        liquidity: 0n,
-                        hasLiquidity: false,
-                    });
-                }
+            // 4. Check Aave V3
+            if (isValidProviderAddress(aaveV3PoolAddr)) {
+                results.push(await checkAaveCompatibleLiquidity(publicClient, token, aaveV3PoolAddr, FlashLoanProvider.Aave, amount));
             }
 
-            // 5. Check ZeroLend (Aave fork - same pattern as Aave)
-            if (zeroLendPoolAddr && zeroLendPoolAddr !== "0x0000000000000000000000000000000000000000") {
-                try {
-                    const reserveData = await publicClient.readContract({
-                        address: zeroLendPoolAddr as Address,
-                        abi: AAVE_POOL_ABI,
-                        functionName: "getReserveData",
-                        args: [tokenAddress as Address],
-                    }) as readonly unknown[];
-
-                    const aTokenAddr = reserveData[8] as Address;
-
-                    const balance = await publicClient.readContract({
-                        address: tokenAddress as Address,
-                        abi: ERC20_ABI,
-                        functionName: "balanceOf",
-                        args: [aTokenAddr],
-                    }) as bigint;
-
-                    results.push({
-                        provider: FlashLoanProvider.ZeroLend,
-                        liquidity: balance,
-                        hasLiquidity: balance >= amount,
-                    });
-                } catch (err) {
-                    console.error("ZeroLend liquidity check failed", err);
-                    results.push({
-                        provider: FlashLoanProvider.ZeroLend,
-                        liquidity: 0n,
-                        hasLiquidity: false,
-                    });
-                }
+            // 5. Check ZeroLend (Aave fork)
+            if (isValidProviderAddress(zeroLendPoolAddr)) {
+                results.push(await checkAaveCompatibleLiquidity(publicClient, token, zeroLendPoolAddr, FlashLoanProvider.ZeroLend, amount));
             }
 
-            // 6. Check Morpho Blue - token balance at singleton address
-            if (morphoBlueAddr && morphoBlueAddr !== "0x0000000000000000000000000000000000000000") {
-                try {
-                    const balance = await publicClient.readContract({
-                        address: tokenAddress as Address,
-                        abi: ERC20_ABI,
-                        functionName: "balanceOf",
-                        args: [morphoBlueAddr],
-                    }) as bigint;
-
-                    results.push({
-                        provider: FlashLoanProvider.Morpho,
-                        liquidity: balance,
-                        hasLiquidity: balance >= amount,
-                    });
-                } catch {
-                    results.push({
-                        provider: FlashLoanProvider.Morpho,
-                        liquidity: 0n,
-                        hasLiquidity: false,
-                    });
-                }
+            // 6. Check Morpho Blue
+            if (isValidProviderAddress(morphoBlueAddr)) {
+                const morpho = await checkBalanceBasedLiquidity(publicClient, token, morphoBlueAddr, FlashLoanProvider.Morpho, amount);
+                results.push(morpho.result);
             }
 
             setLiquidityData(results);

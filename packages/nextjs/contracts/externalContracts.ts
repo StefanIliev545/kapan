@@ -232,128 +232,96 @@ const contractLogos = {
   eth: "/logos/ethereum.svg",
 };
 
+// Protocol icons for lending protocols
+export const PROTOCOL_ICONS: Record<string, string> = {
+  aave: "/logos/aave.svg",
+  compound: "/logos/compound.svg",
+  morpho: "/logos/morpho.svg",
+  venus: "/logos/venus.svg",
+  euler: "/logos/euler.svg",
+};
+
 export const contractNameToLogo = (contractName: keyof typeof contractLogos) => {
   return contractLogos[contractName];
 };
 
+// Helper: strip date/version suffixes from PT/Euler token names
+function stripPtSuffixes(name: string): string {
+  return name
+    .replace(/-\([a-z]+\)$/i, "")
+    .replace(/-\d{1,2}[a-z]{3}\d{4}(-\d+)?$/i, "")
+    .replace(/-1\d{9}(-\d+)?$/, "")
+    .replace(/-\d+$/, "");
+}
+
+function resolveEulerVaultLogo(lower: string): string | null {
+  if (lower.startsWith("ept-")) {
+    return `/logos/pt${stripPtSuffixes(lower.slice(4))}.svg`;
+  }
+  const m = lower.match(/^e([a-z0-9]+)-\d+$/);
+  if (!m) return null;
+  const eulerMap: Record<string, string> = { usdai: "/logos/susdai.svg" };
+  return eulerMap[m[1]] ?? `/logos/${m[1]}.svg`;
+}
+
+function resolvePtTokenLogo(lower: string): string {
+  let w = lower.startsWith("pt ") ? lower.slice(3) : lower.slice(3);
+  if (lower.startsWith("pt ") && w.startsWith("ept-")) w = w.slice(4);
+  return `/logos/pt${stripPtSuffixes(w)}.svg`;
+}
+
+const TOKEN_FALLBACKS: Record<string, string> = {
+  autousdai: "/logos/susdai.svg",
+  thbill: "/logos/usdc.svg",
+  rlp: "/logos/default.svg",
+  syrupusdc: "/logos/usdc.svg",
+  teth: "/logos/ethereum.svg",
+};
+
+const PNG_LOGO_MAP: Record<string, string> = {
+  ekubo: "/logos/ekubo.png",
+  xstrk: "/logos/xstrk.png",
+  lbtc: "/logos/lbtc.png",
+  xwbtc: "/logos/xwbtc.png",
+  xtbtc: "/logos/xtbtc.png",
+  xlbtc: "/logos/xlbtc.png",
+  mre7btc: "/logos/mre7btc.png",
+  mre7yield: "/logos/mre7yield.png",
+  solvbtc: "/logos/solvbtc.png",
+  dog: "/logos/dog.png",
+  tbtc: "/logos/threshold-btc.png",
+  unibtc: "/logos/unibtc.png",
+  xsbtc: "/logos/xsolvbtc.png",
+  lyu: "/logos/lyu.png",
+  usdai: "/logos/susdai.svg",
+};
+
+function isEulerPrefixed(lower: string): boolean {
+  return lower.startsWith("e") && !lower.startsWith("eth") && !lower.startsWith("ezeth") && !lower.startsWith("eurs");
+}
+
 export const tokenNameToLogo = (tokenName: string) => {
-  // Handle special characters and Euler vault tokens
   if (tokenName === "USD₮0" || tokenName.toLowerCase() === "usd₮0" || tokenName.toLowerCase() === "usdt0") {
     return "/logos/usdt.svg";
   }
   const lower = tokenName.toLowerCase();
 
-  // Map tokens without dedicated logos to similar token logos
-  const tokenFallbacks: Record<string, string> = {
-    autousdai: "/logos/susdai.svg", // Auto-compounding USDai -> use sUSDai logo
-    thbill: "/logos/usdc.svg",     // T-Bill token, use stable coin icon
-    rlp: "/logos/default.svg",     // Resolv LP token
-    syrupusdc: "/logos/usdc.svg",  // Syrup USDC
-    teth: "/logos/ethereum.svg",   // Threshold ETH
-  };
-
-  const fallback = tokenFallbacks[lower];
+  const fallback = TOKEN_FALLBACKS[lower];
   if (fallback) return fallback;
 
-  // Handle Euler vault tokens (e-prefixed symbols)
-  // Format: ePT-xxx-DATE-N (Euler-wrapped PT tokens) or eXXX-N (Euler vault shares)
-  // Examples:
-  //   ePT-USDai-20NOV2025-2 -> ptusdai.svg
-  //   ePT-sUSDai-20NOV2025-2 -> ptsusdai.svg
-  //   eUSDai-2 -> susdai.svg (fallback since usdai doesn't exist)
-  //   eELIT-2 -> elit.svg (will use default if not found)
-  if (lower.startsWith("e") && !lower.startsWith("eth") && !lower.startsWith("ezeth") && !lower.startsWith("eurs")) {
-    // Check if it's an Euler-wrapped PT token (ePT-xxx)
-    if (lower.startsWith("ept-")) {
-      // Extract base token from ePT-xxx-DATE-N format
-      const withoutPrefix = lower.slice(4); // Remove "ept-"
-      const baseToken = withoutPrefix
-        .replace(/-\([a-z]+\)$/i, "") // -(ARB), -(ETH), etc.
-        .replace(/-\d{1,2}[a-z]{3}\d{4}(-\d+)?$/i, "") // -15JAN2026 or -15JAN2026-1
-        .replace(/-1\d{9}(-\d+)?$/, "") // Unix timestamp with optional version
-        .replace(/-\d+$/, ""); // Trailing version number like -2
-      return `/logos/pt${baseToken}.svg`;
-    }
-
-    // Check if it's an Euler vault share (eXXX-N format)
-    // e.g., eUSDai-2, eELIT-2
-    const eulerVaultMatch = lower.match(/^e([a-z0-9]+)-\d+$/);
-    if (eulerVaultMatch) {
-      const baseToken = eulerVaultMatch[1];
-      // Special mappings for tokens without dedicated logos
-      const eulerTokenMappings: Record<string, string> = {
-        usdai: "/logos/susdai.svg", // USDai -> use sUSDai logo as fallback
-      };
-      if (eulerTokenMappings[baseToken]) {
-        return eulerTokenMappings[baseToken];
-      }
-      // Try the base token directly
-      return `/logos/${baseToken}.svg`;
-    }
+  if (isEulerPrefixed(lower)) {
+    const eulerLogo = resolveEulerVaultLogo(lower);
+    if (eulerLogo) return eulerLogo;
   }
 
-  // Handle Pendle PT tokens (e.g., "PT-USDe-15JAN2026" -> "ptusde")
-  // Strip dates like "-15JAN2026" or Unix timestamps like "-1750896023"
-  // Also handle bridged versions like "PT-USDai-19FEB2026-(ARB)"
-  // Also handle Euler-wrapped PT tokens like "PT ePT-USDai-19FEB2026-1" -> "ptusdai"
-  if (lower.startsWith("pt-") || lower.startsWith("pt ")) {
-    let withoutPrefix: string;
+  if (lower.startsWith("pt-") || lower.startsWith("pt ")) return resolvePtTokenLogo(lower);
+  if (lower.startsWith("glv")) return "/logos/gmx.svg";
+  if (lower.startsWith("gm:") || lower.startsWith("gm ") || lower === "gm") return "/logos/gm.svg";
 
-    if (lower.startsWith("pt ")) {
-      // Handle "PT ePT-xxx" format (Euler-wrapped PT tokens)
-      // e.g., "pt ept-usdai-19feb2026-1" -> extract "usdai"
-      withoutPrefix = lower.slice(3); // Remove "pt "
-
-      // Check for ePT- prefix (Euler-wrapped)
-      if (withoutPrefix.startsWith("ept-")) {
-        withoutPrefix = withoutPrefix.slice(4); // Remove "ept-"
-      }
-    } else {
-      // Handle standard "pt-xxx" format
-      withoutPrefix = lower.slice(3); // Remove "pt-"
-    }
-
-    // Remove chain suffix like "-(arb)", "-(eth)", etc. first
-    // Then remove date suffix (pattern: -DDMMMYYYY like -15jan2026) or Unix timestamp (-1xxxxxxxxx)
-    // Also remove trailing version numbers like "-1", "-2" at the end
-    const baseToken = withoutPrefix
-      .replace(/-\([a-z]+\)$/i, "") // -(ARB), -(ETH), etc.
-      .replace(/-\d{1,2}[a-z]{3}\d{4}(-\d+)?$/i, "") // -15JAN2026 or -15JAN2026-1
-      .replace(/-1\d{9}(-\d+)?$/, ""); // -1750896023 or -1750896023-1 (Unix timestamp with optional version)
-    return `/logos/pt${baseToken}.svg`;
-  }
-
-  // Handle GMX GLV tokens (e.g., "GLV [WETH-USDC]" -> use GMX logo)
-  if (lower.startsWith("glv")) {
-    return "/logos/gmx.svg";
-  }
-
-  // Handle GMX GM tokens (e.g., "GM:ETH/USD[WETH-USDC]" -> use GM logo)
-  if (lower.startsWith("gm:") || lower.startsWith("gm ") || lower === "gm") {
-    return "/logos/gm.svg";
-  }
-
-  // Central PNG logo overrides for tokens that don't have svgs
-  const pngLogoMap: Record<string, string> = {
-    ekubo: "/logos/ekubo.png",
-    xstrk: "/logos/xstrk.png",
-    lbtc: "/logos/lbtc.png",
-    xwbtc: "/logos/xwbtc.png",
-    xtbtc: "/logos/xtbtc.png",
-    xlbtc: "/logos/xlbtc.png",
-    mre7btc: "/logos/mre7btc.png",
-    mre7yield: "/logos/mre7yield.png",
-    solvbtc: "/logos/solvbtc.png",
-    dog: "/logos/dog.png",
-    tbtc: "/logos/threshold-btc.png", // threshold's tBTC
-    unibtc: "/logos/unibtc.png",
-    xsbtc: "/logos/xsolvbtc.png",
-    lyu: "/logos/lyu.png",
-    usdai: "/logos/usdai.png",
-  };
-
-  const png = pngLogoMap[lower];
+  const png = PNG_LOGO_MAP[lower];
   if (png) return png;
+  // Guard against invalid characters in token names (e.g., "???" from unresolved symbols)
+  if (!lower || /[^a-z0-9._-]/.test(lower)) return "/logos/token.svg";
   return `/logos/${lower}.svg`;
 };
 

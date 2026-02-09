@@ -1,4 +1,4 @@
-import { FC, ReactNode } from "react";
+import type { FC, ReactNode } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 interface BaseModalProps {
@@ -18,7 +18,9 @@ export const BaseModal: FC<BaseModalProps> = ({
   maxWidthClass = "max-w-md",
   boxClassName = ""
 }) => {
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <dialog className="modal modal-open">
@@ -35,6 +37,7 @@ export const BaseModal: FC<BaseModalProps> = ({
           <div className="border-base-200 mb-4 flex items-center justify-between border-b pb-3">
             <h3 className="text-base-content text-lg font-semibold">{title}</h3>
             <button
+              type="button"
               onClick={onClose}
               className="text-base-content/40 hover:text-base-content hover:bg-base-200 rounded-lg p-1.5 transition-colors"
             >
@@ -46,6 +49,7 @@ export const BaseModal: FC<BaseModalProps> = ({
         {/* Close button if no title */}
         {!title && (
           <button
+            type="button"
             onClick={onClose}
             className="text-base-content/40 hover:text-base-content hover:bg-base-200 absolute right-3 top-3 rounded-lg p-1.5 transition-colors"
           >

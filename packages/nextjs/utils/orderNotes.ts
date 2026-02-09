@@ -47,7 +47,9 @@ export const ORDER_CREATED_EVENT = "kapan:order-created";
  * Dispatch event to notify listeners (like PendingOrdersDrawer) that a new order was created
  */
 export function dispatchOrderCreated(): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined") {
+    return;
+  }
   window.dispatchEvent(new CustomEvent(ORDER_CREATED_EVENT));
 }
 
@@ -55,8 +57,10 @@ export function dispatchOrderCreated(): void {
  * Get all stored order notes
  */
 export function getOrderNotes(): Record<string, OrderNote> {
-  if (typeof window === "undefined") return {};
-  
+  if (typeof window === "undefined") {
+    return {};
+  }
+
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? JSON.parse(stored) : {};
@@ -70,8 +74,10 @@ export function getOrderNotes(): Record<string, OrderNote> {
  * Save an order note (keyed by orderHash if available, otherwise by salt)
  */
 export function saveOrderNote(note: OrderNote): void {
-  if (typeof window === "undefined") return;
-  
+  if (typeof window === "undefined") {
+    return;
+  }
+
   try {
     const notes = getOrderNotes();
     // Use orderHash as primary key if available, otherwise use salt
@@ -188,13 +194,17 @@ export function findPendingNoteForOrder(
  * Call this when an order is first seen on-chain
  */
 export function linkNoteToOrderHash(salt: string, orderHash: string): boolean {
-  if (typeof window === "undefined") return false;
-  
+  if (typeof window === "undefined") {
+    return false;
+  }
+
   try {
     const notes = getOrderNotes();
-    
+
     // Find note by salt key
-    if (!notes[salt]) return false;
+    if (!notes[salt]) {
+      return false;
+    }
     
     const note = notes[salt];
     note.orderHash = orderHash;
@@ -215,8 +225,10 @@ export function linkNoteToOrderHash(salt: string, orderHash: string): boolean {
  * Update a note's orderHash (used when hash becomes known after batch confirmation)
  */
 export function updateOrderNoteHash(salt: string, orderHash: string): void {
-  if (typeof window === "undefined") return;
-  
+  if (typeof window === "undefined") {
+    return;
+  }
+
   try {
     const notes = getOrderNotes();
     

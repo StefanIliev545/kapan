@@ -1,0 +1,796 @@
+{
+  "address": "0x99ed8283F1c16A287d9f9d8c9297fCf172Fc7612",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "evc_",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroAddress",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "evc",
+      "outputs": [
+        {
+          "internalType": "contract IEVC",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        }
+      ],
+      "name": "getAcceptedCollaterals",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "vault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "getAssetPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        }
+      ],
+      "name": "getBorrowLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "collateralVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "subAccountIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "getCollateralBalance",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "collateralVault",
+          "type": "address"
+        }
+      ],
+      "name": "getCollateralLtv",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "borrowLTV",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "liquidationLTV",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "collateralVault",
+          "type": "address"
+        }
+      ],
+      "name": "getCollateralToDebtRate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "rate18",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "subAccountIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "getCurrentLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "subAccountIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "getCurrentLtvBpsSimple",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "subAccountIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "getDebtBalance",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "vault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "baseToken",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "quoteToken",
+          "type": "address"
+        }
+      ],
+      "name": "getExchangeRate",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "rate",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "subAccountIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "getHealthFactor",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        }
+      ],
+      "name": "getLiquidationLtvBps",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getMainSubAccount",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "subAccountIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "getSubAccount",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "subAccountIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "getUserAccountData",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "totalCollateralUsd",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalDebtUsd",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "vault",
+          "type": "address"
+        }
+      ],
+      "name": "getVaultAsset",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "vault",
+          "type": "address"
+        }
+      ],
+      "name": "getVaultName",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "vault",
+          "type": "address"
+        }
+      ],
+      "name": "getVaultSymbol",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "borrowVault",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "subAccountIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "isHealthy",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0xddadcf32b0087ab2e3586d048834de191d6ff15bd28bc4fa554f4bcb10333413",
+  "receipt": {
+    "to": "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+    "from": "0x0BE61223F99E57b8b8B7033a77B54Adc7f7cF027",
+    "contractAddress": null,
+    "transactionIndex": 6,
+    "gasUsed": "1445472",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0x766bd4e6eb7bf8183cf153a41f0102e65633904208f760609e92bcd98031f1aa",
+    "transactionHash": "0xddadcf32b0087ab2e3586d048834de191d6ff15bd28bc4fa554f4bcb10333413",
+    "logs": [],
+    "blockNumber": 39829609,
+    "cumulativeGasUsed": "1821636",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0x2A1176964F5D7caE5406B627Bf6166664FE83c60"
+  ],
+  "numDeployments": 1,
+  "solcInputHash": "44e238b08444762488b548b94b331c9f",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"evc_\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"ZeroAddress\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"evc\",\"outputs\":[{\"internalType\":\"contract IEVC\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"}],\"name\":\"getAcceptedCollaterals\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"getAssetPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"}],\"name\":\"getBorrowLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"collateralVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"subAccountIndex\",\"type\":\"uint8\"}],\"name\":\"getCollateralBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"collateralVault\",\"type\":\"address\"}],\"name\":\"getCollateralLtv\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"borrowLTV\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"liquidationLTV\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"collateralVault\",\"type\":\"address\"}],\"name\":\"getCollateralToDebtRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"rate18\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"subAccountIndex\",\"type\":\"uint8\"}],\"name\":\"getCurrentLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"subAccountIndex\",\"type\":\"uint8\"}],\"name\":\"getCurrentLtvBpsSimple\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"subAccountIndex\",\"type\":\"uint8\"}],\"name\":\"getDebtBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"baseToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"quoteToken\",\"type\":\"address\"}],\"name\":\"getExchangeRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"rate\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"subAccountIndex\",\"type\":\"uint8\"}],\"name\":\"getHealthFactor\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"}],\"name\":\"getLiquidationLtvBps\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"getMainSubAccount\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"subAccountIndex\",\"type\":\"uint8\"}],\"name\":\"getSubAccount\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"subAccountIndex\",\"type\":\"uint8\"}],\"name\":\"getUserAccountData\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"totalCollateralUsd\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"totalDebtUsd\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"}],\"name\":\"getVaultAsset\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"}],\"name\":\"getVaultName\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"vault\",\"type\":\"address\"}],\"name\":\"getVaultSymbol\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"borrowVault\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"subAccountIndex\",\"type\":\"uint8\"}],\"name\":\"isHealthy\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Provides LTV queries and position data for ADL and frontend Sub-Account Model:   - Each user has 256 possible sub-accounts (index 0-255)   - Sub-account address = (userAddress & 0xFF...FF00) | subAccountIndex   - Each sub-account can have at most 1 controller (debt) + N collaterals\",\"kind\":\"dev\",\"methods\":{\"getAcceptedCollaterals(address)\":{\"params\":{\"borrowVault\":\"The borrow vault address\"},\"returns\":{\"_0\":\"Array of collateral vault addresses with configured LTVs\"}},\"getAssetPrice(address,address)\":{\"details\":\"Returns the value of 1 whole unit of token\",\"params\":{\"token\":\"The token to price\",\"vault\":\"The vault to query (determines oracle and unit of account)\"},\"returns\":{\"price\":\"Price in unit of account decimals\"}},\"getBorrowLtvBps(address)\":{\"details\":\"Returns the minimum borrow LTV across all enabled collaterals\",\"params\":{\"borrowVault\":\"The vault where the user has debt\"},\"returns\":{\"_0\":\"Minimum borrow LTV in basis points\"}},\"getCollateralBalance(address,address,uint8)\":{\"params\":{\"collateralVault\":\"The vault where collateral is deposited\",\"subAccountIndex\":\"The sub-account index\",\"user\":\"The user address\"},\"returns\":{\"_0\":\"Collateral in underlying asset units\"}},\"getCollateralLtv(address,address)\":{\"params\":{\"borrowVault\":\"The borrow vault address\",\"collateralVault\":\"The collateral vault address\"},\"returns\":{\"borrowLTV\":\"The borrow LTV in basis points\",\"liquidationLTV\":\"The liquidation LTV in basis points\"}},\"getCollateralToDebtRate(address,address)\":{\"details\":\"Useful for ADL: how many debt tokens per collateral token\",\"params\":{\"borrowVault\":\"The borrow vault (debt side)\",\"collateralVault\":\"The collateral vault\"},\"returns\":{\"rate18\":\"Exchange rate with 18 decimals (collateral \\u2192 debt)\"}},\"getCurrentLtvBps(address,address,uint8)\":{\"details\":\"Uses accountLiquidityFull to properly handle multi-collateral positions\",\"params\":{\"borrowVault\":\"The vault where the user has debt\",\"subAccountIndex\":\"The sub-account index\",\"user\":\"The user address\"},\"returns\":{\"_0\":\"Current LTV in basis points (e.g., 6500 = 65%)\"}},\"getCurrentLtvBpsSimple(address,address,uint8)\":{\"details\":\"Alias for getCurrentLtvBps (both now use the same accurate calculation)\",\"params\":{\"borrowVault\":\"The vault where the user has debt\",\"subAccountIndex\":\"The sub-account index\",\"user\":\"The user address\"},\"returns\":{\"_0\":\"Current LTV in basis points\"}},\"getDebtBalance(address,address,uint8)\":{\"params\":{\"borrowVault\":\"The vault where the user has debt\",\"subAccountIndex\":\"The sub-account index\",\"user\":\"The user address\"},\"returns\":{\"_0\":\"Debt in underlying asset units\"}},\"getExchangeRate(address,address,address)\":{\"details\":\"Returns how many quote tokens you get for 1 whole unit of base token\",\"params\":{\"baseToken\":\"The token to price (e.g., WETH)\",\"quoteToken\":\"The unit of account (e.g., USDC)\",\"vault\":\"Any vault that has the oracle configured\"},\"returns\":{\"rate\":\"Exchange rate scaled by quoteToken decimals\"}},\"getHealthFactor(address,address,uint8)\":{\"params\":{\"borrowVault\":\"The vault where the user has debt\",\"subAccountIndex\":\"The sub-account index\",\"user\":\"The user address\"},\"returns\":{\"_0\":\"Health factor in 1e18 scale (1e18 = 1.0, max = no debt)\"}},\"getLiquidationLtvBps(address)\":{\"details\":\"Returns the minimum LLTV across all enabled collaterals\",\"params\":{\"borrowVault\":\"The vault where the user has debt\"},\"returns\":{\"_0\":\"Minimum liquidation threshold in basis points\"}},\"getMainSubAccount(address)\":{\"params\":{\"user\":\"The user's main address\"},\"returns\":{\"_0\":\"The main sub-account address and its index\"}},\"getSubAccount(address,uint8)\":{\"details\":\"Sub-account = (user & 0xFF...FF00) | subAccountIndex      The user's \\\"main\\\" account has index = last byte of their address.\",\"params\":{\"subAccountIndex\":\"The sub-account index (0-255)\",\"user\":\"The user's main address\"},\"returns\":{\"_0\":\"The sub-account address\"}},\"getUserAccountData(address,address,uint8)\":{\"details\":\"Used by ADL/AL triggers to calculate position values\",\"params\":{\"borrowVault\":\"The vault where the user has debt\",\"subAccountIndex\":\"The sub-account index\",\"user\":\"The user address\"},\"returns\":{\"totalCollateralUsd\":\"Total collateral value in 8 decimals USD\",\"totalDebtUsd\":\"Total debt value in 8 decimals USD\"}},\"getVaultAsset(address)\":{\"params\":{\"vault\":\"The vault address\"},\"returns\":{\"_0\":\"The underlying asset address\"}},\"getVaultName(address)\":{\"params\":{\"vault\":\"The vault address\"},\"returns\":{\"_0\":\"The vault name\"}},\"getVaultSymbol(address)\":{\"params\":{\"vault\":\"The vault address\"},\"returns\":{\"_0\":\"The vault symbol\"}},\"isHealthy(address,address,uint8)\":{\"params\":{\"borrowVault\":\"The vault where the user has debt\",\"subAccountIndex\":\"The sub-account index\",\"user\":\"The user address\"},\"returns\":{\"_0\":\"True if position is healthy (or no position)\"}}},\"title\":\"EulerGatewayView\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"evc()\":{\"notice\":\"The Ethereum Vault Connector (EVC) singleton\"},\"getAcceptedCollaterals(address)\":{\"notice\":\"Get list of accepted collaterals for a borrow vault\"},\"getAssetPrice(address,address)\":{\"notice\":\"Get price of a token in the vault's unit of account\"},\"getBorrowLtvBps(address)\":{\"notice\":\"Returns the borrow LTV limit in basis points\"},\"getCollateralBalance(address,address,uint8)\":{\"notice\":\"Get collateral balance for a sub-account in a specific vault\"},\"getCollateralLtv(address,address)\":{\"notice\":\"Get LTV configuration for a specific collateral\"},\"getCollateralToDebtRate(address,address)\":{\"notice\":\"Get exchange rate between collateral and debt token for a position\"},\"getCurrentLtvBps(address,address,uint8)\":{\"notice\":\"Returns the current LTV (debt/collateral) in basis points\"},\"getCurrentLtvBpsSimple(address,address,uint8)\":{\"notice\":\"Returns the current LTV using raw collateral/liability values\"},\"getDebtBalance(address,address,uint8)\":{\"notice\":\"Get debt balance for a sub-account\"},\"getExchangeRate(address,address,address)\":{\"notice\":\"Get exchange rate between two tokens via vault's oracle\"},\"getHealthFactor(address,address,uint8)\":{\"notice\":\"Get health factor (collateral / liability ratio)\"},\"getLiquidationLtvBps(address)\":{\"notice\":\"Returns the liquidation LTV threshold in basis points\"},\"getMainSubAccount(address)\":{\"notice\":\"Get the user's \\\"main\\\" sub-account (index matches last byte of address)\"},\"getSubAccount(address,uint8)\":{\"notice\":\"Get sub-account address from user and index\"},\"getUserAccountData(address,address,uint8)\":{\"notice\":\"Get total collateral and debt values in USD (8 decimals)\"},\"getVaultAsset(address)\":{\"notice\":\"Get vault's underlying asset\"},\"getVaultName(address)\":{\"notice\":\"Get vault's name\"},\"getVaultSymbol(address)\":{\"notice\":\"Get vault's symbol\"},\"isHealthy(address,address,uint8)\":{\"notice\":\"Check if a position is healthy (not liquidatable)\"}},\"notice\":\"Read-only gateway for Euler V2 lending protocol\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/v2/gateways/euler/EulerGatewayView.sol\":\"EulerGatewayView\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":10},\"remappings\":[],\"viaIR\":true},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/IERC20.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev Interface of the ERC20 standard as defined in the EIP.\\n */\\ninterface IERC20 {\\n    /**\\n     * @dev Emitted when `value` tokens are moved from one account (`from`) to\\n     * another (`to`).\\n     *\\n     * Note that `value` may be zero.\\n     */\\n    event Transfer(address indexed from, address indexed to, uint256 value);\\n\\n    /**\\n     * @dev Emitted when the allowance of a `spender` for an `owner` is set by\\n     * a call to {approve}. `value` is the new allowance.\\n     */\\n    event Approval(address indexed owner, address indexed spender, uint256 value);\\n\\n    /**\\n     * @dev Returns the value of tokens in existence.\\n     */\\n    function totalSupply() external view returns (uint256);\\n\\n    /**\\n     * @dev Returns the value of tokens owned by `account`.\\n     */\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from the caller's account to `to`.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transfer(address to, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Returns the remaining number of tokens that `spender` will be\\n     * allowed to spend on behalf of `owner` through {transferFrom}. This is\\n     * zero by default.\\n     *\\n     * This value changes when {approve} or {transferFrom} are called.\\n     */\\n    function allowance(address owner, address spender) external view returns (uint256);\\n\\n    /**\\n     * @dev Sets a `value` amount of tokens as the allowance of `spender` over the\\n     * caller's tokens.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * IMPORTANT: Beware that changing an allowance with this method brings the risk\\n     * that someone may use both the old and the new allowance by unfortunate\\n     * transaction ordering. One possible solution to mitigate this race\\n     * condition is to first reduce the spender's allowance to 0 and set the\\n     * desired value afterwards:\\n     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729\\n     *\\n     * Emits an {Approval} event.\\n     */\\n    function approve(address spender, uint256 value) external returns (bool);\\n\\n    /**\\n     * @dev Moves a `value` amount of tokens from `from` to `to` using the\\n     * allowance mechanism. `value` is then deducted from the caller's\\n     * allowance.\\n     *\\n     * Returns a boolean value indicating whether the operation succeeded.\\n     *\\n     * Emits a {Transfer} event.\\n     */\\n    function transferFrom(address from, address to, uint256 value) external returns (bool);\\n}\\n\",\"keccak256\":\"0xc6a8ff0ea489379b61faa647490411b80102578440ab9d84e9a957cc12164e70\",\"license\":\"MIT\"},\"@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/extensions/IERC20Metadata.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {IERC20} from \\\"../IERC20.sol\\\";\\n\\n/**\\n * @dev Interface for the optional metadata functions from the ERC20 standard.\\n */\\ninterface IERC20Metadata is IERC20 {\\n    /**\\n     * @dev Returns the name of the token.\\n     */\\n    function name() external view returns (string memory);\\n\\n    /**\\n     * @dev Returns the symbol of the token.\\n     */\\n    function symbol() external view returns (string memory);\\n\\n    /**\\n     * @dev Returns the decimals places of the token.\\n     */\\n    function decimals() external view returns (uint8);\\n}\\n\",\"keccak256\":\"0xaa761817f6cd7892fcf158b3c776b34551cde36f48ff9703d53898bc45a94ea2\",\"license\":\"MIT\"},\"contracts/v2/gateways/euler/EulerGatewayView.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport { IEulerVault, IEulerPriceOracle } from \\\"../../interfaces/euler/IEulerVault.sol\\\";\\nimport { IEVC } from \\\"../../interfaces/euler/IEVC.sol\\\";\\nimport { IERC20Metadata } from \\\"@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol\\\";\\n\\n/**\\n * @title EulerGatewayView\\n * @notice Read-only gateway for Euler V2 lending protocol\\n * @dev Provides LTV queries and position data for ADL and frontend\\n *\\n * Sub-Account Model:\\n *   - Each user has 256 possible sub-accounts (index 0-255)\\n *   - Sub-account address = (userAddress & 0xFF...FF00) | subAccountIndex\\n *   - Each sub-account can have at most 1 controller (debt) + N collaterals\\n */\\ncontract EulerGatewayView {\\n    /// @notice The Ethereum Vault Connector (EVC) singleton\\n    IEVC public immutable evc;\\n\\n    error ZeroAddress();\\n\\n    constructor(address evc_) {\\n        if (evc_ == address(0)) revert ZeroAddress();\\n        evc = IEVC(evc_);\\n    }\\n\\n    // ============ Sub-Account Helpers ============\\n\\n    /// @notice Get sub-account address from user and index\\n    /// @dev Sub-account = (user & 0xFF...FF00) | subAccountIndex\\n    ///      The user's \\\"main\\\" account has index = last byte of their address.\\n    /// @param user The user's main address\\n    /// @param subAccountIndex The sub-account index (0-255)\\n    /// @return The sub-account address\\n    function getSubAccount(address user, uint8 subAccountIndex) public pure returns (address) {\\n        return address(uint160(uint160(user) & ~uint160(0xFF)) | uint160(subAccountIndex));\\n    }\\n\\n    /// @notice Get the user's \\\"main\\\" sub-account (index matches last byte of address)\\n    /// @param user The user's main address\\n    /// @return The main sub-account address and its index\\n    function getMainSubAccount(address user) public pure returns (address, uint8) {\\n        uint8 mainIndex = uint8(uint160(user) & 0xFF);\\n        return (getSubAccount(user, mainIndex), mainIndex);\\n    }\\n\\n    // ============ LTV Queries (for ADL) ============\\n\\n    /// @notice Returns the current LTV (debt/collateral) in basis points\\n    /// @dev Uses accountLiquidityFull to properly handle multi-collateral positions\\n    /// @param borrowVault The vault where the user has debt\\n    /// @param user The user address\\n    /// @param subAccountIndex The sub-account index\\n    /// @return Current LTV in basis points (e.g., 6500 = 65%)\\n    function getCurrentLtvBps(\\n        address borrowVault,\\n        address user,\\n        uint8 subAccountIndex\\n    ) external view returns (uint256) {\\n        return _calculateLtvBps(borrowVault, getSubAccount(user, subAccountIndex));\\n    }\\n\\n    /// @notice Returns the current LTV using raw collateral/liability values\\n    /// @dev Alias for getCurrentLtvBps (both now use the same accurate calculation)\\n    /// @param borrowVault The vault where the user has debt\\n    /// @param user The user address\\n    /// @param subAccountIndex The sub-account index\\n    /// @return Current LTV in basis points\\n    function getCurrentLtvBpsSimple(\\n        address borrowVault,\\n        address user,\\n        uint8 subAccountIndex\\n    ) external view returns (uint256) {\\n        return _calculateLtvBps(borrowVault, getSubAccount(user, subAccountIndex));\\n    }\\n\\n    /// @dev Internal LTV calculation that properly handles multi-collateral positions\\n    /// @param borrowVault The vault where the user has debt\\n    /// @param subAccount The sub-account address\\n    /// @return Current LTV in basis points (0 if no position or error)\\n    function _calculateLtvBps(\\n        address borrowVault,\\n        address subAccount\\n    ) internal view returns (uint256) {\\n        // Get detailed liquidity with per-collateral values\\n        // Note: accountLiquidityFull reverts if sub-account has no controller set\\n        address[] memory collaterals;\\n        uint256[] memory collateralValues;\\n        uint256 liabilityValue;\\n\\n        try IEulerVault(borrowVault).accountLiquidityFull(subAccount, true) returns (\\n            address[] memory c,\\n            uint256[] memory cv,\\n            uint256 lv\\n        ) {\\n            collaterals = c;\\n            collateralValues = cv;\\n            liabilityValue = lv;\\n        } catch {\\n            // No position (no controller set) or other error - return 0\\n            return 0;\\n        }\\n\\n        if (liabilityValue == 0) return 0;\\n\\n        // Sum raw collateral values by un-adjusting each collateral's LLTV individually\\n        // This correctly handles positions with multiple collaterals having different LLTVs\\n        uint256 rawCollateralValue = 0;\\n        for (uint256 i = 0; i < collaterals.length; i++) {\\n            if (collateralValues[i] > 0) {\\n                uint16 lltv = IEulerVault(borrowVault).LTVLiquidation(collaterals[i]);\\n                if (lltv > 0) {\\n                    // Euler returns: adjustedValue = rawValue * LLTV / 10000\\n                    // So: rawValue = adjustedValue * 10000 / LLTV\\n                    rawCollateralValue += (collateralValues[i] * 10000) / lltv;\\n                }\\n            }\\n        }\\n\\n        if (rawCollateralValue == 0) return 0;\\n\\n        // LTV (bps) = liability * 10000 / rawCollateral\\n        return (liabilityValue * 10000) / rawCollateralValue;\\n    }\\n\\n    /// @notice Returns the liquidation LTV threshold in basis points\\n    /// @dev Returns the minimum LLTV across all enabled collaterals\\n    /// @param borrowVault The vault where the user has debt\\n    /// @return Minimum liquidation threshold in basis points\\n    function getLiquidationLtvBps(address borrowVault) external view returns (uint256) {\\n        address[] memory collaterals = IEulerVault(borrowVault).LTVList();\\n        if (collaterals.length == 0) return 0;\\n\\n        uint256 minLltv = type(uint256).max;\\n        for (uint256 i = 0; i < collaterals.length; i++) {\\n            uint16 lltv = IEulerVault(borrowVault).LTVLiquidation(collaterals[i]);\\n            if (lltv > 0 && lltv < minLltv) {\\n                minLltv = lltv;\\n            }\\n        }\\n\\n        return minLltv == type(uint256).max ? 0 : minLltv;\\n    }\\n\\n    /// @notice Returns the borrow LTV limit in basis points\\n    /// @dev Returns the minimum borrow LTV across all enabled collaterals\\n    /// @param borrowVault The vault where the user has debt\\n    /// @return Minimum borrow LTV in basis points\\n    function getBorrowLtvBps(address borrowVault) external view returns (uint256) {\\n        address[] memory collaterals = IEulerVault(borrowVault).LTVList();\\n        if (collaterals.length == 0) return 0;\\n\\n        uint256 minLtv = type(uint256).max;\\n        for (uint256 i = 0; i < collaterals.length; i++) {\\n            uint16 ltv = IEulerVault(borrowVault).LTVBorrow(collaterals[i]);\\n            if (ltv > 0 && ltv < minLtv) {\\n                minLtv = ltv;\\n            }\\n        }\\n\\n        return minLtv == type(uint256).max ? 0 : minLtv;\\n    }\\n\\n    // ============ Position Queries ============\\n\\n    /// @notice Check if a position is healthy (not liquidatable)\\n    /// @param borrowVault The vault where the user has debt\\n    /// @param user The user address\\n    /// @param subAccountIndex The sub-account index\\n    /// @return True if position is healthy (or no position)\\n    function isHealthy(\\n        address borrowVault,\\n        address user,\\n        uint8 subAccountIndex\\n    ) external view returns (bool) {\\n        address subAccount = getSubAccount(user, subAccountIndex);\\n\\n        try IEulerVault(borrowVault).accountLiquidity(subAccount, true) returns (\\n            uint256 collateralValue,\\n            uint256 liabilityValue\\n        ) {\\n            // Position is healthy if collateralValue >= liabilityValue (using liquidation LTV)\\n            return collateralValue >= liabilityValue;\\n        } catch {\\n            // No position (no controller) - considered healthy\\n            return true;\\n        }\\n    }\\n\\n    /// @notice Get health factor (collateral / liability ratio)\\n    /// @param borrowVault The vault where the user has debt\\n    /// @param user The user address\\n    /// @param subAccountIndex The sub-account index\\n    /// @return Health factor in 1e18 scale (1e18 = 1.0, max = no debt)\\n    function getHealthFactor(\\n        address borrowVault,\\n        address user,\\n        uint8 subAccountIndex\\n    ) external view returns (uint256) {\\n        address subAccount = getSubAccount(user, subAccountIndex);\\n\\n        try IEulerVault(borrowVault).accountLiquidity(subAccount, true) returns (\\n            uint256 collateralValue,\\n            uint256 liabilityValue\\n        ) {\\n            if (liabilityValue == 0) return type(uint256).max;\\n            return (collateralValue * 1e18) / liabilityValue;\\n        } catch {\\n            // No position (no controller) - infinite health factor\\n            return type(uint256).max;\\n        }\\n    }\\n\\n    /// @notice Get debt balance for a sub-account\\n    /// @param borrowVault The vault where the user has debt\\n    /// @param user The user address\\n    /// @param subAccountIndex The sub-account index\\n    /// @return Debt in underlying asset units\\n    function getDebtBalance(\\n        address borrowVault,\\n        address user,\\n        uint8 subAccountIndex\\n    ) external view returns (uint256) {\\n        address subAccount = getSubAccount(user, subAccountIndex);\\n        return IEulerVault(borrowVault).debtOf(subAccount);\\n    }\\n\\n    /// @notice Get collateral balance for a sub-account in a specific vault\\n    /// @param collateralVault The vault where collateral is deposited\\n    /// @param user The user address\\n    /// @param subAccountIndex The sub-account index\\n    /// @return Collateral in underlying asset units\\n    function getCollateralBalance(\\n        address collateralVault,\\n        address user,\\n        uint8 subAccountIndex\\n    ) external view returns (uint256) {\\n        address subAccount = getSubAccount(user, subAccountIndex);\\n        return IEulerVault(collateralVault).maxWithdraw(subAccount);\\n    }\\n\\n    // ============ Vault Info ============\\n\\n    /// @notice Get vault's underlying asset\\n    /// @param vault The vault address\\n    /// @return The underlying asset address\\n    function getVaultAsset(address vault) external view returns (address) {\\n        return IEulerVault(vault).asset();\\n    }\\n\\n    /// @notice Get vault's name\\n    /// @param vault The vault address\\n    /// @return The vault name\\n    function getVaultName(address vault) external view returns (string memory) {\\n        return IEulerVault(vault).name();\\n    }\\n\\n    /// @notice Get vault's symbol\\n    /// @param vault The vault address\\n    /// @return The vault symbol\\n    function getVaultSymbol(address vault) external view returns (string memory) {\\n        return IEulerVault(vault).symbol();\\n    }\\n\\n    /// @notice Get list of accepted collaterals for a borrow vault\\n    /// @param borrowVault The borrow vault address\\n    /// @return Array of collateral vault addresses with configured LTVs\\n    function getAcceptedCollaterals(address borrowVault) external view returns (address[] memory) {\\n        return IEulerVault(borrowVault).LTVList();\\n    }\\n\\n    /// @notice Get LTV configuration for a specific collateral\\n    /// @param borrowVault The borrow vault address\\n    /// @param collateralVault The collateral vault address\\n    /// @return borrowLTV The borrow LTV in basis points\\n    /// @return liquidationLTV The liquidation LTV in basis points\\n    function getCollateralLtv(\\n        address borrowVault,\\n        address collateralVault\\n    ) external view returns (uint256 borrowLTV, uint256 liquidationLTV) {\\n        borrowLTV = IEulerVault(borrowVault).LTVBorrow(collateralVault);\\n        liquidationLTV = IEulerVault(borrowVault).LTVLiquidation(collateralVault);\\n    }\\n\\n    // ============ Position Value Queries (for ADL/AL) ============\\n\\n    /// @notice Get total collateral and debt values in USD (8 decimals)\\n    /// @dev Used by ADL/AL triggers to calculate position values\\n    /// @param borrowVault The vault where the user has debt\\n    /// @param user The user address\\n    /// @param subAccountIndex The sub-account index\\n    /// @return totalCollateralUsd Total collateral value in 8 decimals USD\\n    /// @return totalDebtUsd Total debt value in 8 decimals USD\\n    function getUserAccountData(\\n        address borrowVault,\\n        address user,\\n        uint8 subAccountIndex\\n    ) external view returns (uint256 totalCollateralUsd, uint256 totalDebtUsd) {\\n        address subAccount = getSubAccount(user, subAccountIndex);\\n\\n        // Get raw collateral and liability values from Euler\\n        // Using liquidation=false to get borrow-adjusted values\\n        // Note: accountLiquidityFull reverts if sub-account has no controller\\n        address[] memory collaterals;\\n        uint256[] memory collateralValues;\\n        uint256 liabilityValue;\\n\\n        try IEulerVault(borrowVault).accountLiquidityFull(subAccount, false) returns (\\n            address[] memory c,\\n            uint256[] memory cv,\\n            uint256 lv\\n        ) {\\n            collaterals = c;\\n            collateralValues = cv;\\n            liabilityValue = lv;\\n        } catch {\\n            // No position (no controller set) - return (0, 0)\\n            return (0, 0);\\n        }\\n\\n        // Sum raw collateral values (un-adjust by dividing by borrow LTV)\\n        uint256 rawCollateralValue = 0;\\n        for (uint256 i = 0; i < collaterals.length; i++) {\\n            if (collateralValues[i] > 0) {\\n                try IEulerVault(borrowVault).LTVBorrow(collaterals[i]) returns (uint16 ltv) {\\n                    if (ltv > 0) {\\n                        // rawValue = adjustedValue * 10000 / LTV\\n                        rawCollateralValue += (collateralValues[i] * 10000) / ltv;\\n                    }\\n                } catch {\\n                    // Skip collateral if LTV lookup fails\\n                    continue;\\n                }\\n            }\\n        }\\n\\n        // Get unit of account decimals to convert to 8 decimals (Chainlink format)\\n        address unitOfAccount;\\n        try IEulerVault(borrowVault).unitOfAccount() returns (address uoa) {\\n            unitOfAccount = uoa;\\n        } catch {\\n            // Default to 18 decimals if we can't get unit of account\\n            return (rawCollateralValue / (10 ** 10), liabilityValue / (10 ** 10));\\n        }\\n        uint8 uoaDecimals = 18; // Default to 18 if we can't get decimals\\n        if (unitOfAccount != address(0) && unitOfAccount.code.length > 0) {\\n            try IERC20Metadata(unitOfAccount).decimals() returns (uint8 d) {\\n                uoaDecimals = d;\\n            } catch {}\\n        }\\n\\n        // Convert from unit of account decimals to 8 decimals\\n        if (uoaDecimals > 8) {\\n            uint256 divisor = 10 ** (uoaDecimals - 8);\\n            totalCollateralUsd = rawCollateralValue / divisor;\\n            totalDebtUsd = liabilityValue / divisor;\\n        } else if (uoaDecimals < 8) {\\n            uint256 multiplier = 10 ** (8 - uoaDecimals);\\n            totalCollateralUsd = rawCollateralValue * multiplier;\\n            totalDebtUsd = liabilityValue * multiplier;\\n        } else {\\n            totalCollateralUsd = rawCollateralValue;\\n            totalDebtUsd = liabilityValue;\\n        }\\n    }\\n\\n    // ============ Price Queries (for ADL) ============\\n\\n    /// @notice Get exchange rate between two tokens via vault's oracle\\n    /// @dev Returns how many quote tokens you get for 1 whole unit of base token\\n    /// @param vault Any vault that has the oracle configured\\n    /// @param baseToken The token to price (e.g., WETH)\\n    /// @param quoteToken The unit of account (e.g., USDC)\\n    /// @return rate Exchange rate scaled by quoteToken decimals\\n    function getExchangeRate(\\n        address vault,\\n        address baseToken,\\n        address quoteToken\\n    ) external view returns (uint256 rate) {\\n        address oracle = IEulerVault(vault).oracle();\\n        if (oracle == address(0)) return 0;\\n\\n        // Get 1 whole unit of base token\\n        uint8 baseDecimals = IERC20Metadata(baseToken).decimals();\\n        uint256 oneUnit = 10 ** baseDecimals;\\n\\n        try IEulerPriceOracle(oracle).getQuote(oneUnit, baseToken, quoteToken) returns (uint256 quote) {\\n            return quote;\\n        } catch {\\n            return 0;\\n        }\\n    }\\n\\n    /// @notice Get price of a token in the vault's unit of account\\n    /// @dev Returns the value of 1 whole unit of token\\n    /// @param vault The vault to query (determines oracle and unit of account)\\n    /// @param token The token to price\\n    /// @return price Price in unit of account decimals\\n    function getAssetPrice(\\n        address vault,\\n        address token\\n    ) external view returns (uint256 price) {\\n        address oracle = IEulerVault(vault).oracle();\\n        address unitOfAccount = IEulerVault(vault).unitOfAccount();\\n        if (oracle == address(0) || unitOfAccount == address(0)) return 0;\\n\\n        uint8 tokenDecimals = IERC20Metadata(token).decimals();\\n        uint256 oneUnit = 10 ** tokenDecimals;\\n\\n        try IEulerPriceOracle(oracle).getQuote(oneUnit, token, unitOfAccount) returns (uint256 quote) {\\n            return quote;\\n        } catch {\\n            return 0;\\n        }\\n    }\\n\\n    /// @notice Get exchange rate between collateral and debt token for a position\\n    /// @dev Useful for ADL: how many debt tokens per collateral token\\n    /// @param borrowVault The borrow vault (debt side)\\n    /// @param collateralVault The collateral vault\\n    /// @return rate18 Exchange rate with 18 decimals (collateral \\u2192 debt)\\n    function getCollateralToDebtRate(\\n        address borrowVault,\\n        address collateralVault\\n    ) external view returns (uint256 rate18) {\\n        address oracle = IEulerVault(borrowVault).oracle();\\n        address unitOfAccount = IEulerVault(borrowVault).unitOfAccount();\\n        if (oracle == address(0) || unitOfAccount == address(0)) return 0;\\n\\n        address collateralAsset = IEulerVault(collateralVault).asset();\\n        address debtAsset = IEulerVault(borrowVault).asset();\\n\\n        uint8 collateralDecimals = IERC20Metadata(collateralAsset).decimals();\\n        uint8 debtDecimals = IERC20Metadata(debtAsset).decimals();\\n\\n        // Get value of 1 collateral in unit of account\\n        uint256 oneCollateral = 10 ** collateralDecimals;\\n        uint256 collateralValue;\\n        try IEulerPriceOracle(oracle).getQuote(oneCollateral, collateralAsset, unitOfAccount) returns (uint256 v) {\\n            collateralValue = v;\\n        } catch {\\n            return 0;\\n        }\\n\\n        // Get value of 1 debt token in unit of account\\n        uint256 oneDebt = 10 ** debtDecimals;\\n        uint256 debtValue;\\n        try IEulerPriceOracle(oracle).getQuote(oneDebt, debtAsset, unitOfAccount) returns (uint256 v) {\\n            debtValue = v;\\n        } catch {\\n            return 0;\\n        }\\n\\n        if (debtValue == 0) return 0;\\n\\n        // exchangeRate = collateralValue / debtValue (how many debt tokens per collateral)\\n        // Scale to 18 decimals\\n        return (collateralValue * 1e18) / debtValue;\\n    }\\n}\\n\",\"keccak256\":\"0x278503aa41cffe12de561719bbab761b79e819a2cc3c3cf40e9796269204c1d9\",\"license\":\"MIT\"},\"contracts/v2/interfaces/euler/IEVC.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\n/// @title IEVC\\n/// @notice Interface for the Ethereum Vault Connector (EVC)\\n/// @dev The EVC mediates between vaults in the Euler V2 protocol\\ninterface IEVC {\\n    /// @notice Batch operation item\\n    struct BatchItem {\\n        address targetContract;\\n        address onBehalfOfAccount;\\n        uint256 value;\\n        bytes data;\\n    }\\n\\n    /// @notice Execute a batch of operations\\n    /// @param items Array of batch items to execute\\n    function batch(BatchItem[] calldata items) external payable;\\n\\n    /// @notice Execute a call on behalf of an account\\n    /// @param targetContract The contract to call\\n    /// @param onBehalfOfAccount The account context for the call\\n    /// @param value ETH value to send\\n    /// @param data The calldata to execute\\n    /// @return result The return data from the call\\n    function call(\\n        address targetContract,\\n        address onBehalfOfAccount,\\n        uint256 value,\\n        bytes calldata data\\n    ) external payable returns (bytes memory result);\\n\\n    /// @notice Enable a vault as collateral for an account\\n    /// @param account The account to enable collateral for\\n    /// @param vault The vault to enable as collateral\\n    function enableCollateral(address account, address vault) external;\\n\\n    /// @notice Disable a vault as collateral for an account\\n    /// @param account The account to disable collateral for\\n    /// @param vault The vault to disable as collateral\\n    function disableCollateral(address account, address vault) external;\\n\\n    /// @notice Enable a vault as controller for an account (allows borrowing)\\n    /// @param account The account to enable controller for\\n    /// @param vault The vault to enable as controller\\n    function enableController(address account, address vault) external;\\n\\n    /// @notice Disable controller for an account\\n    /// @dev Will revert if account has outstanding debt\\n    /// @param account The account to disable controller for\\n    function disableController(address account) external;\\n\\n    /// @notice Check if a vault is enabled as collateral for an account\\n    /// @param account The account to check\\n    /// @param vault The vault to check\\n    /// @return True if the vault is enabled as collateral\\n    function isCollateralEnabled(address account, address vault) external view returns (bool);\\n\\n    /// @notice Check if a vault is enabled as controller for an account\\n    /// @param account The account to check\\n    /// @param vault The vault to check\\n    /// @return True if the vault is enabled as controller\\n    function isControllerEnabled(address account, address vault) external view returns (bool);\\n\\n    /// @notice Get all collateral vaults for an account\\n    /// @param account The account to query\\n    /// @return Array of vault addresses enabled as collateral\\n    function getCollaterals(address account) external view returns (address[] memory);\\n\\n    /// @notice Get all controller vaults for an account\\n    /// @param account The account to query\\n    /// @return Array of vault addresses enabled as controller\\n    function getControllers(address account) external view returns (address[] memory);\\n\\n    /// @notice Set or revoke an operator for an account\\n    /// @param account The account to set operator for\\n    /// @param operator The operator address\\n    /// @param authorized True to authorize, false to revoke\\n    function setAccountOperator(address account, address operator, bool authorized) external;\\n\\n    /// @notice Check if an operator is authorized for an account\\n    /// @param account The account to check\\n    /// @param operator The operator to check\\n    /// @return True if the operator is authorized\\n    function isAccountOperatorAuthorized(address account, address operator) external view returns (bool);\\n\\n    /// @notice Get the owner of an account (handles sub-accounts)\\n    /// @param account The account address\\n    /// @return The owner address\\n    function getAccountOwner(address account) external view returns (address);\\n}\\n\",\"keccak256\":\"0x25d9ee925a3b53e9f5b9e21bd79e9e12f5e6457bcce1576b6a451a7d0a227fca\",\"license\":\"MIT\"},\"contracts/v2/interfaces/euler/IEulerVault.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\n/// @title IEulerVault\\n/// @notice Interface for Euler V2 vaults (EVK - Euler Vault Kit)\\n/// @dev Extends ERC-4626 with borrowing functionality\\ninterface IEulerVault {\\n    // ============ ERC-4626 Standard Functions ============\\n\\n    /// @notice The underlying asset of the vault\\n    function asset() external view returns (address);\\n\\n    /// @notice Total assets held by the vault\\n    function totalAssets() external view returns (uint256);\\n\\n    /// @notice Convert assets to shares\\n    function convertToShares(uint256 assets) external view returns (uint256);\\n\\n    /// @notice Convert shares to assets\\n    function convertToAssets(uint256 shares) external view returns (uint256);\\n\\n    /// @notice Deposit assets and receive shares\\n    /// @param assets Amount of assets to deposit\\n    /// @param receiver Address to receive shares\\n    /// @return shares Amount of shares minted\\n    function deposit(uint256 assets, address receiver) external returns (uint256 shares);\\n\\n    /// @notice Withdraw assets by burning shares\\n    /// @param assets Amount of assets to withdraw\\n    /// @param receiver Address to receive assets\\n    /// @param owner Address whose shares will be burned\\n    /// @return shares Amount of shares burned\\n    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares);\\n\\n    /// @notice Redeem shares for assets\\n    /// @param shares Amount of shares to redeem\\n    /// @param receiver Address to receive assets\\n    /// @param owner Address whose shares will be burned\\n    /// @return assets Amount of assets received\\n    function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);\\n\\n    /// @notice Get share balance of an account\\n    function balanceOf(address account) external view returns (uint256);\\n\\n    /// @notice Maximum withdrawable assets for an owner\\n    function maxWithdraw(address owner) external view returns (uint256);\\n\\n    /// @notice Maximum redeemable shares for an owner\\n    function maxRedeem(address owner) external view returns (uint256);\\n\\n    // ============ EVK Borrowing Extensions ============\\n\\n    /// @notice Borrow assets from the vault\\n    /// @param assets Amount of assets to borrow\\n    /// @param receiver Address to receive borrowed assets\\n    /// @return Amount actually borrowed\\n    function borrow(uint256 assets, address receiver) external returns (uint256);\\n\\n    /// @notice Repay borrowed assets\\n    /// @param assets Amount of assets to repay\\n    /// @param receiver Address of the borrower whose debt to repay\\n    /// @return Amount actually repaid\\n    function repay(uint256 assets, address receiver) external returns (uint256);\\n\\n    /// @notice Get debt balance of an account\\n    /// @param account Address to query\\n    /// @return Amount of debt in asset units\\n    function debtOf(address account) external view returns (uint256);\\n\\n    /// @notice Get debt balance in shares\\n    /// @param account Address to query\\n    /// @return Amount of debt shares\\n    function debtOfExact(address account) external view returns (uint256);\\n\\n    /// @notice Total borrowed assets\\n    function totalBorrows() external view returns (uint256);\\n\\n    // ============ Interest Rate ============\\n\\n    /// @notice Current interest rate\\n    function interestRate() external view returns (uint256);\\n\\n    /// @notice Interest accumulator for debt calculation\\n    function interestAccumulator() external view returns (uint256);\\n\\n    // ============ LTV Configuration ============\\n\\n    /// @notice Get the borrow LTV for a collateral (max LTV for new borrows)\\n    /// @param collateral The collateral vault address\\n    /// @return Borrow LTV in 1e4 scale (8000 = 80%)\\n    function LTVBorrow(address collateral) external view returns (uint16);\\n\\n    /// @notice Get the liquidation LTV for a collateral (LLTV threshold)\\n    /// @param collateral The collateral vault address\\n    /// @return Liquidation LTV in 1e4 scale (9000 = 90%)\\n    function LTVLiquidation(address collateral) external view returns (uint16);\\n\\n    /// @notice Get full LTV configuration including ramping parameters\\n    /// @param collateral The collateral vault address\\n    /// @return borrowLTV The borrow LTV\\n    /// @return liquidationLTV The current liquidation LTV\\n    /// @return initialLiquidationLTV The initial liquidation LTV before ramping\\n    /// @return targetTimestamp When ramping completes\\n    /// @return rampDuration Duration of the ramp\\n    function LTVFull(address collateral) external view returns (\\n        uint16 borrowLTV,\\n        uint16 liquidationLTV,\\n        uint16 initialLiquidationLTV,\\n        uint48 targetTimestamp,\\n        uint32 rampDuration\\n    );\\n\\n    /// @notice Get list of all collaterals with configured LTVs\\n    /// @return Array of collateral vault addresses\\n    function LTVList() external view returns (address[] memory);\\n\\n    // ============ Account Liquidity ============\\n\\n    /// @notice Get account liquidity (health check)\\n    /// @param account The account to check\\n    /// @param liquidation If true, use liquidation LTV; if false, use borrow LTV\\n    /// @return collateralValue Total collateral value in unit of account\\n    /// @return liabilityValue Total liability value in unit of account\\n    function accountLiquidity(address account, bool liquidation)\\n        external view returns (uint256 collateralValue, uint256 liabilityValue);\\n\\n    /// @notice Get detailed account liquidity per collateral\\n    /// @param account The account to check\\n    /// @param liquidation If true, use liquidation LTV; if false, use borrow LTV\\n    /// @return collaterals Array of collateral addresses\\n    /// @return collateralValues Array of collateral values\\n    /// @return liabilityValue Total liability value\\n    function accountLiquidityFull(address account, bool liquidation)\\n        external view returns (\\n            address[] memory collaterals,\\n            uint256[] memory collateralValues,\\n            uint256 liabilityValue\\n        );\\n\\n    // ============ Controller Management ============\\n\\n    /// @notice Disable this vault as controller for the authenticated account\\n    /// @dev Must be called through EVC.call() with proper onBehalfOfAccount context\\n    ///      Reverts if the account has outstanding debt to this vault\\n    function disableController() external;\\n\\n    // ============ Vault Info ============\\n\\n    /// @notice Name of the vault token\\n    function name() external view returns (string memory);\\n\\n    /// @notice Symbol of the vault token\\n    function symbol() external view returns (string memory);\\n\\n    /// @notice Decimals of the vault token\\n    function decimals() external view returns (uint8);\\n\\n    // ============ Oracle & Unit of Account ============\\n\\n    /// @notice Get the price oracle for this vault\\n    function oracle() external view returns (address);\\n\\n    /// @notice Get the unit of account (e.g., USD, ETH)\\n    function unitOfAccount() external view returns (address);\\n}\\n\\n/// @title IEulerPriceOracle\\n/// @notice Interface for Euler's price oracle system\\ninterface IEulerPriceOracle {\\n    /// @notice Get a quote for swapping base to quote tokens\\n    /// @param inAmount Amount of base tokens\\n    /// @param base The base token address\\n    /// @param quote The quote token address (unit of account)\\n    /// @return outAmount Amount of quote tokens\\n    function getQuote(\\n        uint256 inAmount,\\n        address base,\\n        address quote\\n    ) external view returns (uint256 outAmount);\\n\\n    /// @notice Get both bid and ask quotes\\n    /// @param inAmount Amount of base tokens\\n    /// @param base The base token address\\n    /// @param quote The quote token address\\n    /// @return bidOutAmount Amount at bid price\\n    /// @return askOutAmount Amount at ask price\\n    function getQuotes(\\n        uint256 inAmount,\\n        address base,\\n        address quote\\n    ) external view returns (uint256 bidOutAmount, uint256 askOutAmount);\\n}\\n\",\"keccak256\":\"0xd7552a32439bfa82b04931a2708caa91bdc4877ceb05837c2c75d5dd5ec0af8c\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x60a034607c57601f6119a238819003918201601f19168301916001600160401b03831184841017608057808492602094604052833981010312607c57516001600160a01b03811690819003607c578015606d5760805260405161190d90816100958239608051816107920152f35b63d92e233d60e01b5f5260045ffd5b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe6080806040526004361015610012575f80fd5b5f3560e01c9081630fb411e81461078057508063170387f4146104b25780631a3c41d3146107405780632575c021146106ff57806326571bc4146106ba5780634b7d9c801461067e5780635f35f1b11461065b5780637b961e6c146106275780638a353374146105a75780638a9fdd32146104b75780639195322a146104b257806397bc6ca7146103fe578063a23df33c146103db578063a2c5cc9b1461039d578063b56abcb614610371578063ca9d67c8146102dc578063e7d791da1461026d578063eb54804814610239578063efc7ec77146101835763fd388a94146100f8575f80fd5b3461017f57602036600319011261017f5760045f6001600160a01b0361011c6107c1565b16604051928380926395d89b4160e01b82525afa80156101745761014e915f91610152575b5060405191829182610842565b0390f35b61016e91503d805f833e610166818361086c565b8101906115c9565b5f610141565b6040513d5f823e3d90fd5b5f80fd5b3461017f57602036600319011261017f5760045f6001600160a01b036101a76107c1565b1660405192838092631a85bbe160e21b82525afa908115610174575f91610217575b506040518091602082016020835281518091526020604084019201905f5b8181106101f5575050500390f35b82516001600160a01b03168452859450602093840193909201916001016101e7565b61023391503d805f833e61022b818361086c565b810190610ecf565b816101c9565b3461017f57604036600319011261017f5760206102656102576107c1565b61025f6107d7565b9061163a565b604051908152f35b3461017f57602036600319011261017f5760045f6001600160a01b036102916107c1565b16604051928380926306fdde0360e01b82525afa80156101745761014e915f916102c2575060405191829182610842565b6102d691503d805f833e610166818361086c565b82610141565b3461017f57602036600319011261017f57600460206001600160a01b036103016107c1565b16604051928380926338d52e0f60e01b82525afa8015610174575f90610337575b6040516001600160a01b039091168152602090f35b506020813d602011610369575b816103516020938361086c565b8101031261017f576103646020916108ba565b610322565b3d9150610344565b3461017f57604036600319011261017f57602061026561038f6107c1565b6103976107d7565b9061123f565b3461017f57606036600319011261017f5760206103d16103bb6107c1565b6103c36107d7565b6103cb6107ed565b916111bd565b6040519015158152f35b3461017f57602036600319011261017f5760206102656103f96107c1565b6110d2565b3461017f57606036600319011261017f576104176107c1565b60206104216107d7565b60ff61042b6107ed565b60405163ce96cb7760e01b81526001600160a01b03929091168216610100600160a01b03909316929092176004830152909283916024918391165afa8015610174575f9061047f575b602090604051908152f35b506020813d6020116104aa575b816104996020938361086c565b8101031261017f5760209051610474565b3d915061048c565b6107fd565b3461017f57604036600319011261017f576104d06107c1565b6104d86107d7565b60405163bf58094d60e01b81526001600160a01b03918216600482018190529290911691602082602481865afa918215610174575f92610585575b5060209060246040518095819363af5aaeeb60e01b835260048301525afa9182156101745760409261ffff915f91610556575b5081845193168352166020820152f35b610578915060203d60201161057e575b610570818361086c565b8101906109fe565b84610546565b503d610566565b60209192506105a090823d841161057e57610570818361086c565b9190610513565b3461017f57606036600319011261017f576105c06107c1565b60206105ca6107d7565b60ff6105d46107ed565b60405163d283e75f60e01b81526001600160a01b03929091168216610100600160a01b03909316929092176004830152909283916024918391165afa8015610174575f9061047f57602090604051908152f35b3461017f57606036600319011261017f5760206102656106456107c1565b61064d6107d7565b6106556107ed565b9161100e565b3461017f57602036600319011261017f5760206102656106796107c1565b610ef4565b3461017f57602036600319011261017f5760406106996107c1565b815160ff8216610100600160a01b0392909216821781526020810191909152f35b3461017f57604036600319011261017f576106d36107c1565b6024359060ff8216820361017f5760405160ff92909216610100600160a01b0391909116178152602090f35b3461017f57606036600319011261017f576107186107c1565b6107206107d7565b906044356001600160a01b038116810361017f5760209261026592610d8a565b3461017f57606036600319011261017f57604061077461075e6107c1565b6107666107d7565b61076e6107ed565b91610a94565b82519182526020820152f35b3461017f575f36600319011261017f577f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b600435906001600160a01b038216820361017f57565b602435906001600160a01b038216820361017f57565b6044359060ff8216820361017f57565b3461017f57606036600319011261017f57602061026561081b6107c1565b6108236107d7565b60ff61082d6107ed565b610100600160a01b0390921691161790611772565b602060409281835280519182918282860152018484015e5f828201840152601f01601f1916010190565b601f909101601f19168101906001600160401b0382119082101761088f57604052565b634e487b7160e01b5f52604160045260245ffd5b6001600160401b03811161088f5760051b60200190565b51906001600160a01b038216820361017f57565b9080601f8301121561017f5781516108e5816108a3565b926108f3604051948561086c565b81845260208085019260051b82010192831161017f57602001905b82821061091b5750505090565b60208091610928846108ba565b81520191019061090e565b909160608284031261017f5781516001600160401b03811161017f578361095b9184016108ce565b60208301519093906001600160401b03811161017f5783019080601f8301121561017f57815161098a816108a3565b92610998604051948561086c565b81845260208085019260051b82010192831161017f57602001905b8282106109c65750505060409092015190565b81518152602091820191016109b3565b80518210156109ea5760209160051b010190565b634e487b7160e01b5f52603260045260245ffd5b9081602091031261017f575161ffff8116810361017f5790565b81810292918115918404141715610a2b57565b634e487b7160e01b5f52601160045260245ffd5b8115610a49570490565b634e487b7160e01b5f52601260045260245ffd5b91908201809211610a2b57565b9081602091031261017f575160ff8116810361017f5790565b60ff16604d8111610a2b57600a0a90565b60405163c7b0e3a360e01b8152610100600160a01b0390921660ff9093169290921760048201525f602482018190529092916001600160a01b03169083604481845afa905f825f955f94610d3e575b50610af35750505090505f905f90565b5f9492855b8251811015610bd157610b0b81866109d6565b51610b1b575b6001905b01610af8565b6001600160a01b03610b2d82856109d6565b5160405163bf58094d60e01b815291166004820152602081602481885afa5f9181610bb1575b50610b615750600190610b15565b61ffff1680610b71575b50610b11565b610b7e82879993996109d6565b51916127108302928084046127101490151715610a2b57610ba4610baa92600194610a3f565b90610a5d565b9690610b6b565b610bca91925060203d811161057e57610570818361086c565b905f610b53565b5094925050602060049160405192838092630fa0ccd960e21b82525afa5f9181610d02575b50610c0a57506402540be400809104920490565b60ff906012906001600160a01b038116908115159081610cf7575b50610c98575b50166008811115610c6257600719019060ff8211610a2b57610c59610c52610c5f93610a83565b8092610a3f565b93610a3f565b90565b6008811015610c93576008039060ff8211610a2b57610c8d610c86610c5f93610a83565b8092610a18565b93610a18565b509190565b60206004916040519283809263313ce56760e01b82525afa5f9181610cc6575b5015610c2b5790505f610c2b565b610ce991925060203d602011610cf0575b610ce1818361086c565b810190610a6a565b905f610cb8565b503d610cd7565b90503b15155f610c25565b9091506020813d602011610d36575b81610d1e6020938361086c565b8101031261017f57610d2f906108ba565b905f610bf6565b3d9150610d11565b91509250610d5f9194503d805f833e610d57818361086c565b810190610933565b94919094925f610ae3565b9081526001600160a01b0391821660208201529116604082015260600190565b6040516307dc0d1d60e41b815290602090829060049082906001600160a01b03165afa908115610174575f91610e95575b506001600160a01b0316918215610e8e5760405163313ce56760e01b8152926020846004816001600160a01b0387165afa92831561017457610e0a602094610e27965f91610e71575b50610a83565b604051632b9a19db60e21b81529586948593849360048501610d6a565b03915afa5f9181610e3d575b50610c5f57505f90565b9091506020813d602011610e69575b81610e596020938361086c565b8101031261017f5751905f610e33565b3d9150610e4c565b610e889150863d8811610cf057610ce1818361086c565b5f610e04565b5050505f90565b90506020813d602011610ec7575b81610eb06020938361086c565b8101031261017f57610ec1906108ba565b5f610dbb565b3d9150610ea3565b9060208282031261017f5781516001600160401b03811161017f57610c5f92016108ce565b604051631a85bbe160e21b81526001600160a01b039190911691905f81600481865afa908115610174575f91610fde575b50805115610fd8575f19905f5b8151811015610fc5576001600160a01b03610f4d82846109d6565b5160405163bf58094d60e01b815291166004820152602081602481895afa80156101745761ffff915f91610fa7575b501680151580610f9e575b610f95575b50600101610f32565b92506001610f8c565b50838110610f87565b610fbf915060203d811161057e57610570818361086c565b5f610f7c565b5091925090505f198103610c5f57505f90565b505f9150565b610ff291503d805f833e61022b818361086c565b5f610f25565b919082604091031261017f576020825192015190565b6040805163a824bf6760e01b815260ff94909416610100600160a01b039390931692909217600484015260016024840152829060449082906001600160a01b03165afa805f925f9261109e575b506110675750505f1990565b801561109757670de0b6b3a7640000820291808304670de0b6b3a76400001490151715610a2b57610c5f91610a3f565b50505f1990565b9092506110c3915060403d6040116110cb575b6110bb818361086c565b810190610ff8565b90915f61105b565b503d6110b1565b604051631a85bbe160e21b81526001600160a01b039190911691905f81600481865afa908115610174575f916111a3575b50805115610fd8575f19905f5b8151811015610fc5576001600160a01b0361112b82846109d6565b5160405163af5aaeeb60e01b815291166004820152602081602481895afa80156101745761ffff915f91611185575b50168015158061117c575b611173575b50600101611110565b9250600161116a565b50838110611165565b61119d915060203d811161057e57610570818361086c565b5f61115a565b6111b791503d805f833e61022b818361086c565b5f611103565b6040805163a824bf6760e01b815260ff94909416610100600160a01b039390931692909217600484015260016024840152829060449082906001600160a01b03165afa90815f915f9361121c575b50611217575050600190565b101590565b909250611238915060403d6040116110cb576110bb818361086c565b915f61120b565b6040516307dc0d1d60e41b81526001600160a01b03919091169190602081600481865afa908115610174575f9161158f575b50604051630fa0ccd960e21b815290602082600481875afa918215610174575f92611553575b506001600160a01b031680158015611542575b61153a576040516338d52e0f60e01b815292602090849060049082906001600160a01b03165afa928315610174575f936114fb575b50602060049394604051948580926338d52e0f60e01b82525afa928315610174575f936114bf575b5060405163313ce56760e01b8152936020856004816001600160a01b0385165afa948515610174575f9561149e575b5060405163313ce56760e01b8152946020866004816001600160a01b0389165afa958615610174575f96611472575b50839291611374602092610a83565b6113926040519687938493632b9a19db60e21b855260048501610d6a565b0381845afa5f938161143e575b506113ad5750505050505f90565b6113bd93610e0a60209496610a83565b03915afa5f918161140a575b506113d45750505f90565b801561140457670de0b6b3a7640000820291808304670de0b6b3a76400001490151715610a2b57610c5f91610a3f565b50505f90565b9091506020813d602011611436575b816114266020938361086c565b8101031261017f5751905f6113c9565b3d9150611419565b9093506020813d60201161146a575b8161145a6020938361086c565b8101031261017f5751925f61139f565b3d915061144d565b602091965091611374611493869594843d8611610cf057610ce1818361086c565b979250509192611365565b6114b891955060203d602011610cf057610ce1818361086c565b935f611336565b9092506020813d6020116114f3575b816114db6020938361086c565b8101031261017f576114ec906108ba565b915f611307565b3d91506114ce565b92506020833d602011611532575b816115166020938361086c565b8101031261017f57602061152b6004946108ba565b93506112df565b3d9150611509565b505050505f90565b506001600160a01b038216156112aa565b9091506020813d602011611587575b8161156f6020938361086c565b8101031261017f57611580906108ba565b905f611297565b3d9150611562565b90506020813d6020116115c1575b816115aa6020938361086c565b8101031261017f576115bb906108ba565b5f611271565b3d915061159d565b60208183031261017f578051906001600160401b03821161017f570181601f8201121561017f578051906001600160401b03821161088f5760405192611619601f8401601f19166020018561086c565b8284526020838301011161017f57815f9260208093018386015e8301015290565b6040516307dc0d1d60e41b815291906001600160a01b0316602083600481845afa928315610174575f93611733575b5091602060049360405194858092630fa0ccd960e21b82525afa928315610174575f936116f7575b506001600160a01b031691821580156116e6575b610e8e5760405163313ce56760e01b8152926020846004816001600160a01b0387165afa92831561017457610e0a602094610e27965f91610e715750610a83565b506001600160a01b038116156116a5565b9092506020813d60201161172b575b816117136020938361086c565b8101031261017f57611724906108ba565b915f611691565b3d9150611706565b92506020833d60201161176a575b8161174e6020938361086c565b8101031261017f5760206117636004946108ba565b9350611669565b3d9150611741565b60405163c7b0e3a360e01b81526001600160a01b0392831660048201526001602482015291165f82604481845afa905f825f945f946118b3575b506117b957505050505f90565b929192831561153a575f945f5b825181101561188e576117d981866109d6565b516117e7575b6001016117c6565b6001600160a01b036117f982856109d6565b5160405163af5aaeeb60e01b815291166004820152602081602481885afa80156101745761ffff915f91611870575b501680611836575b506117df565b61184382879993996109d6565b51916127108302928084046127101490151715610a2b57610ba461186992600194610a3f565b9690611830565b611888915060203d811161057e57610570818361086c565b5f611828565b509492505050801561140457612710820291820461271003610a2b57610c5f91610a3f565b915092506118cc9193503d805f833e610d57818361086c565b93919093925f6117ac56fea26469706673582212206b429f01ba2569641ffb0ecdeaf67bc0287c7a5efd6e2fddfca1f72e5e1dd93364736f6c634300081e0033",
+  "deployedBytecode": "0x6080806040526004361015610012575f80fd5b5f3560e01c9081630fb411e81461078057508063170387f4146104b25780631a3c41d3146107405780632575c021146106ff57806326571bc4146106ba5780634b7d9c801461067e5780635f35f1b11461065b5780637b961e6c146106275780638a353374146105a75780638a9fdd32146104b75780639195322a146104b257806397bc6ca7146103fe578063a23df33c146103db578063a2c5cc9b1461039d578063b56abcb614610371578063ca9d67c8146102dc578063e7d791da1461026d578063eb54804814610239578063efc7ec77146101835763fd388a94146100f8575f80fd5b3461017f57602036600319011261017f5760045f6001600160a01b0361011c6107c1565b16604051928380926395d89b4160e01b82525afa80156101745761014e915f91610152575b5060405191829182610842565b0390f35b61016e91503d805f833e610166818361086c565b8101906115c9565b5f610141565b6040513d5f823e3d90fd5b5f80fd5b3461017f57602036600319011261017f5760045f6001600160a01b036101a76107c1565b1660405192838092631a85bbe160e21b82525afa908115610174575f91610217575b506040518091602082016020835281518091526020604084019201905f5b8181106101f5575050500390f35b82516001600160a01b03168452859450602093840193909201916001016101e7565b61023391503d805f833e61022b818361086c565b810190610ecf565b816101c9565b3461017f57604036600319011261017f5760206102656102576107c1565b61025f6107d7565b9061163a565b604051908152f35b3461017f57602036600319011261017f5760045f6001600160a01b036102916107c1565b16604051928380926306fdde0360e01b82525afa80156101745761014e915f916102c2575060405191829182610842565b6102d691503d805f833e610166818361086c565b82610141565b3461017f57602036600319011261017f57600460206001600160a01b036103016107c1565b16604051928380926338d52e0f60e01b82525afa8015610174575f90610337575b6040516001600160a01b039091168152602090f35b506020813d602011610369575b816103516020938361086c565b8101031261017f576103646020916108ba565b610322565b3d9150610344565b3461017f57604036600319011261017f57602061026561038f6107c1565b6103976107d7565b9061123f565b3461017f57606036600319011261017f5760206103d16103bb6107c1565b6103c36107d7565b6103cb6107ed565b916111bd565b6040519015158152f35b3461017f57602036600319011261017f5760206102656103f96107c1565b6110d2565b3461017f57606036600319011261017f576104176107c1565b60206104216107d7565b60ff61042b6107ed565b60405163ce96cb7760e01b81526001600160a01b03929091168216610100600160a01b03909316929092176004830152909283916024918391165afa8015610174575f9061047f575b602090604051908152f35b506020813d6020116104aa575b816104996020938361086c565b8101031261017f5760209051610474565b3d915061048c565b6107fd565b3461017f57604036600319011261017f576104d06107c1565b6104d86107d7565b60405163bf58094d60e01b81526001600160a01b03918216600482018190529290911691602082602481865afa918215610174575f92610585575b5060209060246040518095819363af5aaeeb60e01b835260048301525afa9182156101745760409261ffff915f91610556575b5081845193168352166020820152f35b610578915060203d60201161057e575b610570818361086c565b8101906109fe565b84610546565b503d610566565b60209192506105a090823d841161057e57610570818361086c565b9190610513565b3461017f57606036600319011261017f576105c06107c1565b60206105ca6107d7565b60ff6105d46107ed565b60405163d283e75f60e01b81526001600160a01b03929091168216610100600160a01b03909316929092176004830152909283916024918391165afa8015610174575f9061047f57602090604051908152f35b3461017f57606036600319011261017f5760206102656106456107c1565b61064d6107d7565b6106556107ed565b9161100e565b3461017f57602036600319011261017f5760206102656106796107c1565b610ef4565b3461017f57602036600319011261017f5760406106996107c1565b815160ff8216610100600160a01b0392909216821781526020810191909152f35b3461017f57604036600319011261017f576106d36107c1565b6024359060ff8216820361017f5760405160ff92909216610100600160a01b0391909116178152602090f35b3461017f57606036600319011261017f576107186107c1565b6107206107d7565b906044356001600160a01b038116810361017f5760209261026592610d8a565b3461017f57606036600319011261017f57604061077461075e6107c1565b6107666107d7565b61076e6107ed565b91610a94565b82519182526020820152f35b3461017f575f36600319011261017f577f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b600435906001600160a01b038216820361017f57565b602435906001600160a01b038216820361017f57565b6044359060ff8216820361017f57565b3461017f57606036600319011261017f57602061026561081b6107c1565b6108236107d7565b60ff61082d6107ed565b610100600160a01b0390921691161790611772565b602060409281835280519182918282860152018484015e5f828201840152601f01601f1916010190565b601f909101601f19168101906001600160401b0382119082101761088f57604052565b634e487b7160e01b5f52604160045260245ffd5b6001600160401b03811161088f5760051b60200190565b51906001600160a01b038216820361017f57565b9080601f8301121561017f5781516108e5816108a3565b926108f3604051948561086c565b81845260208085019260051b82010192831161017f57602001905b82821061091b5750505090565b60208091610928846108ba565b81520191019061090e565b909160608284031261017f5781516001600160401b03811161017f578361095b9184016108ce565b60208301519093906001600160401b03811161017f5783019080601f8301121561017f57815161098a816108a3565b92610998604051948561086c565b81845260208085019260051b82010192831161017f57602001905b8282106109c65750505060409092015190565b81518152602091820191016109b3565b80518210156109ea5760209160051b010190565b634e487b7160e01b5f52603260045260245ffd5b9081602091031261017f575161ffff8116810361017f5790565b81810292918115918404141715610a2b57565b634e487b7160e01b5f52601160045260245ffd5b8115610a49570490565b634e487b7160e01b5f52601260045260245ffd5b91908201809211610a2b57565b9081602091031261017f575160ff8116810361017f5790565b60ff16604d8111610a2b57600a0a90565b60405163c7b0e3a360e01b8152610100600160a01b0390921660ff9093169290921760048201525f602482018190529092916001600160a01b03169083604481845afa905f825f955f94610d3e575b50610af35750505090505f905f90565b5f9492855b8251811015610bd157610b0b81866109d6565b51610b1b575b6001905b01610af8565b6001600160a01b03610b2d82856109d6565b5160405163bf58094d60e01b815291166004820152602081602481885afa5f9181610bb1575b50610b615750600190610b15565b61ffff1680610b71575b50610b11565b610b7e82879993996109d6565b51916127108302928084046127101490151715610a2b57610ba4610baa92600194610a3f565b90610a5d565b9690610b6b565b610bca91925060203d811161057e57610570818361086c565b905f610b53565b5094925050602060049160405192838092630fa0ccd960e21b82525afa5f9181610d02575b50610c0a57506402540be400809104920490565b60ff906012906001600160a01b038116908115159081610cf7575b50610c98575b50166008811115610c6257600719019060ff8211610a2b57610c59610c52610c5f93610a83565b8092610a3f565b93610a3f565b90565b6008811015610c93576008039060ff8211610a2b57610c8d610c86610c5f93610a83565b8092610a18565b93610a18565b509190565b60206004916040519283809263313ce56760e01b82525afa5f9181610cc6575b5015610c2b5790505f610c2b565b610ce991925060203d602011610cf0575b610ce1818361086c565b810190610a6a565b905f610cb8565b503d610cd7565b90503b15155f610c25565b9091506020813d602011610d36575b81610d1e6020938361086c565b8101031261017f57610d2f906108ba565b905f610bf6565b3d9150610d11565b91509250610d5f9194503d805f833e610d57818361086c565b810190610933565b94919094925f610ae3565b9081526001600160a01b0391821660208201529116604082015260600190565b6040516307dc0d1d60e41b815290602090829060049082906001600160a01b03165afa908115610174575f91610e95575b506001600160a01b0316918215610e8e5760405163313ce56760e01b8152926020846004816001600160a01b0387165afa92831561017457610e0a602094610e27965f91610e71575b50610a83565b604051632b9a19db60e21b81529586948593849360048501610d6a565b03915afa5f9181610e3d575b50610c5f57505f90565b9091506020813d602011610e69575b81610e596020938361086c565b8101031261017f5751905f610e33565b3d9150610e4c565b610e889150863d8811610cf057610ce1818361086c565b5f610e04565b5050505f90565b90506020813d602011610ec7575b81610eb06020938361086c565b8101031261017f57610ec1906108ba565b5f610dbb565b3d9150610ea3565b9060208282031261017f5781516001600160401b03811161017f57610c5f92016108ce565b604051631a85bbe160e21b81526001600160a01b039190911691905f81600481865afa908115610174575f91610fde575b50805115610fd8575f19905f5b8151811015610fc5576001600160a01b03610f4d82846109d6565b5160405163bf58094d60e01b815291166004820152602081602481895afa80156101745761ffff915f91610fa7575b501680151580610f9e575b610f95575b50600101610f32565b92506001610f8c565b50838110610f87565b610fbf915060203d811161057e57610570818361086c565b5f610f7c565b5091925090505f198103610c5f57505f90565b505f9150565b610ff291503d805f833e61022b818361086c565b5f610f25565b919082604091031261017f576020825192015190565b6040805163a824bf6760e01b815260ff94909416610100600160a01b039390931692909217600484015260016024840152829060449082906001600160a01b03165afa805f925f9261109e575b506110675750505f1990565b801561109757670de0b6b3a7640000820291808304670de0b6b3a76400001490151715610a2b57610c5f91610a3f565b50505f1990565b9092506110c3915060403d6040116110cb575b6110bb818361086c565b810190610ff8565b90915f61105b565b503d6110b1565b604051631a85bbe160e21b81526001600160a01b039190911691905f81600481865afa908115610174575f916111a3575b50805115610fd8575f19905f5b8151811015610fc5576001600160a01b0361112b82846109d6565b5160405163af5aaeeb60e01b815291166004820152602081602481895afa80156101745761ffff915f91611185575b50168015158061117c575b611173575b50600101611110565b9250600161116a565b50838110611165565b61119d915060203d811161057e57610570818361086c565b5f61115a565b6111b791503d805f833e61022b818361086c565b5f611103565b6040805163a824bf6760e01b815260ff94909416610100600160a01b039390931692909217600484015260016024840152829060449082906001600160a01b03165afa90815f915f9361121c575b50611217575050600190565b101590565b909250611238915060403d6040116110cb576110bb818361086c565b915f61120b565b6040516307dc0d1d60e41b81526001600160a01b03919091169190602081600481865afa908115610174575f9161158f575b50604051630fa0ccd960e21b815290602082600481875afa918215610174575f92611553575b506001600160a01b031680158015611542575b61153a576040516338d52e0f60e01b815292602090849060049082906001600160a01b03165afa928315610174575f936114fb575b50602060049394604051948580926338d52e0f60e01b82525afa928315610174575f936114bf575b5060405163313ce56760e01b8152936020856004816001600160a01b0385165afa948515610174575f9561149e575b5060405163313ce56760e01b8152946020866004816001600160a01b0389165afa958615610174575f96611472575b50839291611374602092610a83565b6113926040519687938493632b9a19db60e21b855260048501610d6a565b0381845afa5f938161143e575b506113ad5750505050505f90565b6113bd93610e0a60209496610a83565b03915afa5f918161140a575b506113d45750505f90565b801561140457670de0b6b3a7640000820291808304670de0b6b3a76400001490151715610a2b57610c5f91610a3f565b50505f90565b9091506020813d602011611436575b816114266020938361086c565b8101031261017f5751905f6113c9565b3d9150611419565b9093506020813d60201161146a575b8161145a6020938361086c565b8101031261017f5751925f61139f565b3d915061144d565b602091965091611374611493869594843d8611610cf057610ce1818361086c565b979250509192611365565b6114b891955060203d602011610cf057610ce1818361086c565b935f611336565b9092506020813d6020116114f3575b816114db6020938361086c565b8101031261017f576114ec906108ba565b915f611307565b3d91506114ce565b92506020833d602011611532575b816115166020938361086c565b8101031261017f57602061152b6004946108ba565b93506112df565b3d9150611509565b505050505f90565b506001600160a01b038216156112aa565b9091506020813d602011611587575b8161156f6020938361086c565b8101031261017f57611580906108ba565b905f611297565b3d9150611562565b90506020813d6020116115c1575b816115aa6020938361086c565b8101031261017f576115bb906108ba565b5f611271565b3d915061159d565b60208183031261017f578051906001600160401b03821161017f570181601f8201121561017f578051906001600160401b03821161088f5760405192611619601f8401601f19166020018561086c565b8284526020838301011161017f57815f9260208093018386015e8301015290565b6040516307dc0d1d60e41b815291906001600160a01b0316602083600481845afa928315610174575f93611733575b5091602060049360405194858092630fa0ccd960e21b82525afa928315610174575f936116f7575b506001600160a01b031691821580156116e6575b610e8e5760405163313ce56760e01b8152926020846004816001600160a01b0387165afa92831561017457610e0a602094610e27965f91610e715750610a83565b506001600160a01b038116156116a5565b9092506020813d60201161172b575b816117136020938361086c565b8101031261017f57611724906108ba565b915f611691565b3d9150611706565b92506020833d60201161176a575b8161174e6020938361086c565b8101031261017f5760206117636004946108ba565b9350611669565b3d9150611741565b60405163c7b0e3a360e01b81526001600160a01b0392831660048201526001602482015291165f82604481845afa905f825f945f946118b3575b506117b957505050505f90565b929192831561153a575f945f5b825181101561188e576117d981866109d6565b516117e7575b6001016117c6565b6001600160a01b036117f982856109d6565b5160405163af5aaeeb60e01b815291166004820152602081602481885afa80156101745761ffff915f91611870575b501680611836575b506117df565b61184382879993996109d6565b51916127108302928084046127101490151715610a2b57610ba461186992600194610a3f565b9690611830565b611888915060203d811161057e57610570818361086c565b5f611828565b509492505050801561140457612710820291820461271003610a2b57610c5f91610a3f565b915092506118cc9193503d805f833e610d57818361086c565b93919093925f6117ac56fea26469706673582212206b429f01ba2569641ffb0ecdeaf67bc0287c7a5efd6e2fddfca1f72e5e1dd93364736f6c634300081e0033",
+  "devdoc": {
+    "details": "Provides LTV queries and position data for ADL and frontend Sub-Account Model:   - Each user has 256 possible sub-accounts (index 0-255)   - Sub-account address = (userAddress & 0xFF...FF00) | subAccountIndex   - Each sub-account can have at most 1 controller (debt) + N collaterals",
+    "kind": "dev",
+    "methods": {
+      "getAcceptedCollaterals(address)": {
+        "params": {
+          "borrowVault": "The borrow vault address"
+        },
+        "returns": {
+          "_0": "Array of collateral vault addresses with configured LTVs"
+        }
+      },
+      "getAssetPrice(address,address)": {
+        "details": "Returns the value of 1 whole unit of token",
+        "params": {
+          "token": "The token to price",
+          "vault": "The vault to query (determines oracle and unit of account)"
+        },
+        "returns": {
+          "price": "Price in unit of account decimals"
+        }
+      },
+      "getBorrowLtvBps(address)": {
+        "details": "Returns the minimum borrow LTV across all enabled collaterals",
+        "params": {
+          "borrowVault": "The vault where the user has debt"
+        },
+        "returns": {
+          "_0": "Minimum borrow LTV in basis points"
+        }
+      },
+      "getCollateralBalance(address,address,uint8)": {
+        "params": {
+          "collateralVault": "The vault where collateral is deposited",
+          "subAccountIndex": "The sub-account index",
+          "user": "The user address"
+        },
+        "returns": {
+          "_0": "Collateral in underlying asset units"
+        }
+      },
+      "getCollateralLtv(address,address)": {
+        "params": {
+          "borrowVault": "The borrow vault address",
+          "collateralVault": "The collateral vault address"
+        },
+        "returns": {
+          "borrowLTV": "The borrow LTV in basis points",
+          "liquidationLTV": "The liquidation LTV in basis points"
+        }
+      },
+      "getCollateralToDebtRate(address,address)": {
+        "details": "Useful for ADL: how many debt tokens per collateral token",
+        "params": {
+          "borrowVault": "The borrow vault (debt side)",
+          "collateralVault": "The collateral vault"
+        },
+        "returns": {
+          "rate18": "Exchange rate with 18 decimals (collateral → debt)"
+        }
+      },
+      "getCurrentLtvBps(address,address,uint8)": {
+        "details": "Uses accountLiquidityFull to properly handle multi-collateral positions",
+        "params": {
+          "borrowVault": "The vault where the user has debt",
+          "subAccountIndex": "The sub-account index",
+          "user": "The user address"
+        },
+        "returns": {
+          "_0": "Current LTV in basis points (e.g., 6500 = 65%)"
+        }
+      },
+      "getCurrentLtvBpsSimple(address,address,uint8)": {
+        "details": "Alias for getCurrentLtvBps (both now use the same accurate calculation)",
+        "params": {
+          "borrowVault": "The vault where the user has debt",
+          "subAccountIndex": "The sub-account index",
+          "user": "The user address"
+        },
+        "returns": {
+          "_0": "Current LTV in basis points"
+        }
+      },
+      "getDebtBalance(address,address,uint8)": {
+        "params": {
+          "borrowVault": "The vault where the user has debt",
+          "subAccountIndex": "The sub-account index",
+          "user": "The user address"
+        },
+        "returns": {
+          "_0": "Debt in underlying asset units"
+        }
+      },
+      "getExchangeRate(address,address,address)": {
+        "details": "Returns how many quote tokens you get for 1 whole unit of base token",
+        "params": {
+          "baseToken": "The token to price (e.g., WETH)",
+          "quoteToken": "The unit of account (e.g., USDC)",
+          "vault": "Any vault that has the oracle configured"
+        },
+        "returns": {
+          "rate": "Exchange rate scaled by quoteToken decimals"
+        }
+      },
+      "getHealthFactor(address,address,uint8)": {
+        "params": {
+          "borrowVault": "The vault where the user has debt",
+          "subAccountIndex": "The sub-account index",
+          "user": "The user address"
+        },
+        "returns": {
+          "_0": "Health factor in 1e18 scale (1e18 = 1.0, max = no debt)"
+        }
+      },
+      "getLiquidationLtvBps(address)": {
+        "details": "Returns the minimum LLTV across all enabled collaterals",
+        "params": {
+          "borrowVault": "The vault where the user has debt"
+        },
+        "returns": {
+          "_0": "Minimum liquidation threshold in basis points"
+        }
+      },
+      "getMainSubAccount(address)": {
+        "params": {
+          "user": "The user's main address"
+        },
+        "returns": {
+          "_0": "The main sub-account address and its index"
+        }
+      },
+      "getSubAccount(address,uint8)": {
+        "details": "Sub-account = (user & 0xFF...FF00) | subAccountIndex      The user's \"main\" account has index = last byte of their address.",
+        "params": {
+          "subAccountIndex": "The sub-account index (0-255)",
+          "user": "The user's main address"
+        },
+        "returns": {
+          "_0": "The sub-account address"
+        }
+      },
+      "getUserAccountData(address,address,uint8)": {
+        "details": "Used by ADL/AL triggers to calculate position values",
+        "params": {
+          "borrowVault": "The vault where the user has debt",
+          "subAccountIndex": "The sub-account index",
+          "user": "The user address"
+        },
+        "returns": {
+          "totalCollateralUsd": "Total collateral value in 8 decimals USD",
+          "totalDebtUsd": "Total debt value in 8 decimals USD"
+        }
+      },
+      "getVaultAsset(address)": {
+        "params": {
+          "vault": "The vault address"
+        },
+        "returns": {
+          "_0": "The underlying asset address"
+        }
+      },
+      "getVaultName(address)": {
+        "params": {
+          "vault": "The vault address"
+        },
+        "returns": {
+          "_0": "The vault name"
+        }
+      },
+      "getVaultSymbol(address)": {
+        "params": {
+          "vault": "The vault address"
+        },
+        "returns": {
+          "_0": "The vault symbol"
+        }
+      },
+      "isHealthy(address,address,uint8)": {
+        "params": {
+          "borrowVault": "The vault where the user has debt",
+          "subAccountIndex": "The sub-account index",
+          "user": "The user address"
+        },
+        "returns": {
+          "_0": "True if position is healthy (or no position)"
+        }
+      }
+    },
+    "title": "EulerGatewayView",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "evc()": {
+        "notice": "The Ethereum Vault Connector (EVC) singleton"
+      },
+      "getAcceptedCollaterals(address)": {
+        "notice": "Get list of accepted collaterals for a borrow vault"
+      },
+      "getAssetPrice(address,address)": {
+        "notice": "Get price of a token in the vault's unit of account"
+      },
+      "getBorrowLtvBps(address)": {
+        "notice": "Returns the borrow LTV limit in basis points"
+      },
+      "getCollateralBalance(address,address,uint8)": {
+        "notice": "Get collateral balance for a sub-account in a specific vault"
+      },
+      "getCollateralLtv(address,address)": {
+        "notice": "Get LTV configuration for a specific collateral"
+      },
+      "getCollateralToDebtRate(address,address)": {
+        "notice": "Get exchange rate between collateral and debt token for a position"
+      },
+      "getCurrentLtvBps(address,address,uint8)": {
+        "notice": "Returns the current LTV (debt/collateral) in basis points"
+      },
+      "getCurrentLtvBpsSimple(address,address,uint8)": {
+        "notice": "Returns the current LTV using raw collateral/liability values"
+      },
+      "getDebtBalance(address,address,uint8)": {
+        "notice": "Get debt balance for a sub-account"
+      },
+      "getExchangeRate(address,address,address)": {
+        "notice": "Get exchange rate between two tokens via vault's oracle"
+      },
+      "getHealthFactor(address,address,uint8)": {
+        "notice": "Get health factor (collateral / liability ratio)"
+      },
+      "getLiquidationLtvBps(address)": {
+        "notice": "Returns the liquidation LTV threshold in basis points"
+      },
+      "getMainSubAccount(address)": {
+        "notice": "Get the user's \"main\" sub-account (index matches last byte of address)"
+      },
+      "getSubAccount(address,uint8)": {
+        "notice": "Get sub-account address from user and index"
+      },
+      "getUserAccountData(address,address,uint8)": {
+        "notice": "Get total collateral and debt values in USD (8 decimals)"
+      },
+      "getVaultAsset(address)": {
+        "notice": "Get vault's underlying asset"
+      },
+      "getVaultName(address)": {
+        "notice": "Get vault's name"
+      },
+      "getVaultSymbol(address)": {
+        "notice": "Get vault's symbol"
+      },
+      "isHealthy(address,address,uint8)": {
+        "notice": "Check if a position is healthy (not liquidatable)"
+      }
+    },
+    "notice": "Read-only gateway for Euler V2 lending protocol",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}

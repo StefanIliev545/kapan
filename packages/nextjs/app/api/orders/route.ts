@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { eq, desc, and } from "drizzle-orm";
 import { db, orders } from "~~/lib/db";
 
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const conditions = [eq(orders.userAddress, normalizedWallet)];
 
     if (chainId) {
-      conditions.push(eq(orders.chainId, parseInt(chainId)));
+      conditions.push(eq(orders.chainId, Number.parseInt(chainId, 10)));
     }
 
     const userOrders = await db

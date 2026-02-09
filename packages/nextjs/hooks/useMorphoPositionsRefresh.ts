@@ -103,10 +103,9 @@ export function useMorphoPositionsRefresh(
 
         // LTV calculation
         const lltv = Number(market.lltv) / 1e18;
-        let currentLtv: number | null = null;
-        if (collateralBalanceUsd > 0 && borrowBalanceUsd > 0) {
-          currentLtv = (borrowBalanceUsd / collateralBalanceUsd) * 100;
-        }
+        const currentLtv: number | null = (collateralBalanceUsd > 0 && borrowBalanceUsd > 0)
+          ? (borrowBalanceUsd / collateralBalanceUsd) * 100
+          : null;
 
         // Health factor from contract (in 18 decimals, 1e18 = 1.0)
         const healthFactor = pos.healthFactor === BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")

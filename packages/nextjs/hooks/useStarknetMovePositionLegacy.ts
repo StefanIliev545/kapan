@@ -33,6 +33,50 @@ type LegacyResult = {
 import { addrKey } from "~~/utils/address";
 const toOutputPointer = (i: number) => ({ instruction_index: BigInt(i), output_index: 0n });
 
+/** Resolve the source pool ID for Vesu/VesuV2, or null for non-Vesu protocols. */
+function resolveSourcePool(
+  fromProtocol: string,
+  poolId: bigint | string | undefined,
+  fallbackAddress: string,
+): bigint | null {
+  if (fromProtocol === "Vesu") {
+    return typeof poolId === "string" ? BigInt(poolId) : (poolId ?? 0n);
+  }
+  if (fromProtocol === "VesuV2") {
+    return BigInt(normalizeStarknetAddress(poolId ?? fallbackAddress));
+  }
+  return null;
+}
+
+/** Build a CairoOption context for source protocol operations. */
+function buildSourceContext(srcPool: bigint | null, pairAddress: string): CairoOption<bigint[]> {
+  if (srcPool === null) return new CairoOption<bigint[]>(CairoOptionVariant.None);
+  return new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(pairAddress)]);
+}
+
+/** Build deposit/borrow CairoOption contexts for the destination protocol. */
+function buildDestinationContexts(
+  toProtocol: string,
+  selectedVersion: "v1" | "v2",
+  selectedPoolId: bigint,
+  selectedV2PoolAddress: string,
+  debtTokenAddress: string,
+  colAddress: string,
+): { depositCtx: CairoOption<bigint[]>; borrowCtx: CairoOption<bigint[]> } {
+  const none = () => new CairoOption<bigint[]>(CairoOptionVariant.None);
+  const some = (pool: bigint, token: string) =>
+    new CairoOption<bigint[]>(CairoOptionVariant.Some, [pool, BigInt(token)]);
+
+  if (toProtocol === "Vesu" && selectedVersion === "v1") {
+    return { depositCtx: some(selectedPoolId, debtTokenAddress), borrowCtx: some(selectedPoolId, colAddress) };
+  }
+  if (toProtocol === "Vesu" || toProtocol === "VesuV2") {
+    const dstPool = BigInt(normalizeStarknetAddress(selectedV2PoolAddress));
+    return { depositCtx: some(dstPool, debtTokenAddress), borrowCtx: some(dstPool, colAddress) };
+  }
+  return { depositCtx: none(), borrowCtx: none() };
+}
+
 export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResult => {
   const {
     isOpen,
@@ -123,20 +167,9 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       const repayAll = isDebtMaxClicked && isLast;
       const repayAmt = isLast ? (repayAll ? parsed - share * BigInt(entries.length - 1) : share + remainder) : share;
 
-      let srcPool: bigint | null = null;
-      if (fromProtocol === "Vesu") {
-        srcPool = typeof position.poolId === "string" ? BigInt(position.poolId) : (position.poolId ?? 0n);
-      } else if (fromProtocol === "VesuV2") {
-        srcPool = BigInt(normalizeStarknetAddress(position.poolId ?? selectedV2PoolAddress));
-      }
-      const repayCtx =
-        srcPool !== null
-          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(col.address)])
-          : new CairoOption<bigint[]>(CairoOptionVariant.None);
-      const withdrawCtx =
-        srcPool !== null
-          ? new CairoOption<bigint[]>(CairoOptionVariant.Some, [srcPool, BigInt(position.tokenAddress)])
-          : new CairoOption<bigint[]>(CairoOptionVariant.None);
+      const srcPool = resolveSourcePool(fromProtocol, position.poolId, selectedV2PoolAddress);
+      const repayCtx = buildSourceContext(srcPool, col.address);
+      const withdrawCtx = buildSourceContext(srcPool, position.tokenAddress);
 
       const repay = new CairoCustomEnum({
         Deposit: undefined,
@@ -162,22 +195,10 @@ export const useStarknetMovePositionLegacy = (params: LegacyParams): LegacyResul
       const withdrawPtr = toOutputPointer(1);
 
       // Target contexts: if Vesu target, encode pool and pair tokens; otherwise None (e.g., Nostra)
-      let depositCtx: CairoOption<bigint[]> = new CairoOption<bigint[]>(CairoOptionVariant.None);
-      let borrowCtx: CairoOption<bigint[]> = new CairoOption<bigint[]>(CairoOptionVariant.None);
-      if (toProtocol === "Vesu") {
-        if (selectedVersion === "v1") {
-          depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [selectedPoolId, BigInt(position.tokenAddress)]);
-          borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [selectedPoolId, BigInt(col.address)]);
-        } else {
-          const dstPool = BigInt(normalizeStarknetAddress(selectedV2PoolAddress));
-          depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(position.tokenAddress)]);
-          borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(col.address)]);
-        }
-      } else if (toProtocol === "VesuV2") {
-        const dstPool = BigInt(normalizeStarknetAddress(selectedV2PoolAddress));
-        depositCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(position.tokenAddress)]);
-        borrowCtx = new CairoOption<bigint[]>(CairoOptionVariant.Some, [dstPool, BigInt(col.address)]);
-      }
+      const { depositCtx, borrowCtx } = buildDestinationContexts(
+        toProtocol, selectedVersion, selectedPoolId, selectedV2PoolAddress,
+        position.tokenAddress, col.address,
+      );
 
       const redeposit = new CairoCustomEnum({
         Deposit: undefined, Borrow: undefined, Repay: undefined, Withdraw: undefined,

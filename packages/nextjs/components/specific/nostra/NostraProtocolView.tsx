@@ -11,7 +11,9 @@ export const NostraProtocolView: FC = () => {
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading) {
+      return;
+    }
 
     const totalSupplied = suppliedPositions.reduce((sum, position) => sum + position.balance, 0);
     const totalBorrowed = borrowedPositions.reduce(

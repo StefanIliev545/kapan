@@ -16,6 +16,23 @@ const ONEINCH_UNAVAILABLE = new Set([
   9745, // Plasma - 1inch not supported
 ]);
 
+// Chains where Kyberswap IS available
+// Based on Kyber's aggregator API support as of Jan 2026
+const KYBER_AVAILABLE = new Set([
+  1,     // Mainnet
+  42161, // Arbitrum
+  10,    // Optimism
+  137,   // Polygon
+  56,    // BSC
+  8453,  // Base
+  59144, // Linea
+  43114, // Avalanche
+  250,   // Fantom
+  324,   // zkSync
+  534352, // Scroll
+  31337, // Hardhat (for local dev with fork)
+]);
+
 // Chains where CoW Protocol (ComposableCoW + HooksTrampoline) IS available
 // AND we have flash loan providers configured in KapanCowAdapter.
 // Note: Optimism has HooksTrampoline but NOT ComposableCoW as of Jan 2025.
@@ -138,9 +155,15 @@ export function isPendleSupported(chainId: number | undefined): boolean {
   return PENDLE_AVAILABLE.has(chainId);
 }
 
-export function getDefaultSwapRouter(chainId: number | undefined): "1inch" | "pendle" | undefined {
+export function isKyberSupported(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return KYBER_AVAILABLE.has(chainId);
+}
+
+export function getDefaultSwapRouter(chainId: number | undefined): "1inch" | "kyber" | "pendle" | undefined {
   if (chainId === undefined) return undefined;
-  // Prefer 1inch if available, otherwise Pendle
+  // Prefer Kyber first (more reliable), then 1inch, then Pendle
+  if (isKyberSupported(chainId)) return "kyber";
   if (is1inchSupported(chainId)) return "1inch";
   if (isPendleSupported(chainId)) return "pendle";
   return undefined;
@@ -166,20 +189,21 @@ export function getBestSwapRouter(
   chainId: number | undefined,
   fromSymbol?: string,
   toSymbol?: string
-): "1inch" | "pendle" | undefined {
+): "1inch" | "kyber" | "pendle" | undefined {
   if (chainId === undefined) return undefined;
-  
+
   // If either token is a PT token and Pendle is available, use Pendle
   if (isPendleSupported(chainId) && (isPendleToken(fromSymbol) || isPendleToken(toSymbol))) {
     return "pendle";
   }
-  
+
   // Otherwise use default logic
   return getDefaultSwapRouter(chainId);
 }
 
-export function getAvailableSwapRouters(chainId: number | undefined): Array<"1inch" | "pendle"> {
-  const routers: Array<"1inch" | "pendle"> = [];
+export function getAvailableSwapRouters(chainId: number | undefined): Array<"1inch" | "kyber" | "pendle"> {
+  const routers: Array<"1inch" | "kyber" | "pendle"> = [];
+  if (isKyberSupported(chainId)) routers.push("kyber");
   if (is1inchSupported(chainId)) routers.push("1inch");
   if (isPendleSupported(chainId)) routers.push("pendle");
   return routers;
@@ -273,6 +297,16 @@ export function getPendleAdapterInfo(chainId: number | undefined) {
 export function getOneInchAdapterInfo(chainId: number | undefined) {
   if (!chainId || !is1inchSupported(chainId)) return undefined;
   return getContractInfo(chainId, "OneInchAdapter");
+}
+
+export function getKyberAdapterAddress(chainId: number | undefined): Address | undefined {
+  if (!chainId || !isKyberSupported(chainId)) return undefined;
+  return getContractAddress(chainId, "KyberAdapter");
+}
+
+export function getKyberAdapterInfo(chainId: number | undefined) {
+  if (!chainId || !isKyberSupported(chainId)) return undefined;
+  return getContractInfo(chainId, "KyberAdapter");
 }
 
 export function getCowAdapterAddress(chainId: number | undefined): Address | undefined {

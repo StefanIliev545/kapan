@@ -1,5 +1,5 @@
 import { useTargetNetwork } from "./useTargetNetwork";
-import { AccountInterface, InvokeFunctionResponse, Call } from "starknet";
+import type { AccountInterface, InvokeFunctionResponse, Call } from "starknet";
 import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
@@ -12,6 +12,71 @@ import { logger } from "~~/utils/logger";
 type TransactionFunc = (
   tx: () => Promise<InvokeFunctionResponse> | Promise<string> | Call | Call[],
 ) => Promise<string | undefined>;
+
+/** Execute calls via paymaster or regular wallet, returning the transaction hash. */
+async function executeCalls(
+  calls: Call[],
+  shouldUsePaymaster: boolean,
+  selectedToken: { address?: string; symbol?: string } | undefined,
+  sendPaymasterTransaction: (calls: Call[]) => Promise<InvokeFunctionResponse>,
+  walletClient: AccountInterface,
+): Promise<string> {
+  if (shouldUsePaymaster && selectedToken?.address) {
+    logger.debug(`Using paymaster with ${selectedToken.symbol} for gas payment`);
+    const result = await sendPaymasterTransaction(calls);
+    return result.transaction_hash;
+  }
+  logger.debug("Using regular transaction with STRK for gas payment");
+  const result = await walletClient.execute(calls);
+  return result.transaction_hash;
+}
+
+/** Resolve the transaction hash from a tx function result or raw Call(s). */
+async function resolveTransactionHash(
+  tx: () => Promise<InvokeFunctionResponse> | Promise<string> | Call | Call[],
+  shouldUsePaymaster: boolean,
+  selectedToken: { address?: string; symbol?: string } | undefined,
+  sendPaymasterTransaction: (calls: Call[]) => Promise<InvokeFunctionResponse>,
+  walletClient: AccountInterface,
+): Promise<string> {
+  if (typeof tx !== "function") {
+    throw new Error("Incorrect transaction passed to transactor");
+  }
+
+  const result = await tx();
+
+  if (typeof result === "string") {
+    return result;
+  }
+  if ("transaction_hash" in result) {
+    return result.transaction_hash;
+  }
+  // Result is Call or Call[] - execute via paymaster or regular wallet
+  const calls = Array.isArray(result) ? result : [result];
+  return executeCalls(calls, shouldUsePaymaster, selectedToken, sendPaymasterTransaction, walletClient);
+}
+
+/** Extract a user-facing error message from a transaction error. */
+function extractErrorMessage(error: unknown): string {
+  const errorObj = error as Error;
+  const errorPattern = /Contract (.*?)"}/;
+  const match = errorPattern.exec(errorObj.message);
+  return match ? match[1] : errorObj.message;
+}
+
+/** Wait for the on-chain receipt, swallowing fetch failures. */
+async function waitForReceipt(
+  provider: ReturnType<typeof providerFactory>,
+  transactionHash: string,
+): Promise<void> {
+  try {
+    await provider?.waitForTransaction(transactionHash);
+    logger.debug("Transaction confirmed:", transactionHash);
+  } catch (waitError) {
+    console.warn("Error waiting for transaction:", waitError);
+    // Continue anyway - transaction might be included but receipt fetch failed
+  }
+}
 
 /**
  * Paymaster-aware transactor that automatically uses gasless transactions when non-STRK token is selected.
@@ -35,7 +100,7 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
   const STRK_ADDRESS = universalStrkAddress.toLowerCase();
   const { data: paymasterTokens } = usePaymasterGasTokens();
   const isSelectedStrk = selectedAddr === STRK_ADDRESS || (selectedToken?.symbol?.toUpperCase?.() === "STRK");
-  const isSupportedPaymasterToken = !!selectedAddr && !!paymasterTokens?.some((t: any) => (t?.token_address || "")?.toLowerCase() === selectedAddr);
+  const isSupportedPaymasterToken = !!selectedAddr && !!paymasterTokens?.some((t: { token_address?: string }) => (t?.token_address || "")?.toLowerCase() === selectedAddr);
   const shouldUsePaymaster = !isSelectedStrk && isSupportedPaymasterToken;
 
   // Setup paymaster transaction hook
@@ -49,6 +114,9 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
     },
   });
 
+  const transactionType = shouldUsePaymaster ? "gasless" : "regular";
+  const gasTokenSymbol = shouldUsePaymaster ? selectedToken?.symbol : "STRK";
+
   return async tx => {
     if (!walletClient) {
       notification.error("Cannot access account");
@@ -57,81 +125,34 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
     }
 
     let notificationId: string | number | null = null;
-    let transactionHash: Awaited<InvokeFunctionResponse>["transaction_hash"] | undefined = undefined;
+    let transactionHash: string | undefined = undefined;
 
     try {
       const networkId = await walletClient.getChainId();
-      
-      // Show pending notification - this will stay until we get the transaction hash or timeout
-      const transactionType = shouldUsePaymaster ? "gasless" : "regular";
-      const gasTokenSymbol = shouldUsePaymaster ? selectedToken?.symbol : "STRK";
+
       notificationId = notification.loading(
         <TransactionToast
           step="pending"
           message={`Waiting for approval... (${transactionType}, gas: ${gasTokenSymbol})`}
         />
       );
-      
-      // Set up 10 second timeout for pending state
+
       const pendingTimeout = setTimeout(() => {
-        if (notificationId) {
-          notification.remove(notificationId);
-        }
+        if (notificationId) notification.remove(notificationId);
       }, 10000);
-      
+
       try {
-        if (typeof tx === "function") {
-          // Tx is a function that returns the transaction
-          const result = await tx();
-          
-          if (typeof result === "string") {
-            transactionHash = result;
-          } else if ("transaction_hash" in result) {
-            transactionHash = result.transaction_hash;
-          } else {
-            // Result is Call or Call[] - decide whether to use paymaster
-            const calls = Array.isArray(result) ? result : [result];
-            
-            if (shouldUsePaymaster && selectedToken?.address) {
-              logger.debug(`Using paymaster with ${selectedToken.symbol} for gas payment`);
-              const paymasterResult = await sendPaymasterTransaction(calls);
-              transactionHash = paymasterResult.transaction_hash;
-            } else {
-              logger.debug("Using regular transaction with STRK for gas payment");
-              // Fallback to regular transaction
-              const regularResult = await walletClient.execute(calls);
-              transactionHash = regularResult.transaction_hash;
-            }
-          }
-        } else if (tx != null) {
-          // tx is already a Call or Call[]
-          const calls = Array.isArray(tx) ? tx : [tx];
-          
-          if (shouldUsePaymaster && selectedToken?.address) {
-            logger.debug(`Using paymaster with ${selectedToken.symbol} for gas payment`);
-            const paymasterResult = await sendPaymasterTransaction(calls);
-            transactionHash = paymasterResult.transaction_hash;
-          } else {
-            logger.debug("Using regular transaction with STRK for gas payment");
-            const regularResult = await walletClient.execute(calls);
-            transactionHash = regularResult.transaction_hash;
-          }
-        } else {
-          throw new Error("Incorrect transaction passed to transactor");
-        }
-        
-        // Clear timeout since we got the hash
+        transactionHash = await resolveTransactionHash(
+          tx, shouldUsePaymaster, selectedToken, sendPaymasterTransaction, walletClient,
+        );
         clearTimeout(pendingTimeout);
       } catch (error) {
-        // Clear timeout on error
         clearTimeout(pendingTimeout);
         throw error;
       }
 
-      // Now that we have the hash, transaction is sent - switch to "sent" state
       const blockExplorerTxURL = networkId ? getBlockExplorerTxLink(targetNetwork.network, transactionHash) : "";
 
-      // Update notification to "sent" state
       notification.remove(notificationId);
       notificationId = notification.loading(
         <TransactionToast
@@ -142,19 +163,11 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
         />
       );
 
-      // Wait for transaction receipt
-      try {
-        await provider?.waitForTransaction(transactionHash);
-        logger.debug("Transaction confirmed:", transactionHash);
-      } catch (waitError) {
-        console.warn("Error waiting for transaction:", waitError);
-        // Continue anyway - transaction might be included but receipt fetch failed
-      }
-
+      await waitForReceipt(provider, transactionHash);
       notification.remove(notificationId);
 
-      const successMessage = shouldUsePaymaster 
-        ? `Gasless transaction completed! (Paid with ${gasTokenSymbol})` 
+      const successMessage = shouldUsePaymaster
+        ? `Gasless transaction completed! (Paid with ${gasTokenSymbol})`
         : "Transaction completed successfully!";
 
       notification.success(
@@ -169,15 +182,10 @@ export const usePaymasterTransactor = (_walletClient?: AccountInterface): Transa
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("txCompleted"));
       }
-    } catch (error: any) {
-      if (notificationId) {
-        notification.remove(notificationId);
-      }
+    } catch (error: unknown) {
+      if (notificationId) notification.remove(notificationId);
 
-      const errorPattern = /Contract (.*?)"}/;
-      const match = errorPattern.exec(error.message);
-      const message = match ? match[1] : error.message;
-
+      const message = extractErrorMessage(error);
       console.error("⚡️ ~ file: usePaymasterTransactor.tsx ~ error", message);
 
       const blockExplorerTxURL = transactionHash

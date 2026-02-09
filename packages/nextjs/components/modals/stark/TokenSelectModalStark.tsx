@@ -123,7 +123,9 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
 
   // Memoized token objects for modals to avoid react-perf warnings
   const borrowTokenProps = useMemo(() => {
-    if (!selectedToken) return null;
+    if (!selectedToken) {
+      return null;
+    }
     return {
       name: selectedSymbol,
       icon: tokenNameToLogo(selectedSymbol.toLowerCase()),
@@ -137,7 +139,9 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
   }, [selectedToken, selectedSymbol, selectedAddress]);
 
   const depositTokenProps = useMemo(() => {
-    if (!selectedToken) return null;
+    if (!selectedToken) {
+      return null;
+    }
     return {
       name: selectedSymbol,
       icon: tokenNameToLogo(selectedSymbol.toLowerCase()),
@@ -152,7 +156,7 @@ export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({
 
   const vesuContextWithCollateral = useMemo(() => {
     if (protocolName === "vesu_v2" && vesuContext) {
-      return { ...(vesuContext as any), collateralToken: collateralAsset, isVtoken: true };
+      return { ...vesuContext, collateralToken: collateralAsset, isVtoken: true };
     }
     return vesuContext;
   }, [protocolName, vesuContext, collateralAsset]);

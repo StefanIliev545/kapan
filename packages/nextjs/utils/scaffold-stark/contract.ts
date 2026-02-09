@@ -309,9 +309,7 @@ export function getFunctionsByStateMutability(abi: Abi, stateMutability: AbiStat
       }
       return acc;
     }, [] as AbiFunction[])
-    .filter(fn => {
-      return fn.state_mutability == stateMutability;
-    });
+    .filter(fn => fn.state_mutability === stateMutability);
 }
 
 // TODO: in the future when param decoding is standardized in wallets argent and braavos we can return the object
@@ -328,15 +326,16 @@ function tryParsingParamReturnValues(fn: (x: any) => unknown, param: any, isRead
     } else {
       return objectValue;
     }
-  } catch (e) {
+  } catch {
     return param;
   }
 }
 
-function tryParsingParamReturnObject(fn: (x: any) => unknown, param: any) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function tryParsingParamReturnObject(fn: (x: any) => unknown, param: unknown) {
   try {
     return fn(param);
-  } catch (e) {
+  } catch {
     return param;
   }
 }
@@ -601,7 +600,7 @@ const encodeParamsWithType = (paramType = "", param: any, isReadArgsParsing: boo
     return tryParsingParamReturnValues(validateAndParseAddress, param, isReadArgsParsing);
   }
   if (isCairoBool(paramType)) {
-    return param == "false" ? "0x0" : "0x1";
+    return param === "false" ? "0x0" : "0x1";
   }
   if (isCairoResult(paramType)) {
     return encodeCairoResult(paramType, param, isReadArgsParsing);

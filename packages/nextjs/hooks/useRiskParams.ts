@@ -25,7 +25,9 @@ export function useRiskParams(options: {
             {
               address: gateway,
               abi: gatewayAbi,
-              functionName: "getLtv",
+              // Use getCurrentLtvBps which calculates actual debt/collateral ratio
+              // Note: getLtv returns weighted avg max LTV from collateral composition, not current LTV
+              functionName: "getCurrentLtvBps",
               args: [marketOrToken, user],
               chainId,
             },

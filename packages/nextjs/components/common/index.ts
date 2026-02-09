@@ -1,5 +1,6 @@
 // Common UI components
 export * from "./AmountDisplay";
+export * from "./CollapsibleSection";
 export * from "./BalanceError";
 export * from "./BalanceSkeleton";
 export * from "./Button";

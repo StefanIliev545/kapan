@@ -91,6 +91,68 @@ export async function POST(req: NextRequest) {
   return processWebhook(payload);
 }
 
+/** Record a single ChunkExecuted fill event and update the parent order.
+ *  Returns true if a new fill was recorded, false if skipped. */
+async function recordFill(
+  orderHash: string,
+  sellAmount: bigint,
+  buyAmount: bigint,
+  chunkIndex: bigint,
+  txHash: string,
+): Promise<boolean> {
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.orderHash, orderHash))
+    .limit(1);
+
+  if (!order) {
+    console.log("[Webhook] Order not found for hash:", orderHash);
+    return false;
+  }
+
+  // Idempotency check
+  const existingFill = await db
+    .select()
+    .from(orderFills)
+    .where(and(eq(orderFills.orderId, order.id), eq(orderFills.txHash, txHash)))
+    .limit(1);
+
+  if (existingFill.length > 0) {
+    console.log("[Webhook] Fill already recorded:", txHash);
+    return false;
+  }
+
+  const executionPrice = sellAmount > 0n
+    ? (buyAmount * 10n ** 18n / sellAmount).toString()
+    : null;
+
+  await db.insert(orderFills).values({
+    orderId: order.id,
+    txHash,
+    fillSellAmount: sellAmount.toString(),
+    fillBuyAmount: buyAmount.toString(),
+    executionPrice,
+  });
+
+  const newFilledSell = BigInt(order.filledSellAmount || "0") + sellAmount;
+  const newFilledBuy = BigInt(order.filledBuyAmount || "0") + buyAmount;
+  const isFullyFilled = newFilledSell >= BigInt(order.sellAmount);
+
+  await db
+    .update(orders)
+    .set({
+      filledSellAmount: newFilledSell.toString(),
+      filledBuyAmount: newFilledBuy.toString(),
+      status: isFullyFilled ? "filled" : "partially_filled",
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, order.id));
+
+  console.log("[Webhook] Recorded fill for order:", order.id, "chunk:", chunkIndex.toString());
+  return true;
+}
+
 async function processWebhook(payload: AlchemyWebhookPayload) {
   console.log("[Webhook] Received:", payload.type, payload.id);
 
@@ -104,7 +166,6 @@ async function processWebhook(payload: AlchemyWebhookPayload) {
     return Response.json({ error: "Unknown network" }, { status: 400 });
   }
 
-  // Get the OrderManager address for this chain to filter events
   const contracts = deployedContracts[chainId as keyof typeof deployedContracts];
   const orderManagerAddress = contracts?.KapanOrderManager?.address?.toLowerCase();
 
@@ -112,109 +173,34 @@ async function processWebhook(payload: AlchemyWebhookPayload) {
 
   for (const activity of payload.event.activity) {
     const log = activity.log;
-
-    // Only process logs from our OrderManager contract
-    if (log.address.toLowerCase() !== orderManagerAddress) {
-      continue;
-    }
+    if (log.address.toLowerCase() !== orderManagerAddress) continue;
 
     try {
-      // Decode the event log
       const decoded = decodeEventLog({
         abi: [CHUNK_EXECUTED_EVENT],
         data: log.data as Hex,
         topics: log.topics as [Hex, ...Hex[]],
       });
 
-      if (decoded.eventName !== "ChunkExecuted") {
-        continue;
-      }
+      if (decoded.eventName !== "ChunkExecuted") continue;
 
       const { orderHash, chunkIndex, sellAmount, buyAmount } = decoded.args;
-      const txHash = log.transactionHash;
-
       console.log("[Webhook] ChunkExecuted:", {
         orderHash,
         chunkIndex: chunkIndex.toString(),
         sellAmount: sellAmount.toString(),
         buyAmount: buyAmount.toString(),
-        txHash,
+        txHash: log.transactionHash,
       });
 
-      // Find order by orderHash (stored in DB)
-      const [order] = await db
-        .select()
-        .from(orders)
-        .where(eq(orders.orderHash, orderHash))
-        .limit(1);
-
-      if (!order) {
-        console.log("[Webhook] Order not found for hash:", orderHash);
-        continue;
-      }
-
-      // Check if this fill was already recorded (idempotency)
-      const existingFill = await db
-        .select()
-        .from(orderFills)
-        .where(
-          and(
-            eq(orderFills.orderId, order.id),
-            eq(orderFills.txHash, txHash)
-          )
-        )
-        .limit(1);
-
-      if (existingFill.length > 0) {
-        console.log("[Webhook] Fill already recorded:", txHash);
-        continue;
-      }
-
-      // Calculate execution price (buyAmount / sellAmount, scaled to 18 decimals)
-      const executionPrice = sellAmount > 0n
-        ? (buyAmount * 10n ** 18n / sellAmount).toString()
-        : null;
-
-      // Record the fill
-      await db.insert(orderFills).values({
-        orderId: order.id,
-        txHash,
-        fillSellAmount: sellAmount.toString(),
-        fillBuyAmount: buyAmount.toString(),
-        executionPrice,
-      });
-
-      // Update order's filled amounts
-      const currentFilledSell = BigInt(order.filledSellAmount || "0");
-      const currentFilledBuy = BigInt(order.filledBuyAmount || "0");
-      const newFilledSell = currentFilledSell + sellAmount;
-      const newFilledBuy = currentFilledBuy + buyAmount;
-
-      // Check if order is fully filled (compare to original amounts)
-      const totalSellAmount = BigInt(order.sellAmount);
-      const isFullyFilled = newFilledSell >= totalSellAmount;
-
-      await db
-        .update(orders)
-        .set({
-          filledSellAmount: newFilledSell.toString(),
-          filledBuyAmount: newFilledBuy.toString(),
-          status: isFullyFilled ? "filled" : "partially_filled",
-          updatedAt: new Date(),
-        })
-        .where(eq(orders.id, order.id));
-
-      processedCount++;
-      console.log("[Webhook] Recorded fill for order:", order.id, "chunk:", chunkIndex.toString());
+      const recorded = await recordFill(orderHash, sellAmount, buyAmount, chunkIndex, log.transactionHash);
+      if (recorded) processedCount++;
     } catch (error) {
       console.error("[Webhook] Failed to decode event:", error);
     }
   }
 
-  return Response.json({
-    success: true,
-    processed: processedCount,
-  }, { status: 200 });
+  return Response.json({ success: true, processed: processedCount }, { status: 200 });
 }
 
 /**

@@ -1,6 +1,9 @@
 export { AaveForkProtocolView } from "./AaveForkProtocolView";
 export type { AaveForkProtocolConfig, AaveForkProtocolViewProps } from "./AaveForkProtocolView";
 
+export { BaseProtocolHeader } from "./BaseProtocolHeader";
+export type { BaseProtocolHeaderProps, HeaderMetric } from "./BaseProtocolHeader";
+
 export { HealthStatus } from "./HealthStatus";
 export type { HealthStatusProps } from "./HealthStatus";
 

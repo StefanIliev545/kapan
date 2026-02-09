@@ -1,4 +1,5 @@
-import React, { FC, useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
+import type { FC } from "react";
 import { formatUnits } from "viem";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
@@ -65,7 +66,9 @@ export const FiatBalance: FC<FiatBalanceProps> = ({
 
   // Determine the effective decimals.
   const effectiveDecimals = useMemo(() => {
-    if (providedDecimals !== undefined) return providedDecimals;
+    if (providedDecimals !== undefined) {
+      return providedDecimals;
+    }
     if (fetchedDecimals && fetchedDecimals.length > 0) {
       return Number(fetchedDecimals[0]);
     }
@@ -74,34 +77,38 @@ export const FiatBalance: FC<FiatBalanceProps> = ({
 
   // Format the raw token balance.
   const formattedRawBalance = useMemo(() => {
-    if (rawValue === 0n) return "0";
+    if (rawValue === 0n) {
+      return "0";
+    }
     try {
       const formattedFull = formatUnits(isNegative ? -rawValue : rawValue, effectiveDecimals);
       const parts = formattedFull.split(".");
       let result = parts[0];
       if (parts.length > 1 && maxRawDecimals > 0) {
-        const decimalPart = parts[1].substring(0, maxRawDecimals);
+        const decimalPart = parts[1].slice(0, maxRawDecimals);
         if (Number(decimalPart) > 0) {
           result += "." + decimalPart;
         }
       }
       return tokenSymbol ? `${result} ${tokenSymbol}` : result;
-    } catch (e) {
-      console.error("Error formatting raw balance:", e);
+    } catch (error) {
+      console.error("Error formatting raw balance:", error);
       return String(rawValue);
     }
   }, [rawValue, effectiveDecimals, isNegative, tokenSymbol, maxRawDecimals]);
 
   // Calculate the USD value. Using Number conversion for the final division preserves the decimals.
   const usdValue = useMemo(() => {
-    if (rawValue === 0n || !effectivePrice || effectivePrice === 0n) return 0;
+    if (rawValue === 0n || !effectivePrice || effectivePrice === 0n) {
+      return 0;
+    }
     try {
       const numerator = Number(rawValue) * Number(effectivePrice);
       // Price is assumed to have 8 decimals, so we adjust for both token decimals and price precision.
       const divisor = 10 ** (effectiveDecimals + 8);
       return numerator / divisor;
-    } catch (e) {
-      console.error("Error calculating USD value:", e);
+    } catch (error) {
+      console.error("Error calculating USD value:", error);
       return 0;
     }
   }, [rawValue, effectivePrice, effectiveDecimals]);
@@ -122,8 +129,8 @@ export const FiatBalance: FC<FiatBalanceProps> = ({
     }
     
     // For values >= $1K, use K notation to keep display compact
-    if (absValue >= 1_000) {
-      const thousands = absValue / 1_000;
+    if (absValue >= 1000) {
+      const thousands = absValue / 1000;
       const formatted = new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,

@@ -1,48 +1,117 @@
-/**
- * VenusProtocolView Component
- * ---------------------------
- * This component displays Venus Protocol markets in the Kapan Finance interface.
- * It's similar to the AaveProtocolView and CompoundProtocolView components.
- * 
- * Current Implementation:
- * - Uses the simplified Venus Gateway functions to reduce "stack too deep" errors
- * - Combines data from multiple contract calls in the frontend
- * - Converts Venus per-block rates to APY percentages
- * - Formats token balances and prices for display
- * - Provides supply and borrow positions for each token
- * 
- * Venus Protocol Integration Details:
- * - Venus operates on BNB Chain (Binance Smart Chain)
- * - Uses vTokens as the collateral and debt tokens
- * - Reports rates per block, which need to be converted to APY
- * - BNB Chain has approximately 10,512,000 blocks per year (20 blocks per minute)
- * 
- * When fully implemented, this component will:
- * 1. Fetch real token data from the VenusGateway contract
- * 2. Display user's supplied positions and borrowed amounts
- * 3. Show interest rates for each token
- * 4. Allow users to supply, borrow, repay, and migrate debt between protocols
- */
+"use client";
 
-import { FC, useEffect, useMemo, useState } from "react";
-import { ProtocolPosition, ProtocolView } from "../../ProtocolView";
-import { SupplyPositionProps } from "../../SupplyPosition";
-import { VenusMarketEntry } from "./VenusMarketEntry";
-import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { formatUnits, Address } from "viem";
-import { useAccount } from "wagmi";
-import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { useProtocolTotalsFromPositions } from "~~/hooks/common";
+import { FC, useCallback, useEffect, useMemo, useState } from "react";
+import { Cog6ToothIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import { AddButton } from "~~/components/common/AddButton";
+import { SupplyPosition } from "../../SupplyPosition";
+import { BorrowPosition } from "../../BorrowPosition";
+import { TokenSelectModal } from "../../modals/TokenSelectModal";
+import { MultiplyEvmModal } from "../../modals/MultiplyEvmModal";
+import { LTVAutomationModal } from "../../modals/LTVAutomationModal";
+import { CollapsibleSection } from "~~/components/common/CollapsibleSection";
+import { BaseProtocolHeader, type HeaderMetric } from "../common/BaseProtocolHeader";
+import { CrossTopologyMarketsSection } from "../common/CrossTopologyMarketsSection";
+import { CrossPositionLayout } from "~~/components/positions/CrossPositionLayout";
+import {
+  UtilizationWithTooltip,
+  UtilizationMobile,
+  calculateUtilizationMetrics,
+  type CollateralBreakdownItem,
+} from "../common/UtilizationTooltip";
+import type { SwapAsset } from "../../modals/SwapModalShell";
+import type { TokenPosition } from "~~/types/positions";
+import { MetricColors } from "~~/utils/protocolMetrics";
+import { calculateNetYieldMetrics } from "~~/utils/netYield";
+import { useVenusLendingPositions } from "~~/hooks/useVenusLendingPositions";
+import { useAavePositionGroups } from "~~/hooks/adapters/useAavePositionGroups";
 import { useRiskParams } from "~~/hooks/useRiskParams";
 import { useScaffoldContract } from "~~/hooks/scaffold-eth";
-import { filterPositionsByWalletStatus } from "~~/utils/tokenSymbols";
+import { useVenusReserveConfigs } from "~~/hooks/usePredictiveLtv";
+import { usePTEnhancedApyMaps } from "~~/hooks/usePendlePTYields";
+import { useAccount } from "wagmi";
+import { useModal } from "~~/hooks/useModal";
+import { useADLContracts } from "~~/hooks/useADLOrder";
+import { useActiveADL, formatLtvPercent } from "~~/hooks/useConditionalOrders";
+import { LoadingSpinner } from "~~/components/common/Loading";
+import { PositionManager } from "~~/utils/position";
+import { VenusMarketEntry } from "./VenusMarketEntry";
+import type { Address } from "viem";
+import type { ProtocolPosition } from "../../ProtocolView";
 
-// Create a Venus supply position type
-type VenusSupplyPosition = SupplyPositionProps;
+// ── Helpers ─────────────────────────────────────────────────────────
 
-export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId, enabledFeatures }) => {
+/** Convert ProtocolPosition to SwapAsset format for close / swap modals */
+function positionToSwapAsset(pos: ProtocolPosition): SwapAsset {
+  return {
+    symbol: pos.name,
+    address: pos.tokenAddress as `0x${string}`,
+    decimals: pos.tokenDecimals || 18,
+    rawBalance: pos.tokenBalance || 0n,
+    balance: Number(pos.tokenBalance || 0n) / 10 ** (pos.tokenDecimals || 18),
+    icon: pos.icon,
+    price: pos.tokenPrice,
+    usdValue: pos.tokenPrice
+      ? (Number(pos.tokenBalance || 0n) / 10 ** (pos.tokenDecimals || 18)) * (Number(pos.tokenPrice) / 1e8)
+      : undefined,
+  };
+}
+
+// ── Metrics ─────────────────────────────────────────────────────────
+
+interface PositionMetrics {
+  netBalance: number;
+  netYield30d: number;
+  netApyPercent: number | null;
+  totalSupplied: number;
+  totalBorrowed: number;
+}
+
+const EMPTY_METRICS: PositionMetrics = {
+  netBalance: 0,
+  netYield30d: 0,
+  netApyPercent: null,
+  totalSupplied: 0,
+  totalBorrowed: 0,
+};
+
+// ── Main component ──────────────────────────────────────────────────
+
+/**
+ * Venus Protocol View using BaseProtocolHeader + CrossPositionLayout.
+ *
+ * Venus uses cross-topology (any collateral backs any debt), same as Aave.
+ * Includes utilization bar with hover, Add Supply/Loop/Borrow buttons, and Venus market entry toggle.
+ */
+export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?: boolean; move?: boolean } }> = ({ chainId }) => {
   const { address: connectedAddress } = useAccount();
 
+  const supplySelectModal = useModal();
+  const borrowSelectModal = useModal();
+  const multiplyModal = useModal();
+  const adlModal = useModal();
+
+  const [isMarketsOpen, setIsMarketsOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  // Reset state on chain change
+  useEffect(() => {
+    setIsCollapsed(true);
+    setIsMarketsOpen(false);
+  }, [chainId]);
+
+  // ── Data fetching ──────────────────────────────────────────────
+  const {
+    suppliedPositions,
+    borrowedPositions,
+    hasLoadedOnce,
+    comptrollerAddress,
+    vTokenAddresses,
+  } = useVenusLendingPositions(chainId);
+
+  // ── Reserve configs (for LTV column in markets table) ─────────
+  const { configs: reserveConfigs } = useVenusReserveConfigs(chainId, hasLoadedOnce);
+
+  // ── Risk parameters ────────────────────────────────────────────
   const { data: gateway } = useScaffoldContract({ contractName: "VenusGatewayView", chainId: chainId as any });
   const gatewayAddress = gateway?.address as Address | undefined;
 
@@ -54,263 +123,417 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
     chainId,
   });
 
-  // Get Comptroller address from VenusGatewayView
-  const { data: comptrollerAddress } = useScaffoldReadContract({
-    contractName: "VenusGatewayView",
-    functionName: "comptroller",
-    chainId: chainId as any,
+  const effectiveLltvBps = useMemo(() => (lltvBps > 0n ? lltvBps : ltvBps), [lltvBps, ltvBps]);
+
+  // ── ADL ────────────────────────────────────────────────────────
+  const { isSupported: isADLSupported } = useADLContracts(chainId || 1);
+  const { hasActiveADL, activeADL, triggerLtvBps, targetLtvBps } = useActiveADL({
+    protocolName: "venus",
+    chainId: chainId || 1,
   });
 
-  const isWalletConnected = !!connectedAddress;
-  const forceShowAll = !isWalletConnected;
+  // ── Position groups ────────────────────────────────────────────
+  const positionGroups = useAavePositionGroups(
+    "venus",
+    chainId || 1,
+    suppliedPositions,
+    borrowedPositions,
+  );
 
-  // Helper: Convert Venus rates to APY percentage
-  // Venus uses rates per block, so we need to convert to annual rates
-  // Following the formula from Venus docs: https://docs-v4.venus.io/guides/protocol-math#calculating-the-apy-using-rate-per-block
-  const convertRateToAPY = (ratePerBlock: bigint): number => {
-    const ethMantissa = 1e18;
-    const blocksPerDay = 60 * 60 * 24;
-    const daysPerYear = 365;
-    
-    // Convert bigint to number for math operations
-    const ratePerBlockNum = Number(ratePerBlock) / ethMantissa;
-    
-    // Use compound interest formula: ((ratePerBlock * blocksPerDay) + 1) ^ (daysPerYear - 1) - 1
-    const apy = (Math.pow((ratePerBlockNum * blocksPerDay) + 1, daysPerYear - 1) - 1) * 100;
-    
-    return apy;
-  };
+  const positionGroup = positionGroups[0] ?? null;
 
-  // Special token overrides for specific addresses
-  const tokenOverrides: Record<string, { name: string; logo: string }> = {
-    "0x70d95587d40A2caf56bd97485aB3Eec10Bee6336": { name: "gmWETH/USDC", logo: "/logos/gmweth.svg" },
-    "0x47c031236e19d024b42f8AE6780E44A573170703": { name: "gmWBTC/USDC", logo: "/logos/gmbtc.svg" },
-  };
+  // ── Derived data ───────────────────────────────────────────────
+  const activeSupply = useMemo(
+    () => suppliedPositions.filter(p => p.tokenBalance && p.tokenBalance > 0n),
+    [suppliedPositions],
+  );
+  const activeDebt = useMemo(
+    () => borrowedPositions.filter(p => p.tokenBalance && p.tokenBalance > 0n),
+    [borrowedPositions],
+  );
 
-  // Helper to get token display name and logo
-  const getTokenDisplay = (tokenAddress: string, originalSymbol: string) => {
-    const override = tokenOverrides[tokenAddress];
-    if (override) {
-      return {
-        displayName: override.name,
-        logo: override.logo
-      };
-    }
+  const hasDebt = activeDebt.length > 0;
+  const hasCollateral = activeSupply.length > 0;
+  const hasPositions = hasCollateral || hasDebt;
+
+  // Active collateral assets for position modals (swap, close)
+  const collateralAssets: SwapAsset[] = useMemo(
+    () => activeSupply.map(positionToSwapAsset),
+    [activeSupply],
+  );
+
+  // All available market assets for the multiply modal (loop works without existing positions)
+  const allSupplyAssets: SwapAsset[] = useMemo(
+    () => suppliedPositions.map(positionToSwapAsset),
+    [suppliedPositions],
+  );
+  const allBorrowAssets: SwapAsset[] = useMemo(
+    () => borrowedPositions.map(positionToSwapAsset),
+    [borrowedPositions],
+  );
+  const debtOptions: SwapAsset[] = useMemo(
+    () => allBorrowAssets.length > 0 ? allBorrowAssets : allSupplyAssets,
+    [allBorrowAssets, allSupplyAssets],
+  );
+
+  // APY maps for multiply modal
+  const apyMapTokens = useMemo(() =>
+    suppliedPositions.map(p => ({
+      address: p.tokenAddress,
+      symbol: p.name,
+      supplyRate: p.currentRate,
+      borrowRate: borrowedPositions.find(b => b.tokenAddress.toLowerCase() === p.tokenAddress.toLowerCase())?.currentRate || 0,
+    })),
+    [suppliedPositions, borrowedPositions],
+  );
+  const { supplyApyMap, borrowApyMap } = usePTEnhancedApyMaps(chainId, apyMapTokens);
+
+  // Compute metrics
+  const metrics = useMemo((): PositionMetrics => {
+    if (!hasPositions) return EMPTY_METRICS;
+    const yieldMetrics = calculateNetYieldMetrics(activeSupply, activeDebt);
     return {
-      displayName: originalSymbol,
-      logo: tokenNameToLogo(originalSymbol)
+      netBalance: yieldMetrics.netBalance,
+      netYield30d: yieldMetrics.netYield30d,
+      netApyPercent: yieldMetrics.netApyPercent,
+      totalSupplied: yieldMetrics.totalSupplied,
+      totalBorrowed: yieldMetrics.totalBorrowed,
     };
-  };
+  }, [activeSupply, activeDebt, hasPositions]);
 
-  // Step 1: Get basic token info from getAllVenusMarkets
-  const { data: vTokenAddresses, isLoading: isLoadingVTokens } = useScaffoldReadContract({
-    contractName: "VenusGatewayView",
-    functionName: "getAllMarkets",
-    chainId: chainId as any,
-  });
+  // NOTE: Protocol totals are reported by useVenusLendingPositions hook
+  // via useProtocolTotalsFromPositions — do NOT duplicate here.
 
-  // Step 2: Get detailed market information including prices from oracles
-  const { data: marketDetails, isLoading: isLoadingMarketDetails } = useScaffoldReadContract({
-    contractName: "VenusGatewayView",
-    functionName: "getAllVenusMarkets",
-    chainId: chainId as any,
-  });
-  
-  // Step 3: Get market rates after we have the vToken addresses
-  const { data: ratesData, isLoading: isLoadingRates } = useScaffoldReadContract({
-    contractName: "VenusGatewayView",
-    functionName: "getMarketRates",
-    args: [vTokenAddresses],
-    chainId: chainId as any,
-  });
-  
-  // Step 4: Get user balances if wallet is connected
-  const { data: userBalances, isLoading: isLoadingBalances } = useScaffoldReadContract({
-    contractName: "VenusGatewayView",
-    functionName: "getUserBalances",
-    args: [vTokenAddresses, connectedAddress],
-    chainId: chainId as any,
-  });
-  
-  // Step 5: Get collateral status if wallet is connected
-  const { data: collateralStatus, isLoading: isLoadingCollateral } = useScaffoldReadContract({
-    contractName: "VenusGatewayView",
-    functionName: "getCollateralStatus",
-    args: [vTokenAddresses, connectedAddress],
-    chainId: chainId as any,
-  });
+  const totalDebtUsdNumber = useMemo(
+    () => activeDebt.reduce((sum, p) => sum + Math.abs(p.balance), 0),
+    [activeDebt],
+  );
 
-  // Track whether we've loaded data at least once
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  
-  // Reset hasLoadedOnce when chainId changes
-  useEffect(() => {
-    setHasLoadedOnce(false);
-  }, [chainId]);
+  // Total USD values for ADL modal (8-decimal Chainlink format)
+  const totalCollateralUsd = useMemo(
+    () => collateralAssets.reduce((sum, c) => sum + BigInt(Math.round((c.usdValue || 0) * 1e8)), 0n),
+    [collateralAssets],
+  );
+  const totalDebtUsd = useMemo(
+    () => activeDebt.reduce((sum, d) => {
+      const balance = Number(d.tokenBalance || 0n) / 10 ** (d.tokenDecimals || 18);
+      const price = d.tokenPrice ? Number(d.tokenPrice) / 1e8 : 0;
+      return sum + BigInt(Math.round(balance * price * 1e8));
+    }, 0n),
+    [activeDebt],
+  );
 
-  useEffect(() => {
-    const isLoading = isLoadingVTokens || isLoadingMarketDetails || isLoadingRates || 
-                     (connectedAddress && (isLoadingBalances || isLoadingCollateral));
-    if (!isLoading && !hasLoadedOnce && vTokenAddresses && marketDetails && ratesData) {
-      setHasLoadedOnce(true);
-    }
-  }, [isLoadingVTokens, isLoadingMarketDetails, isLoadingRates, isLoadingBalances, isLoadingCollateral, 
-      connectedAddress, hasLoadedOnce, vTokenAddresses, marketDetails, ratesData]);
+  const selectedDebt = activeDebt[0]; // First debt for ADL modal
 
-  // Combine all the data to create supply and borrow positions
-  const { suppliedPositions, borrowedPositions } = useMemo(() => {
-    const supplied: VenusSupplyPosition[] = [];
-    const borrowed: ProtocolPosition[] = [];
+  // ── Utilization ───────────────────────────────────────────────
+  const { utilizationPercentage } = useMemo(
+    () => calculateUtilizationMetrics(metrics.totalSupplied, metrics.totalBorrowed, ltvBps, effectiveLltvBps),
+    [metrics.totalSupplied, metrics.totalBorrowed, ltvBps, effectiveLltvBps],
+  );
 
-    // Check if we have all the required data
-    if (!vTokenAddresses || !marketDetails || !ratesData || (connectedAddress && (!userBalances || !collateralStatus))) {
-      return {
-        suppliedPositions: supplied,
-        borrowedPositions: borrowed,
-      };
-    }
-    
-    // Destructure arrays from tuple responses
-    const [vTokens, tokens, symbols, , decimals, prices] = marketDetails;
-    const [, supplyRates, borrowRates] = ratesData;
-    
-    // Process data to create positions
-    for (let i = 0; i < vTokens.length; i++) {
-      // Get token information
-      const symbol = symbols[i];
-      const decimal = decimals[i];
-      const tokenAddress = tokens[i];
-      
-      // Skip tokens with no underlying (like vBNB potentially)
-      if (tokenAddress === "0x0000000000000000000000000000000000000000") {
-        continue;
-      }
-      
-      // Apply token overrides if needed
-      const { displayName, logo } = getTokenDisplay(tokenAddress, symbol);
-      
-      // Get rates and prices
-      const supplyRate = supplyRates[i];
-      const borrowRate = borrowRates[i];
-      const price = prices[i];
-      
-      // Convert rates to APY
-      const supplyAPY = convertRateToAPY(supplyRate);
-      const borrowAPY = convertRateToAPY(borrowRate);
-      
-      // Convert price from Venus ResilientOracle format
-      // According to Venus docs, prices are returned in USD with a consistent scale factor of 1e18
-      const tokenPrice = Number(formatUnits(price, 18 + (18 - decimal)));
-      
-      // Create supply position
-      let supplyBalance = 0n;
-      let supplyUsdBalance = 0;
-      
-      if (userBalances) {
-        const [balances] = userBalances;
-        supplyBalance = balances[i];
-        const supplyFormatted = Number(formatUnits(supplyBalance, decimal));
-        supplyUsdBalance = supplyFormatted * tokenPrice;
-      }
-      
-      // Convert price to bigint with 8 decimals precision for FiatBalance compatibility
-      const priceWith8Decimals = BigInt(Math.round(tokenPrice * 1e8));
-      
-      supplied.push({
-        icon: logo,
-        name: displayName,
-        balance: supplyUsdBalance,
-        tokenBalance: supplyBalance,
-        currentRate: supplyAPY,
-        tokenAddress: tokenAddress,
-        tokenPrice: priceWith8Decimals, // Add the token price with 8 decimals
-        usdPrice: tokenPrice,
-        tokenDecimals: Number(decimal), // Add the token decimals
-        tokenSymbol: symbol, // Use the original symbol for price overrides
-        protocolName: "Venus",
-        afterInfoContent: comptrollerAddress ? (
-          <VenusMarketEntry
-            vTokenAddress={vTokens[i]} 
-            comptrollerAddress={comptrollerAddress}
-            tokenSymbol={symbol}
-          />
-        ) : null,
-        networkType: "evm",
+  // ── Collateral breakdown for utilization tooltip ─────────────────
+  const collateralBreakdown = useMemo((): CollateralBreakdownItem[] => {
+    if (reserveConfigs.length === 0) return [];
+    const totalCollateral = activeSupply.reduce((sum, p) => sum + p.balance, 0);
+    return activeSupply
+      .filter(p => p.balance > 0)
+      .map(position => {
+        const config = reserveConfigs.find(
+          c => c.token.toLowerCase() === position.tokenAddress.toLowerCase(),
+        );
+        return {
+          name: position.name,
+          icon: position.icon,
+          valueUsd: position.balance,
+          ltvBps: config ? Number(config.ltv) : 0,
+          lltvBps: config ? Number(config.liquidationThreshold) : 0,
+          weightPct: totalCollateral > 0 ? (position.balance / totalCollateral) * 100 : 0,
+        };
       });
-      
-      // Create borrow position
-      let borrowBalance = 0n;
-      let borrowUsdBalance = 0;
-      
-      if (userBalances) {
-        const [, borrowBalances] = userBalances;
-        borrowBalance = borrowBalances[i];
-        const borrowFormatted = Number(formatUnits(borrowBalance, decimal));
-        borrowUsdBalance = borrowFormatted * tokenPrice;
-      }
-      
-      borrowed.push({
-        icon: logo,
-        name: displayName,
-        balance: -borrowUsdBalance, // Negative for borrowed
-        tokenBalance: borrowBalance,
-        currentRate: borrowAPY,
-        tokenAddress: tokenAddress,
-        tokenPrice: priceWith8Decimals, // Add the token price with 8 decimals
-        usdPrice: tokenPrice,
-        tokenDecimals: Number(decimal), // Add the token decimals
-        tokenSymbol: symbol, // Use the original symbol for price overrides
-      });
-    }
-    
-    return {
-      suppliedPositions: supplied,
-      borrowedPositions: borrowed,
-    };
-  }, [vTokenAddresses, marketDetails, ratesData, userBalances, collateralStatus, connectedAddress, convertRateToAPY, comptrollerAddress, getTokenDisplay]);
+  }, [reserveConfigs, activeSupply]);
 
-  const filteredSuppliedPositions = filterPositionsByWalletStatus(
-    suppliedPositions as SupplyPositionProps[],
-    isWalletConnected,
-  );
-  const filteredBorrowedPositions = filterPositionsByWalletStatus(borrowedPositions, isWalletConnected);
+  // ── Position manager for borrow/deposit modals (correct LTV display) ──
+  const borrowPosition = useMemo(() => {
+    if (metrics.totalSupplied <= 0) return undefined;
+    return new PositionManager(
+      metrics.totalSupplied,
+      metrics.totalBorrowed,
+      Number(ltvBps > 0n ? ltvBps : 7500n),
+    );
+  }, [metrics.totalSupplied, metrics.totalBorrowed, ltvBps]);
 
-  // Determine if data is ready for totals calculation
-  const isDataReady = !!(
-    vTokenAddresses &&
-    marketDetails &&
-    ratesData &&
-    !isLoadingVTokens &&
-    !isLoadingMarketDetails &&
-    !isLoadingRates &&
-    (!connectedAddress || (!isLoadingBalances && !isLoadingCollateral))
-  );
+  // ── Loop availability ─────────────────────────────────────────
+  // Venus: all listed markets have non-zero collateral factors (enterMarkets pattern),
+  // so all supply assets are collateral-eligible for loops. No LTV filtering needed.
+  // TODO: If Venus adds non-collateral supply markets in the future, add per-token LTV filtering
+  // similar to AaveForkProtocolView's loopCollaterals logic.
+  const canLoop = allSupplyAssets.length > 0 && debtOptions.length > 0;
+  const loopTitle = canLoop
+    ? "Build a flash-loan loop"
+    : "No markets available for looping";
 
-  // Use the shared hook to update protocol totals in global state
-  useProtocolTotalsFromPositions(
-    "Venus",
-    filteredSuppliedPositions,
-    filteredBorrowedPositions,
-    isDataReady
-  );
+  // ── Auto-expand on positions ───────────────────────────────────
+  useEffect(() => {
+    if (!hasLoadedOnce) return;
+    setIsCollapsed(!hasPositions);
+  }, [hasLoadedOnce, hasPositions]);
 
-  const lltvValue = useMemo(() => (lltvBps > 0n ? lltvBps : ltvBps), [lltvBps, ltvBps]);
+  // ── Event handlers ─────────────────────────────────────────────
+  const toggleCollapsed = useCallback(() => setIsCollapsed(prev => !prev), []);
+  const toggleMarketsOpen = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMarketsOpen(prev => {
+      const newState = !prev;
+      if (newState && isCollapsed) setIsCollapsed(false);
+      return newState;
+    });
+  }, [isCollapsed]);
 
+  // ── Header metrics ─────────────────────────────────────────────
+  const headerMetrics: HeaderMetric[] = useMemo(() => [
+    { label: "Balance", value: metrics.netBalance, type: "currency" },
+    { label: "30D Yield", mobileLabel: "30D", value: metrics.netYield30d, type: "currency" },
+    { label: "Net APY", value: metrics.netApyPercent, type: "apy" },
+    {
+      label: "Utilization",
+      value: null,
+      type: "custom",
+      customRender: (hasData: boolean) => {
+        if (!hasData || !hasDebt) {
+          return <span className={`font-mono text-xs font-bold tabular-nums ${MetricColors.MUTED}`}>{"\u2014"}</span>;
+        }
+        return (
+          <>
+            <div className="hidden sm:block">
+              <UtilizationWithTooltip
+                utilizationPercentage={utilizationPercentage}
+                collateralBreakdown={collateralBreakdown}
+                totalDebtUsd={totalDebtUsdNumber}
+              />
+            </div>
+            <div className="sm:hidden">
+              <UtilizationMobile utilizationPercentage={utilizationPercentage} />
+            </div>
+          </>
+        );
+      },
+    },
+  ], [metrics, hasDebt, utilizationPercentage, collateralBreakdown, totalDebtUsdNumber]);
+
+  // ── Positions toolbar (ADL automation) ─────────────────────────
+  const positionsToolbar = useMemo(() => {
+    if (!connectedAddress || !isADLSupported) return null;
+    return (
+      <div className="flex items-center justify-end gap-2 px-3 pb-2">
+        <button
+          onClick={(e) => { e.stopPropagation(); adlModal.open(); }}
+          className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors ${
+            hasActiveADL
+              ? "text-success hover:text-success/80 hover:bg-success/10"
+              : "text-base-content/50 hover:text-base-content hover:bg-base-200"
+          }`}
+          title={
+            hasActiveADL && triggerLtvBps && targetLtvBps
+              ? `ADL Active: Triggers at ${formatLtvPercent(triggerLtvBps)} → ${formatLtvPercent(targetLtvBps)}`
+              : "Auto-Deleverage Protection"
+          }
+          type="button"
+        >
+          {hasActiveADL ? <ShieldCheckIcon className="size-4" /> : <Cog6ToothIcon className="size-4" />}
+          <span>Automate</span>
+          {hasActiveADL && <span className="bg-success size-2 rounded-full" />}
+        </button>
+      </div>
+    );
+  }, [connectedAddress, isADLSupported, adlModal,
+    hasActiveADL, triggerLtvBps, targetLtvBps]);
+
+  // ── Collateral footer (Add Supply + Add Loop) ─────────────────
+  const collateralFooter = useMemo(() => {
+    if (!connectedAddress) return null;
+    return (
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <AddButton onClick={supplySelectModal.open} label="Add Supply" />
+        <AddButton
+          onClick={multiplyModal.open}
+          label="Add Loop"
+          variant="secondary"
+          disabled={!canLoop}
+          title={loopTitle}
+        />
+      </div>
+    );
+  }, [connectedAddress, supplySelectModal, multiplyModal, canLoop, loopTitle]);
+
+  // ── Debt footer (Add Borrow) ──────────────────────────────────
+  const debtFooter = useMemo(() => {
+    if (!connectedAddress) return null;
+    return (
+      <div>
+        <AddButton onClick={borrowSelectModal.open} label="Add Borrow" />
+      </div>
+    );
+  }, [connectedAddress, borrowSelectModal]);
+
+  // ── Render ─────────────────────────────────────────────────────
   return (
-    <ProtocolView
-      protocolName="Venus"
-      protocolIcon="/logos/venus.svg"
-      ltvBps={ltvBps}
-      lltvBps={lltvValue}
-      suppliedPositions={filteredSuppliedPositions}
-      borrowedPositions={filteredBorrowedPositions}
-      forceShowAll={forceShowAll}
-      networkType="evm"
-      chainId={chainId}
-      enabledFeatures={enabledFeatures}
-      autoExpandOnPositions
-      hasLoadedOnce={hasLoadedOnce}
-    />
+    <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? "p-1" : "space-y-2 py-2 sm:p-3"}`}>
+      {/* Protocol Header */}
+      <BaseProtocolHeader
+        protocolName="Venus"
+        protocolIcon="/logos/venus.svg"
+        protocolUrl="https://app.venus.io"
+        isCollapsed={isCollapsed}
+        isMarketsOpen={isMarketsOpen}
+        onToggleCollapsed={toggleCollapsed}
+        onToggleMarkets={toggleMarketsOpen}
+        hasPositions={hasPositions}
+        metrics={headerMetrics}
+      />
+
+      {/* Markets Section - read-only rate display with Venus collateral toggle */}
+      <CollapsibleSection isOpen={isMarketsOpen && !isCollapsed}>
+        <CrossTopologyMarketsSection
+          suppliedPositions={suppliedPositions}
+          borrowedPositions={borrowedPositions}
+          reserveConfigs={reserveConfigs}
+          renderRowExtra={(_pos, index) =>
+            comptrollerAddress && vTokenAddresses ? (
+              <VenusMarketEntry
+                vTokenAddress={vTokenAddresses[index]}
+                comptrollerAddress={comptrollerAddress}
+                tokenSymbol={_pos.tokenSymbol || _pos.name}
+              />
+            ) : null
+          }
+        />
+      </CollapsibleSection>
+
+      {/* Positions Section */}
+      {!isCollapsed && (
+        <div className="card bg-base-200/40 border-base-300/50 border shadow-md">
+          <div className="card-body p-4">
+            {!hasLoadedOnce ? (
+              <div className="flex justify-center py-4">
+                <LoadingSpinner />
+              </div>
+            ) : hasPositions && positionGroup ? (
+              <CrossPositionLayout
+                group={positionGroup}
+                header={positionsToolbar}
+                collateralFooter={collateralFooter}
+                debtFooter={debtFooter}
+                renderCollateral={(token: TokenPosition) => {
+                  const pos = activeSupply.find(
+                    p => p.tokenAddress.toLowerCase() === token.address.toLowerCase(),
+                  );
+                  if (!pos) return null;
+                  return (
+                    <SupplyPosition
+                      key={pos.tokenAddress}
+                      {...pos}
+                      protocolName="Venus"
+                      networkType="evm"
+                      chainId={chainId}
+                      adlActive={
+                        activeADL?.triggerParams?.collateralToken?.toLowerCase() === pos.tokenAddress.toLowerCase()
+                      }
+                    />
+                  );
+                }}
+                renderDebt={(token: TokenPosition) => {
+                  const pos = activeDebt.find(
+                    p => p.tokenAddress.toLowerCase() === token.address.toLowerCase(),
+                  );
+                  if (!pos) return null;
+                  return (
+                    <BorrowPosition
+                      key={pos.tokenAddress}
+                      {...pos}
+                      protocolName="Venus"
+                      networkType="evm"
+                      chainId={chainId}
+                      availableAssets={collateralAssets}
+                      collateralValue={collateralAssets.reduce((s, c) => s + (c.usdValue || 0), 0)}
+                      position={borrowPosition}
+                      adlProtected={
+                        activeADL?.triggerParams?.debtToken?.toLowerCase() === pos.tokenAddress.toLowerCase()
+                      }
+                    />
+                  );
+                }}
+              />
+            ) : (
+              <div className="space-y-4">
+                <p className="text-base-content/40 py-4 text-center text-sm">
+                  No active positions
+                </p>
+                {collateralFooter}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Token Select Modal (Supply) */}
+      <TokenSelectModal
+        isOpen={supplySelectModal.isOpen}
+        onClose={supplySelectModal.close}
+        tokens={suppliedPositions}
+        protocolName="Venus"
+        isBorrow={false}
+        position={borrowPosition}
+        chainId={chainId}
+      />
+
+      {/* Token Select Modal (Borrow) */}
+      <TokenSelectModal
+        isOpen={borrowSelectModal.isOpen}
+        onClose={borrowSelectModal.close}
+        tokens={borrowedPositions}
+        protocolName="Venus"
+        isBorrow={true}
+        position={borrowPosition}
+        chainId={chainId}
+      />
+
+      {/* Multiply (Loop) Modal */}
+      {multiplyModal.isOpen && (
+        <MultiplyEvmModal
+          isOpen={multiplyModal.isOpen}
+          onClose={multiplyModal.close}
+          protocolName="Venus"
+          chainId={chainId || 1}
+          collaterals={allSupplyAssets}
+          debtOptions={debtOptions}
+          maxLtvBps={ltvBps > 0n ? ltvBps : 8000n}
+          lltvBps={effectiveLltvBps > 0n ? effectiveLltvBps : 8500n}
+          supplyApyMap={supplyApyMap}
+          borrowApyMap={borrowApyMap}
+        />
+      )}
+
+      {/* ADL Automation Modal */}
+      {selectedDebt && (
+        <LTVAutomationModal
+          isOpen={adlModal.isOpen}
+          onClose={adlModal.close}
+          protocolName="venus"
+          chainId={chainId || 1}
+          currentLtvBps={Number(ltvBps)}
+          liquidationLtvBps={Number(effectiveLltvBps)}
+          collateralTokens={collateralAssets}
+          debtToken={{
+            address: selectedDebt.tokenAddress,
+            symbol: selectedDebt.name,
+            decimals: selectedDebt.tokenDecimals || 18,
+            balance: selectedDebt.tokenBalance,
+          }}
+          totalCollateralUsd={totalCollateralUsd}
+          totalDebtUsd={totalDebtUsd}
+        />
+      )}
+    </div>
   );
 };
 

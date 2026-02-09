@@ -13,8 +13,17 @@ import { useVesuSwitch } from "~~/hooks/useVesuSwitch";
 import type { VesuProtocolKey } from "~~/utils/vesu";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import type { TokenInfo } from "~~/hooks/useVesuSwitch";
 
 export type BasicToken = { name: string; address: string; decimals: number; icon: string };
+
+// Type for swapSummary from useVesuSwitch
+interface SwapSummaryWithTokens {
+  sellToken: TokenInfo;
+  buyToken: TokenInfo;
+  sellAmount: bigint;
+  buyAmount: bigint;
+}
 
 export interface SwitchModalBaseProps {
   isOpen: boolean;
@@ -83,7 +92,9 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
 
   // Resolve display name/icon with fallbacks (handles tokens like xSTRK)
   const resolveDisplay = (t: BasicToken | undefined | null) => {
-    if (!t) return { name: "", icon: "" };
+    if (!t) {
+      return { name: "", icon: "" };
+    }
     const raw = t.name || "";
     const name = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(t.address) ?? raw;
     const icon = tokenNameToLogo((name || "").toLowerCase());
@@ -94,19 +105,20 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
   // For debt: buy currentDebt (to repay) -> sell targetDebt (borrowed)
   // The display order differs: collateral shows sell->buy, debt shows buy->sell
   const isDebt = type === "debt";
+  const typedSwapSummary = swapSummary as SwapSummaryWithTokens | null;
   const leftToken = isDebt
-    ? (swapSummary as any)?.buyToken || currentDebt
-    : (swapSummary as any)?.sellToken || currentCollateral;
+    ? typedSwapSummary?.buyToken || currentDebt
+    : typedSwapSummary?.sellToken || currentCollateral;
   const rightToken = isDebt
-    ? (swapSummary as any)?.sellToken || targetToken
-    : (swapSummary as any)?.buyToken || targetToken;
+    ? typedSwapSummary?.sellToken || targetToken
+    : typedSwapSummary?.buyToken || targetToken;
   const leftAmount = isDebt ? swapSummary?.buyAmount || 0n : swapSummary?.sellAmount || 0n;
   const rightAmount = isDebt ? swapSummary?.sellAmount || 0n : swapSummary?.buyAmount || 0n;
   const leftAmountUsd = isDebt ? selectedQuote?.buyAmountInUsd : selectedQuote?.sellAmountInUsd;
   const rightAmountUsd = isDebt ? selectedQuote?.sellAmountInUsd : selectedQuote?.buyAmountInUsd;
   const feeToken = isDebt
-    ? (swapSummary as any)?.buyToken || currentDebt
-    : (swapSummary as any)?.buyToken || targetToken;
+    ? typedSwapSummary?.buyToken || currentDebt
+    : typedSwapSummary?.buyToken || targetToken;
 
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} maxWidthClass="max-w-md" boxClassName="rounded-none p-4">

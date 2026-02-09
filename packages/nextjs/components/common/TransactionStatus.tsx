@@ -11,7 +11,8 @@
  * For toast notifications, use TransactionToast with the notification utility.
  */
 
-import { FC, useMemo } from "react";
+import { useMemo } from "react";
+import type { FC } from "react";
 import { CheckCircle2, Loader2, AlertCircle, Wallet, Clock } from "lucide-react";
 
 export type TransactionStatusState = "idle" | "pending" | "confirming" | "success" | "error";
@@ -92,7 +93,9 @@ export const TransactionStatus: FC<TransactionStatusProps> = ({
     width: showSteps ? `${(currentStep ?? 0) / (totalSteps ?? 1) * 100}%` : "0%",
   }), [currentStep, totalSteps, showSteps]);
 
-  if (status === "idle") return null;
+  if (status === "idle") {
+    return null;
+  }
 
   if (compact) {
     return (
@@ -190,9 +193,9 @@ const STEP_ICONS = {
 
 export const TransactionSteps: FC<TransactionStepsProps> = ({ steps, compact = false }) => {
   if (compact) {
-    const currentStepIdx = steps.findIndex(s => s.status === "in_progress");
-    const completedCount = steps.filter(s => s.status === "completed").length;
-    const currentStep = currentStepIdx >= 0 ? steps[currentStepIdx] : null;
+    const currentStepIdx = steps.findIndex(step => step.status === "in_progress");
+    const completedCount = steps.filter(step => step.status === "completed").length;
+    const currentStep = currentStepIdx !== -1 ? steps[currentStepIdx] : null;
 
     return (
       <div className="flex items-center gap-2 text-sm">

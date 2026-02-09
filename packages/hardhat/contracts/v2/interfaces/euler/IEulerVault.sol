@@ -154,4 +154,39 @@ interface IEulerVault {
 
     /// @notice Decimals of the vault token
     function decimals() external view returns (uint8);
+
+    // ============ Oracle & Unit of Account ============
+
+    /// @notice Get the price oracle for this vault
+    function oracle() external view returns (address);
+
+    /// @notice Get the unit of account (e.g., USD, ETH)
+    function unitOfAccount() external view returns (address);
+}
+
+/// @title IEulerPriceOracle
+/// @notice Interface for Euler's price oracle system
+interface IEulerPriceOracle {
+    /// @notice Get a quote for swapping base to quote tokens
+    /// @param inAmount Amount of base tokens
+    /// @param base The base token address
+    /// @param quote The quote token address (unit of account)
+    /// @return outAmount Amount of quote tokens
+    function getQuote(
+        uint256 inAmount,
+        address base,
+        address quote
+    ) external view returns (uint256 outAmount);
+
+    /// @notice Get both bid and ask quotes
+    /// @param inAmount Amount of base tokens
+    /// @param base The base token address
+    /// @param quote The quote token address
+    /// @return bidOutAmount Amount at bid price
+    /// @return askOutAmount Amount at ask price
+    function getQuotes(
+        uint256 inAmount,
+        address base,
+        address quote
+    ) external view returns (uint256 bidOutAmount, uint256 askOutAmount);
 }

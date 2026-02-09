@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
@@ -29,7 +30,7 @@ const WalletButtonContent = ({ children }: { children: ReactNode }) => (
 // Gas selector with divider (Starknet only)
 const GasSelectorSection = () => (
   <>
-    <div className="bg-base-content/10 h-7 w-[1px]"></div>
+    <div className="bg-base-content/10 h-7 w-[1px]" />
     <div className="px-3 py-1.5">
       <GasTokenSelector />
     </div>
@@ -53,7 +54,9 @@ const StarknetWalletContent = ({
     </div>
   );
 
-  if (!withGlow) return content;
+  if (!withGlow) {
+    return content;
+  }
 
   return (
     <div className="relative">
@@ -110,17 +113,23 @@ export const WalletButton = ({
 
   // Function to get current network from URL or cache
   const getCurrentNetwork = useCallback(() => {
-    if (typeof window === "undefined") return "base";
+    if (typeof globalThis.window === "undefined") {
+      return "base";
+    }
 
     // Check URL first
-    const url = new URL(window.location.href);
+    const url = new URL(globalThis.location.href);
     const urlNetwork = url.searchParams.get("network");
-    if (urlNetwork) return urlNetwork;
+    if (urlNetwork) {
+      return urlNetwork;
+    }
 
     // Fall back to localStorage cache
     try {
       const cached = localStorage.getItem(NETWORK_STORAGE_KEY);
-      if (cached) return cached;
+      if (cached) {
+        return cached;
+      }
     } catch {
       // Ignore localStorage errors
     }
@@ -137,19 +146,23 @@ export const WalletButton = ({
 
   // Listen for popstate (browser back/forward)
   useEffect(() => {
-    if (variant !== "auto") return;
+    if (variant !== "auto") {
+      return;
+    }
 
     const handlePopState = () => {
       setSelectedNetwork(getCurrentNetwork());
     };
 
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    globalThis.addEventListener("popstate", handlePopState);
+    return () => globalThis.removeEventListener("popstate", handlePopState);
   }, [getCurrentNetwork, variant]);
 
   // Poll for URL changes (since NetworkFilter uses shallow updates that don't trigger React)
   useEffect(() => {
-    if (variant !== "auto") return;
+    if (variant !== "auto") {
+      return;
+    }
 
     let lastNetwork = selectedNetwork;
 
@@ -167,8 +180,12 @@ export const WalletButton = ({
 
   // Determine which wallet to show
   const showStarknet = useMemo(() => {
-    if (variant === "starknet") return true;
-    if (variant === "evm") return false;
+    if (variant === "starknet") {
+      return true;
+    }
+    if (variant === "evm") {
+      return false;
+    }
     return selectedNetwork === "starknet";
   }, [variant, selectedNetwork]);
 

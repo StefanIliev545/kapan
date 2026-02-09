@@ -60,11 +60,6 @@ interface IBalancerV3Vault {
     function settle(address token, uint256 amount) external returns (uint256 credit);
 }
 
-// Interface for reading order hash from OrderManager
-interface IKapanOrderManagerLookup {
-    function userSaltToOrderHash(address user, bytes32 salt) external view returns (bytes32);
-}
-
 // Custom errors
 error OnlyRouter();
 error OnlySettlement();
@@ -72,12 +67,7 @@ error OnlyDuringSettlement();
 error InvalidLender();
 error FlashLoanInProgress();
 error UnauthorizedCaller();
-error OnlyOrderManager();
 error NotInFlashLoan();
-error OrderAlreadyInitialized();
-error OrderMismatch();
-error PreHookNotDone();
-error OrderNotFound();
 
 /// @notice Lender type for routing flash loan requests
 enum LenderType {
@@ -121,22 +111,11 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
     /// @notice Mapping of allowed lenders
     mapping(address => bool) public allowedLenders;
 
-    /// @notice The KapanOrderManager address (for hook validation)
-    address public orderManager;
-
-    /// @notice The expected orderHash for the current flash loan settlement
-    /// @dev Set by fundOrder, validated by onPreHook/onPostHook
-    bytes32 private _expectedOrderHash;
-
-    /// @notice Whether pre-hook has been called for the current settlement
-    bool private _preHookDone;
-
     // ============ Events ============
     
     event FlashLoanRequested(address indexed lender, address indexed token, uint256 amount, LenderType lenderType);
-    event OrderFunded(bytes32 indexed orderHash, address indexed token, address indexed recipient, uint256 amount);
+    event OrderFunded(address indexed user, bytes32 indexed salt, address indexed token, address recipient, uint256 amount);
     event LenderUpdated(address indexed lender, bool allowed, LenderType lenderType);
-    event OrderManagerUpdated(address indexed oldManager, address indexed newManager);
 
     // ============ Modifiers ============
 
@@ -152,11 +131,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
 
     modifier duringSettlement() {
         if (!_inFlashLoan) revert OnlyDuringSettlement();
-        _;
-    }
-
-    modifier onlyOrderManager() {
-        if (msg.sender != orderManager) revert OnlyOrderManager();
         _;
     }
 
@@ -205,14 +179,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         allowedLenders[lender] = allowed;
         lenderTypes[lender] = allowed ? LenderType.Aave : LenderType.Unknown;
         emit LenderUpdated(lender, allowed, LenderType.Aave);
-    }
-
-    /// @notice Set the OrderManager address
-    /// @dev Required for hook validation - OrderManager calls onPreHook/onPostHook
-    function setOrderManager(address _orderManager) external onlyOwner {
-        address oldManager = orderManager;
-        orderManager = _orderManager;
-        emit OrderManagerUpdated(oldManager, _orderManager);
     }
 
     // ============ IBorrower Interface ============
@@ -301,8 +267,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         _inFlashLoan = false;
         _flashLoanToken = address(0);
         _currentLender = address(0);
-        _expectedOrderHash = bytes32(0);
-        _preHookDone = false;
     }
 
     // ============ Aave Callback ============
@@ -334,8 +298,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         _inFlashLoan = false;
         _flashLoanToken = address(0);
         _currentLender = address(0);
-        _expectedOrderHash = bytes32(0);
-        _preHookDone = false;
 
         return true;
     }
@@ -371,8 +333,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         _inFlashLoan = false;
         _flashLoanToken = address(0);
         _currentLender = address(0);
-        _expectedOrderHash = bytes32(0);
-        _preHookDone = false;
     }
 
     // ============ Balancer V3 Callback ============
@@ -406,8 +366,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         _inFlashLoan = false;
         _flashLoanToken = address(0);
         _currentLender = address(0);
-        _expectedOrderHash = bytes32(0);
-        _preHookDone = false;
     }
 
     /// @notice Approve a target to spend tokens (standard IBorrower function)
@@ -419,32 +377,11 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
     // ============ Hook Functions (called via HooksTrampoline) ============
 
     /// @notice Transfer flash-loaned tokens to the order recipient (OrderManager)
-    /// @dev Called in pre-hook to fund the order. Sets expectations for the settlement flow.
-    ///      SECURITY: This initializes the expected orderHash - subsequent onPreHook/onPostHook
-    ///      calls must match this orderHash, preventing hook hijacking attacks.
-    /// @param orderHash The order being settled (used for security validation)
-    /// @param token The token to transfer
-    /// @param recipient The recipient (typically OrderManager)
-    /// @param amount The amount to transfer
-    function fundOrder(
-        bytes32 orderHash,
-        address token,
-        address recipient,
-        uint256 amount
-    ) external {
-        if (_expectedOrderHash != bytes32(0)) revert OrderAlreadyInitialized();
-
-        _expectedOrderHash = orderHash;
-        IERC20(token).safeTransfer(recipient, amount);
-        emit OrderFunded(orderHash, token, recipient, amount);
-    }
-
-    /// @notice Transfer flash-loaned tokens using (user, salt) lookup for orderHash
-    /// @dev This allows pre-computing hook calldata before order creation since
-    ///      (user, salt) are known but orderHash is only computed on-chain.
-    ///      Looks up orderHash from OrderManager's userSaltToOrderHash mapping.
-    /// @param user The order owner
-    /// @param salt The order salt
+    /// @dev Called in pre-hook to fund the order before swap execution.
+    ///      Security note: HooksTrampoline is only callable by Settlement contract,
+    ///      so this can only be called during a valid settlement transaction.
+    /// @param user The order owner (for event logging)
+    /// @param salt The order salt (for event logging)
     /// @param token The token to transfer
     /// @param recipient The recipient (typically OrderManager)
     /// @param amount The amount to transfer
@@ -455,36 +392,28 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
         address recipient,
         uint256 amount
     ) external {
-        if (_expectedOrderHash != bytes32(0)) revert OrderAlreadyInitialized();
-        if (orderManager == address(0)) revert OnlyOrderManager();
-
-        // Look up orderHash from OrderManager
-        bytes32 orderHash = IKapanOrderManagerLookup(orderManager).userSaltToOrderHash(user, salt);
-        if (orderHash == bytes32(0)) revert OrderNotFound();
-
-        _expectedOrderHash = orderHash;
         IERC20(token).safeTransfer(recipient, amount);
-        emit OrderFunded(orderHash, token, recipient, amount);
+        emit OrderFunded(user, salt, token, recipient, amount);
     }
 
-    /// @notice Called by OrderManager during pre-hook execution
-    /// @dev Validates the orderHash matches what was set in fundOrder
-    /// @param orderHash The order being settled
-    function onPreHook(bytes32 orderHash) external onlyOrderManager {
-        if (_expectedOrderHash != orderHash) revert OrderMismatch();
-        _preHookDone = true;
-    }
-
-    /// @notice Called by OrderManager during post-hook execution
-    /// @dev Validates orderHash matches and pre-hook was called, then clears state
-    /// @param orderHash The order being settled
-    function onPostHook(bytes32 orderHash) external onlyOrderManager {
-        if (_expectedOrderHash != orderHash) revert OrderMismatch();
-        if (!_preHookDone) revert PreHookNotDone();
-
-        // Clear state for next settlement
-        _expectedOrderHash = bytes32(0);
-        _preHookDone = false;
+    /// @notice Transfer entire token balance to the order recipient (OrderManager)
+    /// @dev For conditional orders where amounts are dynamic. Transfers whatever
+    ///      flash loan amount was received, regardless of what was encoded in appData.
+    /// @param user The order owner (for event logging)
+    /// @param salt The order salt (for event logging)
+    /// @param token The token to transfer
+    /// @param recipient The recipient (typically OrderManager)
+    function fundOrderWithBalance(
+        address user,
+        bytes32 salt,
+        address token,
+        address recipient
+    ) external {
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        if (balance > 0) {
+            IERC20(token).safeTransfer(recipient, balance);
+            emit OrderFunded(user, salt, token, recipient, balance);
+        }
     }
 
     // ============ View Functions ============
@@ -503,14 +432,6 @@ contract KapanCowAdapter is Ownable, IMorphoFlashLoanCallback {
 
     function getLenderType(address lender) external view returns (LenderType) {
         return lenderTypes[lender];
-    }
-
-    function getExpectedOrderHash() external view returns (bytes32) {
-        return _expectedOrderHash;
-    }
-
-    function isPreHookDone() external view returns (bool) {
-        return _preHookDone;
     }
 
     // ============ Emergency Functions ============

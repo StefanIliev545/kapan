@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Address, encodeFunctionData } from "viem";
+import type { Address } from "viem";
+import { encodeFunctionData } from "viem";
 import { useAccount, useWriteContract } from "wagmi";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
 
@@ -75,9 +76,18 @@ export function useAaveLikeEMode(
   } as any);
 
   // Parse E-Mode categories
+  interface RawEModeCategory {
+    id: bigint | number;
+    ltv: bigint | number;
+    liquidationThreshold: bigint | number;
+    liquidationBonus: bigint | number;
+    label?: string;
+    collateralBitmap: bigint;
+    borrowableBitmap: bigint;
+  }
   const emodes = useMemo((): EModeCategory[] => {
     if (!eModesRaw) return [];
-    return (eModesRaw as unknown as any[]).map((e: any) => ({
+    return (eModesRaw as unknown as RawEModeCategory[]).map((e: RawEModeCategory) => ({
       id: Number(e.id),
       ltv: Number(e.ltv),
       liquidationThreshold: Number(e.liquidationThreshold),

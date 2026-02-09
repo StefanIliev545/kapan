@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState, useRef, useCallback } from "react";
+import { useMemo, useEffect, useRef, useCallback } from "react";
 import { formatUnits } from "viem";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useVesuV2Assets } from "./useVesuV2Assets";
@@ -14,11 +14,12 @@ import {
   normalizePrice,
   computeUsdValue,
   parsePositionTuples,
+  toHexAddress,
+  type PositionTuple,
 } from "./useProtocolPositions";
+import { usePositionLoadingState } from "./useProtocolPositions/usePositionLoadingState";
 
 const ZERO_ADDRESS = normalizeStarknetAddress(0n);
-
-const toHexAddress = (raw: bigint): string => `0x${raw.toString(16).padStart(64, "0")}`;
 
 const resolveSymbol = (symbol: unknown, address: string): string => {
   if (typeof symbol === "bigint") {
@@ -164,8 +165,19 @@ export const useVesuV2LendingPositions = (
     return [...firstBatch, ...secondBatch];
   }, [userPositionsPart1, userPositionsPart2]);
 
-  const isUpdating = (isFetching1 && !isLoading1) || (isFetching2 && !isLoading2);
   const isLoadingPositions = isLoading1 || isLoading2;
+  const isFetchingPositions = isFetching1 || isFetching2;
+  const positionsError = positionsError1 || positionsError2;
+
+  // Use shared loading state hook
+  const { hasLoadedOnce, isUpdating, setCachedData, getCachedData } = usePositionLoadingState({
+    isLoading: isLoadingPositions,
+    isFetching: isFetchingPositions,
+    userAddress,
+    poolId: normalizedPoolAddress,
+    error: positionsError,
+    data: mergedUserPositions.length > 0 ? mergedUserPositions : undefined,
+  });
 
   const refetchPositions = useCallback(() => {
     if (!userAddress) return;
@@ -179,38 +191,25 @@ export const useVesuV2LendingPositions = (
     refetchPositionsRef.current = refetchPositions;
   }, [refetchPositions]);
 
-  const [cachedPositions, setCachedPositions] = useState<any[]>([]);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-
+  // Refetch when userAddress changes
   useEffect(() => {
-    setCachedPositions([]);
-    setHasLoadedOnce(false);
     if (userAddress) {
       refetchPositionsRef.current?.();
     }
   }, [userAddress]);
 
+  // Cache positions when loading completes
   useEffect(() => {
     if (!userAddress) {
-      setCachedPositions([]);
+      setCachedData<PositionTuple[]>([]);
       return;
     }
-    if (!isLoading1 && !isLoading2) {
-      setCachedPositions(mergedUserPositions);
-      setHasLoadedOnce(true);
+    if (!isLoadingPositions && mergedUserPositions.length > 0) {
+      setCachedData(mergedUserPositions);
     }
-  }, [mergedUserPositions, isLoading1, isLoading2, userAddress]);
+  }, [mergedUserPositions, isLoadingPositions, userAddress, setCachedData]);
 
-  useEffect(() => {
-    if (!userAddress) return;
-    if (positionsError1 || positionsError2) {
-      setHasLoadedOnce(true);
-      return;
-    }
-    if (userPositionsPart1 !== undefined || userPositionsPart2 !== undefined) {
-      setHasLoadedOnce(true);
-    }
-  }, [positionsError1, positionsError2, userAddress, userPositionsPart1, userPositionsPart2]);
+  const cachedPositions = getCachedData<PositionTuple[]>() ?? [];
 
   const suppliablePositions = useMemo(() => {
     return assetsWithRates

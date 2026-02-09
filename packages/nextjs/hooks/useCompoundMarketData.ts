@@ -5,6 +5,7 @@ import { MarketData } from "~~/components/markets/MarketsSection";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { useSelectedNetwork } from "~~/hooks/scaffold-eth/useSelectedNetwork";
+import { useExternalYields } from "~~/hooks/useExternalYields";
 import formatPercentage from "~~/utils/formatPercentage";
 import { CHAIN_ID_TO_NETWORK, compoundRateToAPR } from "~~/utils/protocolRates";
 
@@ -18,6 +19,9 @@ export const useCompoundMarketData = ({ chainId }: UseCompoundMarketDataParams =
   const selectedNetwork = useSelectedNetwork(chainId as any);
   const resolvedChainId = chainId ?? selectedNetwork.id;
   const network = CHAIN_ID_TO_NETWORK[resolvedChainId] ?? "arbitrum";
+
+  // Fetch external yields (LST staking yields, PT fixed yields, etc.)
+  const { getEffectiveSupplyRate } = useExternalYields(resolvedChainId);
 
   const { data: weth } = useDeployedContractInfo({ contractName: "eth" as any, chainId: resolvedChainId as any });
   const { data: usdc } = useDeployedContractInfo({ contractName: "USDC" as any, chainId: resolvedChainId as any });
@@ -90,9 +94,11 @@ export const useCompoundMarketData = ({ chainId }: UseCompoundMarketDataParams =
         bigint | number,
       ];
 
-      const supplyApr = supplyRate ? compoundRateToAPR(BigInt(supplyRate)) : 0;
+      const protocolSupplyApr = supplyRate ? compoundRateToAPR(BigInt(supplyRate)) : 0;
       const borrowApr = borrowRate ? compoundRateToAPR(BigInt(borrowRate)) : 0;
-      const utilization = borrowApr > 0 ? (supplyApr / borrowApr) * 100 : 0;
+      // Get effective supply rate (includes LST staking yields, PT fixed yields, etc.)
+      const effectiveSupplyApr = getEffectiveSupplyRate(token.address, token.symbol, protocolSupplyApr);
+      const utilization = borrowApr > 0 ? (protocolSupplyApr / borrowApr) * 100 : 0;
       const priceValue = price ? (typeof price === "bigint" ? price : BigInt(price)) : 0n;
       const priceFormatted = price ? Number(formatUnits(priceValue, 8)).toFixed(2) : "0.00";
 
@@ -100,7 +106,7 @@ export const useCompoundMarketData = ({ chainId }: UseCompoundMarketDataParams =
         {
           icon: tokenNameToLogo(token.symbol),
           name: token.symbol,
-          supplyRate: `${formatPercentage(supplyApr)}%`,
+          supplyRate: `${formatPercentage(effectiveSupplyApr)}%`,
           borrowRate: `${formatPercentage(borrowApr)}%`,
           price: priceFormatted,
           utilization: utilization.toFixed(2),
@@ -111,6 +117,6 @@ export const useCompoundMarketData = ({ chainId }: UseCompoundMarketDataParams =
         } satisfies MarketData,
       ];
     });
-  }, [preparedTokens, results, network]);
+  }, [preparedTokens, results, network, getEffectiveSupplyRate]);
 };
 

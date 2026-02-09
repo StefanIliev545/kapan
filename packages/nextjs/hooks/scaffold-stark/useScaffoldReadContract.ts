@@ -1,9 +1,11 @@
-import { Abi, useReadContract } from "@starknet-react/core";
-import { BlockNumber, BlockTag } from "starknet";
+import type { Abi } from "@starknet-react/core";
+import { useReadContract } from "@starknet-react/core";
+import type { BlockNumber } from "starknet";
+import { BlockTag } from "starknet";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useStarkBlockNumber } from "./useBlockNumberContext";
 import { replacer } from "~~/utils/scaffold-stark/common";
-import {
+import type {
   AbiFunctionOutputs,
   ContractAbi,
   ContractName,

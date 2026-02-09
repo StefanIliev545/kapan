@@ -319,3 +319,19 @@ export const Default: Story = {
 ```
 
 After adding stories, rebuild: `yarn storybook:build`
+
+
+### TIPS FROM USER
+
+Before writing code always search first to establish:
+1) Existing relevant logic flows
+2) Existing patterns
+3) Used dependencies
+4) Tooling availability
+
+Prioritize using existing dependencies over new ones. Prioritize using component libraries over old stuff.
+Whenever possible feel free to bring raw tags to how they should be done with component libraries to periodically update the code.
+
+If a task is creating duplicate code consider refactoring. If refactoring is lightweight and for example wraps stuff into a reusable function its fine to do it rather than be risk averse.
+
+Always leave comments for stuff that you think should be done in the future and reference files and functions if needed so that later reads and so on will give you context if something somewhere needs touching up

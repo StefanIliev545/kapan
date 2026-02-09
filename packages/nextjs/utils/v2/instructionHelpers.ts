@@ -419,3 +419,54 @@ export function createEulerInstruction(
   return createProtocolInstruction("euler", encodeLendingInstruction(op, token, user, amount, context, inputIndex));
 }
 
+// ============ Limit Price Calculation ============
+
+/**
+ * Calculate limit price for CoW limit orders (8 decimals, Chainlink-style).
+ *
+ * LimitPriceTrigger expects: limitPrice = (buyAmount / sellAmount) * 1e8
+ *
+ * This function uses all-BigInt math to avoid precision loss for large amounts.
+ *
+ * Math derivation:
+ * ```
+ * limitPrice = (buyAmount / sellAmount) * 1e8
+ *            = (buyAmountRaw / 10^buyDecimals) / (sellAmountRaw / 10^sellDecimals) * 1e8
+ *            = (buyAmountRaw * 10^sellDecimals * 1e8) / (sellAmountRaw * 10^buyDecimals)
+ * ```
+ *
+ * @param sellAmountRaw - Raw amount of tokens being sold (with decimals)
+ * @param sellDecimals - Decimals of the sell token (0-18)
+ * @param buyAmountRaw - Raw amount of tokens being bought (with decimals)
+ * @param buyDecimals - Decimals of the buy token (0-18)
+ * @returns Limit price in 8 decimal format (bigint), or 0n if sellAmount is 0
+ */
+export function calculateLimitPrice(
+  sellAmountRaw: bigint,
+  sellDecimals: number,
+  buyAmountRaw: bigint,
+  buyDecimals: number
+): bigint {
+  if (sellAmountRaw === 0n) return 0n;
+  if (buyAmountRaw === 0n) return 0n;
+
+  // All-bigint math to preserve precision for large token amounts
+  // Formula: (buyAmountRaw * 10^sellDecimals * 1e8) / (sellAmountRaw * 10^buyDecimals)
+  const PRICE_DECIMALS = 100000000n; // 1e8
+
+  // Handle decimal difference to avoid overflow
+  // If sellDecimals > buyDecimals: multiply numerator by 10^(sellDecimals - buyDecimals)
+  // If buyDecimals > sellDecimals: multiply denominator by 10^(buyDecimals - sellDecimals)
+  const decimalDiff = sellDecimals - buyDecimals;
+
+  if (decimalDiff >= 0) {
+    // sellDecimals >= buyDecimals
+    const numerator = buyAmountRaw * PRICE_DECIMALS * BigInt(10 ** decimalDiff);
+    return numerator / sellAmountRaw;
+  } else {
+    // buyDecimals > sellDecimals
+    const denominator = sellAmountRaw * BigInt(10 ** (-decimalDiff));
+    return (buyAmountRaw * PRICE_DECIMALS) / denominator;
+  }
+}
+

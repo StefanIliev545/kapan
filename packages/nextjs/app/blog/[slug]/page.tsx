@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ComponentPropsWithoutRef } from "react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
@@ -9,21 +10,35 @@ import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 // Static style for MDX images - extracted to avoid creating new object on each render
 const mdxImageStyle = { height: "auto", width: "100%" };
 
+// Types for MDX components
+type HeadingProps = ComponentPropsWithoutRef<"h1">;
+type ParagraphProps = ComponentPropsWithoutRef<"p">;
+type ListProps = ComponentPropsWithoutRef<"ul">;
+type ListItemProps = ComponentPropsWithoutRef<"li">;
+type StrongProps = ComponentPropsWithoutRef<"strong">;
+type AnchorProps = ComponentPropsWithoutRef<"a">;
+interface MdxImageProps {
+  src?: string;
+  alt?: string;
+  width?: number;
+  height?: number;
+}
+
 // Custom MDX components
 const mdxComponents = {
-  h1: (props: any) => <h1 className="mb-4 mt-8 text-3xl font-bold" {...props} />,
-  h2: (props: any) => <h2 className="mb-4 mt-8 text-2xl font-bold" {...props} />,
-  h3: (props: any) => <h3 className="mb-3 mt-6 text-xl font-bold" {...props} />,
-  p: (props: any) => <p className="my-4" {...props} />,
-  ul: (props: any) => <ul className="my-4 ml-6 list-disc" {...props} />,
-  ol: (props: any) => <ol className="my-4 ml-6 list-decimal" {...props} />,
-  li: (props: any) => <li className="my-1" {...props} />,
-  strong: (props: any) => <strong className="font-bold" {...props} />,
-  a: (props: any) => <a className="text-primary dark:text-accent hover:underline" {...props} />,
-  img: (props: any) => (
+  h1: (props: HeadingProps) => <h1 className="mb-4 mt-8 text-3xl font-bold" {...props} />,
+  h2: (props: HeadingProps) => <h2 className="mb-4 mt-8 text-2xl font-bold" {...props} />,
+  h3: (props: HeadingProps) => <h3 className="mb-3 mt-6 text-xl font-bold" {...props} />,
+  p: (props: ParagraphProps) => <p className="my-4" {...props} />,
+  ul: (props: ListProps) => <ul className="my-4 ml-6 list-disc" {...props} />,
+  ol: (props: ListProps) => <ol className="my-4 ml-6 list-decimal" {...props} />,
+  li: (props: ListItemProps) => <li className="my-1" {...props} />,
+  strong: (props: StrongProps) => <strong className="font-bold" {...props} />,
+  a: (props: AnchorProps) => <a className="text-primary dark:text-accent hover:underline" {...props} />,
+  img: (props: MdxImageProps) => (
     <Image
-      src={props.src}
-      alt={props.alt || ""}
+      src={props.src ?? ""}
+      alt={props.alt ?? ""}
       width={props.width ?? 800}
       height={props.height ?? 450}
       sizes="(max-width: 768px) 100vw, 800px"

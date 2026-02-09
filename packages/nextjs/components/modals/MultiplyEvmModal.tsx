@@ -1,8 +1,8 @@
 import { FC, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { track } from "@vercel/analytics";
 import Image from "next/image";
-import { Address, formatUnits, parseUnits, type Hex } from "viem";
-import { CheckIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { Address, formatUnits, parseUnits, type TransactionReceipt } from "viem";
+import { CheckIcon, ClockIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
@@ -13,26 +13,30 @@ import { usePendleConvert } from "~~/hooks/usePendleConvert";
 import { useWalletTokenBalances } from "~~/hooks/useWalletTokenBalances";
 import { usePredictiveMaxLeverage, EModeCategory } from "~~/hooks/usePredictiveLtv";
 import { useCowOrder } from "~~/hooks/useCowOrder";
-import { useCowLimitOrder, type ChunkInstructions } from "~~/hooks/useCowLimitOrder";
+import {
+  useCowConditionalOrder,
+  encodeLimitPriceTriggerParams,
+  getProtocolId,
+  type ConditionalOrderInstructions,
+} from "~~/hooks/useCowConditionalOrder";
 import { useCowQuote } from "~~/hooks/useCowQuote";
 import { SwapAsset, SwapRouter, SWAP_ROUTER_OPTIONS } from "./SwapModalShell";
 import {
   FlashLoanProvider,
   MorphoMarketContextForEncoding,
   encodeMorphoContext,
-  createRouterInstruction,
-  encodePushToken,
+  calculateLimitPrice,
 } from "~~/utils/v2/instructionHelpers";
-import { CompletionType, getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate } from "~~/utils/cow";
-import { calculateSuggestedSlippage } from "~~/utils/slippage";
+import { type FlashLoanProviderOption } from "~~/utils/flashLoan";
+import { getCowExplorerAddressUrl, calculateChunkParams, calculateSwapRate, storeOrderQuoteRate, getKapanCowAdapter } from "~~/utils/cow";
+import { calculateSuggestedSlippage, SLIPPAGE_OPTIONS } from "~~/utils/slippage";
 import { formatBps } from "~~/utils/risk";
-import { is1inchSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
+import { is1inchSupported, isKyberSupported, isPendleSupported, getDefaultSwapRouter, getOneInchAdapterInfo, getKyberAdapterInfo, getPendleAdapterInfo, isAaveV3Supported, isBalancerV2Supported, isPendleToken, isCowProtocolSupported } from "~~/utils/chainFeatures";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { saveOrderNote, createLeverageUpNote } from "~~/utils/orderNotes";
-import { executeSequentialTransactions, type TransactionCall } from "~~/utils/transactionSimulation";
 import { extractOrderHash } from "~~/utils/orderHashExtractor";
 import { useSaveOrder } from "~~/hooks/useOrderHistory";
 
@@ -46,22 +50,29 @@ import {
   calculateMinCollateralOut,
   calculateFlashLoanChunkParams,
   buildCowChunkInstructions,
-  buildInitialDepositInstructions,
   addWalletBalancesAndSort,
   calculateMaxLeverageFromLtv,
   adjustMaxLeverageForSlippage,
   calculateFlashLoanAmount,
   getDefaultFlashLoanProviders,
-  buildPreOrderInstructions,
-  createSeedBorrowInstruction,
-  calculateMinBuyPerChunk,
-  handleLimitOrderBuildError,
-  prepareLimitOrderFlashLoanConfig,
   formatLtvDisplay,
   formatPriceDisplay,
   getApyColorClass,
   formatApyDisplay,
   formatYield30dDisplay,
+  resolveSwapRouterFallback,
+  calculateLimitOrderRate,
+  applySlippageToRate,
+  normalizeProtocolForCow,
+  createDefaultChunkParams,
+  resolveEffectiveLtvBps,
+  validateLimitOrderPrerequisites,
+  resolveActiveAdapter,
+  resolveSwapDataForFlow,
+  mapSwapRouterToFlowParam,
+  computeMaxLeverage,
+  resolveProviderOptions,
+  computeSubmitFlags,
   type QuoteData,
   type ChunkParamsResult,
 } from "./multiplyEvmHelpers";
@@ -94,6 +105,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   maxLtvBps = 8000n, lltvBps = 8500n, supplyApyMap = EMPTY_APY_MAP, borrowApyMap = EMPTY_APY_MAP, eMode, disableAssetSelection = false,
 }) => {
   const wasOpenRef = useRef(false);
+  // Refs to avoid stale closure issues in handleSubmit
+  const handleLimitOrderSubmitRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const handleMarketOrderSubmitRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const [collateral, setCollateral] = useState<SwapAsset | undefined>(collaterals[0]);
   const [debt, setDebt] = useState<SwapAsset | undefined>(debtOptions[0]);
   const [marginAmount, setMarginAmount] = useState<string>("");
@@ -109,8 +123,12 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // CoW limit order specific state
   const [limitSlippage, setLimitSlippage] = useState<number>(0.1);
   const [hasAutoSetLimitSlippage, setHasAutoSetLimitSlippage] = useState(false);
-  // customMinPrice: user-specified exchange rate (collateral per 1 unit of debt) for limit orders
+  // Market order auto-slippage
+  const [hasAutoSetMarketSlippage, setHasAutoSetMarketSlippage] = useState(false);
+  // customMinPrice: user-specified exchange rate for limit orders
   const [customMinPrice, setCustomMinPrice] = useState<string>("");
+  // priceInputInverted: false = "1 DEBT = X COLL", true = "1 COLL = X DEBT"
+  const [priceInputInverted, setPriceInputInverted] = useState<boolean>(false);
   const cowAvailable = isCowProtocolSupported(chainId);
 
 
@@ -132,16 +150,23 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // CoW order hooks
   const { isCreating: isCowCreating, isAvailable: cowContractAvailable } = useCowOrder();
-  const { buildOrderCalls: buildLimitOrderCalls, buildRouterCall, orderManagerAddress } = useCowLimitOrder();
+  // Conditional order hook (new system)
+  const {
+    buildOrderCalls: buildConditionalOrderCalls,
+    isReady: conditionalOrderReady,
+    managerAddress: conditionalOrderManagerAddress,
+    limitPriceTriggerAddress,
+  } = useCowConditionalOrder();
   const saveOrder = useSaveOrder();
 
   // Check swap router availability for this chain
   const oneInchAvailable = is1inchSupported(chainId);
+  const kyberAvailable = isKyberSupported(chainId);
   const pendleAvailable = isPendleSupported(chainId);
   const defaultRouter = getDefaultSwapRouter(chainId);
 
-  // Swap router selection
-  const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "1inch");
+  // Swap router selection - default based on chain availability (Kyber preferred)
+  const [swapRouter, setSwapRouter] = useState<SwapRouter>(defaultRouter || "kyber");
 
   // Zap mode: deposit debt token instead of collateral
   const [zapMode, setZapMode] = useState(false);
@@ -149,12 +174,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // ==================== Effects for Router/Token Changes ====================
 
   useEffect(() => {
-    if (swapRouter === "1inch" && !oneInchAvailable) {
-      setSwapRouter(pendleAvailable ? "pendle" : "1inch");
-    } else if (swapRouter === "pendle" && !pendleAvailable) {
-      setSwapRouter(oneInchAvailable ? "1inch" : "pendle");
+    const fallback = resolveSwapRouterFallback(swapRouter, {
+      kyber: kyberAvailable, oneInch: oneInchAvailable, pendle: pendleAvailable,
+    });
+    if (fallback) {
+      setSwapRouter(fallback as SwapRouter);
     }
-  }, [chainId, oneInchAvailable, pendleAvailable, swapRouter]);
+  }, [chainId, oneInchAvailable, kyberAvailable, pendleAvailable, swapRouter]);
 
   useEffect(() => {
     const collateralIsPT = collateral && isPendleToken(collateral.symbol);
@@ -183,15 +209,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // ==================== Computed Values Using Helpers ====================
 
-  const maxLeverage = useMemo(() => {
-    let baseLeverage: number;
-    if (predictiveMaxLeverage > 1 && (collateralConfig || isEModeActive)) {
-      baseLeverage = predictiveMaxLeverage;
-    } else {
-      baseLeverage = calculateMaxLeverageFromLtv(maxLtvBps, protocolName);
-    }
-    return adjustMaxLeverageForSlippage(baseLeverage, slippage);
-  }, [predictiveMaxLeverage, collateralConfig, isEModeActive, maxLtvBps, protocolName, slippage]);
+  const maxLeverage = useMemo(() =>
+    computeMaxLeverage(
+      predictiveMaxLeverage, collateralConfig, isEModeActive,
+      maxLtvBps, protocolName, slippage,
+      calculateMaxLeverageFromLtv, adjustMaxLeverageForSlippage,
+    ),
+    [predictiveMaxLeverage, collateralConfig, isEModeActive, maxLtvBps, protocolName, slippage]);
 
   const effectiveLltvBps = useMemo(() => {
     if (predictiveLiqThreshold > 0 && (collateralConfig || isEModeActive)) {
@@ -266,13 +290,19 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // ==================== Adapter Info ====================
 
   const oneInchAdapter = getOneInchAdapterInfo(chainId);
+  const kyberAdapter = getKyberAdapterInfo(chainId);
   const pendleAdapter = getPendleAdapterInfo(chainId);
+
+  // Select the correct adapter based on swap router
+  const activeAdapter = resolveActiveAdapter(swapRouter, { kyber: kyberAdapter, oneInch: oneInchAdapter, pendle: pendleAdapter });
 
   // ==================== Amount Calculations ====================
 
   const marginAmountRaw = useMemo(() => {
     try {
-      if (!depositToken) return 0n;
+      if (!depositToken) {
+        return 0n;
+      }
       const parsed = parseUnits(marginAmount || "0", depositDecimals);
       return parsed > 0n ? parsed : 0n;
     }
@@ -280,7 +310,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   }, [depositToken, depositDecimals, marginAmount]);
 
   const flashLoanAmountRaw = useMemo(() => {
-    if (!collateral || !debt || leverage <= 1 || marginAmountRaw === 0n) return 0n;
+    if (!collateral || !debt || leverage <= 1 || marginAmountRaw === 0n) {
+      return 0n;
+    }
 
     if (zapMode) {
       const leverageMultiplier = Math.round((leverage - 1) * 10000);
@@ -295,7 +327,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   }, [collateral, debt, leverage, marginAmountRaw, zapMode]);
 
   const totalSwapAmount = useMemo(() => {
-    if (!zapMode) return flashLoanAmountRaw;
+    if (!zapMode) {
+      return flashLoanAmountRaw;
+    }
     return marginAmountRaw + flashLoanAmountRaw;
   }, [zapMode, marginAmountRaw, flashLoanAmountRaw]);
 
@@ -307,11 +341,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       : { name: "", tokenAddress: "0x0000000000000000000000000000000000000000", decimals: 18, type: "supply" },
   });
 
-  const providerOptions = useMemo(() => {
-    if (flashLoanProviders?.length) return flashLoanProviders;
-    if (defaultFlashLoanProvider) return [defaultFlashLoanProvider];
-    return getDefaultFlashLoanProviders(chainId, isAaveV3Supported, isBalancerV2Supported);
-  }, [defaultFlashLoanProvider, flashLoanProviders, chainId]);
+  const providerOptions: FlashLoanProviderOption[] = useMemo(() =>
+    resolveProviderOptions(flashLoanProviders, defaultFlashLoanProvider, chainId, isAaveV3Supported, isBalancerV2Supported, getDefaultFlashLoanProviders),
+    [defaultFlashLoanProvider, flashLoanProviders, chainId]);
 
   const { selectedProvider, setSelectedProvider, liquidityData } = useFlashLoanSelection({
     flashLoanProviders: providerOptions, defaultProvider: defaultFlashLoanProvider ?? providerOptions[0],
@@ -323,11 +355,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const swapQuoteAmount = zapMode ? totalSwapAmount : flashLoanAmountRaw;
 
+  const kyberOrOneInchEnabled = (kyberAvailable && swapRouter === "kyber" || oneInchAvailable && swapRouter === "1inch") && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!activeAdapter;
+
   const { data: oneInchQuote, isLoading: is1inchLoading } = use1inchQuote({
     chainId, src: (debt?.address as Address) || "0x0000000000000000000000000000000000000000",
     dst: (collateral?.address as Address) || "0x0000000000000000000000000000000000000000",
-    amount: swapQuoteAmount.toString(), from: (oneInchAdapter?.address as Address) || "0x0000000000000000000000000000000000000000",
-    slippage, enabled: oneInchAvailable && swapRouter === "1inch" && isOpen && !!collateral && !!debt && swapQuoteAmount > 0n && !!oneInchAdapter,
+    amount: swapQuoteAmount.toString(), from: (activeAdapter?.address as Address) || "0x0000000000000000000000000000000000000000",
+    slippage, enabled: kyberOrOneInchEnabled,
+    preferredRouter: swapRouter === "kyber" ? "kyber" : "1inch",
   });
 
   const pendleConvertResult = usePendleConvert({
@@ -346,14 +381,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const quotesRef = useRef<{
     oneInchQuote: typeof oneInchQuote;
     pendleQuote: typeof pendleQuote;
-    oneInchAdapter: typeof oneInchAdapter;
+    activeAdapter: typeof activeAdapter;
     pendleAdapter: typeof pendleAdapter;
-  }>({ oneInchQuote: undefined, pendleQuote: undefined, oneInchAdapter, pendleAdapter });
+  }>({ oneInchQuote: undefined, pendleQuote: undefined, activeAdapter, pendleAdapter });
 
   // Keep ref in sync with latest values
   useEffect(() => {
-    quotesRef.current = { oneInchQuote, pendleQuote, oneInchAdapter, pendleAdapter };
-  }, [oneInchQuote, pendleQuote, oneInchAdapter, pendleAdapter]);
+    quotesRef.current = { oneInchQuote, pendleQuote, activeAdapter, pendleAdapter };
+  }, [oneInchQuote, pendleQuote, activeAdapter, pendleAdapter]);
 
   const { data: cowQuote, isLoading: isCowQuoteLoading } = useCowQuote({
     sellToken: debt?.address || "",
@@ -365,7 +400,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const isSwapQuoteLoading = executionType === "limit"
     ? isCowQuoteLoading
-    : (swapRouter === "1inch" ? is1inchLoading : isPendleLoading);
+    : (swapRouter === "pendle" ? isPendleLoading : is1inchLoading);
 
   // ==================== Quote Processing Using Helpers ====================
 
@@ -390,8 +425,10 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   // Calculate market exchange rate (collateral per 1 unit of debt) from quote
   // This rate stays constant regardless of swap amount/leverage
   const marketRate = useMemo(() => {
-    if (!bestQuote || !collateral || !debt || swapQuoteAmount === 0n) return null;
-    // rate = collateralOut / debtIn (normalized to collateral decimals for 1 unit of debt)
+    if (!bestQuote || !collateral || !debt || swapQuoteAmount === 0n) {
+      return null;
+    }
+    // Rate = collateralOut / debtIn (normalized to collateral decimals for 1 unit of debt)
     const rateRaw = (bestQuote.amount * BigInt(10 ** debt.decimals)) / swapQuoteAmount;
     const rateFormatted = formatUnits(rateRaw, collateral.decimals);
     return { raw: rateRaw, formatted: rateFormatted };
@@ -402,51 +439,55 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     [swapRouter, quoteData.pendleQuote, quoteData.oneInchQuote]
   );
 
-  // ==================== Auto-estimate Limit Slippage ====================
+  // ==================== Auto-estimate Slippage ====================
 
+  // Auto-estimate slippage for market orders based on quote price impact
   useEffect(() => {
-    if (executionType !== "limit" || hasAutoSetLimitSlippage) return;
-    if (quotesPriceImpact === null) return;
+    if (executionType !== "market" || hasAutoSetMarketSlippage) {
+      return;
+    }
+    if (quotesPriceImpact === null) {
+      return;
+    }
+
+    const suggested = calculateSuggestedSlippage(quotesPriceImpact);
+    setSlippage(suggested);
+    setHasAutoSetMarketSlippage(true);
+  }, [executionType, quotesPriceImpact, hasAutoSetMarketSlippage]);
+
+  // Auto-estimate slippage for limit orders
+  useEffect(() => {
+    if (executionType !== "limit" || hasAutoSetLimitSlippage) {
+      return;
+    }
+    if (quotesPriceImpact === null) {
+      return;
+    }
 
     const suggested = calculateSuggestedSlippage(quotesPriceImpact);
     setLimitSlippage(suggested);
     setHasAutoSetLimitSlippage(true);
   }, [executionType, quotesPriceImpact, hasAutoSetLimitSlippage]);
 
+  // Reset auto-slippage flags when tokens change
   useEffect(() => {
     setHasAutoSetLimitSlippage(false);
     setLimitSlippage(0.1);
+    setHasAutoSetMarketSlippage(false);
+    setSlippage(1); // Reset to default
   }, [collateral?.address, debt?.address]);
 
   // ==================== Min Collateral Calculation ====================
 
   const minCollateralOut = useMemo(() => {
-    // For limit orders, calculate from rate * amount
+    // For limit orders, calculate from rate * amount using extracted helpers
     if (executionType === "limit" && collateral && debt) {
-      // Use custom rate if set, otherwise use market rate
-      let rateToUse: bigint;
-      if (customMinPrice && customMinPrice !== "") {
-        try {
-          rateToUse = parseUnits(customMinPrice, collateral.decimals);
-        } catch {
-          rateToUse = marketRate?.raw ?? 0n;
-        }
-      } else {
-        rateToUse = marketRate?.raw ?? 0n;
-      }
-
-      if (rateToUse === 0n || swapQuoteAmount === 0n) {
-        return { raw: 0n, formatted: "0" };
-      }
-
-      // Apply slippage to the rate
-      const slippageBps = BigInt(Math.round(limitSlippage * 100));
-      const rateWithSlippage = (rateToUse * (10000n - slippageBps)) / 10000n;
-
-      // Calculate total: rate * swapAmount / 10^debtDecimals
-      const totalRaw = (rateWithSlippage * swapQuoteAmount) / BigInt(10 ** debt.decimals);
-      const totalFormatted = formatUnits(totalRaw, collateral.decimals);
-      return { raw: totalRaw, formatted: totalFormatted };
+      const rateToUse = calculateLimitOrderRate(
+        customMinPrice, priceInputInverted,
+        collateral.decimals, debt.decimals,
+        marketRate?.raw,
+      );
+      return applySlippageToRate(rateToUse, swapQuoteAmount, limitSlippage, collateral.decimals, debt.decimals);
     }
 
     // For market orders, use the original calculation
@@ -461,7 +502,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       limitSlippage,
       slippage
     );
-  }, [collateral, debt, executionType, customMinPrice, marketRate, swapQuoteAmount, limitSlippage, bestQuote, swapRouter, quoteData.oneInchQuote, quoteData.pendleQuote, slippage]);
+  }, [collateral, debt, executionType, customMinPrice, priceInputInverted, marketRate, swapQuoteAmount, limitSlippage, bestQuote, swapRouter, quoteData.oneInchQuote, quoteData.pendleQuote, slippage]);
 
   // ==================== Position Metrics ====================
 
@@ -485,7 +526,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // ==================== Router and Transaction Flow ====================
 
-  const { buildMultiplyFlow, routerContract } = useKapanRouterV2();
+  const { buildMultiplyFlow } = useKapanRouterV2();
 
   // ==================== Build Flow for Market Orders ====================
 
@@ -496,36 +537,18 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     }
 
     // Use ref to get latest quote values (avoids stale closure issues)
-    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, oneInchAdapter: currentOneInchAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
-
-    let swapData: string;
-    let minOut: string;
-
-    if (swapRouter === "1inch") {
-      if (!currentOneInchQuote || !currentOneInchAdapter) {
-        console.warn("[buildFlow] 1inch not ready:", { oneInchQuote: !!currentOneInchQuote, oneInchAdapter: !!currentOneInchAdapter });
-        return [];
-      }
-      swapData = currentOneInchQuote.tx.data;
-      minOut = minCollateralOut.formatted;
-    } else {
-      if (!currentPendleQuote || !currentPendleAdapter) {
-        console.warn("[buildFlow] Pendle not ready:", { pendleQuote: !!currentPendleQuote, pendleAdapter: !!currentPendleAdapter });
-        return [];
-      }
-      swapData = currentPendleQuote.transaction.data;
-      minOut = currentPendleQuote.data.minPtOut || currentPendleQuote.data.minTokenOut || minCollateralOut.formatted;
-    }
+    const swapResult = resolveSwapDataForFlow(swapRouter, quotesRef.current, minCollateralOut.formatted);
+    if (!swapResult) return [];
 
     const flowParams = {
       protocolName, collateralToken: collateral.address as Address, debtToken: debt.address as Address,
       initialCollateral: zapMode ? "0" : (marginAmount || "0"),
       flashLoanAmount: formatUnits(flashLoanAmountRaw, debt.decimals),
-      minCollateralOut: minOut, swapData,
+      minCollateralOut: swapResult.minOut, swapData: swapResult.swapData,
       collateralDecimals: collateral.decimals, debtDecimals: debt.decimals,
       flashLoanProvider: selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2, market,
       morphoContext: morphoContext ? encodeMorphoContext(morphoContext) : undefined,
-      swapRouter: (swapRouter === "1inch" ? "oneinch" : "pendle") as "oneinch" | "pendle",
+      swapRouter: mapSwapRouterToFlowParam(swapRouter),
       zapMode,
       depositAmount: zapMode ? marginAmount : undefined,
     };
@@ -539,26 +562,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const chunkParams = useMemo((): ChunkParamsResult => {
     if (executionType !== "limit" || !collateral || !debt || flashLoanAmountRaw === 0n || marginAmountRaw === 0n) {
-      return {
-        numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw],
-        needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0,
-        recommendFlashLoan: false, explanation: ""
-      };
+      return createDefaultChunkParams(flashLoanAmountRaw);
     }
-
-    const ltvBps = collateralConfig?.ltv
-      ? Number(collateralConfig.ltv)
-      : (isEModeActive && eMode ? eMode.ltv : Number(maxLtvBps));
 
     const collateralPrice = collateral.price ?? 0n;
     const debtPrice = debt.price ?? 0n;
 
     if (collateralPrice === 0n || debtPrice === 0n) {
-      return {
-        numChunks: 1, chunkSize: flashLoanAmountRaw, chunkSizes: [flashLoanAmountRaw],
-        needsChunking: false, initialBorrowCapacityUsd: 0n, geometricRatio: 0,
-        recommendFlashLoan: false, explanation: "Missing price data"
-      };
+      return createDefaultChunkParams(flashLoanAmountRaw, "Missing price data");
     }
 
     // Flash loan mode calculation
@@ -579,6 +590,13 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     }
 
     // Multi-chunk mode calculation
+    const ltvBps = resolveEffectiveLtvBps(
+      collateralConfig ? { ltv: Number(collateralConfig.ltv) } : null,
+      isEModeActive,
+      eMode,
+      maxLtvBps
+    );
+
     const swapRate = bestQuote && swapQuoteAmount > 0n
       ? calculateSwapRate(swapQuoteAmount, debt.decimals, bestQuote.amount, collateral.decimals)
       : 0n;
@@ -605,19 +623,53 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     return result;
   }, [executionType, collateral, debt, flashLoanAmountRaw, marginAmountRaw, collateralConfig, isEModeActive, eMode, maxLtvBps, bestQuote, swapQuoteAmount, useFlashLoan, flashLoanChunks, chainId, limitOrderConfig, chunksInput]);
 
-  // ==================== CoW Instructions Using Helper ====================
-
-  const buildInitialDepositFlow = useMemo(() =>
-    buildInitialDepositInstructions(collateral, userAddress, marginAmountRaw, protocolName, morphoContext, market),
-    [collateral, userAddress, marginAmountRaw, protocolName, morphoContext, market]
-  );
-
-  const cowChunks = useMemo((): ChunkInstructions[] => {
-    if (!collateral || !debt || !userAddress || flashLoanAmountRaw === 0n || !orderManagerAddress) {
-      return [{ preInstructions: [], postInstructions: [] }];
+  // Conditional order trigger params for LimitPriceTrigger
+  const conditionalOrderTriggerParams = useMemo(() => {
+    if (!collateral?.address || !debt?.address || !limitPriceTriggerAddress || !userAddress) {
+      return null;
+    }
+    if (flashLoanAmountRaw === 0n || minCollateralOut.raw === 0n) {
+      return null;
     }
 
-    return buildCowChunkInstructions({
+    const normalizedProtocol = normalizeProtocolForCow(protocolName);
+
+    // Calculate limit price (8 decimals, like Chainlink)
+    // For leverage-up: we sell debt to buy collateral
+    // LimitPriceTrigger expects: limitPrice = (buyAmount / sellAmount) * 1e8
+    const limitPrice = calculateLimitPrice(
+      flashLoanAmountRaw, debt.decimals,
+      minCollateralOut.raw, collateral.decimals
+    );
+
+    // Leverage-up is a SELL order: we sell exact borrowed debt to get collateral
+    // totalSellAmount = exact debt to sell, totalBuyAmount = min collateral to receive
+    return encodeLimitPriceTriggerParams({
+      protocolId: getProtocolId(normalizedProtocol),
+      protocolContext: (market || "0x") as `0x${string}`,
+      sellToken: debt.address as Address,
+      buyToken: collateral.address as Address,
+      sellDecimals: debt.decimals,
+      buyDecimals: collateral.decimals,
+      limitPrice,
+      triggerAbovePrice: false, // Execute when price <= limit (we want good rates for buying)
+      totalSellAmount: flashLoanAmountRaw, // Exact amount to sell (debt)
+      totalBuyAmount: minCollateralOut.raw, // Min amount to buy (collateral) - used for slippage protection
+      numChunks: flashLoanChunks,
+      maxSlippageBps: Math.round(limitSlippage * 100), // Use limit slippage for limit orders
+      isKindBuy: false, // SELL order: exact sellAmount, min buyAmount
+    });
+  }, [collateral, debt, limitPriceTriggerAddress, userAddress, flashLoanAmountRaw, minCollateralOut.raw, protocolName, market, flashLoanChunks, limitSlippage]);
+
+  // Build conditional order instructions for the new system
+  const buildConditionalOrderInstructionsData = useMemo((): ConditionalOrderInstructions => {
+    if (!collateral || !debt || !userAddress || flashLoanAmountRaw === 0n || !conditionalOrderManagerAddress) {
+      return { preInstructions: [], postInstructions: [] };
+    }
+
+    // For leverage-up, we use the buildCowChunkInstructions helper but need to adapt it
+    // The new system expects a single instructions object per order, not an array
+    const chunks = buildCowChunkInstructions({
       collateral,
       debt,
       userAddress,
@@ -626,11 +678,14 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       protocolName,
       morphoContext,
       market,
-      orderManagerAddress,
+      orderManagerAddress: conditionalOrderManagerAddress,
       chunkParams,
       chainId,
     });
-  }, [collateral, debt, userAddress, flashLoanAmountRaw, marginAmountRaw, protocolName, morphoContext, market, orderManagerAddress, chunkParams, chainId]);
+
+    // Return the first chunk's instructions (for single-iteration orders)
+    return chunks[0] || { preInstructions: [], postInstructions: [] };
+  }, [collateral, debt, userAddress, flashLoanAmountRaw, marginAmountRaw, protocolName, morphoContext, market, conditionalOrderManagerAddress, chunkParams, chainId]);
 
   // ==================== Transaction Flow Hook ====================
 
@@ -655,8 +710,10 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const handleLeverageInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLeverageInput(e.target.value);
-    const val = parseFloat(e.target.value);
-    if (!isNaN(val)) updateLeverage(val);
+    const val = Number.parseFloat(e.target.value);
+    if (!Number.isNaN(val)) {
+      updateLeverage(val);
+    }
   }, [updateLeverage]);
 
   const handleLeverageInputBlur = useCallback(() => {
@@ -676,7 +733,9 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   const handleFlashLoanProviderChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const p = providerOptions.find(provider => provider.name === e.target.value);
-    if (p) setSelectedProvider(p);
+    if (p) {
+      setSelectedProvider(p);
+    }
   }, [providerOptions, setSelectedProvider]);
 
   const handleToggleBatching = useCallback(() => setPreferBatching(!preferBatching), [setPreferBatching, preferBatching]);
@@ -684,13 +743,17 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
   const handleSelectDebt = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
     const address = e.currentTarget.dataset.address;
     const d = debtWithWalletBalance.find(debtItem => debtItem.address === address);
-    if (d) setDebt(d);
+    if (d) {
+      setDebt(d);
+    }
   }, [debtWithWalletBalance]);
 
   const handleSelectCollateral = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
     const address = e.currentTarget.dataset.address;
     const c = collateralsWithWalletBalance.find(col => col.address === address);
-    if (c) setCollateral(c);
+    if (c) {
+      setCollateral(c);
+    }
   }, [collateralsWithWalletBalance]);
 
   // ==================== Submit Handler ====================
@@ -700,19 +763,18 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       setIsSubmitting(true);
 
       if (executionType === "limit") {
-        await handleLimitOrderSubmit();
+        await handleLimitOrderSubmitRef.current();
       } else {
-        await handleMarketOrderSubmit();
+        await handleMarketOrderSubmitRef.current();
       }
-    } catch (e) {
+    } catch (error) {
       const status = executionType === "limit" ? "multiply_limit_order_complete" : "multiply_tx_complete";
-      track(status, { status: "error", error: e instanceof Error ? e.message : String(e) });
-      throw e;
+      track(status, { status: "error", error: error instanceof Error ? error.message : String(error) });
+      throw error;
     } finally {
       setIsSubmitting(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [executionType, collateral, debt, userAddress, marginAmount, leverage, protocolName, chainId]);
+  }, [executionType]);
 
   // ==================== Limit Order Submit Logic ====================
 
@@ -724,268 +786,143 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
       marginAmount, leverage
     });
 
-    if (!collateral || !debt || !userAddress || !orderManagerAddress || !routerContract) {
-      throw new Error("Missing required data for limit order");
-    }
+    // Validate all prerequisites using extracted helper (throws on failure)
+    validateLimitOrderPrerequisites({
+      collateral, debt, userAddress,
+      conditionalOrderManagerAddress, walletClient, publicClient,
+      limitPriceTriggerAddress, conditionalOrderTriggerParams,
+      flashLoanAmountRaw, minCollateralOutRaw: minCollateralOut.raw,
+    });
 
-    const minBuyPerChunk = calculateMinBuyPerChunk(minCollateralOut.raw, chunkParams.numChunks, collateral.decimals);
+    // After validation, we can safely assert these are non-null
+    const validCollateral = collateral!;
+    const validDebt = debt!;
+    const validUserAddress = userAddress!;
+    const validManagerAddress = conditionalOrderManagerAddress!;
+    const validWalletClient = walletClient!;
+    const validPublicClient = publicClient!;
+
     const isFlashLoanMode = chunkParams.useFlashLoan === true;
-    const seedAmount = isFlashLoanMode ? 0n : chunkParams.chunkSize;
 
-    logLimitOrderBuildInfo(debt, collateral, minBuyPerChunk.formatted, isFlashLoanMode);
-
-    const allCalls: { to: Address; data: Hex }[] = [];
-    const seedBorrowInstruction = createSeedBorrowForMultiChunk(isFlashLoanMode, seedAmount, debt.address);
-    const preOrderInstructions = buildPreOrderInstructionsForLimitOrder(isFlashLoanMode, seedBorrowInstruction);
-
-    addMultiChunkRouterCalls(allCalls, isFlashLoanMode, seedBorrowInstruction);
-
-    console.log("[Limit Order] SUBMIT - chunks debug:", {
-      chunksInput,
-      flashLoanChunks,
-      chunkParamsNumChunks: chunkParams.numChunks,
-      cowChunksLength: cowChunks.length,
-      targetValue: chunkParams.numChunks,
-    });
-
-    const limitOrderResult = await buildLimitOrderCalls({
-      sellToken: debt.address as Address,
-      buyToken: collateral.address as Address,
-      chunkSize: chunkParams.chunkSize,
-      minBuyPerChunk: minBuyPerChunk.raw,
-      totalAmount: flashLoanAmountRaw,
-      chunks: cowChunks,
-      completion: CompletionType.Iterations,
-      targetValue: chunkParams.numChunks,
-      minHealthFactor: "1.1",
-      seedAmount,
-      flashLoan: prepareLimitOrderFlashLoanConfig(isFlashLoanMode, chunkParams.flashLoanLender, debt.address, chunkParams.chunkSize),
-      preOrderInstructions,
-      isKindBuy: false,
-      operationType: "leverage-up",
-    });
-
-    const buildError = handleLimitOrderBuildError(limitOrderResult);
-    if (buildError) {
-      handleLimitOrderBuildFailure(buildError, limitOrderResult);
-      throw new Error(buildError);
-    }
-
-    if (limitOrderResult && limitOrderResult.calls) {
-      allCalls.push(...limitOrderResult.calls);
-    }
-    console.log("[Limit Order] Total calls:", allCalls.length);
-
-    const cowCalls = {
-      salt: limitOrderResult?.salt ?? "",
-      appDataHash: limitOrderResult?.appDataHash ?? "",
-    };
-    saveLimitOrderNote(cowCalls.salt, debt.symbol, collateral.symbol);
-
-    await executeLimitOrderCalls(allCalls, cowCalls);
-  };
-
-  // ==================== Helper Functions for Limit Order ====================
-
-  const logLimitOrderBuildInfo = (
-    debtToken: SwapAsset,
-    collateralToken: SwapAsset,
-    minBuyAmountFormatted: string,
-    isFlashLoanMode: boolean
-  ) => {
-    console.log("[Limit Order] Building batched transaction:", {
-      hasInitialDeposit: marginAmountRaw > 0n && buildInitialDepositFlow.length > 0,
-      sellToken: debtToken.address,
-      buyToken: collateralToken.address,
-      numChunks: chunkParams.numChunks,
-      minBuyPerChunk: minBuyAmountFormatted,
-    });
-    console.log("[Limit Order] Execution mode:", isFlashLoanMode ? "FLASH_LOAN" : "MULTI_CHUNK");
-  };
-
-  const createSeedBorrowForMultiChunk = (isFlashLoanMode: boolean, seedAmount: bigint, debtAddress: Address) => {
-    if (isFlashLoanMode || seedAmount <= 0n || !userAddress) return undefined;
-    return createSeedBorrowInstruction(protocolName, debtAddress, userAddress, seedAmount, morphoContext, market);
-  };
-
-  const buildPreOrderInstructionsForLimitOrder = (
-    isFlashLoanMode: boolean,
-    seedBorrowInstruction: ReturnType<typeof createSeedBorrowInstruction> | undefined
-  ) => {
-    if (!collateral || !debt || !userAddress) return [];
-    return buildPreOrderInstructions({
+    console.log("[Conditional Order] Building order:", {
+      sellToken: validDebt.address,
+      buyToken: validCollateral.address,
+      sellAmount: formatUnits(flashLoanAmountRaw / BigInt(flashLoanChunks), validDebt.decimals),
+      buyAmount: formatUnits(minCollateralOut.raw / BigInt(flashLoanChunks), validCollateral.decimals),
+      numChunks: flashLoanChunks,
       isFlashLoanMode,
-      marginAmountRaw,
-      collateral,
-      debt,
-      userAddress,
-      flashLoanAmountRaw,
-      flashLoanFee: chunkParams.flashLoanFee ?? 0n,
-      numChunks: chunkParams.numChunks,
-      protocolName,
-      morphoContext,
-      market,
-      buildInitialDepositFlow,
-      seedBorrowInstruction,
     });
-  };
-
-  const addMultiChunkRouterCalls = (
-    allCalls: { to: Address; data: Hex }[],
-    isFlashLoanMode: boolean,
-    seedBorrowInstruction: ReturnType<typeof createSeedBorrowInstruction> | undefined
-  ) => {
-    if (isFlashLoanMode || !userAddress) return;
-
-    // Add deposit router call
-    if (marginAmountRaw > 0n && buildInitialDepositFlow.length > 0) {
-      const depositCall = buildRouterCall(buildInitialDepositFlow);
-      if (depositCall) allCalls.push(depositCall);
-    }
-
-    // Add seed borrow router call
-    if (seedBorrowInstruction) {
-      const pushTokenInstruction = createRouterInstruction(encodePushToken(0, userAddress));
-      const seedBorrowCall = buildRouterCall([seedBorrowInstruction, pushTokenInstruction]);
-      if (seedBorrowCall) allCalls.push(seedBorrowCall);
-    }
-  };
-
-  const handleLimitOrderBuildFailure = (
-    errorMsg: string,
-    result: { errorDetails?: { apiResponse?: string } } | null | undefined
-  ) => {
-    const fullError = result?.errorDetails?.apiResponse
-      ? `${errorMsg}\n\nAPI Response: ${result.errorDetails.apiResponse}`
-      : errorMsg;
-    console.error("[Limit Order] Build failed:", fullError);
-    notification.error(<TransactionToast step="failed" message={`CoW API Error: ${errorMsg}`} />);
-  };
-
-  const saveLimitOrderNote = (salt: string, debtSymbol: string, collateralSymbol: string) => {
-    if (salt) {
-      saveOrderNote(createLeverageUpNote(salt, protocolName, debtSymbol, collateralSymbol, chainId));
-    }
-  };
-
-  // ==================== Execute Limit Order Calls ====================
-
-  const executeLimitOrderCalls = async (
-    allCalls: { to: Address; data: Hex }[],
-    cowCalls: { salt: string; appDataHash: string }
-  ) => {
-    const notificationId: string | number = notification.loading(
-      <TransactionToast step="pending" message={`Creating limit order (${allCalls.length} operations)...`} />
-    );
 
     try {
-      // Always use sequential execution for limit orders
-      // MetaMask has issues with approvals in batched calls that may go unused
-      await executeSequentialLimitOrder(allCalls, cowCalls, notificationId);
-    } catch (batchError: unknown) {
-      notification.remove(notificationId);
-      throw batchError;
-    }
-  };
-
-  // ==================== Sequential Limit Order Execution ====================
-
-  const executeSequentialLimitOrder = async (
-    allCalls: { to: Address; data: Hex }[],
-    cowCalls: { salt: string; appDataHash: string },
-    notificationIdInitial: string | number
-  ) => {
-    let notificationId = notificationIdInitial;
-    console.log("[Limit Order] Using sequential TX mode");
-
-    if (!walletClient || !publicClient || !userAddress) {
-      throw new Error("Wallet not connected");
-    }
-
-    const result = await executeSequentialTransactions(
-      publicClient,
-      walletClient,
-      allCalls as TransactionCall[],
-      userAddress,
-      {
-        simulateFirst: true,
-        onProgress: (step, total, phase) => {
-          notification.remove(notificationId);
-          const message = phase === "simulating"
-            ? `Simulating step ${step}/${total}...`
-            : phase === "executing"
-              ? `Executing step ${step}/${total}...`
-              : `Step ${step}/${total} confirmed`;
-          notificationId = notification.loading(
-            <TransactionToast step="pending" message={message} />
-          );
-          if (phase === "confirmed") {
-            console.log(`[Limit Order] Step ${step} confirmed`);
-          }
-        },
-        onError: (step, error) => {
-          console.error(`[Limit Order] Step ${step} FAILED:`, error);
-          notification.remove(notificationId);
-          notification.error(`Step ${step} would fail: ${error}`);
-        },
-      }
-    );
-
-    if (!result.success) {
-      throw new Error(result.error || "Transaction failed");
-    }
-
-    notification.remove(notificationId);
-
-    const explorerUrl = orderManagerAddress ? getCowExplorerAddressUrl(chainId, orderManagerAddress) : undefined;
-    notification.success(
-      <TransactionToast
-        step="confirmed"
-        message="Limit order created!"
-        blockExplorerLink={explorerUrl}
-      />
-    );
-
-    console.log("[Limit Order] All steps completed");
-    console.log("[Limit Order] Salt:", cowCalls.salt);
-    console.log("[Limit Order] AppData Hash:", cowCalls.appDataHash);
-
-    // Extract orderHash from transaction receipts
-    const orderHash = extractOrderHash(result.receipts, orderManagerAddress) ?? undefined;
-    console.log("[Limit Order] OrderHash:", orderHash);
-
-    // Save order to database after successful execution
-    if (cowCalls.salt && debt && collateral && userAddress) {
-      saveOrder.mutate({
-        orderUid: cowCalls.salt,
-        orderHash,
-        salt: cowCalls.salt,
-        userAddress,
-        chainId,
-        orderType: "leverage_up",
-        protocol: protocolName,
-        sellToken: debt.address,
-        buyToken: collateral.address,
-        sellTokenSymbol: debt.symbol,
-        buyTokenSymbol: collateral.symbol,
-        sellAmount: flashLoanAmountRaw.toString(),
-        buyAmount: minCollateralOut.raw.toString(),
+      const result = await buildConditionalOrderCalls({
+        triggerAddress: limitPriceTriggerAddress!,
+        triggerStaticData: conditionalOrderTriggerParams!,
+        sellToken: validDebt.address as Address,
+        buyToken: validCollateral.address as Address,
+        preInstructions: buildConditionalOrderInstructionsData.preInstructions,
+        postInstructions: buildConditionalOrderInstructionsData.postInstructions,
+        maxIterations: flashLoanChunks,
+        flashLoan: isFlashLoanMode && chunkParams.flashLoanLender ? {
+          lender: chunkParams.flashLoanLender as Address,
+          token: validDebt.address as Address,
+          amount: chunkParams.chunkSize,
+        } : undefined,
+        sellTokenRefundAddress: isFlashLoanMode && chunkParams.flashLoanLender ? getKapanCowAdapter(chainId) as Address : validUserAddress,
+        operationType: "leverage-up",
+        protocolName,
+        isKindBuy: false, // SELL order: exact sellAmount, min buyAmount
       });
-    }
 
-    track("multiply_limit_order_complete", { status: "submitted", mode: "sequential" });
-    onClose();
+      if (!result || !result.success) {
+        const errorMsg = result?.error || "Failed to build conditional order calls";
+        notification.error(<TransactionToast step="failed" message={`CoW API Error: ${errorMsg}`} />);
+        throw new Error(errorMsg);
+      }
+
+      // Save order note
+      if (result.salt) {
+        saveOrderNote(createLeverageUpNote(result.salt, protocolName, validDebt.symbol, validCollateral.symbol, chainId));
+      }
+
+      notification.loading(
+        <TransactionToast step="pending" message={`Creating conditional order (${result.calls.length} operations)...`} />
+      );
+
+      // Execute all transaction calls sequentially
+      const receipts: TransactionReceipt[] = [];
+      for (let i = 0; i < result.calls.length; i++) {
+        const call = result.calls[i];
+        const stepNotificationId = notification.loading(
+          <TransactionToast step="pending" message={`Executing step ${i + 1}/${result.calls.length}...`} />
+        );
+
+        const txHash = await validWalletClient.sendTransaction({
+          account: validUserAddress,
+          to: call.to,
+          data: call.data,
+          chain: null,
+        });
+
+        const receipt = await validPublicClient.waitForTransactionReceipt({ hash: txHash });
+        receipts.push(receipt);
+        notification.remove(stepNotificationId as string);
+      }
+
+      const explorerUrl = getCowExplorerAddressUrl(chainId, validManagerAddress);
+      notification.success(
+        <TransactionToast
+          step="confirmed"
+          message="Conditional order created!"
+          blockExplorerLink={explorerUrl}
+        />
+      );
+
+      const orderHash = extractOrderHash(receipts, validManagerAddress) ?? undefined;
+
+      // Save order to database
+      if (result.salt) {
+        saveOrder.mutate({
+          orderUid: result.salt,
+          orderHash,
+          salt: result.salt,
+          userAddress: validUserAddress,
+          chainId,
+          orderType: "leverage_up",
+          protocol: protocolName,
+          sellToken: validDebt.address,
+          buyToken: validCollateral.address,
+          sellTokenSymbol: validDebt.symbol,
+          buyTokenSymbol: validCollateral.symbol,
+          sellAmount: flashLoanAmountRaw.toString(),
+          buyAmount: minCollateralOut.raw.toString(),
+        });
+
+        if (orderHash && flashLoanAmountRaw > 0n && minCollateralOut.raw > 0n) {
+          const quoteRate = Number(flashLoanAmountRaw) / Number(minCollateralOut.raw);
+          storeOrderQuoteRate(chainId, orderHash, quoteRate);
+        }
+      }
+
+      track("multiply_limit_order_complete", { status: "submitted", mode: "conditional" });
+      onClose();
+    } catch (e) {
+      track("multiply_limit_order_complete", {
+        status: "error",
+        error: e instanceof Error ? e.message : String(e),
+      });
+      throw e;
+    }
   };
 
   // ==================== Market Order Submit Logic ====================
 
   const handleMarketOrderSubmit = async () => {
     // Use ref to get latest quote values for logging (same ref used in buildFlow)
-    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, oneInchAdapter: currentOneInchAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
+    const { oneInchQuote: currentOneInchQuote, pendleQuote: currentPendleQuote, activeAdapter: currentActiveAdapter, pendleAdapter: currentPendleAdapter } = quotesRef.current;
     console.log("[handleMarketOrderSubmit] State at submit (from ref):", {
       swapRouter,
       hasOneInchQuote: !!currentOneInchQuote,
-      hasOneInchAdapter: !!currentOneInchAdapter,
+      hasActiveAdapter: !!currentActiveAdapter,
       hasPendleQuote: !!currentPendleQuote,
       hasPendleAdapter: !!currentPendleAdapter,
       flashLoanAmountRaw: flashLoanAmountRaw.toString(),
@@ -1004,14 +941,18 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     track("multiply_tx_complete", { status: "success" });
   };
 
+  // Update refs to always have latest handlers (fixes stale closure in handleSubmit)
+  handleLimitOrderSubmitRef.current = handleLimitOrderSubmit;
+  handleMarketOrderSubmitRef.current = handleMarketOrderSubmit;
+
   // ==================== Derived State for UI ====================
 
-  const hasQuote = swapRouter === "1inch" ? !!oneInchQuote : !!pendleQuote;
-  const hasAdapter = swapRouter === "1inch" ? !!oneInchAdapter : !!pendleAdapter;
-
-  const canSubmitMarket = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && hasQuote && hasAdapter && !isSwapQuoteLoading;
-  const canSubmitLimit = !!collateral && !!debt && marginAmountRaw > 0n && leverage > 1 && cowContractAvailable && !isCowCreating;
-  const canSubmit = executionType === "limit" ? canSubmitLimit : canSubmitMarket;
+  const { canSubmit } = computeSubmitFlags({
+    swapRouter, pendleQuote, oneInchQuote,
+    kyberAdapter, oneInchAdapter, pendleAdapter,
+    executionType, collateral, debt, marginAmountRaw, leverage,
+    isSwapQuoteLoading, conditionalOrderReady, conditionalOrderTriggerParams,
+  });
 
   const isSubmittingAny = isSubmitting || isCowCreating;
   const marginUsd = depositToken && marginAmount
@@ -1104,6 +1045,8 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             marketRate={marketRate}
             customMinPrice={customMinPrice}
             setCustomMinPrice={setCustomMinPrice}
+            priceInputInverted={priceInputInverted}
+            setPriceInputInverted={setPriceInputInverted}
             chunkParams={chunkParams}
             chunksInput={chunksInput}
             setChunksInput={setChunksInput}
@@ -1242,7 +1185,7 @@ const DepositSection: FC<DepositSectionProps> = ({
     <div className="border-base-300/30 mt-2 flex items-center justify-between border-t pt-2">
       <span className="text-base-content/50 text-xs">approx ${marginUsd.toFixed(2)}</span>
       <div className="flex items-center gap-1.5 text-xs">
-        <span className="text-base-content/40">arrow-right</span>
+        <ArrowRightIcon className="text-base-content/40 size-3" />
         <span className="text-success font-medium">{metrics.totalCollateralTokens.toFixed(4)} {collateral?.symbol}</span>
         <span className="text-base-content/50">(${metrics.totalCollateralUsd.toFixed(2)})</span>
       </div>
@@ -1348,6 +1291,8 @@ interface LeverageSectionProps {
   marketRate: { raw: bigint; formatted: string } | null;
   customMinPrice: string;
   setCustomMinPrice: (v: string) => void;
+  priceInputInverted: boolean;
+  setPriceInputInverted: (v: boolean) => void;
   chunkParams: ChunkParamsResult;
   chunksInput: string;
   setChunksInput: (v: string) => void;
@@ -1371,7 +1316,8 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
     handleLeverageSliderChange, cowAvailable, executionType, handleSetExecutionMarket, handleSetExecutionLimit,
     cowContractAvailable,
     debt, collateral, marketRate,
-    customMinPrice, setCustomMinPrice, chunkParams, chunksInput, setChunksInput,
+    customMinPrice, setCustomMinPrice, priceInputInverted, setPriceInputInverted,
+    chunkParams, chunksInput, setChunksInput,
     zapMode, handleZapModeChange, swapRouter,
     handleSwapRouterChange, oneInchAvailable, pendleAvailable, slippage, handleSlippageChange,
     selectedProvider, handleFlashLoanProviderChange, providerOptions, liquidityData,
@@ -1435,6 +1381,8 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
           marketRate={marketRate}
           customMinPrice={customMinPrice}
           setCustomMinPrice={setCustomMinPrice}
+          priceInputInverted={priceInputInverted}
+          setPriceInputInverted={setPriceInputInverted}
           chunkParams={chunkParams}
           chunksInput={chunksInput}
           setChunksInput={setChunksInput}
@@ -1462,7 +1410,7 @@ const LeverageSection: FC<LeverageSectionProps> = (props) => {
             <div className="flex items-center justify-between">
               <span className="text-base-content/60">Slippage</span>
               <select value={slippage} onChange={handleSlippageChange} className="select select-xs bg-base-300/50 h-6 min-h-0 border-0 pr-6 text-xs">
-                {[0.1, 0.3, 0.5, 1, 2, 3].map(s => <option key={s} value={s}>{s}%</option>)}
+                {SLIPPAGE_OPTIONS.map(s => <option key={s} value={s}>{s}%</option>)}
               </select>
             </div>
             <div className="flex items-center justify-between">
@@ -1488,6 +1436,8 @@ interface LimitOrderPricingSectionProps {
   marketRate: { raw: bigint; formatted: string } | null;
   customMinPrice: string;
   setCustomMinPrice: (v: string) => void;
+  priceInputInverted: boolean;
+  setPriceInputInverted: (v: boolean) => void;
   chunkParams: ChunkParamsResult;
   chunksInput: string;
   setChunksInput: (v: string) => void;
@@ -1496,32 +1446,88 @@ interface LimitOrderPricingSectionProps {
 const LimitOrderPricingSection: FC<LimitOrderPricingSectionProps> = (props) => {
   const {
     debt, collateral, marketRate,
-    customMinPrice, setCustomMinPrice, chunkParams, chunksInput, setChunksInput,
+    customMinPrice, setCustomMinPrice, priceInputInverted, setPriceInputInverted,
+    chunkParams, chunksInput, setChunksInput,
   } = props;
 
+  // Calculate inverted market rate for display
+  const invertedMarketRate = useMemo(() => {
+    if (!marketRate || !collateral || !debt) {
+      return null;
+    }
+    const rate = Number(marketRate.formatted);
+    if (rate === 0) {
+      return null;
+    }
+    return 1 / rate;
+  }, [marketRate, collateral, debt]);
+
   // Format price with appropriate precision (preserve significant digits)
-  const formatPrice = (value: number): string => {
-    if (value === 0) return "0";
-    // Use token decimals but cap at reasonable display precision
-    const precision = Math.min(collateral?.decimals ?? 18, 18);
-    // For very small numbers, use more decimals; for larger numbers, use fewer
+  const formatPrice = (value: number, decimals: number): string => {
+    if (value === 0) {
+      return "0";
+    }
+    const precision = Math.min(decimals, 18);
     const magnitude = Math.floor(Math.log10(Math.abs(value)));
     const displayDecimals = Math.max(2, Math.min(precision, 6 - magnitude));
     return value.toFixed(Math.max(0, displayDecimals));
   };
 
+  // Get the current display value and market rate based on inversion mode
+  const { displayValue, displayMarketRate, leftToken, rightToken, displayDecimals } = useMemo(() => {
+    if (!collateral || !debt) {
+      return { displayValue: "0", displayMarketRate: "0", leftToken: "?", rightToken: "?", displayDecimals: 18 };
+    }
+    if (priceInputInverted) {
+      // "1 COLL = X DEBT"
+      return {
+        displayValue: customMinPrice || (invertedMarketRate ? formatPrice(invertedMarketRate, debt.decimals) : "0"),
+        displayMarketRate: invertedMarketRate ? formatPrice(invertedMarketRate, debt.decimals) : "0",
+        leftToken: collateral.symbol,
+        rightToken: debt.symbol,
+        displayDecimals: debt.decimals,
+      };
+    } else {
+      // "1 DEBT = X COLL"
+      return {
+        displayValue: customMinPrice || marketRate?.formatted || "0",
+        displayMarketRate: marketRate?.formatted || "0",
+        leftToken: debt.symbol,
+        rightToken: collateral.symbol,
+        displayDecimals: collateral.decimals,
+      };
+    }
+  }, [collateral, debt, priceInputInverted, customMinPrice, marketRate, invertedMarketRate]);
+
   // Adjust rate by percentage
   const adjustByPercent = (delta: number) => {
-    if (!marketRate || !collateral) return;
-    const currentRate = Number(marketRate.formatted);
+    const currentRate = Number.parseFloat(displayValue) || Number.parseFloat(displayMarketRate);
+    if (!currentRate || currentRate === 0) {
+      return;
+    }
     const newRate = currentRate * (1 + delta / 100);
-    setCustomMinPrice(formatPrice(newRate));
+    setCustomMinPrice(formatPrice(newRate, displayDecimals));
   };
 
   // Reset to market rate
   const resetToMarket = () => {
-    if (!marketRate) return;
-    setCustomMinPrice(marketRate.formatted);
+    setCustomMinPrice(displayMarketRate);
+  };
+
+  // Toggle price direction and convert the current value
+  const toggleDirection = () => {
+    if (!customMinPrice || customMinPrice === "") {
+      // No custom price set, just toggle
+      setPriceInputInverted(!priceInputInverted);
+      return;
+    }
+    // Convert the current value to the new direction
+    const currentValue = Number.parseFloat(customMinPrice);
+    if (currentValue > 0) {
+      const newDecimals = priceInputInverted ? (collateral?.decimals ?? 18) : (debt?.decimals ?? 18);
+      setCustomMinPrice(formatPrice(1 / currentValue, newDecimals));
+    }
+    setPriceInputInverted(!priceInputInverted);
   };
 
   return (
@@ -1549,20 +1555,32 @@ const LimitOrderPricingSection: FC<LimitOrderPricingSectionProps> = (props) => {
         </div>
       </div>
 
-      {/* Row 2: Limit Price Input */}
+      {/* Row 2: Limit Price Input with toggle */}
       {collateral && debt && (
         <>
           <div className="flex items-center gap-1">
-            <span className="text-base-content/50 shrink-0 text-[10px]">1 {debt.symbol} =</span>
+            <button
+              onClick={toggleDirection}
+              className="text-base-content/50 hover:text-primary shrink-0 text-[10px] transition-colors"
+              title="Click to swap price direction"
+            >
+              1 {leftToken} =
+            </button>
             <input
               type="text"
               inputMode="decimal"
               className="border-base-300 bg-base-100 text-base-content min-w-0 flex-1 rounded border px-1 py-0 text-[10px] font-medium"
-              value={customMinPrice || marketRate?.formatted || "0"}
+              value={displayValue}
               onChange={(e) => setCustomMinPrice(e.target.value)}
-              placeholder={marketRate?.formatted || "0"}
+              placeholder={displayMarketRate}
             />
-            <span className="text-base-content/50 shrink-0 text-[10px]">{collateral.symbol}</span>
+            <button
+              onClick={toggleDirection}
+              className="text-base-content/50 hover:text-primary shrink-0 text-[10px] transition-colors"
+              title="Click to swap price direction"
+            >
+              {rightToken}
+            </button>
           </div>
 
           {/* Row 3: Price Adjustment Buttons */}
@@ -1675,7 +1693,7 @@ const DetailsSection: FC<DetailsSectionProps> = ({
           {executionType === "market" && isSwapQuoteLoading ? (
             <span className="loading loading-dots loading-xs" />
           ) : flashLoanAmountRaw > 0n ? (
-            `${shortAmount.toFixed(2)} arrow-right ${Number(minCollateralOut.formatted).toFixed(2)}`
+            <span className="flex items-center gap-1">{shortAmount.toFixed(2)} <ArrowRightIcon className="inline size-3" /> {Number(minCollateralOut.formatted).toFixed(2)}</span>
           ) : "-"}
         </span>
       </div>

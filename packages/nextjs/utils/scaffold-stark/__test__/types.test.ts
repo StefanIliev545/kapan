@@ -14,7 +14,7 @@ import {
   isCairoResult,
   parseGenericType,
 } from "../../../utils/scaffold-stark/types";
-import { AbiParameter } from "../contract";
+
 
 describe("Cairo Type Checks", () => {
   describe("isCairoInt", () => {
@@ -111,27 +111,19 @@ describe("Cairo Type Checks", () => {
   describe("isStructOrEnum", () => {
     it("should return true for struct types", () => {
       expect(
-        isStructOrEnum({
-          type: "struct",
-          name: "MyStruct",
-          members: [] as readonly AbiParameter[],
-        }),
+        isStructOrEnum({ type: "struct" }),
       ).toBe(true);
     });
 
     it("should return true for enum types", () => {
       expect(
-        isStructOrEnum({
-          type: "enum",
-          name: "MyEnum",
-          members: [] as readonly AbiParameter[],
-        }),
+        isStructOrEnum({ type: "enum" }),
       ).toBe(true);
     });
 
     it("should return false for other types", () => {
       expect(isStructOrEnum({ type: "other" })).toBe(false);
-      expect(isStructOrEnum({})).toBe(false);
+      expect(isStructOrEnum({ type: "" })).toBe(false);
     });
   });
 

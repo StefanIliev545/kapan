@@ -6,14 +6,13 @@ import React, {
   useMemo,
   useRef,
   useState,
-  memo,
 } from "react";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { formatUnits, parseUnits, type Address } from "viem";
 import { useAccount } from "wagmi";
-import { useTokenPriceApi } from "~~/hooks/useTokenPriceApi";
+import { useTokenPricesByAddress, priceToRaw } from "~~/hooks/useTokenPrice";
 import { useMovePositionState } from "~~/hooks/useMovePositionState";
 import { RefinanceModalContent } from "./RefinanceModalContent";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
@@ -29,6 +28,7 @@ import {
   type CollateralFromHook,
   type RefinanceModalEvmProps,
 } from "./common";
+import { useHasActiveConditionalOrders } from "~~/hooks/useConditionalOrders";
 
 /* ------------------------------ Helpers ------------------------------ */
 import { addrKey } from "~~/utils/address";
@@ -38,16 +38,27 @@ const price8 = (addr: string, tokenToPrices: PriceMap) =>
   tokenToPrices[addrKey(addr)] ?? 0n;
 
 const toUsdFromP8 = (humanAmount: number, p8: bigint): number => {
-  if (!p8 || p8 === 0n || !isFinite(humanAmount) || humanAmount <= 0) return 0;
+  if (!p8 || p8 === 0n || !Number.isFinite(humanAmount) || humanAmount <= 0) {
+    return 0;
+  }
   return humanAmount * Number(formatUnits(p8, 8));
 };
 
 const toUsdRaw = (amountRaw: bigint, decimals: number, p8: bigint): number => {
-  if (!amountRaw || !p8) return 0;
+  if (!amountRaw || !p8) {
+    return 0;
+  }
   return Number(formatUnits(amountRaw, decimals)) * Number(formatUnits(p8, 8));
 };
 
-const getLtBps = (c: any): number => {
+interface CollateralWithLt {
+  liquidationThresholdBps?: number | bigint;
+  collateralFactorBps?: number | bigint;
+  ltBps?: number | bigint;
+  ltvBps?: number | bigint;
+}
+
+const getLtBps = (c: CollateralWithLt | null | undefined): number => {
   const v = Number(
     c?.liquidationThresholdBps ??
     c?.collateralFactorBps ??
@@ -55,41 +66,190 @@ const getLtBps = (c: any): number => {
     c?.ltvBps ??
     8273
   );
-  return Math.max(0, Math.min(10000, v));
+  return Math.max(0, Math.min(10_000, v));
 };
 
-/* --------------------------- Price Probe ----------------------------- */
-type PriceCallback = (addressLower: string, priceIn8Decimals: bigint) => void;
-const CollatPriceProbe: FC<{
-  symbol?: string;
-  address: string;
-  enabled: boolean;
-  onPrice: PriceCallback;
-}> = memo(({ symbol, address, enabled, onPrice }) => {
-  const sym = (symbol || "").trim();
-  const { isSuccess, price } = useTokenPriceApi(sym) as {
-    isSuccess?: boolean;
-    price?: number;
+/* -------------------- handleExecuteMove helpers -------------------- */
+// Extracted from handleExecuteMove to reduce cognitive complexity.
+// Each helper handles one concern: protocol detection, analytics tracking,
+// context resolution, simulation, or execution fallback.
+
+/** Normalize a protocol name by removing version suffixes and whitespace */
+const normalizeProtocolName = (protocol?: string) =>
+  (protocol || "").toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
+
+/** Determine flash loan provider version from its name */
+const resolveProviderVersion = (providerName: string): "aave" | "v2" | "v3" => {
+  const pv = providerName.toLowerCase();
+  if (pv.includes("aave")) return "aave";
+  if (pv.includes("v3")) return "v3";
+  return "v2";
+};
+
+/** Check if a protocol name matches a normalized key or contains a substring */
+const matchesProtocol = (normalizedName: string, rawName: string, key: string): boolean =>
+  normalizedName === key || rawName.toLowerCase().includes(key);
+
+type TrackingProps = Record<string, string | number | boolean>;
+
+/** Build base tracking props shared by begin/success/error events */
+const buildBaseTrackingProps = (params: {
+  fromProtocol: string;
+  toProtocol: string;
+  position: { name: string; tokenAddress: string; type: string };
+  preferBatching: boolean;
+  chainId?: number;
+}): TrackingProps => {
+  const props: TrackingProps = {
+    network: "evm",
+    fromProtocol: params.fromProtocol,
+    toProtocol: params.toProtocol,
+    debtTokenName: params.position.name,
+    debtTokenAddress: params.position.tokenAddress,
+    positionType: params.position.type,
+    preferBatching: params.preferBatching,
   };
+  if (params.chainId !== undefined) {
+    props.chainId = params.chainId;
+  }
+  return props;
+};
 
-  const lastReported = useRef<bigint | null>(null);
-  const lower = addrKey(address);
+/** Append optional fields (selectedProvider, selectedPool) to tracking props */
+const appendOptionalTrackingFields = (
+  props: TrackingProps,
+  fields: { selectedProvider?: string; selectedPool?: string },
+): void => {
+  if (fields.selectedProvider) {
+    props.selectedProvider = fields.selectedProvider;
+  }
+  if (fields.selectedPool) {
+    props.selectedPool = fields.selectedPool;
+  }
+};
 
-  useEffect(() => {
-    if (!enabled || !sym) return;
-    const ok = isSuccess && typeof price === "number" && isFinite(price) && price > 0;
-    if (!ok) return;
+/** Build per-collateral Euler source contexts from preSelectedCollaterals */
+const buildEulerSourceContexts = (
+  preSelectedCollaterals: Array<{ token: string; symbol?: string; eulerCollateralVault?: string; eulerSubAccountIndex?: number }> | undefined,
+  fromContext: string | undefined,
+): Record<string, `0x${string}`> => {
+  const contexts: Record<string, `0x${string}`> = {};
+  if (!preSelectedCollaterals) return contexts;
 
-    const p8 = BigInt(Math.round(price * 1e8));
-    if (lastReported.current === p8) return;
+  for (const preCol of preSelectedCollaterals) {
+    if (!preCol.eulerCollateralVault) continue;
+    // Re-encode with the correct collateral vault and sub-account index for each collateral
+    // fromContext encodes: (borrowVault, collateralVault, subAccountIndex)
+    const ctx = encodeEulerContext({
+      borrowVault: fromContext ? `0x${fromContext.slice(26, 66)}` : "0x0000000000000000000000000000000000000000",
+      collateralVault: preCol.eulerCollateralVault,
+      subAccountIndex: preCol.eulerSubAccountIndex ?? 0,
+    }) as `0x${string}`;
+    contexts[addrKey(preCol.token)] = ctx;
+    console.log("[Euler Source Context] Built context for", preCol.symbol, "collateralVault:", preCol.eulerCollateralVault, "subAccountIndex:", preCol.eulerSubAccountIndex ?? 0);
+  }
+  return contexts;
+};
 
-    lastReported.current = p8;
-    onPrice(lower, p8);
-  }, [enabled, sym, isSuccess, price, lower, onPrice]);
+/** Resolve the destination context for a single collateral entry */
+const resolveDestContext = (
+  addr: string,
+  isEulerDest: boolean,
+  eulerContexts: Record<string, EulerVaultContextForEncoding>,
+  morphoEncodedContext: `0x${string}` | undefined,
+  symbolForLog?: string,
+): `0x${string}` => {
+  if (!isEulerDest) return morphoEncodedContext || "0x";
 
-  return null;
-});
-CollatPriceProbe.displayName = "CollatPriceProbe";
+  const colCtx = eulerContexts[addrKey(addr)];
+  if (colCtx) {
+    console.log("[Euler Debug] Using per-collateral destination context for", symbolForLog, ":", colCtx);
+    return encodeEulerContext(colCtx) as `0x${string}`;
+  }
+  console.warn("[Euler Debug] No destination context found for collateral:", addr, symbolForLog);
+  return morphoEncodedContext || "0x";
+};
+
+/** Resolve the source context for a single collateral entry */
+const resolveSourceCtx = (
+  addr: string,
+  isFromEuler: boolean,
+  eulerSourceContexts: Record<string, `0x${string}`>,
+  defaultSourceContext: `0x${string}`,
+  symbolForLog?: string,
+): `0x${string}` => {
+  if (!isFromEuler) return defaultSourceContext;
+
+  const ctx = eulerSourceContexts[addrKey(addr)];
+  if (ctx) {
+    console.log("[Euler Debug] Using per-collateral source context for", symbolForLog);
+    return ctx;
+  }
+  console.warn("[Euler Debug] No source context found for collateral:", addr, symbolForLog);
+  return defaultSourceContext;
+};
+
+/** Pre-simulate flow instructions; re-throws on failure with detailed logging */
+const preSimulateFlow = async (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  flow: any[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  simulateFn: (f: any[], o: { skipWhenAuthCallsExist: boolean }) => Promise<void>,
+): Promise<void> => {
+  try {
+    await simulateFn(flow, { skipWhenAuthCallsExist: false });
+    console.log("[Refinance] Pre-simulation passed");
+  } catch (simError: unknown) {
+    console.error("[Refinance] Pre-simulation FAILED:", simError);
+    const e = simError as { message?: string; cause?: unknown; data?: unknown } | null;
+    console.error("[Refinance] Simulation error details:", { message: e?.message, cause: e?.cause, data: e?.data });
+    throw simError;
+  }
+};
+
+/** Execute flow with batching preference, falling back to unbatched if needed */
+const executeFlowWithFallback = async (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  flow: any[],
+  batchPref: boolean,
+  revokePerms: boolean,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  executeFn: (f: any[], b: boolean, o: { revokePermissions: boolean }) => Promise<{ kind: string } | null>,
+): Promise<boolean> => {
+  const res = await executeFn(flow, batchPref, { revokePermissions: revokePerms });
+  let batchingUsed = res?.kind === "batch";
+  if (!res) {
+    const fallbackResult = await executeFn(flow, false, { revokePermissions: revokePerms });
+    batchingUsed = batchingUsed || fallbackResult?.kind === "batch";
+  }
+  return batchingUsed;
+};
+
+/** Resolve the borrow context based on destination protocol */
+const resolveBorrowContext = (
+  isEulerDest: boolean,
+  eulerCtx: EulerVaultContextForEncoding | undefined,
+  morphoEncodedContext: `0x${string}` | undefined,
+): `0x${string}` => {
+  if (isEulerDest && eulerCtx) {
+    return encodeEulerContext(eulerCtx) as `0x${string}`;
+  }
+  return morphoEncodedContext || "0x";
+};
+
+/** Compute default source context for protocols that require it (Morpho Blue, Euler) */
+const computeDefaultSourceContext = (
+  isFromMorpho: boolean,
+  isFromEuler: boolean,
+  fromCtx?: string,
+): `0x${string}` => {
+  if ((isFromMorpho || isFromEuler) && fromCtx) {
+    return fromCtx as `0x${string}`;
+  }
+  return "0x";
+};
+
+/* CollatPriceProbe removed — prices now fetched via useTokenPricesByAddress in the parent */
 
 /* ---------------------------- Component ------------------------------ */
 export { type RefinanceModalEvmProps };
@@ -143,15 +303,21 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   const [mergedPrices, setMergedPrices] = useState<PriceMap>({});
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     setMergedPrices(prev => {
       let changed = false;
       let next = prev;
       for (const [k, v] of Object.entries(seedPrices || {})) {
-        if (!v || v <= 0n) continue;
+        if (!v || v <= 0n) {
+          continue;
+        }
         const key = addrKey(k);
         if (prev[key] !== v) {
-          if (next === prev) next = { ...prev };
+          if (next === prev) {
+            next = { ...prev };
+          }
           next[key] = v;
           changed = true;
         }
@@ -159,11 +325,6 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       return changed ? next : prev;
     });
   }, [isOpen, seedPrices]);
-
-  const reportPrice = useCallback((lower: string, p8: bigint) => {
-    if (!p8 || p8 <= 0n) return;
-    setMergedPrices(prev => (prev[lower] === p8 ? prev : { ...prev, [lower]: p8 }));
-  }, []);
 
   /* --------------------------- State management --------------------------- */
   const state = useMovePositionState(isOpen);
@@ -268,7 +429,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   );
 
   /* ---------------------- Morpho market support ---------------------- */
-  
+
   const {
     supportedCollaterals: morphoSupportedCollaterals,
     marketsByCollateral: morphoMarketsByCollateral,
@@ -282,9 +443,13 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   // Get markets for the currently selected collateral (for Morpho)
   const morphoMarketsForSelectedCollateral = useMemo(() => {
-    if (!isMorphoSelected) return [];
+    if (!isMorphoSelected) {
+      return [];
+    }
     const selectedCollateralAddr = Object.keys(addedCollaterals)[0]?.toLowerCase();
-    if (!selectedCollateralAddr) return [];
+    if (!selectedCollateralAddr) {
+      return [];
+    }
     return morphoMarketsByCollateral[selectedCollateralAddr] || [];
   }, [isMorphoSelected, addedCollaterals, morphoMarketsByCollateral]);
 
@@ -312,9 +477,13 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   // Get vaults for the currently selected collateral (for Euler)
   const eulerVaultsForSelectedCollateral = useMemo(() => {
-    if (!isEulerSelected) return [];
+    if (!isEulerSelected) {
+      return [];
+    }
     const selectedCollateralAddr = Object.keys(addedCollaterals)[0]?.toLowerCase();
-    if (!selectedCollateralAddr) return [];
+    if (!selectedCollateralAddr) {
+      return [];
+    }
     return eulerVaultsByCollateral[selectedCollateralAddr] || [];
   }, [isEulerSelected, addedCollaterals, eulerVaultsByCollateral]);
 
@@ -416,8 +585,12 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   // Auto pick a destination once, based on support + balances
   useEffect(() => {
-    if (!isOpen || autoSelectedDest) return;
-    if (!destinationProtocols.length) return;
+    if (!isOpen || autoSelectedDest) {
+      return;
+    }
+    if (!destinationProtocols.length) {
+      return;
+    }
 
     const supportedMap = effectiveSupportedMap;
     const hasSupportedNonZero = collaterals.some(c => {
@@ -429,8 +602,10 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       setAutoSelectedDest(true);
       return;
     }
-    const alt = destinationProtocols.find(p => p.name !== selectedProtocol);
-    if (alt && alt.name !== selectedProtocol) setSelectedProtocol(alt.name);
+    const alt = destinationProtocols.find(protocol => protocol.name !== selectedProtocol);
+    if (alt && alt.name !== selectedProtocol) {
+      setSelectedProtocol(alt.name);
+    }
     setAutoSelectedDest(true);
   }, [
     isOpen,
@@ -447,19 +622,29 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   const { createMoveBuilder, executeFlowBatchedIfPossible, canDoAtomicBatch, simulateInstructions } = useKapanRouterV2();
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     const next = Boolean(canDoAtomicBatch);
     setPreferBatching(prev => (prev === next ? prev : next));
   }, [isOpen, canDoAtomicBatch, setPreferBatching]);
 
   const [revokePermissions, setRevokePermissions] = useState(false);
 
-  // Auto-enable revoke permissions when batching is enabled
+  // Check for active conditional orders (ADL) - don't revoke permissions if active
+  const { hasActiveOrders: hasActiveADLOrders } = useHasActiveConditionalOrders();
+
+  // Auto-enable revoke permissions when batching is enabled (unless ADL is active)
   useEffect(() => {
-    if (preferBatching) {
+    if (preferBatching && !hasActiveADLOrders) {
       setRevokePermissions(true);
+    } else if (hasActiveADLOrders) {
+      setRevokePermissions(false); // Force disable if ADL is active
     }
-  }, [preferBatching]);
+  }, [preferBatching, hasActiveADLOrders]);
+
+  // Compute effective revoke permissions (disabled if ADL orders exist)
+  const effectiveRevokePermissions = revokePermissions && !hasActiveADLOrders;
 
   const debtInputRef = useRef<HTMLInputElement>(null);
 
@@ -484,16 +669,24 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     const isVesu = selectedProtocol === "Vesu" || selectedProtocol === "VesuV2";
-    if (!isVesu || !evmVesuPools) return;
+    if (!isVesu || !evmVesuPools) {
+      return;
+    }
 
     if (selectedVersion === "v1") {
       const first = evmVesuPools.v1Pools[0]?.name || "";
-      if (first && selectedPool !== first) setSelectedPool(first);
+      if (first && selectedPool !== first) {
+        setSelectedPool(first);
+      }
     } else {
       const first = evmVesuPools.v2Pools[0]?.name || "";
-      if (first && selectedPool !== first) setSelectedPool(first);
+      if (first && selectedPool !== first) {
+        setSelectedPool(first);
+      }
     }
   }, [isOpen, selectedProtocol, selectedVersion, evmVesuPools, selectedPool]);
 
@@ -504,22 +697,30 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     resetState();
   }, [isOpen, resetState]);
 
-  /* ------------------------ Price‑based calculations -------------------- */
+  /* ------------------------ Price-based calculations -------------------- */
   const debtPrice8 = mergedPrices[addrKey(position.tokenAddress)] ?? 0n;
 
   const debtUsd = useMemo(() => {
-    if (!debtConfirmed) return 0;
-    const parsed = parseFloat(debtAmount || "0");
-    if (Number.isNaN(parsed) || parsed <= 0) return 0;
+    if (!debtConfirmed) {
+      return 0;
+    }
+    const parsed = Number.parseFloat(debtAmount || "0");
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      return 0;
+    }
     return toUsdFromP8(parsed, debtPrice8);
   }, [debtAmount, debtConfirmed, debtPrice8]);
 
   const getUsdValue = useCallback(
     (address: string, humanAmount: string): number => {
       const p8 = price8(address, mergedPrices);
-      if (!p8 || p8 === 0n) return 0;
-      const amt = parseFloat(humanAmount || "0");
-      if (Number.isNaN(amt) || amt <= 0) return 0;
+      if (!p8 || p8 === 0n) {
+        return 0;
+      }
+      const amt = Number.parseFloat(humanAmount || "0");
+      if (Number.isNaN(amt) || amt <= 0) {
+        return 0;
+      }
       return toUsdFromP8(amt, p8);
     },
     [mergedPrices]
@@ -534,17 +735,26 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   }, [addedCollaterals, getUsdValue]);
 
   const ltv = useMemo(() => {
-    if (!totalCollateralUsd) return "0.0";
+    if (!totalCollateralUsd) {
+      return "0.0";
+    }
     return ((debtUsd / totalCollateralUsd) * 100).toFixed(1);
   }, [debtUsd, totalCollateralUsd]);
 
-  const HF_SAFE = 2.0;
+  const HF_SAFE = 2;
   const HF_RISK = 1.5;
   const HF_DANGER = 1.1;
 
+  interface CollateralForHF extends CollateralWithLt {
+    address?: string;
+    token?: string;
+    rawBalance?: bigint;
+    decimals?: number;
+  }
+
   const computeHF = useCallback(
     (
-      all: any[],
+      all: CollateralForHF[],
       moved: { address?: string; amount: bigint; decimals: number }[],
       tokenPrices: PriceMap,
       totalDebtUsd: number
@@ -552,7 +762,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       const movedByAddr = new Map<string, bigint>();
       for (const m of moved) {
         const key = addrKey(m.address || "");
-        if (!key) continue;
+        if (!key) {
+          continue;
+        }
         movedByAddr.set(key, (movedByAddr.get(key) ?? 0n) + (m.amount ?? 0n));
       }
 
@@ -560,25 +772,35 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
       for (const c of all) {
         const key = addrKey(c.address || c.token || "");
-        if (!key) continue;
+        if (!key) {
+          continue;
+        }
 
         const rawBal: bigint = c.rawBalance ?? 0n;
         const decs: number = c.decimals ?? 18;
         const lt = getLtBps(c) / 1e4;
-        if (lt <= 0) continue;
+        if (lt <= 0) {
+          continue;
+        }
 
         const movedAmt = movedByAddr.get(key) ?? 0n;
         const remaining = rawBal - movedAmt;
-        if (remaining <= 0n) continue;
+        if (remaining <= 0n) {
+          continue;
+        }
 
         const p8 = price8(key, tokenPrices);
-        if (p8 === 0n) continue;
+        if (p8 === 0n) {
+          continue;
+        }
 
         const usd = toUsdRaw(remaining, decs, p8);
         weightedCollUsd += usd * lt;
       }
 
-      if (!isFinite(totalDebtUsd) || totalDebtUsd <= 0) return 999;
+      if (!Number.isFinite(totalDebtUsd) || totalDebtUsd <= 0) {
+        return 999;
+      }
       return weightedCollUsd / totalDebtUsd;
     },
     []
@@ -588,7 +810,9 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     const out: { address: string; amount: bigint; decimals: number }[] = [];
     for (const [addr, amt] of Object.entries(addedCollaterals)) {
       const col = collaterals.find(c => addrKey(c.address) === addrKey(addr));
-      if (!col) continue;
+      if (!col) {
+        continue;
+      }
       out.push({
         address: addrKey(addr),
         amount: parseUnits(amt || "0", col.decimals),
@@ -598,60 +822,62 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     return out;
   }, [addedCollaterals, collaterals]);
 
-  const refiHF = useMemo(() => {
-    return computeHF(collaterals, movedList, mergedPrices, debtUsd);
-  }, [collaterals, movedList, mergedPrices, debtUsd, computeHF]);
+  const refiHF = useMemo(
+    () => computeHF(collaterals as CollateralForHF[], movedList, mergedPrices, debtUsd),
+    [collaterals, movedList, mergedPrices, debtUsd, computeHF]
+  );
 
   const hfTone = (hf: number) => {
-    if (hf >= HF_SAFE) return { tone: "text-success", badge: "badge-success" };
-    if (hf >= HF_RISK) return { tone: "text-warning", badge: "badge-warning" };
-    if (hf >= HF_DANGER) return { tone: "text-error", badge: "badge-error" };
+    if (hf >= HF_SAFE) {
+      return { tone: "text-success", badge: "badge-success" };
+    }
+    if (hf >= HF_RISK) {
+      return { tone: "text-warning", badge: "badge-warning" };
+    }
+    if (hf >= HF_DANGER) {
+      return { tone: "text-error", badge: "badge-error" };
+    }
     return { tone: "text-error", badge: "badge-error" };
   };
   const hfColor = hfTone(refiHF);
 
-  /* ------------------------------ Probes ------------------------------- */
-  const needDebtProbe =
-    isOpen &&
-    !!position?.name &&
-    !!position?.tokenAddress &&
-    !mergedPrices[addrKey(position.tokenAddress)];
-
-  const apiProbes = useMemo(() => {
-    if (!isOpen) return null;
-
-    const probes: React.ReactNode[] = [];
-
-    if (needDebtProbe) {
-      probes.push(
-        <CollatPriceProbe
-          key={`probe-debt-${addrKey(position.tokenAddress)}`}
-          address={position.tokenAddress}
-          symbol={position.name}
-          enabled
-          onPrice={reportPrice}
-        />
-      );
-    }
-
+  /* ------------------------------ Address-based price fetching ------------------------------- */
+  // Collect all token addresses (debt + collaterals) for batch price fetching
+  const allPriceAddresses = useMemo(() => {
+    if (!isOpen) return [];
+    const addrs = new Set<string>();
+    const debtAddr = addrKey(position.tokenAddress);
+    if (debtAddr) addrs.add(debtAddr);
     for (const c of collaterals) {
       const a = addrKey(c.address);
-      if (!a || !c.symbol) continue;
-      if (!mergedPrices[a]) {
-        probes.push(
-          <CollatPriceProbe
-            key={`probe-${a}`}
-            address={a}
-            symbol={c.symbol}
-            enabled
-            onPrice={reportPrice}
-          />
-        );
-      }
+      if (a) addrs.add(a);
     }
+    return Array.from(addrs);
+  }, [isOpen, position.tokenAddress, collaterals]);
 
-    return <>{probes}</>;
-  }, [isOpen, needDebtProbe, position.tokenAddress, position.name, collaterals, mergedPrices, reportPrice]);
+  const { prices: cgPrices } = useTokenPricesByAddress(
+    chainId || 1,
+    allPriceAddresses,
+    { enabled: allPriceAddresses.length > 0 },
+  );
+
+  // Merge CoinGecko address-based prices into mergedPrices (fills gaps not covered by seedPrices)
+  useEffect(() => {
+    if (!isOpen || !cgPrices || Object.keys(cgPrices).length === 0) return;
+    setMergedPrices(prev => {
+      let changed = false;
+      let next = prev;
+      for (const [addr, usdPrice] of Object.entries(cgPrices)) {
+        const key = addr.toLowerCase();
+        const p8 = priceToRaw(usdPrice);
+        if (p8 > 0n && prev[key] !== p8) {
+          if (!changed) { next = { ...prev }; changed = true; }
+          next[key] = p8;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [isOpen, cgPrices]);
 
   /* --------------------------- Action Handlers --------------------------- */
   const isActionDisabled = useMemo(() => {
@@ -691,74 +917,39 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   }, [debtConfirmed, selectedProtocol, addedCollaterals, isMorphoSelected, selectedMorphoMarket, morphoSupportedCollaterals, isEulerSelected, eulerContext, eulerSupportedCollaterals, effectiveSupportedMap, selectedEulerVault, eulerContextsByCollateral]);
 
   const handleExecuteMove = useCallback(async () => {
-    if (!debtConfirmed || !selectedProtocol) return;
+    if (!debtConfirmed || !selectedProtocol) {
+      return;
+    }
 
     let batchingUsed = false;
+    const baseProps = buildBaseTrackingProps({
+      fromProtocol, toProtocol: selectedProtocol, position,
+      preferBatching: Boolean(preferBatching), chainId,
+    });
+    const optionalFields = { selectedProvider, selectedPool };
 
     try {
       setIsSubmitting(true);
-
-      const txBeginProps: Record<string, string | number | boolean> = {
-        network: "evm",
-        fromProtocol,
-        toProtocol: selectedProtocol,
-        debtTokenName: position.name,
-        debtTokenAddress: position.tokenAddress,
-        positionType: position.type,
-        preferBatching: Boolean(preferBatching),
-      };
-
-      if (chainId !== undefined) {
-        txBeginProps.chainId = chainId;
-      }
-
-      track("refinance_tx_begin", txBeginProps);
+      track("refinance_tx_begin", { ...baseProps });
 
       const builder = createMoveBuilder();
-      const pv = (selectedProvider || "").toLowerCase();
-      const providerVersion =
-        pv.includes("aave") ? "aave" : pv.includes("v3") ? "v3" : "v2";
+      const providerVersion = resolveProviderVersion(selectedProvider || "");
+      const normalizedTo = normalizeProtocolName(selectedProtocol);
+      const normalizedFrom = normalizeProtocolName(fromProtocol);
 
-      const normalizeProtocol = (protocol?: string) =>
-        (protocol || "")
-          .toLowerCase()
-          .replace(/\s+v\d+$/i, "")
-          .replace(/\s+/g, "");
-
-      const normalizedSelectedProtocol = normalizeProtocol(selectedProtocol);
-      const normalizedFromProtocol = normalizeProtocol(fromProtocol);
-
-      if (normalizedSelectedProtocol === "compound" || normalizedFromProtocol === "compound") {
+      if (normalizedTo === "compound" || normalizedFrom === "compound") {
         builder.setCompoundMarket(position.tokenAddress as Address);
       }
 
-      // Check if source protocol requires context (Morpho Blue, Euler)
-      const isFromMorpho = normalizedFromProtocol === "morphoblue" || fromProtocol.toLowerCase().includes("morpho");
-      const isFromEuler = normalizedFromProtocol === "euler" || fromProtocol.toLowerCase().includes("euler");
-
-      // For non-Euler sources, use single context; for Euler, we need per-collateral contexts
-      const defaultSourceContext: `0x${string}` = ((isFromMorpho || isFromEuler) && fromContext)
-        ? fromContext as `0x${string}`
-        : "0x";
+      // Detect source protocol type for context handling
+      const isFromMorpho = matchesProtocol(normalizedFrom, fromProtocol, "morphoblue") || matchesProtocol(normalizedFrom, fromProtocol, "morpho");
+      const isFromEuler = matchesProtocol(normalizedFrom, fromProtocol, "euler");
+      const defaultSourceContext = computeDefaultSourceContext(isFromMorpho, isFromEuler, fromContext);
 
       // Build per-collateral source contexts for Euler (each collateral has its own vault)
-      const eulerSourceContextsByCollateral: Record<string, `0x${string}`> = {};
-      if (isFromEuler && preSelectedCollaterals) {
-        // Extract borrow vault from the fromContext (it's the same for all collaterals)
-        // fromContext encodes: (borrowVault, collateralVault, subAccountIndex)
-        for (const preCol of preSelectedCollaterals) {
-          if (preCol.eulerCollateralVault) {
-            // Re-encode with the correct collateral vault and sub-account index for each collateral
-            const perCollateralContext = encodeEulerContext({
-              borrowVault: fromContext ? `0x${fromContext.slice(26, 66)}` : "0x0000000000000000000000000000000000000000",
-              collateralVault: preCol.eulerCollateralVault,
-              subAccountIndex: preCol.eulerSubAccountIndex ?? 0,
-            }) as `0x${string}`;
-            eulerSourceContextsByCollateral[addrKey(preCol.token)] = perCollateralContext;
-            console.log("[Euler Source Context] Built context for", preCol.symbol, "collateralVault:", preCol.eulerCollateralVault, "subAccountIndex:", preCol.eulerSubAccountIndex ?? 0);
-          }
-        }
-      }
+      const eulerSourceContextsMap = isFromEuler
+        ? buildEulerSourceContexts(preSelectedCollaterals, fromContext)
+        : {};
 
       builder.buildUnlockDebt({
         fromProtocol,
@@ -766,11 +957,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         expectedDebt: debtAmount,
         debtDecimals: position.decimals,
         fromContext: defaultSourceContext,
-        flash: {
-          version: providerVersion as any,
-          premiumBps: 9,
-          bufferBps: 10,
-        },
+        flash: { version: providerVersion, premiumBps: 9, bufferBps: 10 },
       });
 
       // Prepare Morpho context if destination is Morpho Blue
@@ -785,34 +972,13 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         console.log("[Euler Debug] selectedEulerVault:", selectedEulerVault);
       }
 
+      // Build collateral move instructions using extracted context helpers
       Object.entries(addedCollaterals).forEach(([addr, amt]) => {
         const meta = collaterals.find(c => addrKey(c.address) === addrKey(addr));
         if (!meta) return;
         const isMax = collateralIsMaxMap[addr] === true;
-
-        // For Euler destination, each collateral needs its own context with the correct collateralVault
-        let toContext: `0x${string}` = morphoEncodedContext || "0x";
-        if (isEulerSelected) {
-          const collateralContext = eulerContextsByCollateral[addrKey(addr)];
-          if (collateralContext) {
-            toContext = encodeEulerContext(collateralContext) as `0x${string}`;
-            console.log("[Euler Debug] Using per-collateral destination context for", meta.symbol, ":", collateralContext);
-          } else {
-            console.warn("[Euler Debug] No destination context found for collateral:", addr, meta.symbol);
-          }
-        }
-
-        // For Euler source, each collateral needs its own source context
-        let fromCtx: `0x${string}` = defaultSourceContext;
-        if (isFromEuler) {
-          const eulerSourceCtx = eulerSourceContextsByCollateral[addrKey(addr)];
-          if (eulerSourceCtx) {
-            fromCtx = eulerSourceCtx;
-            console.log("[Euler Debug] Using per-collateral source context for", meta.symbol);
-          } else {
-            console.warn("[Euler Debug] No source context found for collateral:", addr, meta.symbol);
-          }
-        }
+        const toContext = resolveDestContext(addr, isEulerSelected, eulerContextsByCollateral, morphoEncodedContext, meta.symbol);
+        const fromCtx = resolveSourceCtx(addr, isFromEuler, eulerSourceContextsMap, defaultSourceContext, meta.symbol);
 
         builder.buildMoveCollateral({
           fromProtocol,
@@ -820,19 +986,12 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
           collateralToken: addr as Address,
           withdraw: isMax ? { max: true } : { amount: amt },
           collateralDecimals: meta.decimals,
-          // Pass source context when moving FROM Morpho Blue or Euler
           fromContext: fromCtx,
-          // Pass protocol-specific context when destination requires it (Morpho, Euler)
           toContext,
         });
       });
 
-      // For borrow, use the first Euler context (borrowVault is the same for all collaterals)
-      // or Morpho context if that's the destination
-      const borrowContext: `0x${string}` = isEulerSelected && eulerContext
-        ? encodeEulerContext(eulerContext) as `0x${string}`
-        : morphoEncodedContext || "0x";
-
+      const borrowContext = resolveBorrowContext(isEulerSelected, eulerContext, morphoEncodedContext);
       builder.buildBorrow({
         mode: "coverFlash",
         toProtocol: selectedProtocol,
@@ -840,7 +999,6 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         decimals: position.decimals,
         extraBps: 5,
         approveToRouter: true,
-        // Pass protocol-specific context for borrow
         toContext: borrowContext,
       });
 
@@ -852,66 +1010,20 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         console.log(`[Euler Debug] Instruction ${i}:`, inst.protocolName, inst.data?.slice(0, 66) + "...");
       });
 
-      // Pre-simulate to catch errors before MetaMask (helps with Euler debugging)
-      try {
-        await simulateInstructions(flow, { skipWhenAuthCallsExist: false });
-        console.log("[Refinance] Pre-simulation passed");
-      } catch (simError: any) {
-        console.error("[Refinance] Pre-simulation FAILED:", simError);
-        // Log detailed error for debugging
-        console.error("[Refinance] Simulation error details:", {
-          message: simError?.message,
-          cause: simError?.cause,
-          data: simError?.data,
-        });
-        // Re-throw to show error to user
-        throw simError;
-      }
+      await preSimulateFlow(flow, simulateInstructions);
+      batchingUsed = await executeFlowWithFallback(flow, preferBatching, effectiveRevokePermissions, executeFlowBatchedIfPossible as any);
 
-      const res = await executeFlowBatchedIfPossible(flow, preferBatching, { revokePermissions });
-      batchingUsed = res?.kind === "batch";
-      if (!res) {
-        const fallbackResult = await executeFlowBatchedIfPossible(flow, false, { revokePermissions });
-        batchingUsed = batchingUsed || fallbackResult?.kind === "batch";
-      }
-
-      const txCompleteProps: Record<string, string | number | boolean> = {
-        network: "evm",
-        fromProtocol,
-        toProtocol: selectedProtocol,
-        debtTokenName: position.name,
-        debtTokenAddress: position.tokenAddress,
-        positionType: position.type,
-        preferBatching: Boolean(preferBatching),
-        batchingUsed,
-        status: "success",
+      const successProps = { ...baseProps, batchingUsed, status: "success" };
+      appendOptionalTrackingFields(successProps, optionalFields);
+      track("refinance_tx_complete", successProps);
+    } catch (error) {
+      console.error("Refinance flow error:", error);
+      const errorProps = {
+        ...baseProps, batchingUsed, status: "error",
+        error: error instanceof Error ? error.message : String(error),
       };
-
-      if (chainId !== undefined) txCompleteProps.chainId = chainId;
-      if (selectedProvider) txCompleteProps.selectedProvider = selectedProvider;
-      if (selectedPool) txCompleteProps.selectedPool = selectedPool;
-
-      track("refinance_tx_complete", txCompleteProps);
-    } catch (e: any) {
-      console.error("Refinance flow error:", e);
-      const txCompleteProps: Record<string, string | number | boolean> = {
-        network: "evm",
-        fromProtocol,
-        toProtocol: selectedProtocol,
-        debtTokenName: position.name,
-        debtTokenAddress: position.tokenAddress,
-        positionType: position.type,
-        preferBatching: Boolean(preferBatching),
-        batchingUsed,
-        status: "error",
-        error: e instanceof Error ? e.message : String(e),
-      };
-
-      if (chainId !== undefined) txCompleteProps.chainId = chainId;
-      if (selectedProvider) txCompleteProps.selectedProvider = selectedProvider;
-      if (selectedPool) txCompleteProps.selectedPool = selectedPool;
-
-      track("refinance_tx_complete", txCompleteProps);
+      appendOptionalTrackingFields(errorProps, optionalFields);
+      track("refinance_tx_complete", errorProps);
     } finally {
       setIsSubmitting(false);
     }
@@ -940,10 +1052,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   ]);
 
   // Determine source pool name
-  const sourcePoolName = useMemo(() => {
-    // For EVM, we don't need to exclude source pool by name
-    return null;
-  }, []);
+  // For EVM, we don't need to exclude source pool by name
+  const sourcePoolName = useMemo(() => null, []);
 
   const handleDebtAmountChange = useCallback((value: string) => {
     setDebtAmount(value);
@@ -1006,7 +1116,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       setPreferBatching={setPreferBatching}
       revokePermissions={revokePermissions}
       setRevokePermissions={setRevokePermissions}
-      apiProbes={apiProbes}
+      hasActiveADLOrders={hasActiveADLOrders}
+      apiProbes={null}
       // Morpho-specific props
       isMorphoSelected={isMorphoSelected}
       morphoMarkets={morphoMarketsForSelectedCollateral}
@@ -1023,4 +1134,3 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     />
   );
 };
-

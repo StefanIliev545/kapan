@@ -3,15 +3,18 @@ import Image from "next/image";
 import { DepositModal } from "~~/components/modals/DepositModal";
 import { WithdrawModal } from "~~/components/modals/WithdrawModal";
 import { CollateralSwapModal } from "~~/components/modals/CollateralSwapModal";
+import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
 import { formatUnits, encodeAbiParameters } from "viem";
 import { useAccount } from "wagmi";
 import { FiatBalance } from "~~/components/FiatBalance";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
-import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { formatBps } from "~~/utils/risk";
 import { sanitizeSymbol } from "~~/utils/tokenSymbols";
 import { formatCurrency } from "~~/utils/formatNumber";
+import { useModal } from "~~/hooks/useModal";
+import { useADLContracts } from "~~/hooks/useADLOrder";
 import type { Address } from "viem";
 
 interface CollateralPosition {
@@ -208,6 +211,10 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   const [selectedCollateral, setSelectedCollateral] = useState<CollateralPosition | null>(null);
   const [selectedAction, setSelectedAction] = useState<"deposit" | "withdraw" | "swap" | null>(null);
   const { address: connectedAddress } = useAccount();
+  const adlModal = useModal();
+
+  // Check if ADL is supported on this chain
+  const { isSupported: isADLSupported } = useADLContracts(chainId || 1);
 
   // Use ZERO_ADDRESS when wallet is not connected
   const queryAddress = connectedAddress || "0x0000000000000000000000000000000000000000";
@@ -310,7 +317,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
   // Parse borrow value and price from compound data
   const borrowDetails = useMemo(() => {
     if (!compoundData) {
-      return { borrowBalance: 0, borrowValue: 0 };
+      return { borrowBalance: 0, borrowValue: 0, borrowBalanceRaw: 0n };
     }
 
     // CompoundData returns [supplyRate, borrowRate, balance, borrowBalance, price, priceScale]
@@ -325,7 +332,7 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
     // Calculate USD value of the borrowed amount (price is in 8 decimals)
     const price8 = baseTokenUsdPrice && baseTokenUsdPrice > 0n ? baseTokenUsdPrice : price;
     const borrowUsdValue = borrowBalance * Number(formatUnits(price8, 8));
-    return { borrowBalance, borrowValue: borrowUsdValue };
+    return { borrowBalance, borrowValue: borrowUsdValue, borrowBalanceRaw: borrowBalanceRaw ?? 0n };
   }, [compoundData, baseTokenDecimalsArray, baseTokenUsdPrice]);
 
   // Process collateral data with prices
@@ -630,6 +637,17 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
                   checked={showAll}
                   onChange={toggleShowAll}
                 />
+                {/* ADL Settings Cog - only show if ADL is supported and user has debt */}
+                {isADLSupported && borrowDetails.borrowBalance > 0 && totalCollateralValue > 0 && (
+                  <button
+                    onClick={adlModal.open}
+                    className="text-base-content/50 hover:text-base-content hover:bg-base-200 flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
+                    title="Auto-Deleverage Protection"
+                  >
+                    <Cog6ToothIcon className="size-4" />
+                    <span>Automate</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -709,6 +727,28 @@ export const CompoundCollateralView: FC<CompoundCollateralViewProps> = ({
           chainId={chainId || 1}
           context={compoundMarketContext}
           position={swapPosition}
+        />
+      )}
+
+      {/* ADL Automation Modal */}
+      {borrowDetails.borrowBalance > 0 && (
+        <LTVAutomationModal
+          isOpen={adlModal.isOpen}
+          onClose={adlModal.close}
+          protocolName="compound"
+          chainId={chainId || 1}
+          currentLtvBps={Math.round((borrowDetails.borrowValue / totalCollateralValue) * 10000) || 0}
+          liquidationLtvBps={Number(weightedLltvBps)}
+          collateralTokens={swapAvailableAssets.filter(a => a.balance > 0)}
+          debtToken={{
+            address: baseToken,
+            symbol: baseTokenSymbol || "UNKNOWN",
+            decimals: Number(baseTokenDecimalsArray[0]),
+            balance: borrowDetails.borrowBalanceRaw,
+          }}
+          totalCollateralUsd={BigInt(Math.round(totalCollateralValue * 1e8))}
+          totalDebtUsd={BigInt(Math.round(borrowDetails.borrowValue * 1e8))}
+          compoundMarket={baseToken}
         />
       )}
     </>
