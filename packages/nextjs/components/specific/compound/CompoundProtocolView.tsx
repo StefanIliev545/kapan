@@ -285,6 +285,7 @@ const CompoundMarketRow: FC<CompoundMarketRowProps> = ({
           networkType="evm"
           chainId={chainId}
           protocolContext={compoundContext}
+          position={existingPosition}
         />
       </div>
     );
@@ -372,6 +373,7 @@ const CompoundMarketRow: FC<CompoundMarketRowProps> = ({
                     networkType="evm"
                     chainId={chainId}
                     protocolContext={compoundContext}
+                    position={existingPosition}
                     availableActions={{ deposit: true, withdraw: true, swap: true }}
                     onSwap={() => handleOpenSwap(col)}
                     onDeposit={() => handleOpenDeposit(col)}

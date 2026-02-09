@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useAccount, useSwitchChain } from "wagmi";
 
 import { useBatchingPreference } from "./useBatchingPreference";
@@ -95,10 +95,16 @@ export const useEvmTransactionFlow = ({
     [ensureCorrectChain, buildFlow, executeFlowBatchedIfPossible, batchingPreference.enabled, simulateInstructions, chainSwitchErrorMessage, emptyFlowErrorMessage, simulateWhenBatching, revokePermissions, hasActiveADLOrders],
   );
 
+  // Track isAnyConfirmed transitions to avoid auto-closing on modal reopen.
+  // wagmi's isConfirmed stays true after tx confirms, so we only close when
+  // isAnyConfirmed transitions from false → true (not when it's already true).
+  const prevConfirmedRef = useRef(false);
+
   useEffect(() => {
-    if (isAnyConfirmed && isOpen) {
+    if (isAnyConfirmed && !prevConfirmedRef.current && isOpen) {
       onClose?.();
     }
+    prevConfirmedRef.current = isAnyConfirmed;
   }, [isAnyConfirmed, isOpen, onClose]);
 
   return {

@@ -2,7 +2,7 @@
 
 import { FC, useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useAccount } from "wagmi";
-import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { Cog6ToothIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { BaseProtocolHeader, type HeaderMetric } from "../common";
 import { CollateralLtvBreakdown, type CollateralBreakdownItem } from "../common/UtilizationTooltip";
 import { CollapsibleSection } from "~~/components/common/CollapsibleSection";
@@ -30,6 +30,8 @@ import { EulerBorrowModal } from "~~/components/modals/EulerBorrowModal";
 import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
 import type { SwapAsset } from "~~/components/modals/SwapModalShell";
 import { useADLContracts } from "~~/hooks/useADLOrder";
+import { useActiveADL, formatLtvPercent } from "~~/hooks/useConditionalOrders";
+import type { Address } from "viem";
 import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
 import { useTokenPricesByAddress } from "~~/hooks/useTokenPrice";
 import { getEffectiveChainId } from "~~/utils/forkChain";
@@ -178,6 +180,13 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
   const addCollateralModal = useModal();
   const borrowModal = useModal();
   const adlModal = useModal();
+
+  // ADL highlighting: detect active ADL order for this specific position group
+  const { hasActiveADL, activeADL, triggerLtvBps, targetLtvBps } = useActiveADL({
+    protocolName: "Euler",
+    chainId,
+    eulerBorrowVault: debt?.vault.address as Address | undefined,
+  });
   const [swapState, setSwapState] = useState<CollateralSwapState>(INITIAL_SWAP_STATE);
   const [debtSwapState, setDebtSwapState] = useState<DebtSwapState>(INITIAL_DEBT_SWAP_STATE);
   const [closeState, setCloseState] = useState<CloseModalState>(INITIAL_CLOSE_STATE);
@@ -470,11 +479,21 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
                       e.stopPropagation();
                       adlModal.open();
                     }}
-                    className="text-base-content/50 hover:text-base-content hover:bg-base-200 flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
-                    title="Auto-Deleverage Protection"
+                    className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors ${
+                      hasActiveADL
+                        ? "text-success hover:text-success/80 hover:bg-success/10"
+                        : "text-base-content/50 hover:text-base-content hover:bg-base-200"
+                    }`}
+                    title={
+                      hasActiveADL && triggerLtvBps && targetLtvBps
+                        ? `ADL Active: Triggers at ${formatLtvPercent(triggerLtvBps)} → ${formatLtvPercent(targetLtvBps)}`
+                        : "Auto-Deleverage Protection"
+                    }
+                    type="button"
                   >
-                    <Cog6ToothIcon className="size-3.5" />
+                    {hasActiveADL ? <ShieldCheckIcon className="size-3.5" /> : <Cog6ToothIcon className="size-3.5" />}
                     <span>Automate</span>
+                    {hasActiveADL && <span className="bg-success size-2 rounded-full" />}
                   </button>
                 )}
               </div>
@@ -509,6 +528,9 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
                     protocolContext={context}
                     availableActions={{ deposit: true, withdraw: true, move: true, swap: true }}
                     onSwap={() => handleOpenSwap(col)}
+                    adlActive={
+                      activeADL?.triggerParams?.collateralToken?.toLowerCase() === col.vault.asset.address.toLowerCase()
+                    }
                   />
                 );
               })}
@@ -549,6 +571,9 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
                 availableAssets={allCollateralsForSwap}
                 onSwap={collaterals.length > 0 ? handleOpenDebtSwap : undefined}
                 onClosePosition={collaterals.length > 0 ? handleOpenCloseModal : undefined}
+                adlProtected={
+                  activeADL?.triggerParams?.debtToken?.toLowerCase() === debt.vault.asset.address.toLowerCase()
+                }
               />
             );
           })()

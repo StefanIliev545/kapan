@@ -86,10 +86,14 @@ export function useConditionalOrderEvents() {
       queryClient.invalidateQueries({ queryKey: ["conditionalOrders"] });
 
       // Refresh positions - the order execution changed the user's position
+      // Protocol-specific query keys (Morpho, Euler use custom keys)
       queryClient.invalidateQueries({ queryKey: qk.morpho.all(chainId) });
       queryClient.invalidateQueries({ queryKey: qk.euler.all(chainId) });
       queryClient.invalidateQueries({ queryKey: qk.positions(chainId, userAddress) });
       queryClient.invalidateQueries({ queryKey: qk.balances(chainId, userAddress) });
+      // Aave, Compound, Venus use wagmi's readContract queries — invalidate those too
+      queryClient.invalidateQueries({ queryKey: ["readContract"] });
+      queryClient.invalidateQueries({ queryKey: ["readContracts"] });
     },
     [queryClient, chainId, userAddress],
   );
