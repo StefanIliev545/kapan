@@ -170,6 +170,9 @@ export interface BuildConditionalOrderResult {
  */
 export function getProtocolId(protocolName: string): Hex {
   const normalized = protocolName.toLowerCase();
+  if (normalized.includes("venus")) {
+    return keccak256(toHex("venus")).slice(0, 10) as Hex;
+  }
   if (normalized.includes("aave")) {
     return keccak256(toHex("aave-v3")).slice(0, 10) as Hex;
   }

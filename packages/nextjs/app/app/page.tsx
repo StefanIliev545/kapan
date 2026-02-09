@@ -102,6 +102,11 @@ const App: NextPage = () => {
   const { viewingAddress: starknetAddress } = useStarknetAccount();
   const lastSeenAddresses = useRef<{ evm?: string; starknet?: string }>({});
 
+  // Settling period: after a reset, show loading state for a minimum duration
+  // to prevent cascading partial totals from jumping around as protocols report one by one.
+  const [isSettling, setIsSettling] = useState(false);
+  const settlingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Tiny helper so the button click never feels blocked
   const handleNetworkChange = useCallback((id: string) => {
     startTransition(() => setSelectedNetwork(id));
@@ -140,9 +145,22 @@ const App: NextPage = () => {
 
   // Reset totals on network switch or wallet address change.
   // Uses expectedCount=0 since we no longer gate on exact count — just track loadedProtocolCount > 0.
-  useEffect(() => {
+  // The settling period prevents cascading partial totals from flashing while protocols report one by one.
+  const startSettlingPeriod = useCallback(() => {
     resetTotals(0);
-  }, [resetTotals, selectedNetwork]);
+    setIsSettling(true);
+    if (settlingTimerRef.current) clearTimeout(settlingTimerRef.current);
+    settlingTimerRef.current = setTimeout(() => setIsSettling(false), 800);
+  }, [resetTotals]);
+
+  // Cleanup settling timer on unmount
+  useEffect(() => () => {
+    if (settlingTimerRef.current) clearTimeout(settlingTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    startSettlingPeriod();
+  }, [startSettlingPeriod, selectedNetwork]);
 
   useEffect(() => {
     const nextEvm = evmAddress ?? "";
@@ -155,8 +173,8 @@ const App: NextPage = () => {
 
     if (!nextEvm && !nextStarknet) return;
 
-    resetTotals(0);
-  }, [evmAddress, starknetAddress, resetTotals]);
+    startSettlingPeriod();
+  }, [evmAddress, starknetAddress, startSettlingPeriod]);
 
   return (
     <DashboardLayout>
@@ -172,7 +190,7 @@ const App: NextPage = () => {
                 netWorth={totalNet}
                 totalSupply={totalSupplied}
                 totalDebt={totalBorrowed}
-                isLoading={loadedProtocolCount === 0}
+                isLoading={isSettling || loadedProtocolCount === 0}
               />
             </div>
           </div>
@@ -190,7 +208,7 @@ const App: NextPage = () => {
               netWorth={totalNet}
               totalSupply={totalSupplied}
               totalDebt={totalBorrowed}
-              isLoading={loadedProtocolCount === 0}
+              isLoading={isSettling || loadedProtocolCount === 0}
             />
           </div>
         </div>

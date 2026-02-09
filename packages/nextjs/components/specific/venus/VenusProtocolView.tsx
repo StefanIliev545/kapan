@@ -435,6 +435,7 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
                       protocolName="Venus"
                       networkType="evm"
                       chainId={chainId}
+                      position={borrowPosition}
                       adlActive={
                         activeADL?.triggerParams?.collateralToken?.toLowerCase() === pos.tokenAddress.toLowerCase()
                       }

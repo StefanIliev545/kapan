@@ -468,6 +468,7 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, c
                       protocolName={protocolName}
                       networkType="evm"
                       chainId={chainId}
+                      position={borrowPosition}
                       adlActive={
                         activeADL?.triggerParams?.collateralToken?.toLowerCase() === pos.tokenAddress.toLowerCase()
                       }
