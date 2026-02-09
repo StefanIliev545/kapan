@@ -76,7 +76,8 @@
     "jscpd": "^4.0.5",
     "knip": "^5.80.2",
     "lint-staged": "~13.2.2",
-    "oxlint": "^1.38.0"
+    "oxlint": "^1.38.0",
+    "typescript": "^5.7.0"
   },
   "packageManager": "yarn@3.2.3",
   "engines": {
