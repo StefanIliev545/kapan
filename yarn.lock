@@ -6731,7 +6731,6 @@ __metadata:
     postgres: ^3.4.8
     prettier: ~3.3.3
     qrcode.react: ~4.0.1
-    qs: ^6.13.1
     react: ^19.2.1
     react-dom: ^19.2.1
     sonner: ^2.0.7
@@ -21846,7 +21845,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"qs@npm:^6.13.1, qs@npm:^6.9.4":
+"qs@npm:^6.9.4":
   version: 6.14.0
   resolution: "qs@npm:6.14.0"
   dependencies:
