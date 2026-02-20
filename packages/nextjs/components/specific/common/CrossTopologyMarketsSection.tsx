@@ -18,6 +18,8 @@ import {
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { TokenIcon } from "~~/components/common/TokenDisplay";
+import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
+import { isPTToken } from "~~/hooks/usePendlePTYields";
 import { formatPercent } from "../utils";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import type { ReserveConfig } from "~~/hooks/usePredictiveLtv";
@@ -71,12 +73,19 @@ const baseColumns = [
   columnHelper.accessor("symbol", {
     id: "market",
     header: "Market",
-    cell: info => (
-      <div className="flex items-center gap-2">
-        <TokenIcon symbol={info.row.original.symbol} customSize={24} />
-        <span className="font-medium">{info.getValue()}</span>
-      </div>
-    ),
+    cell: info => {
+      const symbol = info.getValue();
+      return (
+        <div className="flex items-center gap-2">
+          <TokenIcon symbol={info.row.original.symbol} customSize={24} />
+          {isPTToken(symbol) ? (
+            <TokenSymbolDisplay symbol={symbol} size="sm" variant="inline" />
+          ) : (
+            <span className="font-medium">{symbol}</span>
+          )}
+        </div>
+      );
+    },
     sortingFn: "alphanumeric",
   }),
   columnHelper.accessor("supplyApy", {
@@ -307,7 +316,11 @@ export const CrossTopologyMarketsSection: FC<CrossTopologyMarketsSectionProps> =
             <div className="flex items-center gap-2">
               <TokenIcon symbol={row.symbol} customSize={24} />
               <div className="min-w-0 flex-1">
-                <span className="font-medium">{row.symbol}</span>
+                {isPTToken(row.symbol) ? (
+                  <TokenSymbolDisplay symbol={row.symbol} size="sm" variant="inline" />
+                ) : (
+                  <span className="font-medium">{row.symbol}</span>
+                )}
               </div>
               <div className="flex items-center gap-3 text-[11px]">
                 <span className={`font-mono tabular-nums ${row.supplyApy > 0 ? "text-success" : "text-base-content/30"}`}>

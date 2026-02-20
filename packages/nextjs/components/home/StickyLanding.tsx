@@ -120,7 +120,6 @@ const protocols = [
   { name: "Vesu", logo: "/logos/vesu.svg" },
   { name: "Nostra", logo: "/logos/nostra.svg" },
   { name: "Venus", logo: "/logos/venus.svg" },
-  { name: "ZeroLend", logo: "/logos/zerolend.svg" },
 ];
 
 // Duplicate for seamless loop
@@ -218,7 +217,6 @@ const supportedProtocols = [
   { name: "Vesu", logo: "/logos/vesu.svg" },
   { name: "Nostra", logo: "/logos/nostra.svg" },
   { name: "Venus", logo: "/logos/venus.svg" },
-  { name: "ZeroLend", logo: "/logos/zerolend.svg" },
 ];
 
 // Aggregators & integrations
@@ -441,8 +439,8 @@ const HowItWorks = () => {
       { name: "1inch", logo: "/logos/1inch.png", angle: 135 },
       { name: "Pendle", logo: "/logos/pendle.png", angle: 180 },
       { name: "Venus", logo: "/logos/venus.svg", angle: 225 },
-      { name: "ZeroLend", logo: "/logos/zerolend.svg", angle: 270 },
-      { name: "Nostra", logo: "/logos/nostra.svg", angle: 315 },
+      { name: "Nostra", logo: "/logos/nostra.svg", angle: 270 },
+      { name: "Euler", logo: "/logos/euler.svg", angle: 315 },
     ];
 
     return protocols.map((protocol, i) => {

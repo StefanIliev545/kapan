@@ -135,15 +135,18 @@ function getGatewayConfig(chainId: number) {
 
 // ============ GraphQL Queries ============
 
-const WHITELISTED_MARKETS_QUERY = `
-  query WhitelistedMarkets($chainId: Int!, $first: Int!) {
+// NOTE: Morpho API migrated from "whitelisted" to "listed" (dynamic listing via vaults).
+// A market is listed as soon as a listed vault includes it.
+// See: https://docs.morpho.org/tools/offchain/api/get-started/
+const LISTED_MARKETS_QUERY = `
+  query ListedMarkets($chainId: Int!, $first: Int!) {
     markets(
       first: $first
       orderBy: SupplyAssetsUsd
       orderDirection: Desc
       where: {
         chainId_in: [$chainId]
-        whitelisted: true
+        listed: true
       }
     ) {
       items {
@@ -284,7 +287,7 @@ async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        query: WHITELISTED_MARKETS_QUERY,
+        query: LISTED_MARKETS_QUERY,
         variables: { chainId, first: 500 },
       }),
       next: { revalidate: 60 },
@@ -394,7 +397,7 @@ async function fetchOnChainPositions(
 
 // ============ Main Handler Helpers ============
 
-/** Build a combined market lookup from whitelisted markets and user GraphQL positions. */
+/** Build a combined market lookup from listed markets and user GraphQL positions. */
 function buildMarketLookup(
   markets: MorphoMarket[],
   graphQLPositions: MorphoPosition[],
@@ -483,7 +486,7 @@ export async function GET(
     ]);
 
     if (debug) {
-      console.log(`[positions-onchain] Fetched ${markets.length} whitelisted markets, ${graphQLPositions.length} GraphQL positions`);
+      console.log(`[positions-onchain] Fetched ${markets.length} listed markets, ${graphQLPositions.length} GraphQL positions`);
     }
 
     const marketByKey = buildMarketLookup(markets, graphQLPositions);

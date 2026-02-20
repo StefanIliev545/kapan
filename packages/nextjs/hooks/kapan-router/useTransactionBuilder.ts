@@ -363,7 +363,7 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
     // to reduce the flash loan principal so that (principal + fee) fits within our supply balance.
     // Balancer V2/V3 have no fees, so we can flash the full amount.
     // Aave-compatible providers have fees, need special handling for max withdrawals
-    const needsFeeSplit = isMax && (flashLoanProvider === FlashLoanProvider.Aave || flashLoanProvider === FlashLoanProvider.ZeroLend);
+    const needsFeeSplit = isMax && flashLoanProvider === FlashLoanProvider.Aave;
 
     if (needsFeeSplit) {
       // AAVE WITH FEE HANDLING using Split

@@ -32,8 +32,10 @@ export function isCowChainSupported(chainId: number): boolean {
 
 /**
  * Morpho GraphQL API endpoint
+ * Migrated from blue-api.morpho.org to api.morpho.org per Morpho docs.
+ * See: https://docs.morpho.org/tools/offchain/api/get-started/
  */
-export const MORPHO_GRAPHQL_API = "https://blue-api.morpho.org/graphql";
+export const MORPHO_GRAPHQL_API = "https://api.morpho.org/graphql";
 
 /**
  * Check if a chain is supported by Morpho

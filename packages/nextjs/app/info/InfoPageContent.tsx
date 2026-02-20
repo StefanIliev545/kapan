@@ -121,7 +121,6 @@ const protocols = [
   { name: "Morpho", logo: "/logos/morpho.svg" },
   { name: "Compound", logo: "/logos/compound.svg" },
   { name: "Venus", logo: "/logos/venus.svg" },
-  { name: "ZeroLend", logo: "/logos/zerolend.svg" },
   { name: "Vesu", logo: "/logos/vesu.svg" },
   { name: "Nostra", logo: "/logos/nostra.svg" },
 ];

@@ -3,9 +3,12 @@ import { useMemo } from "react";
 import { Address } from "viem";
 
 /**
- * DeFi Llama Yields API for Liquid Staking Token yields
+ * DeFi Llama Yields API for Liquid Staking Token and Staked Stablecoin yields
  *
- * Fetches native staking yields for LSTs like wstETH, rETH, weETH, etc.
+ * Fetches native staking/savings yields for:
+ * - ETH LSTs: wstETH, rETH, weETH, etc.
+ * - Staked stablecoins: sUSDe, sUSDS, sUSDai, sDAI, scrvUSD, sFRAX
+ *
  * These yields are additive with lending protocol rates.
  */
 
@@ -19,8 +22,9 @@ const LST_REFETCH_INTERVAL_MS = 10 * 60 * 1000; // Refetch every 10 minutes
 // Minimum TVL to filter out low-liquidity pools (in USD)
 const MIN_LST_TVL_USD = 1_000_000;
 
-// Native LST protocol projects on DeFi Llama (not lending protocols)
+// Native LST/staked stablecoin protocol projects on DeFi Llama (not lending protocols)
 const LST_PROJECTS = new Set([
+  // ETH LSTs
   "lido",
   "rocket-pool",
   "ether.fi-stake",
@@ -36,12 +40,19 @@ const LST_PROJECTS = new Set([
   "ankr",
   "origin-ether",
   "dinero-(pirex-eth)",
+  // Staked stablecoins
+  "sky-lending",    // sUSDS / sUSDai (Sky savings rate)
+  "ethena-usde",    // sUSDe (Ethena staked USDe)
+  "sdai",           // sDAI (Spark DAI savings rate)
+  "crvusd",         // scrvUSD (Curve staked crvUSD)
+  "frax",           // sFRAX (Frax staked FRAX)
 ]);
 
 // Symbol to canonical symbol mapping (handles variations)
 const SYMBOL_ALIASES: Record<string, string> = {
+  // ETH LSTs
   steth: "steth",
-  wsteth: "wsteth",
+  wsteth: "steth",   // wstETH is wrapped stETH — same Lido staking yield
   reth: "reth",
   cbeth: "cbeth",
   weeth: "weeth",
@@ -58,9 +69,16 @@ const SYMBOL_ALIASES: Record<string, string> = {
   oeth: "oeth",
   apxeth: "apxeth",
   pxeth: "pxeth",
+  // Staked stablecoins
+  susde: "susde",
+  susds: "susds",
+  susdai: "susds",   // sUSDai on Arbitrum is the same Sky savings yield as sUSDS
+  sdai: "sdai",
+  sfrax: "sfrax",
+  scrvusd: "scrvusd",
 };
 
-// Known LST token addresses by chain
+// Known LST/staked stablecoin token addresses by chain
 const LST_ADDRESSES: Record<number, Record<string, Address>> = {
   1: { // Ethereum
     steth: "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
@@ -77,6 +95,12 @@ const LST_ADDRESSES: Record<number, Record<string, Address>> = {
     meth: "0xd5F7838F5C461fefF7FE49ea5ebaF7728bB0ADfa",
     wbeth: "0xa2E3356610840701BDf5611a53974510Ae27E2e1",
     oeth: "0x856c4Efb76C1D1AE02e20CEB03A2A6a08b0b8dC3",
+    // Staked stablecoins
+    susde: "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
+    susds: "0xa3931d71877C0E7a3148CB7Eb4463524FEc27fbD",
+    sdai: "0x83F20F44975D03b1b09e64809B757c47f942BEeA",
+    sfrax: "0xA663B02CF0a4b149d2aD41910CB81e23e1c41c32",
+    scrvusd: "0x0655977FEb2f289A4aB78af67BAB0d17aAb84367",
   },
   42161: { // Arbitrum
     wsteth: "0x5979D7b546E38E414F7E9822514be443A4800529",
@@ -85,6 +109,11 @@ const LST_ADDRESSES: Record<number, Record<string, Address>> = {
     rseth: "0x4186BFC76E2E237523CBC30FD220FE055156b41F",
     ezeth: "0x2416092f143378750bb29b79eD961ab195CcEea5",
     wbeth: "0xa067C0F38A6a6D703f37C6F71f7C0F6254CC8a49",
+    // Staked stablecoins
+    susde: "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2",
+    susds: "0x6491c05A82219b8D1479057361ff1654749b0f6d",
+    // sUSDai on Arbitrum — same Sky savings yield as sUSDS, mapped via SYMBOL_ALIASES
+    susdai: "0x0B2b2B2016FF58b441c057528BD29b0eAe5D2D48",
   },
   10: { // Optimism
     wsteth: "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb",
@@ -96,6 +125,8 @@ const LST_ADDRESSES: Record<number, Record<string, Address>> = {
     cbeth: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",
     weeth: "0x04C0599Ae5A44757c0af6F9eC3b93da8976c150A",
     ezeth: "0x2416092f143378750bb29b79eD961ab195CcEea5",
+    // Staked stablecoins
+    susds: "0x5875eEE11Cf8398102FdAd704C9E96607675467a",
   },
   59144: { // Linea
     wsteth: "0xB5beDd42000b71FddE22D3eE8a79Bd49A568fC8F",
@@ -237,10 +268,17 @@ export function useLSTYields(enabled = true) {
       map.set(y.address.toLowerCase(), y);
       // Map all chain-specific addresses (Arbitrum, Optimism, etc.) to the same yield
       const normalizedSymbol = normalizeLSTSymbol(y.symbol);
+      // Collect all symbols that resolve to this normalized symbol (handles aliases like susdai→susds)
+      const matchingKeys = new Set<string>([normalizedSymbol]);
+      for (const [alias, target] of Object.entries(SYMBOL_ALIASES)) {
+        if (target === normalizedSymbol) matchingKeys.add(alias);
+      }
       for (const chainAddresses of Object.values(LST_ADDRESSES)) {
-        const addr = chainAddresses[normalizedSymbol];
-        if (addr) {
-          map.set(addr.toLowerCase(), y);
+        for (const key of matchingKeys) {
+          const addr = chainAddresses[key];
+          if (addr) {
+            map.set(addr.toLowerCase(), y);
+          }
         }
       }
     });
@@ -254,6 +292,10 @@ export function useLSTYields(enabled = true) {
       map.set(normalized, y);
       // Also add the original symbol
       map.set(y.symbol.toLowerCase(), y);
+      // Map all aliases that resolve to this symbol (e.g., susdai→susds)
+      for (const [alias, target] of Object.entries(SYMBOL_ALIASES)) {
+        if (target === normalized) map.set(alias, y);
+      }
     });
     return map;
   }, [query.data]);

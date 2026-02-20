@@ -499,6 +499,7 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, c
               />
             ) : (
               <div className="space-y-4">
+                {positionsToolbar}
                 <p className="text-base-content/40 py-4 text-center text-sm">
                   No active positions
                 </p>

@@ -1,7 +1,6 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { formatUnits } from "viem";
-import { base, linea } from "viem/chains";
 import { useAccount, useSwitchChain } from "wagmi";
 import { ArrowRightIcon, CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { SegmentedActionBar } from "../common/SegmentedActionBar";
@@ -62,14 +61,12 @@ export const MoveSupplyModal: FC<MoveSupplyModalProps> = ({
     protocol.toLowerCase().replace(/\s+/g, "").replace(/v\d+/i, "");
 
   // Filter and sort protocols (exclude current)
-  const isZerolendSupported = useMemo(() => chainId === base.id || chainId === linea.id, [chainId]);
-
   const protocols = useMemo(() =>
     rates
       ?.filter(rate => normalizeProtocolName(rate.protocol) !== normalizeProtocolName(fromProtocol))
-      .filter(rate => (normalizeProtocolName(rate.protocol) === "zerolend" ? isZerolendSupported : true))
+      .filter(rate => normalizeProtocolName(rate.protocol) !== "zerolend")
       .sort((a, b) => b.supplyRate - a.supplyRate) || [],
-    [rates, fromProtocol, isZerolendSupported]
+    [rates, fromProtocol]
   );
 
   // Auto-select best protocol

@@ -119,10 +119,7 @@ function calculateQuoteAmount(
         ? selectedFrom.rawBalance
         : parseUnits(amountIn || "0", decimals);
 
-    const isAaveWithMax = isMax && (
-        providerEnum === FlashLoanProvider.Aave ||
-        providerEnum === FlashLoanProvider.ZeroLend
-    );
+    const isAaveWithMax = isMax && providerEnum === FlashLoanProvider.Aave;
 
     if (!isAaveWithMax || baseAmount === 0n) {
         return baseAmount.toString();
@@ -449,11 +446,11 @@ function buildBaseMarketInstructions(
 }
 
 /**
- * Calculates the flash loan withdraw amount, adding a fee buffer for Aave/ZeroLend providers.
+ * Calculates the flash loan withdraw amount, adding a fee buffer for Aave providers.
  * Balancer V2/V3 has no fee, so no buffer needed.
  */
 function calculateWithdrawAmount(amountInBigInt: bigint, providerEnum: FlashLoanProvider): bigint {
-    const isAaveFlashLoan = providerEnum === FlashLoanProvider.Aave || providerEnum === FlashLoanProvider.ZeroLend;
+    const isAaveFlashLoan = providerEnum === FlashLoanProvider.Aave;
     return isAaveFlashLoan
         ? amountInBigInt + (amountInBigInt / 1000n)
         : amountInBigInt;

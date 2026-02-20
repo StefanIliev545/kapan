@@ -42,11 +42,6 @@ const NostraProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Nostra" /> }
 );
 
-const ZeroLendProtocolView = dynamic(
-  () => import("~~/components/specific/zerolend/ZeroLendProtocolView").then(m => m.ZeroLendProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading ZeroLend" /> }
-);
-
 const MorphoProtocolView = dynamic(
   () => import("~~/components/specific/morpho/MorphoProtocolView").then(m => m.MorphoProtocolView),
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Morpho" /> }
@@ -84,7 +79,7 @@ const networkOptions: NetworkOption[] = [
 ];
 
 // All protocol views now call setProtocolTotals() to report to the global portfolio balance.
-// Reporters: Wallet, Morpho, Euler, Compound, Nostra, Vesu, AaveFork (Aave/Spark/ZeroLend), Venus.
+// Reporters: Wallet, Morpho, Euler, Compound, Nostra, Vesu, AaveFork (Aave/Spark), Venus.
 
 // Static feature flags for protocol views (extracted for referential stability)
 const ENABLED_FEATURES_SWAP_AND_MOVE = { swap: true, move: true } as const;
@@ -282,9 +277,6 @@ const App: NextPage = () => {
                 <EulerProtocolView chainId={base.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <ZeroLendProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
@@ -352,9 +344,6 @@ const App: NextPage = () => {
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={linea.id} /></StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <AaveProtocolView chainId={linea.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <ZeroLendProtocolView chainId={linea.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <EulerProtocolView chainId={linea.id} />

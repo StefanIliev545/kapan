@@ -77,7 +77,6 @@ export const formatProtocolName = (protocolId: string): string => {
     aave: "Aave V3",
     compound: "Compound V3",
     venus: "Venus",
-    zerolend: "ZeroLend",
     spark: "Spark",
     morpho: "Morpho Blue",
     vesu: "Vesu",

@@ -7,7 +7,6 @@ export type GatewayContractName =
   | "AaveGatewayView"
   | "CompoundGatewayView"
   | "VenusGatewayView"
-  | "ZeroLendGatewayView"
   | "SparkGatewayView";
 
 /**
@@ -19,7 +18,6 @@ export const PROTOCOL_TO_GATEWAY_MAP: Record<string, GatewayContractName> = {
   aave: "AaveGatewayView",
   compound: "CompoundGatewayView",
   venus: "VenusGatewayView",
-  zerolend: "ZeroLendGatewayView",
   spark: "SparkGatewayView",
 };
 

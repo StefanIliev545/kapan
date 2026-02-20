@@ -97,14 +97,6 @@ const MORPHO_AVAILABLE = new Set([
   130,   // Unichain (different address: 0x8f5ae9CddB9f68de460C77730b018Ae7E04a140A)
 ]);
 
-// ZeroLend (from 04_deploy_zero_lend_gateway_write.ts MAP)
-// Note: Mainnet LRT market has frozen reserves as of Jan 2026, so excluded
-const ZEROLEND_AVAILABLE = new Set([
-  // 1,  // Mainnet (LRT market) - FROZEN, all reserves paused
-  59144, // Linea
-  8453,  // Base
-]);
-
 // ==================== DESTINATION PROTOCOL AVAILABILITY ====================
 // IMPORTANT: Keep in sync with packages/hardhat/deploy/v2/ gateway deploy scripts
 
@@ -139,7 +131,6 @@ export const FLASH_LOAN_FEES_BPS = {
   BalancerV3: 0,
   Morpho: 0,
   Aave: 5,       // 0.05%
-  ZeroLend: 5,   // 0.05% (Aave fork)
   UniswapV3: 30, // ~0.3% varies by pool
 } as const;
 
@@ -236,11 +227,6 @@ export function isBalancerV3Supported(chainId: number | undefined): boolean {
 export function isMorphoSupported(chainId: number | undefined): boolean {
   if (chainId === undefined) return false;
   return MORPHO_AVAILABLE.has(chainId);
-}
-
-export function isZeroLendSupported(chainId: number | undefined): boolean {
-  if (chainId === undefined) return false;
-  return ZEROLEND_AVAILABLE.has(chainId);
 }
 
 // ==================== DESTINATION PROTOCOLS ====================
