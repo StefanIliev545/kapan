@@ -20,7 +20,10 @@ import { useVesuV2Assets } from "~~/hooks/useVesuV2Assets";
 import { arbitrum, base, linea, optimism } from "wagmi/chains";
 import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates } from "~~/utils/protocols";
 import formatPercentage from "~~/utils/formatPercentage";
+import { useExternalYields } from "~~/hooks/useExternalYields";
 import { aaveRateToAPY, venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
+import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
+import { isPTToken } from "~~/hooks/usePendlePTYields";
 
 const TOKEN_ALIASES: Record<string, string> = {
   usdt: "USDT",
@@ -32,14 +35,15 @@ const TOKEN_ALIASES: Record<string, string> = {
 const canonicalizeTokenName = (name: string) => TOKEN_ALIASES[name.toLowerCase()] || name;
 
 const AAVE_CHAIN_IDS = [arbitrum.id, base.id, optimism.id, linea.id];
-const ZEROLEND_CHAIN_IDS = [base.id, linea.id];
 
 const useAaveLikeData = (
-  contractName: "AaveGatewayView" | "ZeroLendGatewayView",
+  contractName: "AaveGatewayView",
   protocol: MarketData["protocol"],
   chainIds: number[],
 ): MarketData[] => {
   const { address: connectedAddress } = useAccount();
+  // External yields (LST staking yields, etc.) — chain-independent for LSTs
+  const { getEffectiveSupplyRate } = useExternalYields();
 
   const arbInfo = useDeployedContractInfo({ contractName: contractName as any, chainId: arbitrum.id as any });
   const baseInfo = useDeployedContractInfo({ contractName: contractName as any, chainId: base.id as any });
@@ -88,10 +92,12 @@ const useAaveLikeData = (
       const chainId = contracts[index]?.chainId;
       const network = (chainId && CHAIN_ID_TO_NETWORK[chainId]) || "arbitrum";
       return (result.result as any[]).map(token => {
-        const supplyAPY = aaveRateToAPY(token.supplyRate);
+        const protocolSupplyAPY = aaveRateToAPY(token.supplyRate);
         const borrowAPY = aaveRateToAPY(token.borrowRate);
+        // Apply external yields (LST staking yields, PT fixed yields, etc.)
+        const supplyAPY = getEffectiveSupplyRate(token.token, token.symbol, protocolSupplyAPY);
         const price = Number(formatUnits(token.price, 8));
-        const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
+        const utilization = borrowAPY > 0 ? (protocolSupplyAPY / borrowAPY) * 100 : 0;
         return {
           icon: tokenNameToLogo(token.symbol),
           name: token.symbol,
@@ -106,7 +112,7 @@ const useAaveLikeData = (
         } as MarketData;
       });
     });
-  }, [contracts, protocol, results]);
+  }, [contracts, protocol, results, getEffectiveSupplyRate]);
 };
 
 const useNostraData = (): MarketData[] => {
@@ -172,6 +178,9 @@ const useNostraData = (): MarketData[] => {
 };
 
 const useVenusData = (): MarketData[] => {
+  // External yields (LST staking yields, etc.) — chain-independent for LSTs
+  const { getEffectiveSupplyRate } = useExternalYields();
+
   const venusArbMarkets = useEvmReadContract({
     contractName: "VenusGatewayView",
     functionName: "getAllVenusMarkets",
@@ -211,10 +220,12 @@ const useVenusData = (): MarketData[] => {
 
       tokens.forEach((token: string, i: number) => {
         if (token === "0x0000000000000000000000000000000000000000") return;
-        const supplyAPY = venusRateToAPY(supplyRates[i]);
+        const protocolSupplyAPY = venusRateToAPY(supplyRates[i]);
         const borrowAPY = venusRateToAPY(borrowRates[i]);
+        // Apply external yields (LST staking yields, PT fixed yields, etc.)
+        const supplyAPY = getEffectiveSupplyRate(token, symbols[i], protocolSupplyAPY);
         const price = Number(formatUnits(prices[i], 18 + (18 - decimals[i])));
-        const utilization = borrowAPY > 0 ? (supplyAPY / borrowAPY) * 100 : 0;
+        const utilization = borrowAPY > 0 ? (protocolSupplyAPY / borrowAPY) * 100 : 0;
         aggregated.push({
           icon: tokenNameToLogo(symbols[i]),
           name: symbols[i],
@@ -231,7 +242,7 @@ const useVenusData = (): MarketData[] => {
     });
 
     return aggregated;
-  }, [venusArbMarkets.data, venusArbRates.data, venusBaseMarkets.data, venusBaseRates.data]);
+  }, [venusArbMarkets.data, venusArbRates.data, venusBaseMarkets.data, venusBaseRates.data, getEffectiveSupplyRate]);
 };
 
 const VESU_V1_POOL_CONFIGS = [
@@ -356,7 +367,6 @@ const useVesuData = (): MarketData[] => {
 
 export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   const aave = useAaveLikeData("AaveGatewayView", "aave", AAVE_CHAIN_IDS);
-  const zerolend = useAaveLikeData("ZeroLendGatewayView", "zerolend", ZEROLEND_CHAIN_IDS);
   const compoundArbitrum = useCompoundMarketData({ chainId: arbitrum.id });
   const compoundBase = useCompoundMarketData({ chainId: base.id });
   const compoundOptimism = useCompoundMarketData({ chainId: optimism.id });
@@ -371,8 +381,8 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   const [sortBy, setSortBy] = useState<"supply" | "borrow">("supply");
 
   const all = useMemo(
-    () => [...aave, ...zerolend, ...compound, ...nostra, ...venus, ...vesu],
-    [aave, zerolend, compound, nostra, venus, vesu],
+    () => [...aave, ...compound, ...nostra, ...venus, ...vesu],
+    [aave, compound, nostra, venus, vesu],
   );
 
   const groups = useMemo(() => {
@@ -459,7 +469,6 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     venus: "/logos/venus.svg",
     vesu: "/logos/vesu.svg",
     compound: "/logos/compound.svg",
-    zerolend: "/logos/zerolend.svg",
   };
 
   const networkNames: Record<MarketData["network"], string> = {
@@ -476,7 +485,6 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     venus: "Venus",
     vesu: "Vesu",
     compound: "Compound",
-    zerolend: "ZeroLend",
   };
 
   return (
@@ -530,7 +538,11 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
                     <div className="bg-base-200/60 ring-base-300/30 relative size-10 rounded-xl p-1.5 shadow-sm ring-1">
                       <Image src={group.icon} alt={group.name} fill className="rounded-lg object-contain" />
                     </div>
-                    <span className="text-lg font-bold tracking-tight">{group.name}</span>
+                    {isPTToken(group.name) ? (
+                      <TokenSymbolDisplay symbol={group.name} size="base" variant="inline" />
+                    ) : (
+                      <span className="text-lg font-bold tracking-tight">{group.name}</span>
+                    )}
                   </div>
 
                   {/* Rates */}

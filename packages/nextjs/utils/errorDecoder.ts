@@ -58,8 +58,6 @@ const KNOWN_ERRORS: Record<string, string> = {
   "0x882f8103": "UnsupportedFlashLoanProvider - flash loan provider not supported",
   "0x3e6ad70a": "UniswapV3RequiresPoolAddress - Uniswap V3 flash loan requires pool address",
   "0xabd2d467": "AavePoolNotRegistered - Aave pool address not configured",
-  "0xd6fd6fc3": "ZeroLendPoolNotRegistered - ZeroLend pool address not configured",
-
   // ========================================================================
   // Morpho Gateway Errors
   // ========================================================================

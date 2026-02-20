@@ -3,12 +3,14 @@ import { MORPHO_GRAPHQL_API } from "~~/utils/constants";
 
 // Optimized query with server-side filtering support
 // Key filters: utilization_lte, supplyAssetsUsd_gte reduce junk at API level
+// NOTE: Morpho API migrated from "whitelisted" to "listed" (dynamic listing via vaults).
+// See: https://docs.morpho.org/tools/offchain/api/get-started/
 const QUERY_MARKETS = `
   query Markets(
-    $first: Int, 
-    $skip: Int, 
-    $chainId: Int!, 
-    $whitelisted: Boolean,
+    $first: Int,
+    $skip: Int,
+    $chainId: Int!,
+    $listed: Boolean,
     $utilizationMax: Float,
     $minSupplyUsd: Float,
     $search: String
@@ -18,9 +20,9 @@ const QUERY_MARKETS = `
       skip: $skip
       orderBy: SupplyAssetsUsd
       orderDirection: Desc
-      where: { 
+      where: {
         chainId_in: [$chainId]
-        whitelisted: $whitelisted
+        listed: $listed
         utilization_lte: $utilizationMax
         supplyAssetsUsd_gte: $minSupplyUsd
         search: $search
@@ -29,7 +31,7 @@ const QUERY_MARKETS = `
       items {
         id
         uniqueKey
-        whitelisted
+        listed
         warnings {
           type
           level
@@ -37,7 +39,7 @@ const QUERY_MARKETS = `
         supplyingVaults {
           address
           name
-          whitelisted
+          listed
           state {
             totalAssetsUsd
           }
@@ -89,9 +91,9 @@ const normalizeUtilization = (val: any): number => {
   return n > 1.5 ? n / 100 : n;
 };
 
-// Check for suspicious "G" tokens (like GMORPHO) that aren't whitelisted
+// Check for suspicious "G" tokens (like GMORPHO) that aren't listed
 const isSuspiciousGToken = (m: MarketItem): boolean => {
-  if (m?.whitelisted) return false; // Whitelisted tokens are safe
+  if (m?.listed) return false; // Listed tokens are safe
   
   const loanSym = (m?.loanAsset?.symbol || "").toUpperCase();
   const collSym = (m?.collateralAsset?.symbol || "").toUpperCase();
@@ -105,16 +107,16 @@ const isSuspiciousGToken = (m: MarketItem): boolean => {
 
 // Trust Logic - relaxed when searching
 const isMarketTrusted = (m: MarketItem, isSearching: boolean): boolean => {
-  // 1. DAO Whitelisted (Always Safe)
-  if (m.whitelisted === true || m.whitelisted === "true" || m.whitelisted === 1) return true;
+  // 1. Listed by Morpho (dynamically listed when a listed vault includes the market)
+  if (m.listed === true || m.listed === "true" || m.listed === 1) return true;
 
   // 2. Vault Trusted (Curated)
-  // We check if a Whitelisted Vault has >$10k in it.
+  // We check if a Listed Vault has >$10k in it.
   const hasTrustedVault = Array.isArray(m.supplyingVaults) && m.supplyingVaults.some(
     (v: any) => {
-      const vaultWhitelisted = v.whitelisted === true || v.whitelisted === "true" || v.whitelisted === 1;
+      const vaultListed = v.listed === true || v.listed === "true" || v.listed === 1;
       const vaultAssets = safeFloat(v.state?.totalAssetsUsd);
-      return vaultWhitelisted && vaultAssets > 10_000;
+      return vaultListed && vaultAssets > 10_000;
     }
   );
   if (hasTrustedVault) return true;
@@ -167,7 +169,9 @@ const parseRequestParams = (chainId: string, sp: URLSearchParams): RequestParams
     hideSaturated,
     debug: sp.get("debug") === "true",
     targetCount: isSearching ? 100 : Math.min(parseInt(sp.get("first") || "500", 10), 500),
-    serverMinSupplyUsd: isSearching ? 100 : 1000,
+    // Low server-side floor to avoid hiding freshly listed markets with little supply yet.
+    // Client-side minLiquidity handles stricter filtering.
+    serverMinSupplyUsd: isSearching ? 0 : 100,
     serverMaxUtilization: hideSaturated ? 0.995 : 0.9999,
     minLiquidity: safeFloat(sp.get("minLiq") || sp.get("minLiquidityUsd") || "1000"),
   };
@@ -186,7 +190,7 @@ const fetchMarketsBatch = async (
   skip: number,
   first: number,
   params: RequestParams,
-  whitelisted?: boolean,
+  listed?: boolean,
   searchTerm?: string,
 ): Promise<BatchResult> => {
   const variables: Record<string, any> = {
@@ -197,8 +201,8 @@ const fetchMarketsBatch = async (
     minSupplyUsd: params.serverMinSupplyUsd,
   };
 
-  if (whitelisted !== undefined) {
-    variables.whitelisted = whitelisted;
+  if (listed !== undefined) {
+    variables.listed = listed;
   }
   if (searchTerm) {
     variables.search = searchTerm;
@@ -208,7 +212,7 @@ const fetchMarketsBatch = async (
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query: QUERY_MARKETS, variables }),
-    next: { revalidate: whitelisted ? 120 : 60 },
+    next: { revalidate: listed ? 120 : 60 },
   });
 
   const data = await res.json();
@@ -237,7 +241,11 @@ const hasCriticalWarning = (m: MarketItem): boolean => {
 
 /** Apply client-side quality filters after server-side filtering. */
 const passesClientFilters = (m: MarketItem, params: RequestParams): boolean => {
-  if (safeFloat(m.state?.liquidityAssetsUsd) < params.minLiquidity) return false;
+  // Listed markets get a lower liquidity floor since Morpho's listing logic
+  // already provides curation (market must be in a listed vault).
+  const isListed = m.listed === true || m.listed === "true";
+  const effectiveMinLiquidity = isListed ? Math.min(params.minLiquidity, 100) : params.minLiquidity;
+  if (safeFloat(m.state?.liquidityAssetsUsd) < effectiveMinLiquidity) return false;
 
   const maxApy = params.isSearching ? 50.0 : 10.0;
   if (safeFloat(m.state?.supplyApy) > maxApy || safeFloat(m.state?.borrowApy) > maxApy) return false;
@@ -259,21 +267,21 @@ const MAX_PAGES = 10;
 interface FetchCategoryOpts {
   params: RequestParams;
   allMarkets: Map<string, MarketItem>;
-  whitelisted: boolean;
-  /** If true, apply trust check for non-whitelisted markets */
+  listed: boolean;
+  /** If true, apply trust check for non-listed markets */
   requireTrust: boolean;
 }
 
 /** Paginate through a market category, applying filters and optional trust checks. */
 const fetchMarketCategory = async ({
-  params, allMarkets, whitelisted, requireTrust,
+  params, allMarkets, listed, requireTrust,
 }: FetchCategoryOpts): Promise<void> => {
   let skip = 0;
   let hasMore = true;
   const searchTerm = params.isSearching ? params.search : undefined;
 
   while (hasMore && skip < PAGE_SIZE * MAX_PAGES && allMarkets.size < params.targetCount) {
-    const batch = await fetchMarketsBatch(skip, PAGE_SIZE, params, whitelisted, searchTerm);
+    const batch = await fetchMarketsBatch(skip, PAGE_SIZE, params, listed, searchTerm);
 
     for (const m of batch.items) {
       if (allMarkets.has(m.uniqueKey)) continue;
@@ -298,10 +306,10 @@ const searchRelevanceScore = (m: MarketItem, searchLower: string): number => {
   return 2;
 };
 
-/** Sort markets: whitelisted first, then by search relevance, then by liquidity. */
+/** Sort markets: listed first, then by search relevance, then by liquidity. */
 const sortMarkets = (markets: MarketItem[], params: RequestParams): MarketItem[] => {
   return markets.sort((a, b) => {
-    const wlDiff = (b.whitelisted ? 1 : 0) - (a.whitelisted ? 1 : 0);
+    const wlDiff = (b.listed ? 1 : 0) - (a.listed ? 1 : 0);
     if (wlDiff !== 0) return wlDiff;
 
     if (params.isSearching) {
@@ -328,24 +336,24 @@ export async function GET(
   const allMarkets = new Map<string, MarketItem>();
 
   try {
-    // 1. Fetch whitelisted markets (highest quality)
+    // 1. Fetch listed markets (dynamically listed via Morpho vaults)
     if (reqParams.curationMode === "curated" || reqParams.curationMode === "all") {
       await fetchMarketCategory({
         params: reqParams,
         allMarkets,
-        whitelisted: true,
+        listed: true,
         requireTrust: false,
       });
-      if (reqParams.debug) console.log(`[Morpho] Whitelisted: ${allMarkets.size} markets`);
+      if (reqParams.debug) console.log(`[Morpho] Listed: ${allMarkets.size} markets`);
     }
 
-    // 2. Fetch additional markets (vault-trusted, Pendle, etc.) if needed
+    // 2. Fetch additional non-listed markets (Pendle, searched tokens, etc.) if needed
     const needMoreMarkets = reqParams.curationMode === "curated" && allMarkets.size < reqParams.targetCount;
     if (needMoreMarkets || reqParams.curationMode === "all") {
       await fetchMarketCategory({
         params: reqParams,
         allMarkets,
-        whitelisted: false,
+        listed: false,
         requireTrust: reqParams.curationMode !== "all",
       });
       if (reqParams.debug) console.log(`[Morpho] Total after discovery: ${allMarkets.size} markets`);

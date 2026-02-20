@@ -944,7 +944,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
     }
 
     const providerEnum = selectedProvider?.providerEnum ?? FlashLoanProvider.BalancerV2;
-    const isAave = providerEnum === FlashLoanProvider.Aave || providerEnum === FlashLoanProvider.ZeroLend;
+    const isAave = providerEnum === FlashLoanProvider.Aave;
     const swapMinAmountOut = isAave
       ? repayAmountRaw + (repayAmountRaw * AAVE_FLASH_LOAN_FEE_BPS) / 10000n
       : repayAmountRaw;

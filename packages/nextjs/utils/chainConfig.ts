@@ -289,14 +289,6 @@ const MORPHO_SUPPORTED: Set<number> = new Set([
 ]);
 
 /**
- * Chains where ZeroLend is available
- */
-const ZEROLEND_SUPPORTED: Set<number> = new Set([
-  CHAIN_IDS.LINEA,
-  CHAIN_IDS.BASE,
-]);
-
-/**
  * Chains where Spark is available
  */
 const SPARK_SUPPORTED: Set<number> = new Set([CHAIN_IDS.MAINNET]);
@@ -353,11 +345,6 @@ export function isMorphoSupported(chainId: number | undefined): boolean {
   return MORPHO_SUPPORTED.has(chainId);
 }
 
-export function isZeroLendSupported(chainId: number | undefined): boolean {
-  if (chainId === undefined) return false;
-  return ZEROLEND_SUPPORTED.has(chainId);
-}
-
 export function isSparkSupported(chainId: number | undefined): boolean {
   if (chainId === undefined) return false;
   return SPARK_SUPPORTED.has(chainId);
@@ -408,7 +395,6 @@ export const FLASH_LOAN_FEES_BPS = {
   BalancerV3: 0,
   Morpho: 0,
   Aave: 5,       // 0.05%
-  ZeroLend: 5,   // 0.05% (Aave fork)
   UniswapV3: 30, // ~0.3% varies by pool
 } as const;
 

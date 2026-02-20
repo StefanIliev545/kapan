@@ -78,7 +78,7 @@ export type UseMovePositionDataResult = {
   vesuPools?: VesuPoolsData;
 };
 
-import { isZeroLendSupported, isVenusSupported, isMorphoBlueSupported, isSparkSupported, isEulerSupported } from "~~/utils/chainFeatures";
+import { isVenusSupported, isMorphoBlueSupported, isSparkSupported, isEulerSupported } from "~~/utils/chainFeatures";
 import { getAvailableFlashLoanProviders, FlashLoanProvider, type FlashLoanProviderOption } from "~~/utils/flashLoan";
 
 export function useMovePositionData(params: MovePositionInput): UseMovePositionDataResult {
@@ -132,9 +132,6 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
       }
       if (isMorphoBlueSupported(chainId)) {
         protocols.push({ name: "Morpho Blue", logo: getProtocolLogo("Morpho Blue") });
-      }
-      if (isZeroLendSupported(chainId)) {
-        protocols.push({ name: "ZeroLend", logo: getProtocolLogo("ZeroLend") });
       }
       if (isVenusSupported(chainId)) {
         protocols.push({ name: "Venus", logo: getProtocolLogo("Venus") });

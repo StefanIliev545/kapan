@@ -11,7 +11,6 @@ import { useRiskParams } from "./useRiskParams";
  */
 export type ViewGatewayContractName =
   | "AaveGatewayView"
-  | "ZeroLendGatewayView"
   | "SparkGatewayView"
   | "CompoundGatewayView"
   | "VenusGatewayView";
@@ -22,7 +21,6 @@ export type ViewGatewayContractName =
  */
 export type WriteGatewayContractName =
   | "AaveGatewayWrite"
-  | "ZeroLendGatewayWrite"
   | "SparkGatewayWrite"
   | "CompoundGatewayWrite"
   | "VenusGatewayWrite";
@@ -131,7 +129,6 @@ export function useGatewayWithRiskParams(
  */
 export const VIEW_TO_WRITE_GATEWAY: Record<ViewGatewayContractName, WriteGatewayContractName> = {
   AaveGatewayView: "AaveGatewayWrite",
-  ZeroLendGatewayView: "ZeroLendGatewayWrite",
   SparkGatewayView: "SparkGatewayWrite",
   CompoundGatewayView: "CompoundGatewayWrite",
   VenusGatewayView: "VenusGatewayWrite",

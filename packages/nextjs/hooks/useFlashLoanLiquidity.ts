@@ -27,7 +27,6 @@ const ROUTER_ABI = parseAbi([
 
 // Keys used in KapanRouter for aaveCompatiblePools mapping
 const AAVE_POOL_KEY = keccak256(toHex("aave"));
-const ZEROLEND_POOL_KEY = keccak256(toHex("zerolend"));
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,11 +125,10 @@ export const useFlashLoanLiquidity = (
         setIsLoading(true);
         try {
             // 1. Get Provider Addresses from Router
-            const [balancerV2Addr, balancerV3Addr, aaveV3PoolAddr, zeroLendPoolAddr, morphoBlueAddr] = await Promise.all([
+            const [balancerV2Addr, balancerV3Addr, aaveV3PoolAddr, morphoBlueAddr] = await Promise.all([
                 publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "balancerV2Vault" }).catch(() => ZERO_ADDRESS),
                 publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "balancerV3Vault" }).catch(() => ZERO_ADDRESS),
                 publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "aaveCompatiblePools", args: [AAVE_POOL_KEY] }).catch(() => ZERO_ADDRESS),
-                publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "aaveCompatiblePools", args: [ZEROLEND_POOL_KEY] }).catch(() => ZERO_ADDRESS),
                 publicClient.readContract({ address: routerInfo.address, abi: ROUTER_ABI, functionName: "morphoBlue" }).catch(() => ZERO_ADDRESS),
             ]);
 
@@ -156,12 +154,7 @@ export const useFlashLoanLiquidity = (
                 results.push(await checkAaveCompatibleLiquidity(publicClient, token, aaveV3PoolAddr, FlashLoanProvider.Aave, amount));
             }
 
-            // 5. Check ZeroLend (Aave fork)
-            if (isValidProviderAddress(zeroLendPoolAddr)) {
-                results.push(await checkAaveCompatibleLiquidity(publicClient, token, zeroLendPoolAddr, FlashLoanProvider.ZeroLend, amount));
-            }
-
-            // 6. Check Morpho Blue
+            // 5. Check Morpho Blue
             if (isValidProviderAddress(morphoBlueAddr)) {
                 const morpho = await checkBalanceBasedLiquidity(publicClient, token, morphoBlueAddr, FlashLoanProvider.Morpho, amount);
                 results.push(morpho.result);

@@ -24,7 +24,7 @@ export { sortMarketsByLiquidityDesc };
  * @param options.search - Search term to filter markets
  * @param options.first - Max number of markets to fetch (default: 2000)
  * @param options.curation - Curation mode (default: "curated")
- * @param options.minLiquidityUsd - Minimum liquidity in USD (default: "10000")
+ * @param options.minLiquidityUsd - Minimum liquidity in USD (default: "1000")
  * @param options.hideSaturated - Hide saturated markets (default: true)
  */
 export async function fetchMorphoMarkets(
@@ -41,7 +41,7 @@ export async function fetchMorphoMarkets(
     const params = new URLSearchParams({
       first: String(options?.first ?? 2000),
       curation: options?.curation ?? "curated",
-      minLiquidityUsd: options?.minLiquidityUsd ?? "10000",
+      minLiquidityUsd: options?.minLiquidityUsd ?? "1000",
       hideSaturated: String(options?.hideSaturated ?? true),
     });
 

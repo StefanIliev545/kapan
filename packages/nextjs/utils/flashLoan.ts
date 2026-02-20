@@ -16,7 +16,6 @@ import {
   isBalancerV3Supported,
   isAaveV3Supported,
   isMorphoSupported,
-  isZeroLendSupported,
   FLASH_LOAN_FEES_BPS,
 } from "~~/utils/chainFeatures";
 
@@ -30,7 +29,7 @@ export { FlashLoanProvider };
  * Note: "v1" is used for Starknet Vesu flash loans which have a different mechanism
  * than EVM flash loans. It's included here for type compatibility.
  */
-export type FlashLoanVersion = "v1" | "v2" | "v3" | "aave" | "zerolend" | "morpho";
+export type FlashLoanVersion = "v1" | "v2" | "v3" | "aave" | "morpho";
 
 /**
  * Flash loan provider option for UI components.
@@ -82,13 +81,6 @@ export const ALL_FLASH_LOAN_PROVIDERS: FlashLoanProviderOption[] = [
     providerEnum: FlashLoanProvider.Aave,
     feeBps: FLASH_LOAN_FEES_BPS.Aave,
   },
-  {
-    name: "ZeroLend",
-    version: "zerolend",
-    icon: "/logos/zerolend.svg",
-    providerEnum: FlashLoanProvider.ZeroLend,
-    feeBps: FLASH_LOAN_FEES_BPS.ZeroLend,
-  },
 ];
 
 /**
@@ -100,7 +92,6 @@ export const FLASH_LOAN_PRIORITY: FlashLoanProvider[] = [
   FlashLoanProvider.Morpho,      // 0% fee
   FlashLoanProvider.BalancerV3,  // 0% fee
   FlashLoanProvider.Aave,        // 0.05% fee
-  FlashLoanProvider.ZeroLend,    // 0.05% fee (Aave fork)
 ];
 
 /**
@@ -128,10 +119,6 @@ export function getAvailableFlashLoanProviders(chainId: number | undefined): Fla
   if (isAaveV3Supported(chainId)) {
     providers.push(ALL_FLASH_LOAN_PROVIDERS[3]); // Aave
   }
-  if (isZeroLendSupported(chainId)) {
-    providers.push(ALL_FLASH_LOAN_PROVIDERS[4]); // ZeroLend
-  }
-
   return providers;
 }
 
@@ -188,8 +175,6 @@ export function versionToProviderEnum(version: FlashLoanVersion | string): Flash
   switch (version) {
     case "aave":
       return FlashLoanProvider.Aave;
-    case "zerolend":
-      return FlashLoanProvider.ZeroLend;
     case "morpho":
       return FlashLoanProvider.Morpho;
     case "v3":
@@ -216,8 +201,6 @@ export function getFlashLoanFeeBps(providerEnum: FlashLoanProvider): number {
       return FLASH_LOAN_FEES_BPS.Morpho;
     case FlashLoanProvider.Aave:
       return FLASH_LOAN_FEES_BPS.Aave;
-    case FlashLoanProvider.ZeroLend:
-      return FLASH_LOAN_FEES_BPS.ZeroLend;
     case FlashLoanProvider.UniswapV3:
       return FLASH_LOAN_FEES_BPS.UniswapV3;
     default:
