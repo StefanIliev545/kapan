@@ -1022,6 +1022,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       setSlippage={setSlippage}
       swapRouter={swapRouter}
       setSwapRouter={setSwapRouter}
+      kyberAvailable={kyberAvailable}
       oneInchAvailable={oneInchAvailable}
       pendleAvailable={pendleAvailable}
       flashLoanProviders={flashLoanProviders}
@@ -1125,6 +1126,7 @@ interface DebtSwapRightPanelProps {
   setSlippage: (s: number) => void;
   swapRouter: SwapRouter;
   setSwapRouter: (r: SwapRouter) => void;
+  kyberAvailable: boolean;
   oneInchAvailable: boolean;
   pendleAvailable: boolean;
   flashLoanProviders?: FlashLoanProviderOption[];
@@ -1157,6 +1159,7 @@ function DebtSwapRightPanel(props: DebtSwapRightPanelProps): ReactNode {
     setSlippage,
     swapRouter,
     setSwapRouter,
+    kyberAvailable,
     oneInchAvailable,
     pendleAvailable,
     flashLoanProviders,
@@ -1203,7 +1206,7 @@ function DebtSwapRightPanel(props: DebtSwapRightPanelProps): ReactNode {
                 ))}
               </select>
             </div>
-            {oneInchAvailable && pendleAvailable && (
+            {[kyberAvailable, oneInchAvailable, pendleAvailable].filter(Boolean).length >= 2 && (
               <div className="flex items-center justify-between">
                 <span className="text-base-content/50">Router</span>
                 <select
@@ -1211,8 +1214,9 @@ function DebtSwapRightPanel(props: DebtSwapRightPanelProps): ReactNode {
                   value={swapRouter}
                   onChange={(e) => setSwapRouter(e.target.value as SwapRouter)}
                 >
-                  <option value="1inch">1inch</option>
-                  <option value="pendle">Pendle</option>
+                  {kyberAvailable && <option value="kyber">Kyber</option>}
+                  {oneInchAvailable && <option value="1inch">1inch</option>}
+                  {pendleAvailable && <option value="pendle">Pendle</option>}
                 </select>
               </div>
             )}

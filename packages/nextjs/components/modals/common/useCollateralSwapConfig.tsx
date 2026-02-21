@@ -1822,7 +1822,7 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                                     ))}
                                 </select>
                             </div>
-                            {oneInchAvailable && pendleAvailable && (
+                            {[kyberAvailable, oneInchAvailable, pendleAvailable].filter(Boolean).length >= 2 && (
                                 <div className="flex items-center justify-between">
                                     <span className="text-base-content/50">Router</span>
                                     <select
@@ -1830,8 +1830,9 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                                         value={swapRouter}
                                         onChange={(e) => setSwapRouter(e.target.value as SwapRouter)}
                                     >
-                                        <option value="1inch">1inch</option>
-                                        <option value="pendle">Pendle</option>
+                                        {kyberAvailable && <option value="kyber">Kyber</option>}
+                                        {oneInchAvailable && <option value="1inch">1inch</option>}
+                                        {pendleAvailable && <option value="pendle">Pendle</option>}
                                     </select>
                                 </div>
                             )}

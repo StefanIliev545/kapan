@@ -19,9 +19,12 @@ import {
 } from "~~/hooks/useConditionalOrders";
 import { useConditionalOrderEvents } from "~~/hooks/useConditionalOrderEvents";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
-import { ShieldCheckIcon, ArrowTrendingUpIcon, ArrowsRightLeftIcon, QuestionMarkCircleIcon, ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
+import { ShieldCheckIcon, ArrowTrendingUpIcon, ArrowsRightLeftIcon, ArrowsUpDownIcon, QuestionMarkCircleIcon, ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import { type KapanProtocol } from "~~/utils/cow/appData";
 import { getCowExplorerAddressUrl } from "~~/utils/cow/addresses";
+import { useBridgeHistory } from "~~/hooks/useBridgeHistory";
+import { type BridgeHistoryEntry } from "~~/utils/bridgeHistory";
+import { getChainName } from "~~/utils/chainConfig";
 
 // ============ Limit Price Trigger Decoding ============
 
@@ -348,13 +351,23 @@ export function PendingOrdersDrawer() {
     return info?.symbol ?? truncateAddress(address);
   }, [tokenInfoMap]);
 
-  // Don't render anything if not connected or no contract available
-  if (!isAvailable || !userAddress) {
+  // Bridge history (localStorage-backed, polls LI.FI status API)
+  const { bridges, pendingCount: bridgePendingCount } = useBridgeHistory();
+
+  // Don't render anything if not connected
+  if (!userAddress) {
     return null;
   }
 
-  // Show button if we have orders OR if a new order was just created
-  const showButton = conditionalOrders.length > 0 || hasPendingNew;
+  // Show drawer if we have conditional orders OR bridges
+  const hasAnyContent = isAvailable || bridges.length > 0;
+  if (!hasAnyContent) {
+    return null;
+  }
+
+  // Show button if we have orders, bridges, or a new order was just created
+  const showButton = conditionalOrders.length > 0 || hasPendingNew || bridges.length > 0;
+  const totalActiveCount = activeCount + bridgePendingCount;
 
   return (
     <>
@@ -368,8 +381,8 @@ export function PendingOrdersDrawer() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
           <span className="font-medium">Orders</span>
-          {activeCount > 0 && (
-            <span className="bg-primary-content text-primary rounded px-1.5 py-0.5 text-xs font-bold">{activeCount}</span>
+          {totalActiveCount > 0 && (
+            <span className="bg-primary-content text-primary rounded px-1.5 py-0.5 text-xs font-bold">{totalActiveCount}</span>
           )}
         </button>
       )}
@@ -434,11 +447,11 @@ export function PendingOrdersDrawer() {
               <div className="flex items-center justify-center py-16">
                 <span className="loading loading-spinner loading-md"></span>
               </div>
-            ) : conditionalOrders.length === 0 ? (
+            ) : conditionalOrders.length === 0 && bridges.length === 0 ? (
               <div className="text-base-content/50 py-16 text-center">
                 <p className="text-sm">No orders yet</p>
               </div>
-            ) : filteredOrders.length === 0 ? (
+            ) : filteredOrders.length === 0 && bridges.length === 0 ? (
               <div className="text-base-content/50 py-16 text-center">
                 <p className="text-sm">No orders for this protocol</p>
                 {hasOlderOrders && (
@@ -520,14 +533,34 @@ export function PendingOrdersDrawer() {
                     )}
                   </>
                 )}
+
+                {/* Bridges section */}
+                {bridges.length > 0 && (
+                  <>
+                    <div className="border-base-300 bg-base-100 sticky top-0 border-y px-4 py-2">
+                      <span className="text-base-content/60 text-xs font-bold uppercase tracking-tight">
+                        <ArrowsUpDownIcon className="mr-1 inline size-3" />
+                        Bridges
+                      </span>
+                    </div>
+                    {bridges.slice(0, 8).map(bridge => renderBridgeItem(bridge))}
+                  </>
+                )}
               </div>
             )}
           </div>
 
           {/* Footer */}
-          {recentOrders.length > 0 && (
+          {(recentOrders.length > 0 || bridges.length > 0) && (
             <div className="border-base-200 text-base-content/40 flex items-center justify-between border-t px-4 py-2 text-xs">
-              <span>{activeCount} active{hasOlderOrders ? ` · ${conditionalOrders.length - recentOrders.length} older` : ''}</span>
+              <span>
+                {activeCount > 0 ? `${activeCount} active` : ''}
+                {activeCount > 0 && bridgePendingCount > 0 ? ' · ' : ''}
+                {bridgePendingCount > 0 ? `${bridgePendingCount} pending bridge${bridgePendingCount !== 1 ? 's' : ''}` : ''}
+                {(activeCount > 0 || bridgePendingCount > 0) && hasOlderOrders ? ' · ' : ''}
+                {hasOlderOrders ? `${conditionalOrders.length - recentOrders.length} older` : ''}
+                {activeCount === 0 && bridgePendingCount === 0 && !hasOlderOrders ? `${bridges.length} bridge${bridges.length !== 1 ? 's' : ''}` : ''}
+              </span>
               <div className="flex items-center gap-3">
                 {cowExplorerUrl && (
                   <a href={cowExplorerUrl} target="_blank" rel="noopener noreferrer" className="text-base-content/40 hover:text-primary flex items-center gap-1 transition-colors">
@@ -553,6 +586,106 @@ export function PendingOrdersDrawer() {
     if (limitPriceTriggerAddress && triggerAddr === limitPriceTriggerAddress) return "limit";
     if (ltvTriggerAddress && triggerAddr === ltvTriggerAddress) return "adl";
     return "unknown";
+  }
+
+  // Helper function to render a bridge item
+  function renderBridgeItem(bridge: BridgeHistoryEntry) {
+    const isPending = bridge.status === "pending";
+    const isDone = bridge.status === "done";
+    const fromChain = getChainName(bridge.fromChainId);
+    const toChain = getChainName(bridge.toChainId);
+    const capitalize = (s: string | undefined) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "?";
+
+    return (
+      <div key={bridge.routeId} className={`hover:bg-base-50 px-4 py-3 transition-colors ${!isPending ? 'opacity-60' : ''}`}>
+        {/* Row 0: Bridge badge + Status */}
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="bg-accent/20 text-accent flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium">
+            <ArrowsUpDownIcon className="size-3" />
+            Bridge
+          </span>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+            isPending ? 'bg-warning/20 text-warning' : isDone ? 'bg-success/20 text-success' : 'bg-error/20 text-error'
+          }`}>
+            {isPending ? 'Pending' : isDone ? 'Done' : 'Failed'}
+          </span>
+        </div>
+
+        {/* Row 1: Token pair + chains + time */}
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center -space-x-1">
+              {/* Use <img> for LI.FI logos (arbitrary external hosts not in next/image allowlist) with tokenNameToLogo fallback */}
+              <img
+                src={bridge.fromTokenLogoURI || tokenNameToLogo(bridge.fromTokenSymbol)}
+                alt={bridge.fromTokenSymbol}
+                width={24}
+                height={24}
+                className="ring-base-100 size-6 rounded-full ring-2"
+                onError={e => { (e.target as HTMLImageElement).src = tokenNameToLogo(bridge.fromTokenSymbol); }}
+              />
+              <img
+                src={bridge.toTokenLogoURI || tokenNameToLogo(bridge.toTokenSymbol)}
+                alt={bridge.toTokenSymbol}
+                width={24}
+                height={24}
+                className="ring-base-100 size-6 rounded-full ring-2"
+                onError={e => { (e.target as HTMLImageElement).src = tokenNameToLogo(bridge.toTokenSymbol); }}
+              />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">{bridge.fromTokenSymbol} → {bridge.toTokenSymbol}</span>
+              <span className="text-base-content/40 text-[10px]">{capitalize(fromChain)} → {capitalize(toChain)}</span>
+            </div>
+          </div>
+          <span className="text-base-content/40 text-xs">{timeAgo(Math.floor(bridge.createdAt / 1000), true)}</span>
+        </div>
+
+        {/* Row 2: Amount details */}
+        <div className="bg-base-200/50 mb-2 rounded-lg p-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-base-content/60">Sent</span>
+            <span className="font-medium">
+              {bridge.fromAmount} {bridge.fromTokenSymbol}
+              {bridge.fromAmountUSD && <span className="text-base-content/40 ml-1">(${bridge.fromAmountUSD})</span>}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-base-content/60">{isDone ? "Received" : "Expected"}</span>
+            <span className="font-medium">
+              {bridge.toAmount} {bridge.toTokenSymbol}
+              {bridge.toAmountUSD && <span className="text-base-content/40 ml-1">(${bridge.toAmountUSD})</span>}
+            </span>
+          </div>
+        </div>
+
+        {/* Row 3: Tx links */}
+        <div className="flex items-center gap-3 text-xs">
+          {bridge.sendingTxLink ? (
+            <a href={bridge.sendingTxLink} target="_blank" rel="noopener noreferrer" className="text-base-content/40 hover:text-primary flex items-center gap-0.5 transition-colors">
+              <ArrowTopRightOnSquareIcon className="size-3" />
+              Source tx
+            </a>
+          ) : isPending ? (
+            <span className="text-base-content/30 flex items-center gap-1">
+              <span className="loading loading-spinner loading-xs"></span>
+              Waiting...
+            </span>
+          ) : null}
+          {bridge.receivingTxLink ? (
+            <a href={bridge.receivingTxLink} target="_blank" rel="noopener noreferrer" className="text-base-content/40 hover:text-primary flex items-center gap-0.5 transition-colors">
+              <ArrowTopRightOnSquareIcon className="size-3" />
+              Dest tx
+            </a>
+          ) : isPending && bridge.sendingTxHash ? (
+            <span className="text-base-content/30 flex items-center gap-1">
+              <span className="loading loading-spinner loading-xs"></span>
+              Bridging...
+            </span>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   // Helper function to render an order item

@@ -32,9 +32,14 @@ export const qk = {
   morpho: {
     // Base key for all morpho queries on a chain
     all: (chainId: number) => ["morpho", chainId] as const,
-    // Markets list (optionally filtered by search)
-    markets: (chainId: number, search?: string) =>
-      search ? (["morpho", chainId, "markets", search] as const) : (["morpho", chainId, "markets"] as const),
+    // Markets list (optionally filtered by search and low-liquidity toggle)
+    markets: (chainId: number, search?: string, opts?: { showLowLiquidity?: boolean }) => {
+      const base = search
+        ? (["morpho", chainId, "markets", search] as const)
+        : (["morpho", chainId, "markets"] as const);
+      // Separate cache entry when showing low-liquidity markets
+      return opts?.showLowLiquidity ? ([...base, "low-liq"] as const) : base;
+    },
     // User positions
     positions: (chainId: number, userAddress?: string) =>
       ["morpho", chainId, "positions", userAddress?.toLowerCase() ?? ""] as const,
@@ -44,6 +49,12 @@ export const qk = {
     collateralSwapMarkets: (chainId: number) => ["morpho", chainId, "collateral-swap-markets"] as const,
     // Debt swap markets
     debtSwapMarkets: (chainId: number) => ["morpho", chainId, "debt-swap-markets"] as const,
+  },
+
+  // Bridges
+  bridges: {
+    history: (wallet?: string) => ["bridges", "history", wallet?.toLowerCase() ?? ""] as const,
+    statusPoll: (routeIds: string[]) => ["bridges", "status-poll", ...routeIds] as const,
   },
 
   // Euler V2

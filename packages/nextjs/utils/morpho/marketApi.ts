@@ -26,6 +26,7 @@ export { sortMarketsByLiquidityDesc };
  * @param options.curation - Curation mode (default: "curated")
  * @param options.minLiquidityUsd - Minimum liquidity in USD (default: "1000")
  * @param options.hideSaturated - Hide saturated markets (default: true)
+ * @param options.showLowLiquidity - Show markets with low/zero liquidity (default: false)
  */
 export async function fetchMorphoMarkets(
   chainId: number,
@@ -35,6 +36,7 @@ export async function fetchMorphoMarkets(
     curation?: string;
     minLiquidityUsd?: string;
     hideSaturated?: boolean;
+    showLowLiquidity?: boolean;
   }
 ): Promise<MorphoMarket[]> {
   try {
@@ -47,6 +49,12 @@ export async function fetchMorphoMarkets(
 
     if (options?.search?.trim()) {
       params.set("search", options.search.trim());
+    }
+
+    if (options?.showLowLiquidity) {
+      params.set("showLowLiquidity", "true");
+      params.set("minLiquidityUsd", "0");
+      params.set("hideSaturated", "false");
     }
 
     const response = await fetch(`/api/morpho/${chainId}/markets?${params.toString()}`);

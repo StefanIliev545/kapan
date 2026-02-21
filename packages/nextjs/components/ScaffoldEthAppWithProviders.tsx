@@ -34,6 +34,7 @@ import { StarknetWalletAnalytics } from "~~/components/StarknetWalletAnalytics";
 import { usePathname } from "next/navigation";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
+import { useBridgeTracking } from "~~/hooks/useBridgeTracking";
 import { BlockNumberProvider } from "~~/hooks/scaffold-eth";
 import { StarkBlockNumberProvider } from "~~/hooks/scaffold-stark";
 import { appChains } from "~~/services/web3/connectors";
@@ -62,6 +63,7 @@ const ScaffoldEthApp = ({
   initialHost?: string | null;
 }) => {
   useInitializeNativeCurrencyPrice();
+  useBridgeTracking();
   const pathname = usePathname();
   const [hostname, setHostname] = useState<string | null>(initialHost ?? null);
 

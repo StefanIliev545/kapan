@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { formatUnits } from "viem";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
@@ -364,37 +364,41 @@ export function useMorphoLendingPositions(
 
 // ============ Markets-only Hook (for market selection UI) ============
 
-export function useMorphoMarkets(chainId: number, search?: string) {
+export function useMorphoMarkets(chainId: number, search?: string, showLowLiquidity?: boolean) {
   // Normalize search: empty string or undefined both mean no search
   const normalizedSearch = search?.trim() || undefined;
-  
+
   const {
     data: markets = [],
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: qk.morpho.markets(chainId, normalizedSearch),
+    queryKey: qk.morpho.markets(chainId, normalizedSearch, { showLowLiquidity }),
     queryFn: () => {
-      logger.debug("[useMorphoMarkets] Fetching markets with search:", normalizedSearch || "(none)");
-      return fetchMorphoMarketsApi(chainId, { search: normalizedSearch });
+      logger.debug("[useMorphoMarkets] Fetching markets with search:", normalizedSearch || "(none)", "lowLiq:", showLowLiquidity);
+      return fetchMorphoMarketsApi(chainId, { search: normalizedSearch, showLowLiquidity });
     },
     staleTime: 30_000, // Reduced from 60s to 30s for search responsiveness
     refetchOnWindowFocus: false,
     enabled: chainId > 0,
+    // Keep previous markets visible while fetching new data (e.g. toggling low-liquidity)
+    placeholderData: keepPreviousData,
     // Use select so sorting does not rerun unnecessarily
     select: (ms) => sortMarketsByLiquidityDesc(ms),
   });
 
   // Filter to only markets with both collateral and loan assets
   // Keep original conditions, but preserve the sorted order
+  // When showLowLiquidity is on, relax the supplyAssets check (markets may have zero supply)
   const validMarkets = useMemo(() => {
     return markets.filter(
-      (m) => m.collateralAsset && m.loanAsset && 
-        // Check either supplyAssets or supplyAssetsUsd (API may return one or both)
-        ((m.state.supplyAssets ?? 0) > 0 || (m.state.supplyAssetsUsd ?? 0) > 0)
+      (m) => m.collateralAsset && m.loanAsset &&
+        (showLowLiquidity ||
+          // Check either supplyAssets or supplyAssetsUsd (API may return one or both)
+          ((m.state.supplyAssets ?? 0) > 0 || (m.state.supplyAssetsUsd ?? 0) > 0))
     );
-  }, [markets]);
+  }, [markets, showLowLiquidity]);
 
   // Group by collateral/loan pair for display
   const marketPairs = useMemo(() => {
