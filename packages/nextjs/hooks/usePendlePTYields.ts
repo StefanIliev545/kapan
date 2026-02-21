@@ -82,7 +82,10 @@ export function calculateFixedApy(
   return annualizedReturn * 100; // As percentage
 }
 
-// Map chain IDs to Pendle API chain names
+// Map chain IDs to Pendle API chain names.
+// Check https://api-v2.pendle.finance/core/v1/chains for supported chains.
+// TODO: Add Unichain (130) once Pendle's API supports it — contracts are deployed
+// but the API doesn't return chain 130 yet (last checked Feb 2026).
 const PENDLE_CHAIN_MAP: Record<number, string> = {
   1: "1",        // Ethereum
   42161: "42161", // Arbitrum

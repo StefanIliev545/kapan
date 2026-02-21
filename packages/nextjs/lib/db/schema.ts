@@ -104,6 +104,48 @@ export const orders = pgTable(
   ]
 );
 
+// ============ Bridges ============
+
+export const bridgeStatusEnum = pgEnum("bridge_status", ["pending", "done", "failed"]);
+
+/**
+ * Bridge transaction history (LI.FI widget routes).
+ * Primary source of truth — localStorage in bridgeHistory.ts acts as write-through cache.
+ */
+export const bridges = pgTable(
+  "bridges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    routeId: text("route_id").notNull().unique(),
+    userAddress: text("user_address").notNull(),
+    fromChainId: integer("from_chain_id").notNull(),
+    toChainId: integer("to_chain_id").notNull(),
+    fromTokenSymbol: text("from_token_symbol").notNull(),
+    toTokenSymbol: text("to_token_symbol").notNull(),
+    fromTokenLogoUri: text("from_token_logo_uri"),
+    toTokenLogoUri: text("to_token_logo_uri"),
+    fromAmount: text("from_amount").notNull(),
+    toAmount: text("to_amount").notNull(),
+    fromAmountUsd: text("from_amount_usd"),
+    toAmountUsd: text("to_amount_usd"),
+    sendingTxHash: text("sending_tx_hash"),
+    sendingTxLink: text("sending_tx_link"),
+    receivingTxHash: text("receiving_tx_hash"),
+    receivingTxLink: text("receiving_tx_link"),
+    status: bridgeStatusEnum("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  table => [
+    index("idx_bridges_user").on(table.userAddress),
+    index("idx_bridges_user_status").on(table.userAddress, table.status),
+    index("idx_bridges_route_id").on(table.routeId),
+  ],
+);
+
+// ============ Order Fills ============
+
 /**
  * Individual order fills (for tracking partial fills)
  */

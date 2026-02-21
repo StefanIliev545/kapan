@@ -4,8 +4,10 @@ import { useAccount, usePublicClient } from "wagmi";
 import { type Address, erc20Abi, formatUnits } from "viem";
 import { useExternalYields, type ExternalYield } from "./useExternalYields";
 import { useMorphoMarkets } from "./useMorphoLendingPositions";
+import { usePendleTokens } from "./usePendleTokens";
 import { useTokenPricesByAddress } from "./useTokenPrice";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { useGlobalState } from "~~/services/store/store";
 
 // Major tokens whitelist (addresses by chainId)
 // These are always shown if user has balance
@@ -166,9 +168,14 @@ export function useWalletTokens(chainId?: number) {
   const { address: userAddress } = useAccount();
   const publicClient = usePublicClient({ chainId });
   const { findYield } = useExternalYields(chainId);
+  // Global ETH price (fetched from Uniswap by scaffold-eth) as a reliable fallback
+  const globalEthPrice = useGlobalState(s => s.nativeCurrencyPrice);
   // useMorphoMarkets requires chainId, default to mainnet (1) if not provided
   const effectiveChainId = chainId ?? 1;
   const { marketPairs } = useMorphoMarkets(effectiveChainId, undefined);
+
+  // Fetch Pendle PT tokens so we discover PT tokens the user holds even without a Morpho market
+  const { tokens: pendlePTTokens } = usePendleTokens({ chainId: effectiveChainId });
 
   // Build whitelist of known tokens
   const { tokenWhitelist, addressesNeedingPrices } = useMemo(() => {
@@ -185,13 +192,18 @@ export function useWalletTokens(chainId?: number) {
       addMorphoMarketTokens(tokens, marketPairs);
     }
 
+    // Add Pendle PT tokens (catches PT tokens without Morpho markets, e.g. new maturities)
+    for (const pt of pendlePTTokens) {
+      upsertTokenMetadata(tokens, pt.address, pt.symbol, pt.decimals, pt.priceUsd, "pendle");
+    }
+
     // Collect addresses that still need prices (tokens without Morpho/preset prices)
     const addrsWithoutPrice = Array.from(tokens.values())
       .filter(t => !t.price)
       .map(t => t.address);
 
     return { tokenWhitelist: tokens, addressesNeedingPrices: [...new Set(addrsWithoutPrice)] };
-  }, [chainId, marketPairs]);
+  }, [chainId, marketPairs, pendlePTTokens]);
 
   // Fetch prices by contract address (no symbol ambiguity)
   const { prices: fetchedPricesByAddress } = useTokenPricesByAddress(
@@ -202,7 +214,7 @@ export function useWalletTokens(chainId?: number) {
 
   // Fetch balances for whitelisted tokens
   const query = useQuery({
-    queryKey: ["wallet-tokens", chainId, userAddress, tokenWhitelist.size, Object.keys(fetchedPricesByAddress).length],
+    queryKey: ["wallet-tokens", chainId, userAddress, tokenWhitelist.size, Object.keys(fetchedPricesByAddress).length, globalEthPrice],
     queryFn: async (): Promise<WalletToken[]> => {
       if (!userAddress || !publicClient || tokenWhitelist.size === 0) {
         return [];
@@ -216,9 +228,12 @@ export function useWalletTokens(chainId?: number) {
         const nativeBalance = await publicClient.getBalance({ address: userAddress });
         if (nativeBalance > 0n) {
           const balanceFormatted = parseFloat(formatUnits(nativeBalance, 18));
-          // Use WETH address price for native ETH
+          // Use WETH price for native ETH — check whitelist first (may have Morpho price),
+          // then fall back to fetched price from CoinGecko
           const wethToken = MAJOR_TOKENS[chainId || 1]?.find(t => t.symbol === "WETH");
-          const ethPrice = wethToken ? (fetchedPricesByAddress[wethToken.address.toLowerCase()] || 0) : 0;
+          const wethKey = wethToken?.address.toLowerCase();
+          const wethFromWhitelist = wethKey ? tokenWhitelist.get(wethKey) : undefined;
+          const ethPrice = wethFromWhitelist?.price || (wethKey ? fetchedPricesByAddress[wethKey] : 0) || globalEthPrice || 0;
           const usdValue = balanceFormatted * ethPrice;
 
           results.push({

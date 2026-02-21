@@ -1,10 +1,10 @@
 import { supportedChains as snchains } from "./supportedChains";
 import { Chain as SNChain } from "@starknet-react/chains";
-import * as chains from "viem/chains";
+import { type Chain, mainnet, arbitrum, base, optimism, linea, plasma, unichain } from "viem/chains";
 import { defineChain } from "viem";
 
 export type ScaffoldConfig = {
-  targetEVMNetworks: readonly chains.Chain[];
+  targetEVMNetworks: readonly Chain[];
   targetSNNetworks: readonly SNChain[];
   pollingInterval: number;
   alchemyApiKey: string;
@@ -48,13 +48,13 @@ const scaffoldConfig = {
   // The networks on which your DApp is live
   // Using custom localhost chain with chainId 31337 to match Hardhat network deployments
   targetEVMNetworks: [
-    chains.mainnet,
-    chains.arbitrum,
-    chains.base,
-    chains.optimism,
-    chains.linea,
-    chains.plasma,
-    chains.unichain,
+    mainnet,
+    arbitrum,
+    base,
+    optimism,
+    linea,
+    plasma,
+    unichain,
     // Conditionally include Hardhat (localhost) for local development only
     ...(process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? [localhost] : []),
   ],

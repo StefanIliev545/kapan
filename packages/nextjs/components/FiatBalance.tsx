@@ -90,7 +90,7 @@ export const FiatBalance: FC<FiatBalanceProps> = ({
           result += "." + decimalPart;
         }
       }
-      return tokenSymbol ? `${result} ${tokenSymbol}` : result;
+      return result;
     } catch (error) {
       console.error("Error formatting raw balance:", error);
       return String(rawValue);

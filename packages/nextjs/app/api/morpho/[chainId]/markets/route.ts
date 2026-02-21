@@ -145,6 +145,7 @@ interface RequestParams {
   isSearching: boolean;
   curationMode: string;
   hideSaturated: boolean;
+  showLowLiquidity: boolean;
   debug: boolean;
   targetCount: number;
   serverMinSupplyUsd: number;
@@ -158,7 +159,8 @@ const parseRequestParams = (chainId: string, sp: URLSearchParams): RequestParams
 
   const search = (sp.get("search") || "").trim();
   const isSearching = search.length > 0;
-  const hideSaturated = sp.get("hideSaturated") === "true";
+  const showLowLiquidity = sp.get("showLowLiquidity") === "true";
+  const hideSaturated = showLowLiquidity ? false : sp.get("hideSaturated") === "true";
 
   return {
     chainIdInt,
@@ -167,13 +169,15 @@ const parseRequestParams = (chainId: string, sp: URLSearchParams): RequestParams
     isSearching,
     curationMode: (sp.get("curation") || "curated").toLowerCase(),
     hideSaturated,
+    showLowLiquidity,
     debug: sp.get("debug") === "true",
-    targetCount: isSearching ? 100 : Math.min(parseInt(sp.get("first") || "500", 10), 500),
+    targetCount: isSearching ? 200 : Math.min(parseInt(sp.get("first") || "1000", 10), 1500),
     // Low server-side floor to avoid hiding freshly listed markets with little supply yet.
     // Client-side minLiquidity handles stricter filtering.
-    serverMinSupplyUsd: isSearching ? 0 : 100,
+    // When showLowLiquidity is on, drop the server floor to 0 to include near-empty markets.
+    serverMinSupplyUsd: isSearching || showLowLiquidity ? 0 : 100,
     serverMaxUtilization: hideSaturated ? 0.995 : 0.9999,
-    minLiquidity: safeFloat(sp.get("minLiq") || sp.get("minLiquidityUsd") || "1000"),
+    minLiquidity: showLowLiquidity ? 0 : safeFloat(sp.get("minLiq") || sp.get("minLiquidityUsd") || "1000"),
   };
 };
 
@@ -241,17 +245,21 @@ const hasCriticalWarning = (m: MarketItem): boolean => {
 
 /** Apply client-side quality filters after server-side filtering. */
 const passesClientFilters = (m: MarketItem, params: RequestParams): boolean => {
-  // Listed markets get a lower liquidity floor since Morpho's listing logic
-  // already provides curation (market must be in a listed vault).
-  const isListed = m.listed === true || m.listed === "true";
-  const effectiveMinLiquidity = isListed ? Math.min(params.minLiquidity, 100) : params.minLiquidity;
-  if (safeFloat(m.state?.liquidityAssetsUsd) < effectiveMinLiquidity) return false;
+  // When showLowLiquidity is on, skip the liquidity floor check entirely
+  if (!params.showLowLiquidity) {
+    // Listed markets get a lower liquidity floor since Morpho's listing logic
+    // already provides curation (market must be in a listed vault).
+    const isListed = m.listed === true || m.listed === "true";
+    const effectiveMinLiquidity = isListed ? Math.min(params.minLiquidity, 100) : params.minLiquidity;
+    if (safeFloat(m.state?.liquidityAssetsUsd) < effectiveMinLiquidity) return false;
+  }
 
   const maxApy = params.isSearching ? 50.0 : 10.0;
   if (safeFloat(m.state?.supplyApy) > maxApy || safeFloat(m.state?.borrowApy) > maxApy) return false;
 
   const util = normalizeUtilization(m.state?.utilization);
-  if (util > 0.99) return false;
+  // When showLowLiquidity is on, also relax the utilization cap (show saturated markets)
+  if (!params.showLowLiquidity && util > 0.99) return false;
   if (params.hideSaturated && util >= 0.995) return false;
   if (!params.isSearching && isSuspiciousGToken(m)) return false;
   if (hasCriticalWarning(m)) return false;
@@ -262,7 +270,9 @@ const passesClientFilters = (m: MarketItem, params: RequestParams): boolean => {
 // --- Paginated market fetching ---
 
 const PAGE_SIZE = 200;
-const MAX_PAGES = 10;
+// 15 pages × 200 = 3,000 raw items per category before client-side filtering.
+// Chains like Base have many listed markets, so we need headroom.
+const MAX_PAGES = 15;
 
 interface FetchCategoryOpts {
   params: RequestParams;

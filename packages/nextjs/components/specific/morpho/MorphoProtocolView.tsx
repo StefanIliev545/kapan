@@ -119,6 +119,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   const effectiveChainId = getEffectiveChainId(chainId);
 
   const [isMarketsOpen, setIsMarketsOpen] = useState(false);
+  const [showLowLiquidity, setShowLowLiquidity] = useState(false);
   // Start collapsed, will auto-expand when positions are found
   const [isCollapsed, setIsCollapsed] = useState(true);
 
@@ -131,13 +132,12 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   const {
     markets,
     rows: apiRows,
-    isLoadingMarkets,
     isLoadingPositions,
     hasLoadedOnce,
     isUpdating,
   } = useMorphoLendingPositions(effectiveChainId, connectedAddress);
 
-  const { marketPairs } = useMorphoMarkets(effectiveChainId, undefined);
+  const { marketPairs, markets: browseMarkets, isLoading: isLoadingBrowseMarkets } = useMorphoMarkets(effectiveChainId, undefined, showLowLiquidity);
 
   // Fetch external yields (Pendle PT tokens, Maple syrup tokens, etc.) for APY display
   const { findYield } = useExternalYields(effectiveChainId);
@@ -268,10 +268,12 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
       {/* Markets Section - expandable */}
       <CollapsibleSection isOpen={isMarketsOpen && !isCollapsed}>
         <MorphoMarketsSection
-          markets={markets}
+          markets={browseMarkets}
           marketPairs={marketPairs}
-          isLoading={isLoadingMarkets}
+          isLoading={isLoadingBrowseMarkets}
           chainId={effectiveChainId}
+          showLowLiquidity={showLowLiquidity}
+          onShowLowLiquidityChange={setShowLowLiquidity}
         />
       </CollapsibleSection>
 

@@ -60,6 +60,11 @@ interface MorphoMarketsSectionProps {
   isLoading: boolean;
   chainId: number;
 
+  /** Show markets with low/zero liquidity */
+  showLowLiquidity?: boolean;
+  /** Callback when the low-liquidity toggle changes */
+  onShowLowLiquidityChange?: (value: boolean) => void;
+
   /**
    * Optional: wire this to open your supply flow (modal / route / drawer).
    */
@@ -72,6 +77,28 @@ interface MorphoMarketsSectionProps {
 }
 
 const DEFAULT_PAGE_SIZE = 20;
+
+// Loop APY safety margin: use 99% of LLTV as the effective max LTV for loop APY calculations.
+// This matches the SAFETY_BUFFER in MultiplyEvmModal and avoids showing APYs that require
+// borrowing right at the liquidation boundary.
+const LOOP_APY_LTV_FACTOR = 0.99;
+
+/**
+ * Calculate the max loop (leveraged) APY for a market.
+ * Formula: collateralYield * leverage - borrowApy * (leverage - 1)
+ * where leverage = 1 / (1 - effectiveLtv)
+ */
+function calculateMaxLoopApy(
+  collateralYieldPct: number, // as percentage (e.g., 5.0 for 5%)
+  borrowApyPct: number,       // as percentage
+  lltv01: number,             // as 0-1 ratio
+): number | null {
+  const effectiveLtv = lltv01 * LOOP_APY_LTV_FACTOR;
+  if (effectiveLtv <= 0 || effectiveLtv >= 1) return null;
+
+  const leverage = 1 / (1 - effectiveLtv);
+  return collateralYieldPct * leverage - borrowApyPct * (leverage - 1);
+}
 
 // Row data type for TanStack Table
 interface MarketRow {
@@ -86,6 +113,7 @@ interface MarketRow {
   borrowApy01: number;
   lltv01: number;
   impliedApy: number | null; // PT implied yield for collateral (as percentage, e.g., 15.5)
+  maxLoopApy: number | null; // Max leveraged APY at ~99% of LLTV (as percentage)
   collateralAddress: string;
 }
 
@@ -266,6 +294,19 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
   const handleToggleOpen = React.useCallback(() => setIsOpen(prev => !prev), []);
   const handleStopPropagation = React.useCallback((e: React.MouseEvent) => e.stopPropagation(), []);
 
+  // Clicking a category tab selects all matching options and closes the dropdown
+  const handleCategoryClick = React.useCallback((category: TokenCategory) => {
+    setActiveCategory(category);
+    if (category === "all") {
+      onValueChange([]);
+    } else {
+      const matching = options.filter(opt => matchesCategory(opt, category));
+      onValueChange(matching);
+      setIsOpen(false);
+      setSearchTerm("");
+    }
+  }, [options, onValueChange]);
+
   const updatePosition = React.useCallback(() => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
@@ -390,7 +431,7 @@ function SearchableSelect({ options, value, onValueChange, placeholder, allLabel
               key={category}
               category={category}
               isActive={activeCategory === category}
-              onClick={setActiveCategory}
+              onClick={handleCategoryClick}
             />
           ))}
           <div className="flex-1" />
@@ -464,6 +505,7 @@ interface MobileMarketRowProps {
     borrowApy01: number;
     lltv01: number;
     impliedApy: number | null;
+    maxLoopApy: number | null;
   };
   usd: Intl.NumberFormat;
   chainId: number;
@@ -563,6 +605,9 @@ function MobileMarketRow({ row, usd, chainId, onSupply, onLoop }: MobileMarketRo
             {row.impliedApy !== null && (
               <span>Implied: <span className="text-info">{formatPercent(row.impliedApy / 100, 2)}</span></span>
             )}
+            {row.maxLoopApy !== null && (
+              <span>Loop: <span className={row.maxLoopApy > 0 ? "text-success" : "text-error"}>{formatPercent(row.maxLoopApy / 100, 2)}</span></span>
+            )}
           </div>
           <button
             className="btn btn-xs btn-primary"
@@ -587,6 +632,8 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   // marketPairs is part of the interface but currently unused (reserved for future use)
   isLoading,
   chainId,
+  showLowLiquidity = false,
+  onShowLowLiquidityChange,
   onSupply,
   pageSize = DEFAULT_PAGE_SIZE,
 }) => {
@@ -662,6 +709,17 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
         }
         // Note: impliedApy is intentionally mutable because it's conditionally assigned above
 
+        const supplyApy01 = toNumberSafe(m.state?.supplyApy);
+        const borrowApy01 = toNumberSafe(m.state?.borrowApy);
+        const lltv01 = toNumberSafe(m.lltv) / 1e18;
+
+        // For loop APY, use the collateral's yield source:
+        // - PT/external yield tokens: use impliedApy (already a percentage)
+        // - Regular tokens: use supplyApy (as ratio, convert to %)
+        const collateralYieldPct = impliedApy !== null ? impliedApy : supplyApy01 * 100;
+        const borrowApyPct = borrowApy01 * 100;
+        const maxLoopApy = calculateMaxLoopApy(collateralYieldPct, borrowApyPct, lltv01);
+
         return {
           market: m,
           collateralSymbol,
@@ -671,10 +729,11 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           supplyUsd,
           borrowUsd,
           utilization01: toNumberSafe(m.state?.utilization),
-          supplyApy01: toNumberSafe(m.state?.supplyApy),
-          borrowApy01: toNumberSafe(m.state?.borrowApy),
-          lltv01: toNumberSafe(m.lltv) / 1e18,
+          supplyApy01,
+          borrowApy01,
+          lltv01,
           impliedApy,
+          maxLoopApy,
         };
       });
   }, [markets, collateralFilterSet, debtFilterSet, findYield]);
@@ -776,6 +835,29 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       cell: info => formatPercent(info.getValue(), 2),
       sortingFn: "basic",
     }),
+    columnHelper.accessor("maxLoopApy", {
+      id: "maxLoop",
+      header: () => (
+        <Tooltip content="Estimated net APY at max safe leverage (~99% of LLTV). Includes external yield for PT tokens.">
+          <span className="cursor-help border-b border-dashed border-current">Max Loop</span>
+        </Tooltip>
+      ),
+      cell: info => {
+        const value = info.getValue();
+        if (value === null) return <span className="text-base-content/30">—</span>;
+        const isPositive = value > 0;
+        return (
+          <span className={isPositive ? "text-success" : "text-error"}>
+            {formatPercent(value / 100, 2)}
+          </span>
+        );
+      },
+      sortingFn: (rowA, rowB) => {
+        const a = rowA.original.maxLoopApy ?? -Infinity;
+        const b = rowB.original.maxLoopApy ?? -Infinity;
+        return a - b;
+      },
+    }),
     columnHelper.display({
       id: "actions",
       header: "",
@@ -835,6 +917,11 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
     setSelectedCollaterals([]);
     setSelectedDebtAssets([]);
   }, []);
+
+  const handleLowLiquidityToggle = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => onShowLowLiquidityChange?.(e.target.checked),
+    [onShowLowLiquidityChange],
+  );
 
   const handleSupplyClick = React.useCallback(
     (m: MorphoMarket) => {
@@ -1077,6 +1164,16 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           allLabel="All Debt"
         />
 
+        <label className="label cursor-pointer gap-1.5">
+          <input
+            type="checkbox"
+            checked={showLowLiquidity}
+            onChange={handleLowLiquidityToggle}
+            className="checkbox checkbox-xs"
+          />
+          <span className="label-text text-base-content/60 text-xs">Low liquidity</span>
+        </label>
+
         <div className="flex-1" />
 
         <Text size="1" color="gray" className="tabular-nums">
@@ -1152,7 +1249,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                   {rows.map(row => (
                     <tr
                       key={row.id}
-                      className="group"
+                      className="hover:bg-base-200 transition-colors rounded-lg"
                     >
                       {row.getVisibleCells().map((cell, idx, cells) => {
                         const isFirst = idx === 0;
@@ -1161,7 +1258,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                         return (
                           <td
                             key={cell.id}
-                            className={`group-hover:bg-base-200/30 py-2.5 transition-colors ${
+                            className={`py-2.5 ${
                               cell.column.id === "market" ? "pl-3" :
                               cell.column.id === "util" ? "text-center" :
                               cell.column.id === "actions" ? "pr-3" :

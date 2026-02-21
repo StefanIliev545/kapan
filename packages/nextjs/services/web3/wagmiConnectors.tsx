@@ -8,7 +8,7 @@ import {
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import { rainbowkitBurnerWallet } from "burner-connector";
-import * as chains from "viem/chains";
+import { type Chain, hardhat } from "viem/chains";
 import scaffoldConfig from "~~/scaffold.config";
 import { type CreateConnectorFn } from "wagmi";
 import { safe } from "wagmi/connectors";
@@ -22,7 +22,7 @@ const wallets = [
   coinbaseWallet,
   rainbowWallet,
   safeWallet,
-  ...(!targetNetworks.some(network => network.id !== (chains.hardhat as chains.Chain).id) || !onlyLocalBurnerWallet
+  ...(!targetNetworks.some(network => network.id !== (hardhat as Chain).id) || !onlyLocalBurnerWallet
     ? [rainbowkitBurnerWallet]
     : []),
 ];

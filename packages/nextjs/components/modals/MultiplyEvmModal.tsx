@@ -94,8 +94,10 @@ interface MultiplyEvmModalProps {
   disableAssetSelection?: boolean;  // If true, disable collateral/debt dropdowns (e.g., for Morpho preselected markets)
 }
 
-// No additional safety buffer - the protocol's LTV vs liquidation threshold gap is sufficient
-const SAFETY_BUFFER = 1.0;
+// Small safety buffer to prevent overshooting max LTV after swap fees, rounding, and oracle jitter.
+// Morpho Blue has no gap between max LTV and liquidation threshold (LLTV is both), so without
+// this buffer the slider max can result in a position right at or slightly past the LLTV.
+const SAFETY_BUFFER = 0.995;
 
 // Static empty objects for default props - extracted to avoid creating new objects on each render
 const EMPTY_APY_MAP: Record<string, number> = {};
