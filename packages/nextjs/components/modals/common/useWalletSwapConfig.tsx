@@ -61,6 +61,10 @@ const ONE_INCH_ROUTER: Record<number, Address> = {
 
 const PENDLE_ROUTER: Address = "0x888888888889758F76e7103c6CbF23ABbF58F946";
 
+// 1inch uses this address for native ETH swaps
+const NATIVE_TOKEN_1INCH: Address = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+const NATIVE_TOKEN_ZERO: Address = "0x0000000000000000000000000000000000000000";
+
 // Extended swap asset type with optional name and subtitle
 type ExtendedSwapAsset = SwapAsset & { name?: string; subtitle?: string };
 
@@ -165,10 +169,11 @@ export function useWalletSwapConfig(props: UseWalletSwapConfigProps): SwapOperat
   // Convert wallet tokens to SwapAsset format
   const fromAssets = useMemo<SwapAsset[]>(() => {
     return walletTokens
-      .filter(t => t.balance > 0n && t.address !== "0x0000000000000000000000000000000000000000")
+      .filter(t => t.balance > 0n)
       .map(t => ({
         symbol: t.symbol,
-        address: t.address,
+        // 1inch expects 0xEeee... for native ETH, not the zero address
+        address: t.address === NATIVE_TOKEN_ZERO ? NATIVE_TOKEN_1INCH : t.address,
         decimals: t.decimals,
         rawBalance: t.balance,
         balance: t.balanceFormatted,
@@ -213,7 +218,11 @@ export function useWalletSwapConfig(props: UseWalletSwapConfigProps): SwapOperat
   // Initialize from token when modal opens
   useEffect(() => {
     if (isOpen && fromToken) {
-      const asset = fromAssets.find(a => a.address.toLowerCase() === fromToken.address.toLowerCase());
+      // Map zero address to 1inch native address for matching
+      const lookupAddr = fromToken.address === NATIVE_TOKEN_ZERO
+        ? NATIVE_TOKEN_1INCH.toLowerCase()
+        : fromToken.address.toLowerCase();
+      const asset = fromAssets.find(a => a.address.toLowerCase() === lookupAddr);
       if (asset) setSelectedFrom(asset);
     }
   }, [isOpen, fromToken, fromAssets]);
@@ -318,7 +327,11 @@ export function useWalletSwapConfig(props: UseWalletSwapConfigProps): SwapOperat
     return PENDLE_ROUTER;
   }, [swapRouter, chainId]);
 
+  const isNativeToken = selectedFrom?.address === NATIVE_TOKEN_1INCH || selectedFrom?.address === NATIVE_TOKEN_ZERO;
+
   const checkApproval = useCallback(async (): Promise<boolean> => {
+    // Native ETH doesn't need approval — it's sent as msg.value
+    if (isNativeToken) return true;
     if (!publicClient || !userAddress || !selectedFrom || rawAmountIn === "0") return false;
     const routerAddress = getRouterAddress();
     if (!routerAddress) return false;
@@ -334,7 +347,7 @@ export function useWalletSwapConfig(props: UseWalletSwapConfigProps): SwapOperat
     } catch {
       return false;
     }
-  }, [publicClient, userAddress, selectedFrom, rawAmountIn, getRouterAddress]);
+  }, [isNativeToken, publicClient, userAddress, selectedFrom, rawAmountIn, getRouterAddress]);
 
   const handleApprove = useCallback(async () => {
     if (!walletClient || !publicClient || !selectedFrom || !userAddress) return;
@@ -498,6 +511,26 @@ export function useWalletSwapConfig(props: UseWalletSwapConfigProps): SwapOperat
     </div>
   );
 
+  // ============ Enriched selectedTo with price from quote ============
+  // The toAssets don't have prices, but the 1inch/Pendle quote provides USD values
+  // Back-calculate a per-token price so SwapModalShell can display USD for the output
+  const enrichedSelectedTo = useMemo<SwapAsset | null>(() => {
+    if (!selectedTo) return null;
+    if (selectedTo.price && selectedTo.price > 0n) return selectedTo;
+
+    if (swapRouter === "1inch" && oneInchQuote?.dstUSD && oneInchQuote?.dstAmount) {
+      const dstUsd = parseFloat(oneInchQuote.dstUSD);
+      const dstAmount = Number(formatUnits(BigInt(oneInchQuote.dstAmount), selectedTo.decimals));
+      if (dstAmount > 0 && dstUsd > 0) {
+        const pricePerToken = dstUsd / dstAmount;
+        return { ...selectedTo, price: BigInt(Math.round(pricePerToken * 1e8)) };
+      }
+    }
+
+    // Pendle quotes don't include USD values — could extend later
+    return selectedTo;
+  }, [selectedTo, swapRouter, oneInchQuote]);
+
   // ============ Warnings ============
   const warnings: ReactNode = error ? (
     <div className="alert alert-error text-sm">{error}</div>
@@ -514,7 +547,7 @@ export function useWalletSwapConfig(props: UseWalletSwapConfigProps): SwapOperat
     fromAssets,
     toAssets,
     selectedFrom,
-    selectedTo,
+    selectedTo: enrichedSelectedTo,
     setSelectedFrom,
     setSelectedTo,
     fromReadOnly: false,

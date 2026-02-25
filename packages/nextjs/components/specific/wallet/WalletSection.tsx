@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState, useCallback, useEffect } from "react";
+import { FC, useState, useCallback, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDownIcon, ArrowsRightLeftIcon, ArrowsUpDownIcon } from "@heroicons/react/24/outline";
@@ -31,6 +31,15 @@ const COLLAPSE_ANIMATE = { opacity: 1, height: "auto" };
 // Chains that LI.FI supports for bridging (subset of Kapan's chains)
 const BRIDGEABLE_CHAINS = new Set([1, 42161, 8453, 10, 59144]); // mainnet, arbitrum, base, optimism, linea
 
+/** Truncate raw balance to ~half the decimal places for compact display */
+function truncateBalance(value: number): string {
+  if (value === 0) return "0";
+  const abs = Math.abs(value);
+  // For large values (>1000), show 1 decimal; for medium (>1), show 2; for small, show 3-4
+  const maxDecimals = abs >= 1000 ? 1 : abs >= 1 ? 2 : abs >= 0.01 ? 3 : 4;
+  return value.toLocaleString(undefined, { maximumFractionDigits: maxDecimals });
+}
+
 interface WalletSectionProps {
   chainId?: number;
   defaultExpanded?: boolean;
@@ -45,11 +54,8 @@ interface WalletTokenCardProps {
 }
 
 const WalletTokenCard: FC<WalletTokenCardProps> = ({ token, canSwap, canBridge, onSwapClick, onBridgeClick }) => {
-  const isNativeETH = token.address === "0x0000000000000000000000000000000000000000";
-  const showSwap = canSwap && !isNativeETH;
-  // Native ETH can be bridged but uses a special address in LI.FI
+  const showSwap = canSwap;
   const showBridge = canBridge;
-  const showActions = showSwap || showBridge;
 
   const handleSwap = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -65,64 +71,66 @@ const WalletTokenCard: FC<WalletTokenCardProps> = ({ token, canSwap, canBridge, 
   const isPT = token.symbol.toLowerCase().startsWith("pt-");
   const isSyrup = token.symbol.toLowerCase().startsWith("syrup");
 
+  const truncatedBalance = useMemo(() => truncateBalance(token.balanceFormatted), [token.balanceFormatted]);
+
   return (
-    <div className={`group relative overflow-hidden rounded-xl border border-base-300/50 bg-base-100 px-3.5 py-3 transition-colors hover:border-base-content/10 ${showActions ? "cursor-pointer" : ""}`}>
-      {/* Card content — blurs on hover when actions available */}
-      <div className={`flex flex-col gap-2.5 transition-all duration-200 ${showActions ? "group-hover:opacity-20 group-hover:blur-[3px]" : ""}`}>
-        {/* Row 1: Icon + Symbol */}
-        <div className="flex min-w-0 items-center gap-2.5">
-          <TokenIcon icon={token.icon} symbol={token.symbol} customSize={28} />
-          <div className="min-w-0 flex-1">
-            <TokenSymbolDisplay symbol={token.symbol} size="sm" variant="inline" />
-          </div>
+    <div className="group/token flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-base-200/60">
+      {/* Token icon */}
+      <TokenIcon icon={token.icon} symbol={token.symbol} customSize={24} />
+
+      {/* Token info: symbol + USD inline, raw balance below */}
+      <div className="flex min-w-0 flex-1 flex-col" title={`${token.balanceFormatted} ${token.symbol}`}>
+        <div className="flex items-baseline gap-1.5">
+          <span className="min-w-0 truncate">
+            <TokenSymbolDisplay symbol={token.symbol} size="xs" variant="inline" />
+          </span>
+          {token.usdValue > 0 ? (
+            <UsdDisplay value={token.usdValue} className="flex-shrink-0 text-[11px] font-semibold text-base-content/60" />
+          ) : null}
         </div>
-
-        {/* Row 2: USD value + raw balance + yield badge */}
-        <div className="flex min-w-0 items-center gap-2 pl-[38px]">
-          <div className="min-w-0 truncate" title={`${token.balanceFormatted} ${token.symbol}`}>
-            {token.usdValue > 0 ? (
-              <span className="flex items-baseline gap-1.5">
-                <UsdDisplay value={token.usdValue} className="text-sm font-semibold text-base-content" />
-                <span className="text-base-content/35 text-xs">{token.balanceFormatted}</span>
-              </span>
-            ) : (
-              <span className="text-sm text-base-content/50">{token.balanceFormatted > 0 ? token.balanceFormatted : "-"}</span>
-            )}
-          </div>
-
-          <div className="flex-1" />
-
-          {hasYield && (
-            <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold leading-none ${
-              isPT ? "bg-info/10 text-info"
-                : isSyrup ? "bg-warning/10 text-warning"
-                : "bg-success/10 text-success"
-            }`}>
-              {isPT ? "F " : ""}{token.externalYield!.apy.toFixed(1)}%
-            </span>
-          )}
-        </div>
+        <span className="text-base-content/25 font-mono text-[9px] tabular-nums leading-tight">
+          {token.balanceFormatted > 0 ? truncatedBalance : "—"}
+        </span>
       </div>
 
-      {/* Action overlay — appears on hover */}
-      {showActions && (
-        <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+      {/* Yield badge */}
+      {hasYield && (
+        <span className={`shrink-0 rounded px-1 py-px text-[8px] font-semibold leading-none ${
+          isPT ? "bg-info/10 text-info"
+            : isSyrup ? "bg-warning/10 text-warning"
+            : "bg-success/10 text-success"
+        }`}>
+          {isPT ? "F " : ""}{token.externalYield!.apy.toFixed(1)}%
+        </span>
+      )}
+
+      {/* Action buttons — icon-only by default, expand to show label on hover */}
+      {(showSwap || showBridge) && (
+        <div className="flex flex-shrink-0 items-center gap-px">
           {showSwap && (
             <button
               onClick={handleSwap}
-              className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3.5 py-2 text-primary transition-colors hover:bg-primary/20"
+              className="group/btn flex h-6 items-center gap-0 overflow-hidden rounded text-base-content/25 transition-all duration-200 ease-out hover:gap-1 hover:bg-primary/15 hover:px-1.5 hover:text-primary"
+              style={{ maxWidth: "24px", transitionProperty: "max-width, background-color, color, gap, padding" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.maxWidth = "80px"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.maxWidth = "24px"; }}
+              aria-label={`Swap ${token.symbol}`}
             >
-              <ArrowsRightLeftIcon className="size-4" />
-              <span className="text-sm font-semibold">Swap</span>
+              <ArrowsRightLeftIcon className="size-3 shrink-0" />
+              <span className="whitespace-nowrap text-[10px] font-medium opacity-0 transition-opacity duration-150 group-hover/btn:opacity-100">Swap</span>
             </button>
           )}
           {showBridge && (
             <button
               onClick={handleBridge}
-              className="flex items-center gap-1.5 rounded-lg bg-info/10 px-3.5 py-2 text-info transition-colors hover:bg-info/20"
+              className="group/btn flex h-6 items-center gap-0 overflow-hidden rounded text-base-content/25 transition-all duration-200 ease-out hover:gap-1 hover:bg-info/15 hover:px-1.5 hover:text-info"
+              style={{ maxWidth: "24px", transitionProperty: "max-width, background-color, color, gap, padding" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.maxWidth = "80px"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.maxWidth = "24px"; }}
+              aria-label={`Bridge ${token.symbol}`}
             >
-              <ArrowsUpDownIcon className="size-4" />
-              <span className="text-sm font-semibold">Bridge</span>
+              <ArrowsUpDownIcon className="size-3 shrink-0" />
+              <span className="whitespace-nowrap text-[10px] font-medium opacity-0 transition-opacity duration-150 group-hover/btn:opacity-100">Bridge</span>
             </button>
           )}
         </div>
@@ -256,7 +264,10 @@ export const WalletSection: FC<WalletSectionProps> = ({
                     No tokens found in wallet
                   </div>
                 ) : (
-                  <div className="grid gap-2.5 p-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+                  <div
+                    className="grid gap-x-1 gap-y-0.5 p-2"
+                    style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
+                  >
                     {tokens.map((token) => (
                       <WalletTokenCard
                         key={token.address}

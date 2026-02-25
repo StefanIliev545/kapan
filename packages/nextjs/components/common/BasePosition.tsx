@@ -7,11 +7,10 @@ import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import { FiatBalance } from "../FiatBalance";
 import { SegmentedActionBar, SegmentedAction } from "./SegmentedActionBar";
 import { PositionInfoDropdown } from "./PositionInfoDropdown";
-import { getProtocolLogo as getProtocolLogoUtil } from "~~/utils/protocol";
 import { useToggle } from "~~/hooks/useModal";
-import { useOptimalRate } from "~~/hooks/useOptimalRate";
 import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
+import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
 import { TokenSymbolDisplay } from "./TokenSymbolDisplay";
 
@@ -97,36 +96,6 @@ const BalanceDisplay: FC<BalanceDisplayProps> = ({
   );
 };
 
-/** Rate display with protocol logo */
-type RateWithLogoProps = {
-  rate: number;
-  protocolLogo: string;
-  protocolName: string;
-  /** Compact styling for mobile */
-  compact?: boolean;
-};
-
-const RateWithLogo: FC<RateWithLogoProps> = ({ rate, protocolLogo, protocolName, compact = false }) => {
-  const iconSize = compact ? "size-3" : "size-4";
-  const textClass = compact ? "text-[11px]" : "text-xs";
-
-  return (
-    <div className="flex items-center gap-0.5">
-      <span className={clsx("text-success font-mono font-semibold tabular-nums", textClass)}>
-        {formatPercentage(rate)}%
-      </span>
-      <div className={clsx("relative flex-shrink-0", iconSize)}>
-        <Image
-          src={protocolLogo}
-          alt={protocolName}
-          fill
-          className="rounded object-contain"
-        />
-      </div>
-    </div>
-  );
-};
-
 // Base stat column definition
 export type StatColumn = {
   key: string;
@@ -182,10 +151,10 @@ export interface BasePositionProps {
   // Action bar configuration
   actions: SegmentedAction[];
 
-  // For optimal rate display
+  // Deprecated: was used for optimal rate column, kept for backwards compat
   optimalRateOverride?: { protocol: string; rate: number };
 
-  // Extra stat columns (beyond Balance, APY/APR, Best APY/APR)
+  // Extra stat columns (beyond Balance, APY/APR, 30D Yield)
   extraStats?: Array<{
     label: string;
     value: ReactNode;
@@ -255,9 +224,14 @@ function buildStatColumns(opts: {
   };
   rateLabel: string;
   currentRate: number;
-  displayedOptimalRate: number;
-  displayedOptimalProtocol: string;
-  getProtocolLogo: (protocol: string) => string;
+  /** 30-day projected yield in USD */
+  yield30dUsd: number;
+  /** 30-day projected yield in raw token units */
+  yield30dRaw: number;
+  /** Token symbol for the raw yield tooltip */
+  tokenName: string;
+  /** Whether this is a borrow/cost position (yield is negative) */
+  isNegative: boolean;
   extraStats: Array<{ label: string; value: ReactNode }>;
 }): Array<{ key: string; content: ReactNode; hasBorder?: boolean }> {
   const columns: Array<{ key: string; content: ReactNode; hasBorder?: boolean }> = [];
@@ -290,16 +264,28 @@ function buildStatColumns(opts: {
     ),
   });
 
+  // 30-day projected yield with raw token tooltip on hover
+  const yieldColorClass = opts.yield30dUsd === 0
+    ? "text-base-content/40"
+    : opts.isNegative ? "text-error" : "text-success";
+  const signPrefix = opts.isNegative && opts.yield30dUsd !== 0 ? "-" : "";
+  const rawYieldFormatted = Math.abs(opts.yield30dRaw).toLocaleString(undefined, { maximumFractionDigits: 4 });
+
   columns.push({
-    key: "best-rate",
+    key: "30d-yield",
     content: (
       <>
-        <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">Best {opts.rateLabel}</div>
-        <RateWithLogo
-          rate={opts.displayedOptimalRate}
-          protocolLogo={opts.getProtocolLogo(opts.displayedOptimalProtocol)}
-          protocolName={opts.displayedOptimalProtocol}
-        />
+        <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">30D Yield</div>
+        <div className="group/yield relative cursor-help">
+          <div className={`font-mono text-xs font-semibold tabular-nums ${yieldColorClass}`}>
+            {opts.yield30dUsd === 0 ? "—" : `${signPrefix}${formatCurrencyCompact(Math.abs(opts.yield30dUsd))}`}
+          </div>
+          {opts.yield30dUsd !== 0 && (
+            <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover/yield:opacity-100">
+              {signPrefix}{rawYieldFormatted} {opts.tokenName}
+            </span>
+          )}
+        </div>
       </>
     ),
   });
@@ -349,7 +335,7 @@ export const BasePosition: FC<BasePositionProps> = ({
   controlledExpanded,
   onToggleExpanded,
   actions,
-  optimalRateOverride,
+  optimalRateOverride: _optimalRateOverride,
   extraStats = [],
   balanceClassName,
   isNegativeBalance = false,
@@ -369,24 +355,15 @@ export const BasePosition: FC<BasePositionProps> = ({
       ? "Action unavailable for this market"
       : "Action unavailable");
 
-  // Fetch optimal rate
-  const { protocol: optimalProtocol, rate: optimalRateDisplay } = useOptimalRate({
-    networkType,
-    tokenAddress,
-    type: positionType,
-  });
-
-  const hasOptimalProtocol = Boolean(optimalProtocol);
-  const displayedOptimalProtocol =
-    optimalRateOverride?.protocol ??
-    (hasOptimalProtocol ? optimalProtocol : protocolName);
-  const displayedOptimalRate =
-    optimalRateOverride?.rate ??
-    (hasOptimalProtocol ? optimalRateDisplay : currentRate);
-
-  const getProtocolLogo = (protocol: string) => getProtocolLogoUtil(protocol);
-
   const hasAnyActions = actions.length > 0;
+
+  // Calculate 30-day projected yield (USD and raw token)
+  const normalizedTokenBal = typeof tokenBalance === "bigint" ? tokenBalance : BigInt(tokenBalance || 0);
+  const tokenAmountNum = Number(normalizedTokenBal) / (10 ** (tokenDecimals || 18));
+  const tokenPriceUsd = tokenPrice ? Number(tokenPrice) / 1e8 : 0;
+  const balanceUsdForYield = tokenAmountNum * tokenPriceUsd;
+  const yield30dUsd = balanceUsdForYield * (currentRate / 100) * (30 / 365);
+  const yield30dRaw = tokenAmountNum * (currentRate / 100) * (30 / 365);
 
   // Toggle expanded state - memoized to avoid recreation on every render
   const toggleExpanded = useCallback((e: React.MouseEvent) => {
@@ -434,9 +411,10 @@ export const BasePosition: FC<BasePositionProps> = ({
     balanceProps,
     rateLabel,
     currentRate,
-    displayedOptimalRate,
-    displayedOptimalProtocol,
-    getProtocolLogo,
+    yield30dUsd,
+    yield30dRaw,
+    tokenName: name,
+    isNegative: isNegativeBalance,
     extraStats,
   });
 
@@ -501,15 +479,12 @@ export const BasePosition: FC<BasePositionProps> = ({
                 {formatPercentage(currentRate)}%
               </div>
             </div>
-            {/* Best rate - hidden on very narrow screens */}
+            {/* 30D yield - hidden on very narrow screens */}
             <div className="hidden flex-col items-center text-center min-[400px]:flex">
-              <div className="text-base-content/40 text-[8px] font-medium uppercase tracking-widest">Best</div>
-              <RateWithLogo
-                rate={displayedOptimalRate}
-                protocolLogo={getProtocolLogo(displayedOptimalProtocol)}
-                protocolName={displayedOptimalProtocol}
-                compact
-              />
+              <div className="text-base-content/40 text-[8px] font-medium uppercase tracking-widest">30D</div>
+              <div className={`font-mono text-[11px] font-semibold tabular-nums ${yield30dUsd === 0 ? "text-base-content/40" : isNegativeBalance ? "text-error" : "text-success"}`}>
+                {yield30dUsd === 0 ? "—" : `${isNegativeBalance ? "-" : ""}${formatCurrencyCompact(Math.abs(yield30dUsd))}`}
+              </div>
             </div>
           </div>
 

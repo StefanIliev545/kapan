@@ -918,8 +918,18 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
     let debtCount = 0;
     for (const group of groups) {
       for (const col of group.collaterals) {
-        const symbol = col.vault.asset.symbol?.toLowerCase();
-        const price = symbol ? (pricesRaw[symbol] ?? 0n) : 0n;
+        const sym = col.vault.asset.symbol;
+        const symLower = sym?.toLowerCase() ?? "";
+        let price = pricesRaw[symLower] ?? 0n;
+
+        // PT tokens often lack oracle prices — use Pendle's PT price as fallback
+        if (price === 0n && isPTToken(sym)) {
+          const ptYield = findProtocolYield(col.vault.asset.address, sym);
+          if (ptYield?.metadata?.ptPriceUsd && ptYield.metadata.ptPriceUsd > 0) {
+            price = BigInt(Math.round(ptYield.metadata.ptPriceUsd * 1e8));
+          }
+        }
+
         totalCollateral += calcUsdValue(col.balance, col.vault.asset.decimals, price);
       }
       if (group.debt && group.debt.balance > 0n) {
@@ -1013,7 +1023,7 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
 
     const { totalCollateral, totalDebt } = sumPositionValues(enrichedPositionGroups);
     setProtocolTotals("Euler", totalCollateral, totalDebt);
-  }, [hasLoadedOnce, enrichedPositionGroups, pricesRaw, setProtocolTotals, effectiveChainId, isPricesLoading, hasPrices]);
+  }, [hasLoadedOnce, enrichedPositionGroups, pricesRaw, setProtocolTotals, effectiveChainId, isPricesLoading, hasPrices, findProtocolYield]);
 
   // Use enrichedPositionGroups for hasPositions check - this comes from subgraph data
   // and ensures auto-expand works even before balance fetching completes
