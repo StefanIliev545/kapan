@@ -197,16 +197,16 @@ export const WalletSection: FC<WalletSectionProps> = ({
 
   return (
     <>
-      <div className="card-surface-interactive border-t-primary/40 border-t-[3px] shadow-lg sm:border-t-0 sm:border-l-[3px] sm:border-l-primary/40">
-        {/* Header - matches BaseProtocolHeader structure */}
-        <div className="card-body cursor-pointer px-3 py-1.5 sm:px-5 sm:py-2" onClick={() => setIsExpanded(!isExpanded)}>
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* Icon + Title — same fixed width as protocol headers */}
-            <div className="flex items-center gap-2 sm:min-w-[130px]">
-              <div className="bg-base-300/50 flex size-6 items-center justify-center rounded-md">
+      <div className="header-surface shadow-[inset_3px_0_0_0_rgba(255,255,255,0.12)]">
+        {/* Header */}
+        <div className="cursor-pointer px-4 py-3 sm:px-5" onClick={() => setIsExpanded(!isExpanded)}>
+          <div className="flex items-center gap-4 sm:gap-5">
+            {/* Icon + Title */}
+            <div className="flex items-center gap-2.5 sm:min-w-[150px]">
+              <div className="token-icon-wrapper-md">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="text-base-content/70 size-4"
+                  className="text-base-content/60 size-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -214,36 +214,36 @@ export const WalletSection: FC<WalletSectionProps> = ({
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                   />
                 </svg>
               </div>
-              <span className="text-sm font-bold">Wallet</span>
+              <span className="text-sm font-semibold tracking-tight sm:text-lg">Wallet</span>
             </div>
 
             {/* Divider */}
-            <div className="via-base-300 hidden h-8 w-px bg-gradient-to-b from-transparent to-transparent sm:block" />
+            <div className="via-base-300/60 hidden h-12 w-px bg-gradient-to-b from-transparent to-transparent sm:block" />
 
-            {/* Stats — Balance first, then Tokens */}
-            <div className="flex flex-1 items-center gap-6 sm:gap-10">
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider sm:text-[9px]">Balance</span>
-                <span className="text-success font-mono text-[11px] font-bold tabular-nums">
-                  {isLoading ? "—" : formatCurrencyCompact(totalValue)}
+            {/* Stats */}
+            <div className="flex flex-1 items-center gap-8 sm:gap-12">
+              <div className="flex flex-col items-center gap-1">
+                <span className="header-label">Balance</span>
+                <span className="text-success header-value">
+                  {isLoading ? "\u2014" : formatCurrencyCompact(totalValue)}
                 </span>
               </div>
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider sm:text-[9px]">Tokens</span>
-                <span className="font-mono text-[11px] font-bold tabular-nums">
-                  {isLoading ? "—" : tokenCount}
+              <div className="flex flex-col items-center gap-1">
+                <span className="header-label">Tokens</span>
+                <span className="header-value">
+                  {isLoading ? "\u2014" : tokenCount}
                 </span>
               </div>
             </div>
 
             {/* Expand icon */}
             <ChevronDownIcon
-              className={`text-base-content/40 size-4 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`}
+              className={`text-base-content/30 size-5 transition-transform duration-300 ${isExpanded ? "" : "-rotate-90"}`}
             />
           </div>
         </div>

@@ -170,6 +170,24 @@ img[src$="/logos/ethereum.svg"] {
   @apply card-surface cursor-pointer select-none transition-all duration-200 hover:bg-base-200/60 hover:border-base-content/15;
 }
 
+/* Premium header surface — more space, softer presence */
+.header-surface {
+  @apply card bg-base-200/20 shadow-md rounded-none border border-base-300/30
+    cursor-pointer select-none transition-all duration-300
+    hover:bg-base-200/40 hover:border-base-content/10
+    sm:rounded-xl;
+}
+
+/* Header stat label — refined, lowercase, airy */
+.header-label {
+  @apply text-[9px] tracking-[0.12em] text-base-content/30 font-normal;
+}
+
+/* Header stat value — clean, confident */
+.header-value {
+  @apply text-sm font-semibold tabular-nums tracking-tight;
+}
+
 /* Badge/Tag styles - small status indicators */
 .badge-tag {
   @apply px-2 py-0.5 text-[10px] uppercase tracking-wider rounded border;
