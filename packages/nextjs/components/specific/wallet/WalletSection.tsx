@@ -12,6 +12,7 @@ import { TokenIcon } from "~~/components/common/TokenDisplay";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { UsdDisplay } from "~~/components/common/AmountDisplay";
 import { useGlobalState } from "~~/services/store/store";
+import { useTxCompletedListenerDelayed } from "~~/hooks/common/useTxCompletedListener";
 
 // Lazy load modals
 const WalletSwapModal = dynamic(
@@ -146,6 +147,9 @@ export const WalletSection: FC<WalletSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const { tokens, isLoading, totalValue, tokenCount, refetch } = useWalletTokens(chainId);
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+
+  // Refetch wallet tokens when any transaction completes (same as protocol sections)
+  useTxCompletedListenerDelayed(useCallback(() => { refetch(); }, [refetch]), 2000);
 
   // Report wallet value to the global portfolio balance
   useEffect(() => {

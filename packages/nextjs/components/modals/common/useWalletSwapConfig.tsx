@@ -511,25 +511,42 @@ export function useWalletSwapConfig(props: UseWalletSwapConfigProps): SwapOperat
     </div>
   );
 
-  // ============ Enriched selectedTo with price from quote ============
-  // The toAssets don't have prices, but the 1inch/Pendle quote provides USD values
-  // Back-calculate a per-token price so SwapModalShell can display USD for the output
+  // ============ Enriched selectedTo with price derived from quote ============
+  // The toAssets don't have prices. Derive the output token price from:
+  // 1. The 1inch quote's dstUSD field (if available)
+  // 2. Fallback: use the from token price + exchange ratio from the quote
   const enrichedSelectedTo = useMemo<SwapAsset | null>(() => {
     if (!selectedTo) return null;
     if (selectedTo.price && selectedTo.price > 0n) return selectedTo;
 
-    if (swapRouter === "1inch" && oneInchQuote?.dstUSD && oneInchQuote?.dstAmount) {
-      const dstUsd = parseFloat(oneInchQuote.dstUSD);
-      const dstAmount = Number(formatUnits(BigInt(oneInchQuote.dstAmount), selectedTo.decimals));
-      if (dstAmount > 0 && dstUsd > 0) {
-        const pricePerToken = dstUsd / dstAmount;
-        return { ...selectedTo, price: BigInt(Math.round(pricePerToken * 1e8)) };
+    if (swapRouter === "1inch" && oneInchQuote?.dstAmount) {
+      const dstAmountNum = Number(formatUnits(BigInt(oneInchQuote.dstAmount), selectedTo.decimals));
+      if (dstAmountNum <= 0) return selectedTo;
+
+      // Try dstUSD first (may not be returned by all 1inch endpoints)
+      if (oneInchQuote.dstUSD) {
+        const dstUsd = parseFloat(oneInchQuote.dstUSD);
+        if (dstUsd > 0) {
+          return { ...selectedTo, price: BigInt(Math.round((dstUsd / dstAmountNum) * 1e8)) };
+        }
+      }
+
+      // Fallback: derive from the from-token price and the exchange ratio
+      if (selectedFrom?.price && selectedFrom.price > 0n) {
+        const srcAmountNum = Number(formatUnits(
+          BigInt(oneInchQuote.srcAmount || rawAmountIn),
+          selectedFrom.decimals,
+        ));
+        if (srcAmountNum > 0) {
+          const fromPriceUsd = Number(selectedFrom.price) / 1e8;
+          const toTokenPrice = (fromPriceUsd * srcAmountNum) / dstAmountNum;
+          return { ...selectedTo, price: BigInt(Math.round(toTokenPrice * 1e8)) };
+        }
       }
     }
 
-    // Pendle quotes don't include USD values — could extend later
     return selectedTo;
-  }, [selectedTo, swapRouter, oneInchQuote]);
+  }, [selectedTo, selectedFrom, swapRouter, oneInchQuote, rawAmountIn]);
 
   // ============ Warnings ============
   const warnings: ReactNode = error ? (
