@@ -39,6 +39,10 @@ import { useGlobalState } from "~~/services/store/store";
 import { useModal } from "~~/hooks/useModal";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { useTxCompletedListenerDelayed } from "~~/hooks/common/useTxCompletedListener";
+import { useExternalYields, isPTToken } from "~~/hooks/useExternalYields";
+import { calculateNetYieldMetrics } from "~~/utils/netYield";
+import { formatCurrencyCompact } from "~~/utils/formatNumber";
+import { formatSignedPercent } from "../utils";
 
 // CSS class constants (used by EulerPositionGroupRow)
 const TEXT_SUCCESS = "text-success";
@@ -191,6 +195,10 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
   const [debtSwapState, setDebtSwapState] = useState<DebtSwapState>(INITIAL_DEBT_SWAP_STATE);
   const [closeState, setCloseState] = useState<CloseModalState>(INITIAL_CLOSE_STATE);
 
+  // External yields (Pendle PT implied yield, LST staking yield, Maple syrup yield)
+  // Used to show accurate supply rates for collateral tokens that have external yield sources
+  const { getEffectiveSupplyRate, findYield } = useExternalYields(chainId);
+
   // Extract sub-account index from sub-account address (last byte)
   // Sub-account address = (userAddress & ~0xFF) | subAccountIndex
   const subAccountIndex = useMemo(() => {
@@ -271,6 +279,41 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
 
     return { totalCollateralUsd: collateralUsd, totalDebtUsd: debtUsd };
   }, [collaterals, debt, pricesRaw]);
+
+  // Per-sub-account net yield metrics (Net APY, 30D yield)
+  // For PT tokens, standard oracle prices are often missing — fall back to Pendle's ptPriceUsd
+  const subAccountYieldMetrics = useMemo(() => {
+    const supplied = collaterals.map(col => {
+      const sym = col.vault.asset.symbol;
+      const symLower = sym?.toLowerCase() ?? "";
+      let priceRaw = pricesRaw[symLower] ?? 0n;
+
+      // PT tokens often lack oracle prices — use Pendle's PT price as fallback
+      if (priceRaw === 0n && isPTToken(sym)) {
+        const ptYield = findYield(col.vault.asset.address, sym);
+        if (ptYield?.metadata?.ptPriceUsd && ptYield.metadata.ptPriceUsd > 0) {
+          priceRaw = BigInt(Math.round(ptYield.metadata.ptPriceUsd * 1e8));
+        }
+      }
+
+      const balanceUsd = priceRaw > 0n
+        ? (Number(col.balance) / 10 ** col.vault.asset.decimals) * (Number(priceRaw) / 1e8)
+        : 0;
+      const rate = getEffectiveSupplyRate(col.vault.asset.address, sym, (col.vault.supplyApy ?? 0) * 100);
+      return { balance: balanceUsd, currentRate: rate };
+    });
+
+    const borrowed = debt && debt.balance > 0n ? (() => {
+      const symLower = debt.vault.asset.symbol?.toLowerCase() ?? "";
+      const priceRaw = pricesRaw[symLower] ?? 0n;
+      const balanceUsd = priceRaw > 0n
+        ? (Number(debt.balance) / 10 ** debt.vault.asset.decimals) * (Number(priceRaw) / 1e8)
+        : 0;
+      return [{ balance: balanceUsd, currentRate: (debt.vault.borrowApy ?? 0) * 100 }];
+    })() : [];
+
+    return calculateNetYieldMetrics(supplied, borrowed);
+  }, [collaterals, debt, pricesRaw, getEffectiveSupplyRate, findYield]);
 
   // Handler to open collateral swap modal
   const handleOpenSwap = useCallback((collateral: typeof collaterals[0]) => {
@@ -441,63 +484,92 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
       <MultiPositionLayout
         group={positionGroup}
         header={
-          <div className="mb-2 flex items-center justify-between">
-            <div>
+          <div className="mb-2 flex items-center justify-between text-xs">
+            {/* Left: label + balance */}
+            <div className="flex items-center gap-2">
               {!isMainAccount && (
                 <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-wider">
                   Sub-account
                 </span>
               )}
-            </div>
-            {healthStatus && (
-              <div className="flex items-center gap-2 text-xs">
-                <div className="group/ltv relative inline-flex items-center gap-1">
-                  <span className="text-base-content/60">
-                    LTV:{" "}
-                    <span className={`font-mono font-semibold ${healthStatus.colorClass}`}>
-                      {healthStatus.currentLtv.toFixed(1)}%
-                    </span>
-                    <span className="text-base-content/50">/{healthStatus.effectiveLltv.toFixed(0)}%</span>
-                  </span>
-                  {collateralBreakdown.length > 0 && (
-                    <>
-                      <span className="text-primary text-[8px]">{"\u24d8"}</span>
-                      <div className="pointer-events-none absolute right-0 top-full z-[100] mt-2 hidden group-hover/ltv:block">
-                        <div className="bg-base-100 ring-base-300/50 pointer-events-auto min-w-[280px] rounded-lg p-3 shadow-xl ring-1">
-                          <CollateralLtvBreakdown items={collateralBreakdown} totalDebtUsd={debtUsdNumber} />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <span className={`text-[10px] font-medium uppercase ${healthStatus.colorClass}`}>
-                  {healthStatus.label}
+              <span className="text-base-content/60 font-mono tabular-nums">
+                Balance:{" "}
+                <span className={`font-semibold ${subAccountYieldMetrics.netBalance >= 0 ? TEXT_SUCCESS : TEXT_ERROR}`}>
+                  {formatCurrencyCompact(subAccountYieldMetrics.netBalance)}
                 </span>
-                {isADLSupported && debt && collaterals.length > 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      adlModal.open();
-                    }}
-                    className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors ${
-                      hasActiveADL
-                        ? "text-success hover:text-success/80 hover:bg-success/10"
-                        : "text-base-content/50 hover:text-base-content hover:bg-base-200"
-                    }`}
-                    title={
-                      hasActiveADL && triggerLtvBps && targetLtvBps
-                        ? `ADL Active: Triggers at ${formatLtvPercent(triggerLtvBps)} → ${formatLtvPercent(targetLtvBps)}`
-                        : "Auto-Deleverage Protection"
-                    }
-                    type="button"
-                  >
-                    {hasActiveADL ? <ShieldCheckIcon className="size-3.5" /> : <Cog6ToothIcon className="size-3.5" />}
-                    <span>Automate</span>
-                    {hasActiveADL && <span className="bg-success size-2 rounded-full" />}
-                  </button>
-                )}
-              </div>
-            )}
+              </span>
+            </div>
+            {/* Right: rates */}
+            <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+              {/* Net APY */}
+              <span className="text-base-content/60 font-mono tabular-nums">
+                APY:{" "}
+                <span className={`font-semibold ${subAccountYieldMetrics.netApyPercent == null ? "text-base-content/40" : subAccountYieldMetrics.netApyPercent >= 0 ? TEXT_SUCCESS : TEXT_ERROR}`}>
+                  {subAccountYieldMetrics.netApyPercent != null ? formatSignedPercent(subAccountYieldMetrics.netApyPercent) : "—"}
+                </span>
+              </span>
+              {/* 30D Yield with annual tooltip */}
+              <span className="text-base-content/60 group relative cursor-help font-mono tabular-nums">
+                30D:{" "}
+                <span className={`font-semibold ${subAccountYieldMetrics.netYield30d >= 0 ? TEXT_SUCCESS : TEXT_ERROR}`}>
+                  {formatCurrencyCompact(subAccountYieldMetrics.netYield30d)}
+                </span>
+                <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                  Est. annual: <span className={subAccountYieldMetrics.netAnnualYield >= 0 ? TEXT_SUCCESS : TEXT_ERROR}>{formatCurrencyCompact(subAccountYieldMetrics.netAnnualYield)}</span>
+                </span>
+              </span>
+              {/* LTV + health */}
+              {healthStatus && (
+                <>
+                  <div className="group/ltv relative inline-flex items-center gap-1 font-mono tabular-nums">
+                    <span className="text-base-content/60">
+                      LTV:{" "}
+                      <span className={`font-semibold ${healthStatus.colorClass}`}>
+                        {healthStatus.currentLtv.toFixed(1)}%
+                      </span>
+                      <span className="text-base-content/50">/{healthStatus.effectiveLltv.toFixed(0)}%</span>
+                    </span>
+                    {collateralBreakdown.length > 0 && (
+                      <>
+                        <span className="text-primary text-[8px]">{"\u24d8"}</span>
+                        <div className="pointer-events-none absolute right-0 top-full z-[100] mt-2 hidden group-hover/ltv:block">
+                          <div className="bg-base-100 ring-base-300/50 pointer-events-auto min-w-[280px] rounded-lg p-3 shadow-xl ring-1">
+                            <CollateralLtvBreakdown items={collateralBreakdown} totalDebtUsd={debtUsdNumber} />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-medium uppercase ${healthStatus.colorClass}`}>
+                    {healthStatus.label}
+                  </span>
+                </>
+              )}
+              {/* Automate button */}
+              {isADLSupported && debt && collaterals.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  adlModal.open();
+                }}
+                className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors ${
+                  hasActiveADL
+                    ? "text-success hover:text-success/80 hover:bg-success/10"
+                    : "text-base-content/50 hover:text-base-content hover:bg-base-200"
+                }`}
+                title={
+                  hasActiveADL && triggerLtvBps && targetLtvBps
+                    ? `ADL Active: Triggers at ${formatLtvPercent(triggerLtvBps)} → ${formatLtvPercent(targetLtvBps)}`
+                    : "Auto-Deleverage Protection"
+                }
+                type="button"
+              >
+                {hasActiveADL ? <ShieldCheckIcon className="size-3.5" /> : <Cog6ToothIcon className="size-3.5" />}
+                <span>Automate</span>
+                {hasActiveADL && <span className="bg-success size-2 rounded-full" />}
+              </button>
+              )}
+            </div>
           </div>
         }
         collateralContent={
@@ -518,7 +590,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
                     tokenSymbol={symbol}
                     balance={0}
                     tokenBalance={col.balance}
-                    currentRate={(col.vault.supplyApy ?? 0) * 100}
+                    currentRate={getEffectiveSupplyRate(col.vault.asset.address, col.vault.asset.symbol, (col.vault.supplyApy ?? 0) * 100)}
                     tokenAddress={col.vault.asset.address}
                     tokenDecimals={col.vault.asset.decimals}
                     tokenPrice={getPrice(col.vault.asset.symbol)}
@@ -765,6 +837,9 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
   // Check if ADL is supported on this chain
   const { isSupported: isADLSupported } = useADLContracts(effectiveChainId);
 
+  // External yields for protocol-level metrics (Pendle PT, LST, Maple)
+  const { getEffectiveSupplyRate: getProtocolEffectiveRate, findYield: findProtocolYield } = useExternalYields(effectiveChainId);
+
   // Refetch positions after transactions complete (with delay for subgraph indexing)
   useTxCompletedListenerDelayed(
     useCallback(() => {
@@ -868,13 +943,46 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
 
     const { totalCollateral, totalDebt, debtCount } = sumPositionValues(enrichedPositionGroups);
 
+    // Aggregate supply/borrow positions across all sub-accounts for net yield calculation
+    const supplied: Array<{ balance: number; currentRate: number }> = [];
+    const borrowed: Array<{ balance: number; currentRate: number }> = [];
+    for (const group of enrichedPositionGroups) {
+      for (const col of group.collaterals) {
+        const sym = col.vault.asset.symbol;
+        const symLower = sym?.toLowerCase() ?? "";
+        let price = pricesRaw[symLower] ?? 0n;
+
+        // PT tokens often lack oracle prices — use Pendle's PT price as fallback
+        if (price === 0n && isPTToken(sym)) {
+          const ptYield = findProtocolYield(col.vault.asset.address, sym);
+          if (ptYield?.metadata?.ptPriceUsd && ptYield.metadata.ptPriceUsd > 0) {
+            price = BigInt(Math.round(ptYield.metadata.ptPriceUsd * 1e8));
+          }
+        }
+
+        const balanceUsd = calcUsdValue(col.balance, col.vault.asset.decimals, price);
+        if (balanceUsd <= 0) continue;
+        const rate = getProtocolEffectiveRate(col.vault.asset.address, sym, (col.vault.supplyApy ?? 0) * 100);
+        supplied.push({ balance: balanceUsd, currentRate: rate });
+      }
+      if (group.debt && group.debt.balance > 0n) {
+        const symbol = group.debt.vault.asset.symbol?.toLowerCase() ?? "";
+        const price = pricesRaw[symbol] ?? 0n;
+        const balanceUsd = calcUsdValue(group.debt.balance, group.debt.vault.asset.decimals, price);
+        if (balanceUsd > 0) {
+          borrowed.push({ balance: balanceUsd, currentRate: (group.debt.vault.borrowApy ?? 0) * 100 });
+        }
+      }
+    }
+    const yieldMetrics = calculateNetYieldMetrics(supplied, borrowed);
+
     return {
       netBalance: totalCollateral - totalDebt,
-      netYield30d: 0, // Would need APY-weighted calculation
-      netApyPercent: null, // Would need APY data
+      netYield30d: yieldMetrics.netYield30d,
+      netApyPercent: yieldMetrics.netApyPercent,
       positionsWithDebt: debtCount,
     };
-  }, [enrichedPositionGroups, pricesRaw, isPricesLoading, hasPrices]);
+  }, [enrichedPositionGroups, pricesRaw, isPricesLoading, hasPrices, getProtocolEffectiveRate, findProtocolYield]);
 
   // Compute all used sub-account indices (for debt swap to find next available)
   const usedSubAccountIndices = useMemo(() => {
