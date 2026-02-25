@@ -610,9 +610,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
           )
         }
         collateralFooter={
-          debt ? (
-            <AddButton onClick={addCollateralModal.open} label="Add Collateral" />
-          ) : undefined
+          <AddButton onClick={addCollateralModal.open} label={debt ? "Add Collateral" : "Add Supply"} />
         }
         debtContent={
           !debt ? undefined : (() => {
@@ -727,16 +725,16 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
         eulerSubAccountIndex={closeState.subAccountIndex}
       />
 
-      {/* Add Collateral Modal */}
-      {debt && (
-        <AddEulerCollateralModal
-          isOpen={addCollateralModal.isOpen}
-          onClose={addCollateralModal.close}
-          chainId={chainId}
-          borrowVaultAddress={debt.vault.address}
-          existingCollateralVaults={collaterals.map(c => c.vault.address)}
-        />
-      )}
+      {/* Add Collateral/Supply Modal */}
+      <AddEulerCollateralModal
+        isOpen={addCollateralModal.isOpen}
+        onClose={addCollateralModal.close}
+        chainId={chainId}
+        borrowVaultAddress={debt?.vault.address}
+        existingCollateralVaults={collaterals.map(c => c.vault.address)}
+        title={debt ? "Add Collateral" : "Add Supply"}
+        subAccountIndex={subAccountIndex}
+      />
 
       {/* Borrow Modal - shown when user has collateral but no debt */}
       {!debt && collaterals.length > 0 && (

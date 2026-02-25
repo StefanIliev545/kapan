@@ -26,6 +26,8 @@ module.exports = {
           warning: "#fbbf24",
           error: "#f87171",
           "--rounded-btn": "0px",
+          "--rounded-box": "0px",
+          "--rounded-badge": "0px",
           ".tooltip": { "--tooltip-tail": "6px" },
           ".link": { textUnderlineOffset: "2px" },
           ".link:hover": { opacity: "0.8" },

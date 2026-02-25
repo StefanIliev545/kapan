@@ -19,10 +19,14 @@ interface AddEulerCollateralModalProps {
   isOpen: boolean;
   onClose: () => void;
   chainId: number;
-  /** The borrow vault address for this position */
-  borrowVaultAddress: string;
+  /** The borrow vault address for this position (undefined for supply-only sub-accounts) */
+  borrowVaultAddress?: string;
   /** Existing collateral vault addresses (to exclude from selection) */
   existingCollateralVaults: string[];
+  /** Custom modal title */
+  title?: string;
+  /** Sub-account index (for supply-only context encoding) */
+  subAccountIndex?: number;
 }
 
 interface CollateralOption {
@@ -40,6 +44,8 @@ export const AddEulerCollateralModal: FC<AddEulerCollateralModalProps> = ({
   chainId,
   borrowVaultAddress,
   existingCollateralVaults,
+  title = "Add Collateral",
+  subAccountIndex,
 }) => {
   // State for tracking which collateral vault is selected (for context encoding)
   const [selectedCollateralVault, setSelectedCollateralVault] = useState<string | null>(null);
@@ -58,41 +64,53 @@ export const AddEulerCollateralModal: FC<AddEulerCollateralModalProps> = ({
     enabled: isOpen && !!chainId,
   });
 
-  // Find the borrow vault and its accepted collaterals
+  // Find available vaults to deposit into.
+  // With debt: show accepted collaterals of the borrow vault (excluding existing ones).
+  // Without debt (supply-only): show all vaults (excluding existing ones).
   const availableCollaterals = useMemo(() => {
-    const borrowAddr = borrowVaultAddress.toLowerCase();
-    const bVault = allVaults.find(v => v.address.toLowerCase() === borrowAddr);
-
-    if (!bVault) {
-      return [];
-    }
-
-    // Get accepted collateral vaults
-    const acceptedCollaterals = bVault.collaterals || [];
     const existingSet = new Set(existingCollateralVaults.map(a => a.toLowerCase()));
 
-    // Filter out existing collaterals and map to full info
-    const available: CollateralOption[] = [];
-    for (const col of acceptedCollaterals) {
-      if (existingSet.has(col.vaultAddress.toLowerCase())) continue;
+    if (borrowVaultAddress) {
+      // With debt: filter to accepted collaterals of the borrow vault
+      const borrowAddr = borrowVaultAddress.toLowerCase();
+      const bVault = allVaults.find(v => v.address.toLowerCase() === borrowAddr);
+      if (!bVault) return [];
 
-      // Find full vault info
-      const vaultInfo = allVaults.find(
-        v => v.address.toLowerCase() === col.vaultAddress.toLowerCase()
-      );
-
-      if (vaultInfo) {
-        available.push({
-          vaultAddress: col.vaultAddress,
-          vaultSymbol: col.vaultSymbol,
-          tokenSymbol: col.tokenSymbol || vaultInfo.asset.symbol,
-          tokenAddress: vaultInfo.asset.address,
-          tokenDecimals: vaultInfo.asset.decimals,
-          supplyApy: vaultInfo.supplyApy || 0,
-        });
+      const acceptedCollaterals = bVault.collaterals || [];
+      const available: CollateralOption[] = [];
+      for (const col of acceptedCollaterals) {
+        if (existingSet.has(col.vaultAddress.toLowerCase())) continue;
+        const vaultInfo = allVaults.find(
+          v => v.address.toLowerCase() === col.vaultAddress.toLowerCase()
+        );
+        if (vaultInfo) {
+          available.push({
+            vaultAddress: col.vaultAddress,
+            vaultSymbol: col.vaultSymbol,
+            tokenSymbol: col.tokenSymbol || vaultInfo.asset.symbol,
+            tokenAddress: vaultInfo.asset.address,
+            tokenDecimals: vaultInfo.asset.decimals,
+            supplyApy: vaultInfo.supplyApy || 0,
+          });
+        }
       }
+      return available;
     }
 
+    // Without debt: show all vaults not already in this sub-account
+    const available: CollateralOption[] = [];
+    for (const vault of allVaults) {
+      if (existingSet.has(vault.address.toLowerCase())) continue;
+      // Skip vaults with no meaningful supply APY info (likely inactive)
+      available.push({
+        vaultAddress: vault.address,
+        vaultSymbol: vault.symbol || vault.asset.symbol,
+        tokenSymbol: vault.asset.symbol,
+        tokenAddress: vault.asset.address,
+        tokenDecimals: vault.asset.decimals,
+        supplyApy: vault.supplyApy || 0,
+      });
+    }
     return available;
   }, [allVaults, borrowVaultAddress, existingCollateralVaults]);
 
@@ -172,15 +190,20 @@ export const AddEulerCollateralModal: FC<AddEulerCollateralModalProps> = ({
   // Build the Euler context for the deposit
   const eulerContext = useMemo(() => {
     if (!selectedCollateralVault) return undefined;
+    // For supply-only sub-accounts, use the vault itself as both borrow and collateral context
+    const borrowVault = borrowVaultAddress || selectedCollateralVault;
     return encodeEulerContext({
-      borrowVault: borrowVaultAddress,
+      borrowVault,
       collateralVault: selectedCollateralVault,
+      subAccountIndex,
     });
-  }, [borrowVaultAddress, selectedCollateralVault]);
+  }, [borrowVaultAddress, selectedCollateralVault, subAccountIndex]);
 
   const emptyMessage = existingCollateralVaults.length > 0
-    ? "All accepted collaterals are already in use"
-    : "No accepted collaterals found";
+    ? borrowVaultAddress
+      ? "All accepted collaterals are already in use"
+      : "All available vaults are already in use"
+    : "No available vaults found";
 
   return (
     <>
@@ -188,7 +211,7 @@ export const AddEulerCollateralModal: FC<AddEulerCollateralModalProps> = ({
         isOpen={isOpen && !isLoadingVaults}
         isActionModalOpen={isActionModalOpen}
         onClose={handleDone}
-        title="Add Collateral"
+        title={title}
       >
         <TokenListContainer isEmpty={sortedCollaterals.length === 0} emptyMessage={emptyMessage}>
           {sortedCollaterals.map(token => (
