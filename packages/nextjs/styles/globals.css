@@ -259,3 +259,57 @@ img[src$="/logos/ethereum.svg"] {
 .step-circle {
   @apply w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary;
 }
+
+/* ============================================
+   MARKET TABLE UTILITY CLASSES
+   Premium table styling for all market sections
+   ============================================ */
+
+/* Table header cell — quiet, refined labels */
+.market-th {
+  @apply text-[9px] tracking-[0.12em] text-base-content/30 font-normal
+    pb-3 border-b border-base-content/[0.06];
+}
+
+/* Table body row — subtle separator + hover accent */
+.market-row {
+  @apply border-b border-base-content/[0.03] last:border-0
+    transition-colors duration-150;
+}
+
+.market-row:hover > td {
+  @apply bg-base-content/[0.02];
+}
+
+/* Table cell — generous padding */
+.market-td {
+  @apply py-3 text-sm;
+}
+
+/* Numeric value — tabular, semibold */
+.market-value {
+  @apply text-sm font-semibold tabular-nums tracking-tight;
+}
+
+/* Mobile market card */
+.market-card {
+  @apply bg-base-content/[0.02] border border-base-content/[0.05]
+    px-3.5 py-2.5 transition-all duration-200
+    hover:bg-base-content/[0.04] hover:border-base-content/[0.08];
+}
+
+/* Filter bar container */
+.market-filter-bar {
+  @apply flex items-center gap-2.5 flex-wrap px-1 pb-2;
+}
+
+/* Action link — subtle text that lifts on hover */
+.market-action {
+  @apply text-sm font-medium text-base-content/50 hover:text-base-content
+    transition-colors duration-150;
+}
+
+.market-action-primary {
+  @apply text-sm font-medium text-base-content/80 hover:text-base-content
+    transition-colors duration-150;
+}

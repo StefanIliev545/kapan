@@ -3,6 +3,16 @@
 import { FC, useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper,
+  type SortingState,
+} from "@tanstack/react-table";
+import { ScrollArea } from "@radix-ui/themes";
 import { ContractResponse } from "../specific/vesu/VesuMarkets";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolDisplay, getV2PoolDisplay } from "../specific/vesu/pools";
@@ -365,6 +375,179 @@ const useVesuData = (): MarketData[] => {
   ]);
 };
 
+// ── TanStack Table for inner group markets ──────────────────────────
+
+const networkIcons: Record<MarketData["network"], string> = {
+  arbitrum: "/logos/arb.svg",
+  base: "/logos/base.svg",
+  optimism: "/logos/optimism.svg",
+  linea: "/logos/linea.svg",
+  starknet: "/logos/starknet.svg",
+};
+
+const protocolIcons: Record<MarketData["protocol"], string> = {
+  aave: "/logos/aave.svg",
+  nostra: "/logos/nostra.svg",
+  venus: "/logos/venus.svg",
+  vesu: "/logos/vesu.svg",
+  compound: "/logos/compound.svg",
+};
+
+const networkNames: Record<MarketData["network"], string> = {
+  arbitrum: "Arbitrum",
+  base: "Base",
+  optimism: "Optimism",
+  linea: "Linea",
+  starknet: "Starknet",
+};
+
+const protocolNames: Record<MarketData["protocol"], string> = {
+  aave: "Aave",
+  nostra: "Nostra",
+  venus: "Venus",
+  vesu: "Vesu",
+  compound: "Compound",
+};
+
+const groupColumnHelper = createColumnHelper<MarketData>();
+
+const groupColumns = [
+  groupColumnHelper.accessor("network", {
+    id: "network",
+    header: "Network",
+    cell: info => {
+      const network = info.getValue();
+      return (
+        <div className="flex items-center gap-2">
+          <div className="relative size-4">
+            <Image src={networkIcons[network]} alt={network} fill className="object-contain" />
+          </div>
+          <span className="text-sm">{networkNames[network]}</span>
+        </div>
+      );
+    },
+    enableSorting: false,
+  }),
+  groupColumnHelper.accessor("protocol", {
+    id: "protocol",
+    header: "Protocol",
+    cell: info => {
+      const protocol = info.getValue();
+      const poolName = info.row.original.poolName;
+      return (
+        <div className="flex items-center gap-2">
+          <div className="relative size-4">
+            <Image src={protocolIcons[protocol]} alt={protocol} fill className="object-contain" />
+          </div>
+          <span className="text-sm">
+            {protocolNames[protocol]}
+            {poolName ? <span className="text-base-content/40"> · {poolName}</span> : ""}
+          </span>
+        </div>
+      );
+    },
+    enableSorting: false,
+  }),
+  groupColumnHelper.accessor("utilization", {
+    id: "utilization",
+    header: "Utilization",
+    cell: info => (
+      <span className="text-base-content/50 text-sm tabular-nums">{info.getValue()}%</span>
+    ),
+    sortingFn: (rowA, rowB) =>
+      parseFloat(rowA.original.utilization) - parseFloat(rowB.original.utilization),
+  }),
+  groupColumnHelper.accessor("supplyRate", {
+    id: "supplyRate",
+    header: "Supply APY",
+    cell: info => (
+      <span className="text-success text-sm font-semibold tabular-nums">{info.getValue()}</span>
+    ),
+    sortingFn: (rowA, rowB) =>
+      parseFloat(rowA.original.supplyRate) - parseFloat(rowB.original.supplyRate),
+  }),
+  groupColumnHelper.accessor("borrowRate", {
+    id: "borrowRate",
+    header: "Borrow APR",
+    cell: info => (
+      <span className="text-sm tabular-nums">{info.getValue()}</span>
+    ),
+    sortingFn: (rowA, rowB) =>
+      parseFloat(rowA.original.borrowRate) - parseFloat(rowB.original.borrowRate),
+  }),
+];
+
+/** Inner table for a single token group — uses TanStack Table for sorting */
+const GroupMarketsTable: FC<{ markets: MarketData[] }> = ({ markets }) => {
+  const [sorting, setSorting] = useState<SortingState>([{ id: "borrowRate", desc: false }]);
+
+  const table = useReactTable({
+    data: markets,
+    columns: groupColumns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  return (
+    <div className="border-x border-b border-base-content/[0.05] overflow-hidden">
+      <ScrollArea scrollbars="horizontal" type="auto">
+        <table className="w-full text-sm">
+          <thead>
+            {table.getHeaderGroups().map(headerGroup => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map(header => {
+                  const canSort = header.column.getCanSort();
+                  const columnId = header.column.id;
+                  const isCenter = columnId === "utilization" || columnId === "supplyRate" || columnId === "borrowRate";
+
+                  return (
+                    <th
+                      key={header.id}
+                      className={`market-th ${isCenter ? "text-center" : "text-left"} ${
+                        canSort ? "hover:text-base-content/50 cursor-pointer" : ""
+                      }`}
+                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                    >
+                      <span className={`inline-flex items-center gap-1 ${header.column.getIsSorted() ? "text-base-content/60" : ""}`}>
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {header.column.getIsSorted() === "desc" && <ChevronDown className="size-3" />}
+                        {header.column.getIsSorted() === "asc" && <ChevronUp className="size-3" />}
+                      </span>
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map(row => (
+              <tr key={row.id} className="market-row">
+                {row.getVisibleCells().map(cell => {
+                  const columnId = cell.column.id;
+                  const isCenter = columnId === "utilization" || columnId === "supplyRate" || columnId === "borrowRate";
+
+                  return (
+                    <td
+                      key={cell.id}
+                      className={`market-td px-4 ${isCenter ? "text-center" : ""}`}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ScrollArea>
+    </div>
+  );
+};
+
+// ── Main component ──────────────────────────────────────────────────
+
 export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   const aave = useAaveLikeData("AaveGatewayView", "aave", AAVE_CHAIN_IDS);
   const compoundArbitrum = useCompoundMarketData({ chainId: arbitrum.id });
@@ -428,87 +611,32 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
     return sorted.filter(g => g.name.toLowerCase().includes(lower) || g.name.toLowerCase().includes(canon));
   }, [sorted, search]);
 
-  const [groupSorts, setGroupSorts] = useState<
-    Record<string, { column: "supply" | "borrow"; direction: "asc" | "desc" }>
-  >({});
-
-  const toggleGroupSort = useCallback((name: string, column: "supply" | "borrow") => {
-    setGroupSorts(prev => {
-      const current = prev[name] || { column: "borrow", direction: "asc" };
-      return {
-        ...prev,
-        [name]:
-          current.column === column
-            ? { column, direction: current.direction === "asc" ? "desc" : "asc" }
-            : { column, direction: "asc" },
-      };
-    });
-  }, []);
-
   // Memoized handlers for sort buttons
   const handleSortBySupply = useCallback(() => setSortBy("supply"), []);
   const handleSortByBorrow = useCallback(() => setSortBy("borrow"), []);
-
-  // Factory for group sort handlers
-  const createGroupSortHandler = useCallback(
-    (name: string, column: "supply" | "borrow") => () => toggleGroupSort(name, column),
-    [toggleGroupSort],
-  );
-
-  const networkIcons: Record<MarketData["network"], string> = {
-    arbitrum: "/logos/arb.svg",
-    base: "/logos/base.svg",
-    optimism: "/logos/optimism.svg",
-    linea: "/logos/linea.svg",
-    starknet: "/logos/starknet.svg",
-  };
-
-  const protocolIcons: Record<MarketData["protocol"], string> = {
-    aave: "/logos/aave.svg",
-    nostra: "/logos/nostra.svg",
-    venus: "/logos/venus.svg",
-    vesu: "/logos/vesu.svg",
-    compound: "/logos/compound.svg",
-  };
-
-  const networkNames: Record<MarketData["network"], string> = {
-    arbitrum: "Arbitrum",
-    base: "Base",
-    optimism: "Optimism",
-    linea: "Linea",
-    starknet: "Starknet",
-  };
-
-  const protocolNames: Record<MarketData["protocol"], string> = {
-    aave: "Aave",
-    nostra: "Nostra",
-    venus: "Venus",
-    vesu: "Vesu",
-    compound: "Compound",
-  };
 
   return (
     <div className="space-y-6">
       {/* Sort Controls */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-widest">Sort by best</span>
-          <div className="bg-base-200/50 flex rounded-lg p-0.5">
+        <div className="flex items-center gap-3">
+          <span className="text-[9px] tracking-[0.12em] text-base-content/30 font-normal uppercase">Sort by best</span>
+          <div className="bg-base-content/[0.03] flex p-0.5 border border-base-content/[0.05]">
             <button
-              className={`rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
+              className={`px-3 py-1 text-[10px] font-medium uppercase tracking-wider transition-all duration-200 ${
                 sortBy === "supply"
-                  ? "bg-success/20 text-success shadow-sm"
-                  : "text-base-content/50 hover:text-base-content/80"
+                  ? "bg-success/15 text-success"
+                  : "text-base-content/40 hover:text-base-content/70"
               }`}
               onClick={handleSortBySupply}
             >
               Supply APY
             </button>
             <button
-              className={`rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
+              className={`px-3 py-1 text-[10px] font-medium uppercase tracking-wider transition-all duration-200 ${
                 sortBy === "borrow"
-                  ? "bg-error/20 text-error shadow-sm"
-                  : "text-base-content/50 hover:text-base-content/80"
+                  ? "bg-error/15 text-error"
+                  : "text-base-content/40 hover:text-base-content/70"
               }`}
               onClick={handleSortByBorrow}
             >
@@ -516,150 +644,77 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
             </button>
           </div>
         </div>
-        <span className="text-base-content/30 text-[10px]">{filtered.length} tokens</span>
+        <span className="text-base-content/25 text-[10px] tabular-nums">{filtered.length} tokens</span>
       </div>
 
       {/* Market Groups */}
-      <div className="space-y-3">
-        {filtered.map(group => {
-          const sortInfo = groupSorts[group.name] || { column: "borrow", direction: "asc" };
-          const sortedMarkets = [...group.markets].sort((a, b) => {
-            const key = sortInfo.column === "supply" ? "supplyRate" : "borrowRate";
-            const aVal = parseFloat(a[key]);
-            const bVal = parseFloat(b[key]);
-            return sortInfo.direction === "asc" ? aVal - bVal : bVal - aVal;
-          });
-          return (
-            <details key={group.name} className="group overflow-hidden rounded-xl">
-              <summary className="cursor-pointer list-none">
-                <div className="from-base-100 to-base-100/80 border-base-200/60 hover:border-base-300 flex items-center gap-4 rounded-xl border bg-gradient-to-r p-4 transition-all duration-300 hover:shadow-lg">
-                  {/* Token Icon & Name */}
-                  <div className="flex min-w-[120px] items-center gap-3">
-                    <div className="bg-base-200/60 ring-base-300/30 relative size-10 rounded-xl p-1.5 shadow-sm ring-1">
-                      <Image src={group.icon} alt={group.name} fill className="rounded-lg object-contain" />
-                    </div>
-                    {isPTToken(group.name) ? (
-                      <TokenSymbolDisplay symbol={group.name} size="base" variant="inline" />
-                    ) : (
-                      <span className="text-lg font-bold tracking-tight">{group.name}</span>
-                    )}
+      <div className="space-y-2">
+        {filtered.map(group => (
+          <details key={group.name} className="group overflow-hidden">
+            <summary className="cursor-pointer list-none">
+              <div className="flex items-center gap-4 border border-base-content/[0.05] bg-base-content/[0.02] px-4 py-3.5 transition-all duration-200 hover:bg-base-content/[0.04] hover:border-base-content/[0.08]">
+                {/* Token Icon & Name */}
+                <div className="flex min-w-[120px] items-center gap-3">
+                  <div className="token-icon-wrapper-lg">
+                    <Image src={group.icon} alt={group.name} fill className="object-contain" />
                   </div>
-
-                  {/* Rates */}
-                  <div className="flex flex-1 items-center justify-center gap-6 md:gap-12">
-                    <RatePill
-                      variant="supply"
-                      label="Supply Rate"
-                      rate={group.bestSupply.supplyRate}
-                      networkType={group.bestSupply.networkType}
-                      protocol={group.bestSupply.protocol}
-                      poolName={group.bestSupply.poolName}
-                    />
-                    <RatePill
-                      variant="borrow"
-                      label="Borrow Rate"
-                      rate={group.bestBorrow.borrowRate}
-                      networkType={group.bestBorrow.networkType}
-                      protocol={group.bestBorrow.protocol}
-                      poolName={group.bestBorrow.poolName}
-                    />
-                  </div>
-
-                  {/* Markets count & expand indicator */}
-                  <div className="flex items-center gap-3">
-                    <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-wider">
-                      {group.markets.length} {group.markets.length === 1 ? "market" : "markets"}
-                    </span>
-                    <div className="bg-base-200/50 group-open:bg-primary/20 flex size-6 items-center justify-center rounded-lg transition-colors">
-                      <svg 
-                        className="text-base-content/50 group-open:text-primary size-3.5 transition-all duration-200 group-open:rotate-180" 
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </summary>
-
-              {/* Expanded Content */}
-              <div className="bg-base-200/30 border-base-200/50 mt-2 overflow-hidden rounded-xl border">
-                {/* Table Header */}
-                <div className="border-base-200/50 grid grid-cols-5 gap-4 border-b px-4 py-3">
-                  <span className="text-base-content/40 text-[10px] font-semibold uppercase tracking-widest">Network</span>
-                  <span className="text-base-content/40 text-[10px] font-semibold uppercase tracking-widest">Protocol</span>
-                  <span className="text-base-content/40 text-center text-[10px] font-semibold uppercase tracking-widest">Utilization</span>
-                  <button
-                    type="button"
-                    className={`text-center text-[10px] font-semibold uppercase tracking-widest transition-colors ${
-                      sortInfo.column === "supply" ? "text-success" : "text-base-content/40 hover:text-base-content/60"
-                    }`}
-                    onClick={createGroupSortHandler(group.name, "supply")}
-                  >
-                    Supply APY {sortInfo.column === "supply" && (sortInfo.direction === "asc" ? "↑" : "↓")}
-                  </button>
-                  <button
-                    type="button"
-                    className={`text-center text-[10px] font-semibold uppercase tracking-widest transition-colors ${
-                      sortInfo.column === "borrow" ? "text-error" : "text-base-content/40 hover:text-base-content/60"
-                    }`}
-                    onClick={createGroupSortHandler(group.name, "borrow")}
-                  >
-                    Borrow APR {sortInfo.column === "borrow" && (sortInfo.direction === "asc" ? "↑" : "↓")}
-                  </button>
+                  {isPTToken(group.name) ? (
+                    <TokenSymbolDisplay symbol={group.name} size="base" variant="inline" />
+                  ) : (
+                    <span className="text-base font-semibold tracking-tight">{group.name}</span>
+                  )}
                 </div>
 
-                {/* Table Rows */}
-                <div className="divide-base-200/30 divide-y">
-                  {sortedMarkets.map((m, idx) => (
-                    <div
-                      key={`${m.protocol}-${m.network}-${m.address}${m.poolName ? `-${m.poolName}` : ""}`}
-                      className={`hover:bg-base-200/30 grid grid-cols-5 items-center gap-4 px-4 py-3 transition-colors ${
-                        idx === 0 ? "bg-base-100/50" : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="relative size-5">
-                          <Image src={networkIcons[m.network]} alt={m.network} fill className="object-contain" />
-                        </div>
-                        <span className="text-sm font-medium">{networkNames[m.network]}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="relative size-5">
-                          <Image src={protocolIcons[m.protocol]} alt={m.protocol} fill className="rounded object-contain" />
-                        </div>
-                        <span className="text-sm font-medium">
-                          {protocolNames[m.protocol]}
-                          {m.poolName ? ` • ${m.poolName}` : ""}
-                        </span>
-                      </div>
-                      <div className="text-center">
-                        <span className="text-base-content/70 font-mono text-sm font-medium tabular-nums">{m.utilization}%</span>
-                      </div>
-                      <div className="text-center">
-                        <span className="text-success font-mono text-sm font-semibold tabular-nums">{m.supplyRate}</span>
-                      </div>
-                      <div className="text-center">
-                        <span className="text-error font-mono text-sm font-semibold tabular-nums">{m.borrowRate}</span>
-                      </div>
-                    </div>
-                  ))}
+                {/* Rates */}
+                <div className="flex flex-1 items-center justify-center gap-6 md:gap-12">
+                  <RatePill
+                    variant="supply"
+                    label="Supply Rate"
+                    rate={group.bestSupply.supplyRate}
+                    networkType={group.bestSupply.networkType}
+                    protocol={group.bestSupply.protocol}
+                    poolName={group.bestSupply.poolName}
+                  />
+                  <RatePill
+                    variant="borrow"
+                    label="Borrow Rate"
+                    rate={group.bestBorrow.borrowRate}
+                    networkType={group.bestBorrow.networkType}
+                    protocol={group.bestBorrow.protocol}
+                    poolName={group.bestBorrow.poolName}
+                  />
+                </div>
+
+                {/* Markets count & expand indicator */}
+                <div className="flex items-center gap-3">
+                  <span className="text-base-content/30 text-[10px] font-normal tracking-[0.12em]">
+                    {group.markets.length} {group.markets.length === 1 ? "market" : "markets"}
+                  </span>
+                  <svg
+                    className="text-base-content/30 group-open:text-base-content/50 size-4 transition-all duration-300 group-open:rotate-180"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
               </div>
-            </details>
-          );
-        })}
+            </summary>
+
+            {/* Expanded: TanStack Table */}
+            <GroupMarketsTable markets={group.markets} />
+          </details>
+        ))}
       </div>
 
       {/* Empty State */}
       {filtered.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="bg-base-200/50 mb-4 flex size-16 items-center justify-center rounded-2xl">
-            <MagnifyingGlassIcon className="text-base-content/30 size-8" />
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="bg-base-content/[0.03] border border-base-content/[0.05] mb-4 flex size-14 items-center justify-center">
+            <MagnifyingGlassIcon className="text-base-content/20 size-6" />
           </div>
-          <p className="text-base-content/50 text-sm">No markets found</p>
+          <p className="text-base-content/30 text-sm">No markets found</p>
         </div>
       )}
     </div>

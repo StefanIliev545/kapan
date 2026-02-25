@@ -318,12 +318,12 @@ export const CompoundMarketsSection: FC<CompoundMarketsSectionProps> = ({
                     return (
                       <th
                         key={header.id}
-                        className={`label-text-xs pb-2 ${
+                        className={`market-th ${
                           isMarket ? "text-left" :
                           isCollaterals ? "px-3 text-left" :
-                          isActions ? "pl-6" :
+                          isActions ? "pl-6 border-0" :
                           "text-right"
-                        } ${canSort ? "hover:text-base-content/60 cursor-pointer transition-colors" : ""}`}
+                        } ${canSort ? "hover:text-base-content/50 cursor-pointer" : ""}`}
                         onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                       >
                         {!header.isPlaceholder && (
@@ -340,7 +340,7 @@ export const CompoundMarketsSection: FC<CompoundMarketsSectionProps> = ({
             </thead>
             <tbody>
               {table.getRowModel().rows.map(row => (
-                <tr key={row.id} className="group">
+                <tr key={row.id} className="market-row">
                   {row.getVisibleCells().map(cell => {
                     const columnId = cell.column.id;
                     const isMarket = columnId === "market";
@@ -350,19 +350,19 @@ export const CompoundMarketsSection: FC<CompoundMarketsSectionProps> = ({
                     return (
                       <td
                         key={cell.id}
-                        className={`group-hover:bg-base-200/30 py-2.5 transition-colors ${
-                          isMarket ? "rounded-l-lg pl-3" :
+                        className={`market-td ${
+                          isMarket ? "pl-3" :
                           isCollaterals ? "px-3" :
-                          isActions ? "rounded-r-lg pl-6 pr-3 text-right" :
+                          isActions ? "pl-6 pr-3 text-right" :
                           "text-right tabular-nums"
                         }`}
                       >
                         {isActions ? (
-                          <div className="flex items-center justify-end gap-3">
+                          <div className="flex items-center justify-end gap-4">
                             {onBorrow && (
                               <button
                                 type="button"
-                                className="text-base-content/60 hover:text-primary text-sm font-medium transition-colors"
+                                className="market-action"
                                 onClick={() => handleBorrow(row.original)}
                               >
                                 Borrow
@@ -370,7 +370,7 @@ export const CompoundMarketsSection: FC<CompoundMarketsSectionProps> = ({
                             )}
                             <button
                               type="button"
-                              className="text-base-content hover:text-primary text-sm font-medium transition-colors"
+                              className="market-action-primary"
                               onClick={() => handleSupply(row.original)}
                             >
                               Supply
@@ -390,11 +390,11 @@ export const CompoundMarketsSection: FC<CompoundMarketsSectionProps> = ({
       </div>
 
       {/* Mobile cards */}
-      <div className="block space-y-2 md:hidden">
+      <div className="block space-y-1.5 md:hidden">
         {rows.map(row => (
           <div
             key={row.baseToken}
-            className="border-base-300/50 bg-base-200/20 hover:bg-base-200/40 rounded-lg border px-3 py-2 transition-colors"
+            className="market-card"
           >
             <div className="flex items-center gap-2">
               <TokenIcon symbol={row.baseSymbol} size={24} />
