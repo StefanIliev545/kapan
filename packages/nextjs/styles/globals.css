@@ -7,6 +7,13 @@ body {
   min-height: 100vh;
 }
 
+/* Global: sharp edges everywhere — no border-radius */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
 /* Scroll snap styles for landing page */
 .snap-container {
   scroll-snap-type: y mandatory;
@@ -141,15 +148,15 @@ img[src$="/logos/ethereum.svg"] {
 
 /* Token icon wrappers - gradient background with ring */
 .token-icon-wrapper {
-  @apply relative rounded-xl bg-gradient-to-br from-base-200 to-base-300/50 ring-1 ring-base-300/50 flex-shrink-0 flex items-center justify-center;
+  @apply relative bg-gradient-to-br from-base-200 to-base-300/50 ring-1 ring-base-300/50 flex-shrink-0 flex items-center justify-center;
 }
 
 .token-icon-wrapper-sm {
-  @apply token-icon-wrapper w-7 h-7 p-0.5 rounded-lg;
+  @apply token-icon-wrapper w-7 h-7 p-0.5;
 }
 
 .token-icon-wrapper-md {
-  @apply token-icon-wrapper w-8 h-8 p-1.5 rounded-lg shadow-sm ring-base-300/30;
+  @apply token-icon-wrapper w-8 h-8 p-1.5 shadow-sm ring-base-300/30;
 }
 
 .token-icon-wrapper-lg {
@@ -159,7 +166,7 @@ img[src$="/logos/ethereum.svg"] {
 /* Card surfaces - consistent card styling */
 /* No rounding on mobile (edge-to-edge), rounded on sm+ */
 .card-surface {
-  @apply card bg-base-200/40 shadow-md rounded-none border border-base-300/50 sm:rounded-xl;
+  @apply card bg-base-200/40 shadow-md border border-base-300/50;
 }
 
 .card-surface-hover {
@@ -170,9 +177,26 @@ img[src$="/logos/ethereum.svg"] {
   @apply card-surface cursor-pointer select-none transition-all duration-200 hover:bg-base-200/60 hover:border-base-content/15;
 }
 
+/* Premium header surface — more space, softer presence */
+.header-surface {
+  @apply card bg-base-200/20 shadow-md border border-base-300/30
+    cursor-pointer select-none transition-all duration-300
+    hover:bg-base-200/40 hover:border-base-content/10;
+}
+
+/* Header stat label — refined, lowercase, airy */
+.header-label {
+  @apply text-[9px] tracking-[0.12em] text-base-content/30 font-normal;
+}
+
+/* Header stat value — clean, confident */
+.header-value {
+  @apply text-sm font-semibold tabular-nums tracking-tight;
+}
+
 /* Badge/Tag styles - small status indicators */
 .badge-tag {
-  @apply px-2 py-0.5 text-[10px] uppercase tracking-wider rounded border;
+  @apply px-2 py-0.5 text-[10px] uppercase tracking-wider border;
 }
 
 .badge-tag-success {
@@ -199,7 +223,7 @@ img[src$="/logos/ethereum.svg"] {
 
 /* Position count badges - for asset/market counts */
 .count-badge {
-  @apply flex items-center gap-1.5 px-2 py-0.5 rounded-full text-sm;
+  @apply flex items-center gap-1.5 px-2 py-0.5 text-sm;
 }
 
 .count-badge-success {

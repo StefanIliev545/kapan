@@ -37,9 +37,36 @@ const CONDITIONAL_ORDER_EVENTS_ABI = [
   },
 ] as const;
 
+// TriggerExecuted fires on each chunk fill — positions change after every chunk, not just completion.
+const TRIGGER_EXECUTED_EVENT_ABI = [
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "orderHash", type: "bytes32" },
+      { indexed: false, name: "iterationCount", type: "uint256" },
+      { indexed: false, name: "actualSellAmount", type: "uint256" },
+      { indexed: false, name: "actualBuyAmount", type: "uint256" },
+    ],
+    name: "TriggerExecuted",
+    type: "event",
+  },
+] as const;
+
+/** Dispatch the global txCompleted event so protocol views (Morpho, Euler, Compound, etc.)
+ *  trigger their position refetch via useTxCompletedListener. */
+function dispatchTxCompleted() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("txCompleted"));
+  }
+}
+
 /**
  * Hook that watches for conditional order events and invalidates queries when they fire.
- * This enables real-time updates when ADL orders are created, executed, or cancelled.
+ * This enables real-time updates when ADL, limit, or auto-leverage orders are created,
+ * executed (each chunk), completed, or cancelled.
+ *
+ * Mounted in PendingOrdersDrawer which is always rendered (regardless of drawer open/close),
+ * so event watching is always active when the user is connected.
  */
 export function useConditionalOrderEvents() {
   const { address: userAddress } = useAccount();
@@ -71,12 +98,12 @@ export function useConditionalOrderEvents() {
     [queryClient, chainId],
   );
 
-  // Callback for order completion - also refresh positions since they changed
-  const handleOrderCompleted = useCallback(
-    (logs: Log[]) => {
+  // Shared logic for position-changing events (completion, cancellation, chunk fills)
+  const refreshPositions = useCallback(
+    (eventName: string, logs: Log[]) => {
       if (logs.length === 0) return;
 
-      logger.info("[useConditionalOrderEvents] Order COMPLETED, refreshing positions", {
+      logger.info(`[useConditionalOrderEvents] ${eventName}, refreshing positions`, {
         eventCount: logs.length,
         chainId,
         user: userAddress,
@@ -94,8 +121,27 @@ export function useConditionalOrderEvents() {
       // Aave, Compound, Venus use wagmi's readContract queries — invalidate those too
       queryClient.invalidateQueries({ queryKey: ["readContract"] });
       queryClient.invalidateQueries({ queryKey: ["readContracts"] });
+
+      // Dispatch txCompleted so protocol views (MorphoProtocolView, EulerProtocolView,
+      // CompoundLendingPositions, etc.) that listen via useTxCompletedListener also refresh.
+      dispatchTxCompleted();
     },
     [queryClient, chainId, userAddress],
+  );
+
+  const handleOrderCompleted = useCallback(
+    (logs: Log[]) => refreshPositions("Order COMPLETED", logs),
+    [refreshPositions],
+  );
+
+  const handleOrderCancelled = useCallback(
+    (logs: Log[]) => refreshPositions("Order CANCELLED", logs),
+    [refreshPositions],
+  );
+
+  const handleTriggerExecuted = useCallback(
+    (logs: Log[]) => refreshPositions("Chunk executed (TriggerExecuted)", logs),
+    [refreshPositions],
   );
 
   // Watch for ConditionalOrderCreated
@@ -107,8 +153,7 @@ export function useConditionalOrderEvents() {
     enabled: isEnabled,
   });
 
-  // Watch for ConditionalOrderCompleted (ADL/AutoLeverage executed)
-  // This also refreshes positions since the order changed the user's position
+  // Watch for ConditionalOrderCompleted (ADL/AutoLeverage/Limit fully executed)
   useWatchContractEvent({
     address: contractAddress,
     abi: CONDITIONAL_ORDER_EVENTS_ABI,
@@ -117,12 +162,23 @@ export function useConditionalOrderEvents() {
     enabled: isEnabled,
   });
 
-  // Watch for ConditionalOrderCancelled
+  // Watch for ConditionalOrderCancelled — positions may have partially changed
   useWatchContractEvent({
     address: contractAddress,
     abi: CONDITIONAL_ORDER_EVENTS_ABI,
     eventName: "ConditionalOrderCancelled",
-    onLogs: handleOrderEvent,
+    onLogs: handleOrderCancelled,
+    enabled: isEnabled,
+  });
+
+  // Watch for TriggerExecuted — fires on each chunk fill. Positions change after
+  // every chunk, not just on final completion. This ensures the UI stays up-to-date
+  // for multi-chunk orders (limit orders, DCA, etc.).
+  useWatchContractEvent({
+    address: contractAddress,
+    abi: TRIGGER_EXECUTED_EVENT_ABI,
+    eventName: "TriggerExecuted",
+    onLogs: handleTriggerExecuted,
     enabled: isEnabled,
   });
 

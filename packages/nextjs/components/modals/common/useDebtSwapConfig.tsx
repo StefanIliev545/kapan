@@ -587,9 +587,21 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
 
     // Morpho flow - pair-isolated markets require collateral migration
     if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && collateralTokenAddress && collateralBalance) {
-      const postInstructions = isMax
+      // Calculate proportional collateral based on debt ratio.
+      // For partial swaps we only move collateral proportional to the debt being moved.
+      // For isMax we move everything.
+      const proportionalCollateral = isMax || currentDebtBalance === 0n
+        ? collateralBalance
+        : (collateralBalance * repayAmountRaw) / currentDebtBalance;
+
+      // Only use GetSupplyBalance sweep for isMax single-chunk (reads remaining balance on-chain).
+      // For multi-chunk, the same post-instructions are replayed for every iteration by the contract,
+      // so GetSupplyBalance would try to sweep ALL remaining collateral on the first chunk.
+      // Instead, use fixed proportional amounts per chunk.
+      const useMaxSweep = isMax && numChunks === 1;
+      const postInstructions = useMaxSweep
         ? buildMorphoMaxConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress)
-        : buildMorphoChunkConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress, collateralBalance / BigInt(numChunks));
+        : buildMorphoChunkConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress, proportionalCollateral / BigInt(numChunks));
       return { preInstructions: [], postInstructions };
     }
 
@@ -611,7 +623,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       normalizedProtocol, debtFromToken, userAddress, context, selectedTo.address, conditionalOrderManagerAddress, isMax,
     );
     return { preInstructions: [], postInstructions };
-  }, [selectedTo, userAddress, effectiveLimitOrderNewDebt, conditionalOrderManagerAddress, cowFlashLoanInfo, protocolName, debtFromToken, context, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, numChunks, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, isMax]);
+  }, [selectedTo, userAddress, effectiveLimitOrderNewDebt, conditionalOrderManagerAddress, cowFlashLoanInfo, protocolName, debtFromToken, context, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, numChunks, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, isMax, repayAmountRaw, currentDebtBalance]);
 
   // ============ Output Amount ============
   const amountOut = useMemo(() => {
@@ -632,11 +644,16 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
     const swapData = swapQuote.tx.data as `0x${string}`;
 
     // Morpho flow - pair-isolated markets require collateral migration
+    // For partial swaps, only move collateral proportional to the debt being moved.
+    // For isMax, move everything (uses fixed colBal which should match on-chain balance).
     if (isMorpho && oldMorphoContextEncoded && newMorphoContextEncoded && collateralTokenAddress && collateralBalance) {
+      const proportionalCollateral = isMax || currentDebtBalance === 0n
+        ? collateralBalance
+        : (collateralBalance * repayAmountRaw) / currentDebtBalance;
       return buildMorphoMarketFlow(
         debtFromToken, selectedTo.address, userAddress!, requiredNewDebt, swapMinAmountOut,
         swapData, providerEnum, swapProtocol, oldMorphoContextEncoded, newMorphoContextEncoded,
-        collateralTokenAddress, collateralBalance,
+        collateralTokenAddress, proportionalCollateral,
       );
     }
 
@@ -657,7 +674,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       protocolName as any, debtFromToken, selectedTo.address, swapMinAmountOut,
       requiredNewDebt, swapQuote.tx.data, providerEnum, context, isMax, swapProtocol,
     );
-  }, [swapQuote, selectedTo, hasAdapter, requiredNewDebt, selectedProvider, swapRouter, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, swapMinAmountOut, debtFromToken, userAddress, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, buildDebtSwapFlow, protocolName, context, isMax]);
+  }, [swapQuote, selectedTo, hasAdapter, requiredNewDebt, selectedProvider, swapRouter, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, swapMinAmountOut, debtFromToken, userAddress, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, buildDebtSwapFlow, protocolName, context, isMax, repayAmountRaw, currentDebtBalance]);
 
   // ============ Transaction Flow ============
   const { handleConfirm: handleSwap, batchingPreference } = useEvmTransactionFlow({

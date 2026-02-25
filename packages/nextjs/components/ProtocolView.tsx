@@ -254,14 +254,12 @@ interface StatDisplayProps {
 
 const StatDisplay: FC<StatDisplayProps> = ({ label, value, valueClass, isMobile }) => {
   const baseClasses = isMobile
-    ? "flex flex-col items-center py-1"
-    : "hover:bg-base-200/30 group flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors";
-  const labelClasses = isMobile
-    ? "text-base-content/40 text-[8px] font-medium uppercase tracking-wider"
-    : "label-text-xs-semibold";
+    ? "flex flex-col items-center gap-1 py-1"
+    : "hover:bg-base-content/[0.03] flex min-w-[96px] flex-col items-center gap-1.5 rounded-lg px-4 py-2 transition-colors duration-200";
+  const labelClasses = "header-label";
   const valueClasses = isMobile
-    ? `font-mono text-xs font-bold tabular-nums ${valueClass}`
-    : `font-mono text-sm font-bold tabular-nums tracking-tight ${valueClass}`;
+    ? `text-xs font-semibold tabular-nums ${valueClass}`
+    : `header-value ${valueClass}`;
 
   return (
     <div className={baseClasses}>
@@ -553,27 +551,27 @@ const ProtocolHeaderMobile: FC<ProtocolHeaderMobileProps> = ({
   onToggleMarkets, readOnly, isCollapsed, hideUtilization, netBalance,
   netYield30d, netApyPercent, utilizationPercentage, headerElement, onStopPropagation,
 }) => (
-  <div className="space-y-3 sm:hidden">
+  <div className="space-y-2 sm:hidden">
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <div className="token-icon-wrapper-md">
           <Image src={protocolIcon} alt={`${protocolName} icon`} width={20} height={20} className="object-contain drop-shadow-sm" />
         </div>
-        <span className="text-sm font-bold tracking-tight">{protocolName}</span>
+        <span className="text-sm font-semibold tracking-tight">{protocolName}</span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <MarketsButton show={!forceShowAll && !disableMarkets} isOpen={isMarketsOpen} onToggle={onToggleMarkets} isMobile />
         <ConnectHint show={forceShowAll && !readOnly} isMobile />
-        <ChevronDownIcon className={`text-base-content/40 size-4 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`} />
+        <ChevronDownIcon className={`text-base-content/30 size-4 transition-transform duration-300${isCollapsed ? ' -rotate-90' : ''}`} />
       </div>
     </div>
-    <div className={`grid gap-1 ${hideUtilization ? 'grid-cols-3' : 'grid-cols-4'}`}>
+    <div className="flex items-center justify-evenly">
       <StatDisplay label="Balance" value={formatCurrency(netBalance)} valueClass={getValueClass(netBalance)} isMobile />
       <StatDisplay label="30D" value={formatCurrency(netYield30d)} valueClass={getValueClass(netYield30d)} isMobile />
       <StatDisplay label="Net APY" value={netApyPercent == null ? "\u2014" : formatSignedPercentage(netApyPercent)} valueClass={getValueClass(netApyPercent)} isMobile />
       {!hideUtilization && (
-        <div className="flex flex-col items-center py-1">
-          <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider">LTV</span>
+        <div className="flex flex-col items-center gap-1 py-1">
+          <span className="header-label">LTV</span>
           <HealthStatus utilizationPercentage={utilizationPercentage} />
         </div>
       )}
@@ -597,11 +595,8 @@ interface UtilizationWithTooltipProps {
 const UtilizationWithTooltip: FC<UtilizationWithTooltipProps> = ({
   utilizationPercentage, collateralBreakdown, totalDebtUsd,
 }) => (
-  <div className="group/util hover:bg-base-200/30 relative flex flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors">
-    <div className="flex items-center gap-1">
-      <span className="label-text-xs-semibold">Utilization</span>
-      {collateralBreakdown.length > 0 && <span className="text-primary text-[8px]">{"\u24d8"}</span>}
-    </div>
+  <div className="group/util hover:bg-base-content/[0.03] relative flex min-w-[96px] flex-col items-center gap-1.5 rounded-lg px-4 py-2 transition-colors duration-200">
+    <span className="header-label">Utilization</span>
     <HealthStatus utilizationPercentage={utilizationPercentage} />
     {collateralBreakdown.length > 0 && (
       <div className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 hidden -translate-x-1/2 group-hover/util:block">
@@ -643,16 +638,13 @@ const ProtocolHeaderDesktop: FC<ProtocolHeaderDesktopProps> = ({
 }) => (
   <div className="hidden sm:block">
     <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3.5 py-1">
         <div className="token-icon-wrapper-lg">
-          <Image src={protocolIcon} alt={`${protocolName} icon`} width={24} height={24} className="object-contain drop-shadow-sm" />
+          <Image src={protocolIcon} alt={`${protocolName} icon`} width={26} height={26} className="object-contain drop-shadow-sm" />
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="label-text-xs-semibold">Protocol</span>
-          <span className="text-base font-bold tracking-tight">{protocolName}</span>
-        </div>
+        <span className="whitespace-nowrap text-lg font-semibold tracking-tight">{protocolName}</span>
       </div>
-      <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
+      <div className="via-base-300/60 h-12 w-px bg-gradient-to-b from-transparent to-transparent" />
       <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
         <StatDisplay label="Balance" value={formatCurrency(netBalance)} valueClass={getValueClass(netBalance)} />
         <StatDisplay label="30D Yield" value={formatCurrency(netYield30d)} valueClass={getValueClass(netYield30d)} />
@@ -664,10 +656,10 @@ const ProtocolHeaderDesktop: FC<ProtocolHeaderDesktopProps> = ({
       {headerElement && (
         <div className="hidden items-center md:flex" onClick={onStopPropagation}>{headerElement}</div>
       )}
-      <div className="border-base-300/50 flex items-center gap-2.5 border-l pl-2">
+      <div className="flex items-center gap-2 pl-3">
         <MarketsButton show={!forceShowAll && !disableMarkets} isOpen={isMarketsOpen} onToggle={onToggleMarkets} />
         <ConnectHint show={forceShowAll && !readOnly} />
-        <ChevronDownIcon className={`text-base-content/40 size-5 transition-transform duration-200${isCollapsed ? '-rotate-90' : ''}`} />
+        <ChevronDownIcon className={`text-base-content/30 size-5 transition-transform duration-300${isCollapsed ? ' -rotate-90' : ''}`} />
       </div>
     </div>
     {headerElement && (
@@ -1620,8 +1612,8 @@ export const ProtocolView: FC<ProtocolViewProps> = ({
   return (
     <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 p-3'}`}>
       {/* Protocol Header Card */}
-      <div className="card-surface-interactive shadow-lg" onClick={handleToggleCollapse}>
-        <div className="card-body p-3 sm:px-5">
+      <div className="header-surface shadow-[inset_3px_0_0_0_rgba(255,255,255,0.12)]" onClick={handleToggleCollapse}>
+        <div className="card-body px-4 py-3 sm:px-5 sm:py-3">
           <ProtocolHeaderMobile
             protocolIcon={protocolIcon} protocolName={protocolName} forceShowAll={forceShowAll}
             disableMarkets={disableMarkets} isMarketsOpen={isMarketsOpen} onToggleMarkets={handleToggleMarkets}

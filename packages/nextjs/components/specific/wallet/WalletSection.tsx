@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState, useCallback, useEffect } from "react";
+import { FC, useState, useCallback, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDownIcon, ArrowsRightLeftIcon, ArrowsUpDownIcon } from "@heroicons/react/24/outline";
@@ -12,6 +12,7 @@ import { TokenIcon } from "~~/components/common/TokenDisplay";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { UsdDisplay } from "~~/components/common/AmountDisplay";
 import { useGlobalState } from "~~/services/store/store";
+import { useTxCompletedListenerDelayed } from "~~/hooks/common/useTxCompletedListener";
 
 // Lazy load modals
 const WalletSwapModal = dynamic(
@@ -31,6 +32,15 @@ const COLLAPSE_ANIMATE = { opacity: 1, height: "auto" };
 // Chains that LI.FI supports for bridging (subset of Kapan's chains)
 const BRIDGEABLE_CHAINS = new Set([1, 42161, 8453, 10, 59144]); // mainnet, arbitrum, base, optimism, linea
 
+/** Truncate raw balance to ~half the decimal places for compact display */
+function truncateBalance(value: number): string {
+  if (value === 0) return "0";
+  const abs = Math.abs(value);
+  // For large values (>1000), show 1 decimal; for medium (>1), show 2; for small, show 3-4
+  const maxDecimals = abs >= 1000 ? 1 : abs >= 1 ? 2 : abs >= 0.01 ? 3 : 4;
+  return value.toLocaleString(undefined, { maximumFractionDigits: maxDecimals });
+}
+
 interface WalletSectionProps {
   chainId?: number;
   defaultExpanded?: boolean;
@@ -45,11 +55,8 @@ interface WalletTokenCardProps {
 }
 
 const WalletTokenCard: FC<WalletTokenCardProps> = ({ token, canSwap, canBridge, onSwapClick, onBridgeClick }) => {
-  const isNativeETH = token.address === "0x0000000000000000000000000000000000000000";
-  const showSwap = canSwap && !isNativeETH;
-  // Native ETH can be bridged but uses a special address in LI.FI
+  const showSwap = canSwap;
   const showBridge = canBridge;
-  const showActions = showSwap || showBridge;
 
   const handleSwap = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -65,64 +72,66 @@ const WalletTokenCard: FC<WalletTokenCardProps> = ({ token, canSwap, canBridge, 
   const isPT = token.symbol.toLowerCase().startsWith("pt-");
   const isSyrup = token.symbol.toLowerCase().startsWith("syrup");
 
+  const truncatedBalance = useMemo(() => truncateBalance(token.balanceFormatted), [token.balanceFormatted]);
+
   return (
-    <div className={`group relative overflow-hidden rounded-xl border border-base-300/50 bg-base-100 px-3.5 py-3 transition-colors hover:border-base-content/10 ${showActions ? "cursor-pointer" : ""}`}>
-      {/* Card content — blurs on hover when actions available */}
-      <div className={`flex flex-col gap-2.5 transition-all duration-200 ${showActions ? "group-hover:opacity-20 group-hover:blur-[3px]" : ""}`}>
-        {/* Row 1: Icon + Symbol */}
-        <div className="flex min-w-0 items-center gap-2.5">
-          <TokenIcon icon={token.icon} symbol={token.symbol} customSize={28} />
-          <div className="min-w-0 flex-1">
-            <TokenSymbolDisplay symbol={token.symbol} size="sm" variant="inline" />
-          </div>
+    <div className="group/token flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-base-200/60">
+      {/* Token icon */}
+      <TokenIcon icon={token.icon} symbol={token.symbol} customSize={24} />
+
+      {/* Token info: symbol + USD inline, raw balance below */}
+      <div className="flex min-w-0 flex-1 flex-col" title={`${token.balanceFormatted} ${token.symbol}`}>
+        <div className="flex items-baseline gap-1.5">
+          <span className="min-w-0 truncate">
+            <TokenSymbolDisplay symbol={token.symbol} size="xs" variant="inline" />
+          </span>
+          {token.usdValue > 0 ? (
+            <UsdDisplay value={token.usdValue} className="flex-shrink-0 text-[11px] font-semibold text-base-content/60" />
+          ) : null}
         </div>
-
-        {/* Row 2: USD value + raw balance + yield badge */}
-        <div className="flex min-w-0 items-center gap-2 pl-[38px]">
-          <div className="min-w-0 truncate" title={`${token.balanceFormatted} ${token.symbol}`}>
-            {token.usdValue > 0 ? (
-              <span className="flex items-baseline gap-1.5">
-                <UsdDisplay value={token.usdValue} className="text-sm font-semibold text-base-content" />
-                <span className="text-base-content/35 text-xs">{token.balanceFormatted}</span>
-              </span>
-            ) : (
-              <span className="text-sm text-base-content/50">{token.balanceFormatted > 0 ? token.balanceFormatted : "-"}</span>
-            )}
-          </div>
-
-          <div className="flex-1" />
-
-          {hasYield && (
-            <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold leading-none ${
-              isPT ? "bg-info/10 text-info"
-                : isSyrup ? "bg-warning/10 text-warning"
-                : "bg-success/10 text-success"
-            }`}>
-              {isPT ? "F " : ""}{token.externalYield!.apy.toFixed(1)}%
-            </span>
-          )}
-        </div>
+        <span className="text-base-content/25 font-mono text-[9px] tabular-nums leading-tight">
+          {token.balanceFormatted > 0 ? truncatedBalance : "—"}
+        </span>
       </div>
 
-      {/* Action overlay — appears on hover */}
-      {showActions && (
-        <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+      {/* Yield badge */}
+      {hasYield && (
+        <span className={`shrink-0 rounded px-1 py-px text-[8px] font-semibold leading-none ${
+          isPT ? "bg-info/10 text-info"
+            : isSyrup ? "bg-warning/10 text-warning"
+            : "bg-success/10 text-success"
+        }`}>
+          {isPT ? "F " : ""}{token.externalYield!.apy.toFixed(1)}%
+        </span>
+      )}
+
+      {/* Action buttons — icon-only by default, expand to show label on hover */}
+      {(showSwap || showBridge) && (
+        <div className="flex flex-shrink-0 items-center gap-px">
           {showSwap && (
             <button
               onClick={handleSwap}
-              className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3.5 py-2 text-primary transition-colors hover:bg-primary/20"
+              className="group/btn flex h-6 items-center gap-0 overflow-hidden rounded text-base-content/25 transition-all duration-200 ease-out hover:gap-1 hover:bg-primary/15 hover:px-1.5 hover:text-primary"
+              style={{ maxWidth: "24px", transitionProperty: "max-width, background-color, color, gap, padding" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.maxWidth = "80px"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.maxWidth = "24px"; }}
+              aria-label={`Swap ${token.symbol}`}
             >
-              <ArrowsRightLeftIcon className="size-4" />
-              <span className="text-sm font-semibold">Swap</span>
+              <ArrowsRightLeftIcon className="size-3 shrink-0" />
+              <span className="whitespace-nowrap text-[10px] font-medium opacity-0 transition-opacity duration-150 group-hover/btn:opacity-100">Swap</span>
             </button>
           )}
           {showBridge && (
             <button
               onClick={handleBridge}
-              className="flex items-center gap-1.5 rounded-lg bg-info/10 px-3.5 py-2 text-info transition-colors hover:bg-info/20"
+              className="group/btn flex h-6 items-center gap-0 overflow-hidden rounded text-base-content/25 transition-all duration-200 ease-out hover:gap-1 hover:bg-info/15 hover:px-1.5 hover:text-info"
+              style={{ maxWidth: "24px", transitionProperty: "max-width, background-color, color, gap, padding" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.maxWidth = "80px"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.maxWidth = "24px"; }}
+              aria-label={`Bridge ${token.symbol}`}
             >
-              <ArrowsUpDownIcon className="size-4" />
-              <span className="text-sm font-semibold">Bridge</span>
+              <ArrowsUpDownIcon className="size-3 shrink-0" />
+              <span className="whitespace-nowrap text-[10px] font-medium opacity-0 transition-opacity duration-150 group-hover/btn:opacity-100">Bridge</span>
             </button>
           )}
         </div>
@@ -138,6 +147,9 @@ export const WalletSection: FC<WalletSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const { tokens, isLoading, totalValue, tokenCount, refetch } = useWalletTokens(chainId);
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+
+  // Refetch wallet tokens when any transaction completes (same as protocol sections)
+  useTxCompletedListenerDelayed(useCallback(() => { refetch(); }, [refetch]), 2000);
 
   // Report wallet value to the global portfolio balance
   useEffect(() => {
@@ -185,16 +197,16 @@ export const WalletSection: FC<WalletSectionProps> = ({
 
   return (
     <>
-      <div className="card-surface-interactive border-t-primary/40 border-t-[3px] shadow-lg sm:border-t-0 sm:border-l-[3px] sm:border-l-primary/40">
-        {/* Header - matches BaseProtocolHeader structure */}
-        <div className="card-body cursor-pointer px-3 py-1.5 sm:px-5 sm:py-2" onClick={() => setIsExpanded(!isExpanded)}>
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* Icon + Title — same fixed width as protocol headers */}
-            <div className="flex items-center gap-2 sm:min-w-[130px]">
-              <div className="bg-base-300/50 flex size-6 items-center justify-center rounded-md">
+      <div className="header-surface shadow-[inset_3px_0_0_0_rgba(255,255,255,0.12)]">
+        {/* Header */}
+        <div className="cursor-pointer px-4 py-3 sm:px-5" onClick={() => setIsExpanded(!isExpanded)}>
+          <div className="flex items-center gap-4 sm:gap-5">
+            {/* Icon + Title */}
+            <div className="flex items-center gap-2.5 sm:min-w-[150px]">
+              <div className="token-icon-wrapper-md">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="text-base-content/70 size-4"
+                  className="text-base-content/60 size-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -202,36 +214,36 @@ export const WalletSection: FC<WalletSectionProps> = ({
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                   />
                 </svg>
               </div>
-              <span className="text-sm font-bold">Wallet</span>
+              <span className="text-sm font-semibold tracking-tight sm:text-lg">Wallet</span>
             </div>
 
             {/* Divider */}
-            <div className="via-base-300 hidden h-8 w-px bg-gradient-to-b from-transparent to-transparent sm:block" />
+            <div className="via-base-300/60 hidden h-12 w-px bg-gradient-to-b from-transparent to-transparent sm:block" />
 
-            {/* Stats — Balance first, then Tokens */}
-            <div className="flex flex-1 items-center gap-6 sm:gap-10">
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider sm:text-[9px]">Balance</span>
-                <span className="text-success font-mono text-[11px] font-bold tabular-nums">
-                  {isLoading ? "—" : formatCurrencyCompact(totalValue)}
+            {/* Stats */}
+            <div className="flex flex-1 items-center gap-8 sm:gap-12">
+              <div className="flex flex-col items-center gap-1">
+                <span className="header-label">Balance</span>
+                <span className="text-success header-value">
+                  {isLoading ? "\u2014" : formatCurrencyCompact(totalValue)}
                 </span>
               </div>
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-base-content/40 text-[8px] font-medium uppercase tracking-wider sm:text-[9px]">Tokens</span>
-                <span className="font-mono text-[11px] font-bold tabular-nums">
-                  {isLoading ? "—" : tokenCount}
+              <div className="flex flex-col items-center gap-1">
+                <span className="header-label">Tokens</span>
+                <span className="header-value">
+                  {isLoading ? "\u2014" : tokenCount}
                 </span>
               </div>
             </div>
 
             {/* Expand icon */}
             <ChevronDownIcon
-              className={`text-base-content/40 size-4 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`}
+              className={`text-base-content/30 size-5 transition-transform duration-300 ${isExpanded ? "" : "-rotate-90"}`}
             />
           </div>
         </div>
@@ -256,7 +268,10 @@ export const WalletSection: FC<WalletSectionProps> = ({
                     No tokens found in wallet
                   </div>
                 ) : (
-                  <div className="grid gap-2.5 p-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+                  <div
+                    className="grid gap-x-1 gap-y-0.5 p-2"
+                    style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
+                  >
                     {tokens.map((token) => (
                       <WalletTokenCard
                         key={token.address}
