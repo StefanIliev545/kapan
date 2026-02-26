@@ -44,17 +44,19 @@ export function encodeSwapCtx(token: string, minOut: bigint, data: `0x${string}`
   return encodeAbiParameters([{ type: "address" }, { type: "uint256" }, { type: "bytes" }], [token as Address, minOut, data]);
 }
 
-/** Morpho conditional post-instructions for isMax (withdraw remaining). */
-export function buildMorphoMaxConditionalPost(p: string, debt: string, user: string, oldC: string, newC: string, col: string, to: string, mgr: string): ProtocolInstruction[] {
+/** Morpho conditional post-instructions for isMax (withdraw all collateral).
+ * Unlike Euler, Morpho debt swaps don't need GetSupplyBalance because the
+ * collateral token doesn't change — we just move the full known balance
+ * from the old market to the new one. Same shape as the chunk version. */
+export function buildMorphoMaxConditionalPost(p: string, debt: string, user: string, oldC: string, newC: string, col: string, to: string, mgr: string, colBal: bigint): ProtocolInstruction[] {
   return [
     createRouterInstruction(encodeApprove(1, p)),
     createProtocolInstruction(p, encodeLendingInstruction(LendingOp.Repay, debt, user, 0n, oldC, 1)),
-    createProtocolInstruction(p, encodeLendingInstruction(LendingOp.GetSupplyBalance, col, user, 0n, oldC, 999)),
-    createProtocolInstruction(p, encodeLendingInstruction(LendingOp.WithdrawCollateral, col, user, 0n, oldC, 4)),
-    createRouterInstruction(encodeApprove(5, p)),
-    createProtocolInstruction(p, encodeLendingInstruction(LendingOp.DepositCollateral, col, user, 0n, newC, 5)),
+    createProtocolInstruction(p, encodeLendingInstruction(LendingOp.WithdrawCollateral, col, user, colBal, oldC, 999)),
+    createRouterInstruction(encodeApprove(4, p)),
+    createProtocolInstruction(p, encodeLendingInstruction(LendingOp.DepositCollateral, col, user, 0n, newC, 4)),
     createProtocolInstruction(p, encodeLendingInstruction(LendingOp.Borrow, to, user, 0n, newC, 0)),
-    createRouterInstruction(encodePushToken(7, mgr)),
+    createRouterInstruction(encodePushToken(6, mgr)),
     createRouterInstruction(encodePushToken(3, user)),
   ];
 }

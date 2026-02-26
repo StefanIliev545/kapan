@@ -594,13 +594,10 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
         ? collateralBalance
         : (collateralBalance * repayAmountRaw) / currentDebtBalance;
 
-      // Only use GetSupplyBalance sweep for isMax single-chunk (reads remaining balance on-chain).
-      // For multi-chunk, the same post-instructions are replayed for every iteration by the contract,
-      // so GetSupplyBalance would try to sweep ALL remaining collateral on the first chunk.
-      // Instead, use fixed proportional amounts per chunk.
-      const useMaxSweep = isMax && numChunks === 1;
-      const postInstructions = useMaxSweep
-        ? buildMorphoMaxConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress)
+      // Both max and chunk flows use fixed collateral amounts — no GetSupplyBalance needed
+      // because Morpho debt swaps don't change the collateral token, only the market context.
+      const postInstructions = isMax && numChunks === 1
+        ? buildMorphoMaxConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress, collateralBalance)
         : buildMorphoChunkConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress, proportionalCollateral / BigInt(numChunks));
       return { preInstructions: [], postInstructions };
     }

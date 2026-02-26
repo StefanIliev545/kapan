@@ -276,6 +276,19 @@ const TOKEN_FALLBACKS: Record<string, string> = {
   rlp: "/logos/default.svg",
   syrupusdc: "/logos/usdc.svg",
   teth: "/logos/ethereum.svg",
+  // TODO: AARBWBTC is Aave's aToken receipt for WBTC on Arbitrum — ideally a composite icon
+  // with WBTC large + small Aave/Arb badges, but WBTC icon works for now
+  aarbwbtc: "/logos/wbtc.svg",
+  vaultbtc: "/logos/wbtc.svg",
+  // USD-pegged without dedicated icons
+  usd: "/logos/usdc.svg",
+  axusd: "/logos/usdc.svg",
+  // Truly unknown — generic fallback
+  ghost: "/logos/default.svg",
+  elit: "/logos/default.svg",
+  credit: "/logos/default.svg",
+  osak: "/logos/default.svg",
+  labu: "/logos/default.svg",
 };
 
 const PNG_LOGO_MAP: Record<string, string> = {
@@ -294,6 +307,15 @@ const PNG_LOGO_MAP: Record<string, string> = {
   xsbtc: "/logos/xsolvbtc.png",
   lyu: "/logos/lyu.png",
   usdai: "/logos/susdai.svg",
+  frxusd: "/logos/frxusd.png",
+  fxusd: "/logos/fxusd.png",
+  bal: "/logos/bal.png",
+  eul: "/logos/eul.png",
+  yobtc: "/logos/yobtc.png",
+  ibtc: "/logos/ibtc.png",
+  jrt: "/logos/jrt.png",
+  rex: "/logos/rex.png",
+  xpet: "/logos/xpet.png",
 };
 
 function isEulerPrefixed(lower: string): boolean {
