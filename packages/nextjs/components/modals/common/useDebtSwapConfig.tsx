@@ -617,7 +617,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
 
     // Standard flow (Aave, Compound, Venus) - no collateral migration needed
     const postInstructions = buildStandardConditionalPost(
-      normalizedProtocol, debtFromToken, userAddress, context, selectedTo.address, conditionalOrderManagerAddress, isMax,
+      normalizedProtocol, debtFromToken, userAddress, context, selectedTo.address, conditionalOrderManagerAddress,
     );
     return { preInstructions: [], postInstructions };
   }, [selectedTo, userAddress, effectiveLimitOrderNewDebt, conditionalOrderManagerAddress, cowFlashLoanInfo, protocolName, debtFromToken, context, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, numChunks, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, isMax, repayAmountRaw, currentDebtBalance]);
