@@ -495,15 +495,15 @@ function MobileVaultRow({ row, usd, chainId, onSupply, onBorrow }: MobileVaultRo
 
   return (
     <div
-      className={`cursor-pointer rounded-lg border transition-colors ${
+      className={`cursor-pointer border transition-colors duration-200 ${
         isExpanded
-          ? 'border-primary/30 bg-base-200/40'
-          : 'border-base-300/50 bg-base-200/20 hover:bg-base-200/40'
+          ? 'border-base-content/10 bg-base-content/[0.04]'
+          : 'market-card'
       }`}
       onClick={handleToggle}
     >
       {/* Main row */}
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5">
         <TokenIcon symbol={row.assetSymbol} size={24} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
@@ -772,18 +772,18 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
       id: "actions",
       header: "",
       cell: info => (
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-4">
           {onBorrow && info.row.original.collaterals.length > 0 && (
             <button
               onClick={() => handleBorrowClick(info.row.original.vault)}
-              className="text-base-content/60 hover:text-primary text-sm font-medium transition-colors"
+              className="market-action"
             >
               Borrow
             </button>
           )}
           <button
             onClick={() => handleSupplyClick(info.row.original.vault)}
-            className="text-base-content hover:text-primary text-sm font-medium transition-colors"
+            className="market-action-primary"
           >
             Supply
           </button>
@@ -942,7 +942,7 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
   return (
     <Flex direction="column" gap="3">
       {/* Filter bar */}
-      <Flex align="center" gap="2" wrap="wrap" className="px-1">
+      <Flex align="center" gap="2" wrap="wrap" className="market-filter-bar">
         <Box className="w-full sm:w-auto sm:min-w-[200px] sm:max-w-[280px]">
           <TextField.Root
             size="1"
@@ -1015,7 +1015,7 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
       ) : (
         <>
           {/* Mobile: Card-based layout */}
-          <div className="block space-y-2 md:hidden">
+          <div className="block space-y-1.5 md:hidden">
             {rows.map(row => (
               <MobileVaultRowItem
                 key={row.original.vault.id}
@@ -1046,13 +1046,13 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                         return (
                           <th
                             key={header.id}
-                            className={`label-text-xs pb-2 ${
+                            className={`market-th ${
                               isMarket ? "text-left" :
                               isCollaterals ? "px-3 text-left" :
                               isUtil ? "text-center" :
-                              isActions ? "pl-6" :
+                              isActions ? "pl-6 border-0" :
                               "text-right"
-                            } ${canSort ? "hover:text-base-content/60 cursor-pointer transition-colors" : ""}`}
+                            } ${canSort ? "hover:text-base-content/50 cursor-pointer" : ""}`}
                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                           >
                             {!header.isPlaceholder && (
@@ -1071,7 +1071,7 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                   {rows.map(row => (
                     <tr
                       key={row.id}
-                      className="group"
+                      className="market-row"
                     >
                       {row.getVisibleCells().map(cell => {
                         const columnId = cell.column.id;
@@ -1083,11 +1083,11 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                         return (
                           <td
                             key={cell.id}
-                            className={`group-hover:bg-base-200/30 py-2.5 transition-colors ${
-                              isMarket ? "rounded-l-lg pl-3" :
+                            className={`market-td ${
+                              isMarket ? "pl-3" :
                               isCollaterals ? "px-3" :
                               isUtil ? "text-center" :
-                              isActions ? "rounded-r-lg pl-6 pr-3 text-right" :
+                              isActions ? "pl-6 pr-3 text-right" :
                               "text-right tabular-nums"
                             }`}
                           >

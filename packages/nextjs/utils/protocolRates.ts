@@ -3,7 +3,7 @@
  * Used by Aave, Compound, Venus, and other lending protocol views
  */
 
-import { arbitrum, base, optimism, linea } from "wagmi/chains";
+import { arbitrum, base, optimism, linea, mainnet } from "wagmi/chains";
 import type { MarketData } from "~~/components/markets/MarketsSection";
 
 // Time constants
@@ -13,6 +13,7 @@ export const SECONDS_PER_YEAR = 60 * 60 * 24 * 365;
  * Chain ID to network name mapping for market data
  */
 export const CHAIN_ID_TO_NETWORK: Record<number, MarketData["network"]> = {
+  [mainnet.id]: "ethereum",
   [arbitrum.id]: "arbitrum",
   [base.id]: "base",
   [optimism.id]: "optimism",

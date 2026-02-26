@@ -61,18 +61,24 @@ const extractRateValue = (field: RateField): number => {
   return scale === 0 ? 0 : base / scale;
 };
 
+/**
+ * Compute effective supply APY from Vesu API stats.
+ * Yields are additive: base lending yield + LST staking yield + incentives.
+ * - supplyApy: base yield from lending utilization
+ * - lstApr: underlying LST staking yield (wstETH, xSTRK, BTC LSTs, etc.)
+ * - defiSpringSupplyApr / btcFiSupplyApr: incentive programs
+ */
 const computeSupplyAPY = (stats: {
   supplyApy?: RateField;
+  lstApr?: RateField;
   defiSpringSupplyApr?: RateField;
   btcFiSupplyApr?: RateField;
 } | null | undefined): number => {
-  const directSupply = extractRateValue(stats?.supplyApy);
-  if (directSupply > 0) return directSupply;
-
-  const defiSpringSupply = extractRateValue(stats?.defiSpringSupplyApr);
-  if (defiSpringSupply > 0) return defiSpringSupply;
-
-  return extractRateValue(stats?.btcFiSupplyApr);
+  const base = extractRateValue(stats?.supplyApy);
+  const lst = extractRateValue(stats?.lstApr);
+  const defiSpring = extractRateValue(stats?.defiSpringSupplyApr);
+  const btcFi = extractRateValue(stats?.btcFiSupplyApr);
+  return base + lst + defiSpring + btcFi;
 };
 
 type ApiAsset = {
@@ -80,6 +86,7 @@ type ApiAsset = {
   stats?: {
     borrowApr?: RateField;
     supplyApy?: RateField;
+    lstApr?: RateField;
     defiSpringSupplyApr?: RateField;
     btcFiSupplyApr?: RateField;
   } | null;

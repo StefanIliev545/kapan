@@ -44,7 +44,10 @@ export function encodeSwapCtx(token: string, minOut: bigint, data: `0x${string}`
   return encodeAbiParameters([{ type: "address" }, { type: "uint256" }, { type: "bytes" }], [token as Address, minOut, data]);
 }
 
-/** Morpho conditional post-instructions for isMax (withdraw remaining). */
+/** Morpho conditional post-instructions for isMax (withdraw all collateral).
+ * Uses GetSupplyBalance to query the full collateral balance on-chain,
+ * then withdraws it all. This adds one instruction vs the chunk version,
+ * shifting all subsequent UTXO indices by +1. */
 export function buildMorphoMaxConditionalPost(p: string, debt: string, user: string, oldC: string, newC: string, col: string, to: string, mgr: string): ProtocolInstruction[] {
   return [
     createRouterInstruction(encodeApprove(1, p)),
@@ -69,6 +72,7 @@ export function buildMorphoChunkConditionalPost(p: string, debt: string, user: s
     createProtocolInstruction(p, encodeLendingInstruction(LendingOp.DepositCollateral, col, user, 0n, newC, 4)),
     createProtocolInstruction(p, encodeLendingInstruction(LendingOp.Borrow, to, user, 0n, newC, 0)),
     createRouterInstruction(encodePushToken(6, mgr)),
+    createRouterInstruction(encodePushToken(3, user)),
   ];
 }
 
@@ -108,12 +112,13 @@ export function buildEulerConditionalPost(e: EulerCondParams): ProtocolInstructi
   out.push(createProtocolInstruction(e.proto, encodeLendingInstruction(LendingOp.Borrow, e.to, e.user, 0n, bC, 0)));
   const bU = u++;
   out.push(createRouterInstruction(encodePushToken(bU, e.mgr)));
-  if (e.isMax) out.push(createRouterInstruction(encodePushToken(3, e.user)));
+  // Limit orders may fill at a better price — always refund repay surplus to user
+  out.push(createRouterInstruction(encodePushToken(3, e.user)));
   return out;
 }
 
 /** Standard (Aave/Compound/Venus) conditional post-instructions. */
-export function buildStandardConditionalPost(proto: string, debt: string, user: string, ctx: string | undefined, to: string, mgr: string, isMax: boolean): ProtocolInstruction[] {
+export function buildStandardConditionalPost(proto: string, debt: string, user: string, ctx: string | undefined, to: string, mgr: string): ProtocolInstruction[] {
   const c = ctx || "0x";
   const out: ProtocolInstruction[] = [
     createRouterInstruction(encodeApprove(1, proto)),
@@ -121,7 +126,9 @@ export function buildStandardConditionalPost(proto: string, debt: string, user: 
     createProtocolInstruction(proto, encodeLendingInstruction(LendingOp.Borrow, to, user, 0n, c, 0)),
     createRouterInstruction(encodePushToken(4, mgr)),
   ];
-  if (isMax) out.push(createRouterInstruction(encodePushToken(3, user)));
+  // Limit orders may fill at a better price than expected, so the repay
+  // output (UTXO[3]) can contain a surplus. Always refund it to the user.
+  out.push(createRouterInstruction(encodePushToken(3, user)));
   return out;
 }
 

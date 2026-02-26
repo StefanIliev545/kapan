@@ -594,12 +594,9 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
         ? collateralBalance
         : (collateralBalance * repayAmountRaw) / currentDebtBalance;
 
-      // Only use GetSupplyBalance sweep for isMax single-chunk (reads remaining balance on-chain).
-      // For multi-chunk, the same post-instructions are replayed for every iteration by the contract,
-      // so GetSupplyBalance would try to sweep ALL remaining collateral on the first chunk.
-      // Instead, use fixed proportional amounts per chunk.
-      const useMaxSweep = isMax && numChunks === 1;
-      const postInstructions = useMaxSweep
+      // Max flow uses GetSupplyBalance to query full collateral on-chain;
+      // chunk flow uses a fixed proportional amount (no GetSupplyBalance needed).
+      const postInstructions = isMax && numChunks === 1
         ? buildMorphoMaxConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress)
         : buildMorphoChunkConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress, proportionalCollateral / BigInt(numChunks));
       return { preInstructions: [], postInstructions };
@@ -620,7 +617,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
 
     // Standard flow (Aave, Compound, Venus) - no collateral migration needed
     const postInstructions = buildStandardConditionalPost(
-      normalizedProtocol, debtFromToken, userAddress, context, selectedTo.address, conditionalOrderManagerAddress, isMax,
+      normalizedProtocol, debtFromToken, userAddress, context, selectedTo.address, conditionalOrderManagerAddress,
     );
     return { preInstructions: [], postInstructions };
   }, [selectedTo, userAddress, effectiveLimitOrderNewDebt, conditionalOrderManagerAddress, cowFlashLoanInfo, protocolName, debtFromToken, context, isMorpho, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, collateralBalance, numChunks, isEuler, oldEulerContextEncoded, newEulerContextEncoded, eulerCollaterals, eulerBorrowVault, oldSubAccountIndex, newSubAccountIndex, isMax, repayAmountRaw, currentDebtBalance]);

@@ -246,13 +246,13 @@ export const CrossTopologyMarketsSection: FC<CrossTopologyMarketsSectionProps> =
                     return (
                       <th
                         key={header.id}
-                        className={`label-text-xs pb-2 ${
+                        className={`market-th ${
                           isMarket
                             ? "text-left"
                             : isExtra
                               ? "w-8"
                               : "text-right"
-                        } ${canSort ? "hover:text-base-content/60 cursor-pointer transition-colors" : ""}`}
+                        } ${canSort ? "hover:text-base-content/50 cursor-pointer" : ""}`}
                         onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                       >
                         {!header.isPlaceholder && (
@@ -271,7 +271,7 @@ export const CrossTopologyMarketsSection: FC<CrossTopologyMarketsSectionProps> =
             </thead>
             <tbody>
               {table.getRowModel().rows.map(row => (
-                <tr key={row.id} className="group">
+                <tr key={row.id} className="market-row">
                   {row.getVisibleCells().map(cell => {
                     const columnId = cell.column.id;
                     const isMarket = columnId === "market";
@@ -280,11 +280,11 @@ export const CrossTopologyMarketsSection: FC<CrossTopologyMarketsSectionProps> =
                     return (
                       <td
                         key={cell.id}
-                        className={`group-hover:bg-base-200/30 py-2.5 transition-colors ${
+                        className={`market-td ${
                           isMarket
-                            ? "rounded-l-lg pl-3"
+                            ? "pl-3"
                             : isExtra
-                              ? "rounded-r-lg pr-3 text-right"
+                              ? "pr-3 text-right"
                               : "text-right"
                         }`}
                       >
@@ -307,11 +307,11 @@ export const CrossTopologyMarketsSection: FC<CrossTopologyMarketsSectionProps> =
       </div>
 
       {/* Mobile cards */}
-      <div className="block space-y-2 md:hidden">
+      <div className="block space-y-1.5 md:hidden">
         {rows.map(row => (
           <div
             key={row.tokenAddress}
-            className="border-base-300/50 bg-base-200/20 hover:bg-base-200/40 rounded-lg border px-3 py-2 transition-colors"
+            className="market-card"
           >
             <div className="flex items-center gap-2">
               <TokenIcon symbol={row.symbol} customSize={24} />

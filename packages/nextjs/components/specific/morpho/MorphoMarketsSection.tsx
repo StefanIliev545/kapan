@@ -555,15 +555,15 @@ function MobileMarketRow({ row, usd, chainId, onSupply, onLoop }: MobileMarketRo
 
   return (
     <div
-      className={`cursor-pointer rounded-lg border transition-colors ${
+      className={`cursor-pointer border transition-colors duration-200 ${
         isExpanded
-          ? 'border-primary/30 bg-base-200/40'
-          : 'border-base-300/50 bg-base-200/20 hover:bg-base-200/40'
+          ? 'border-base-content/10 bg-base-content/[0.04]'
+          : 'market-card'
       }`}
       onClick={handleToggle}
     >
       {/* Main row */}
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5">
         {/* Token pair icons + name */}
         <TokenPairAvatars collateralSymbol={row.collateralSymbol} loanSymbol={row.loanSymbol} />
         <div className="min-w-0 flex-1">
@@ -862,16 +862,16 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       id: "actions",
       header: "",
       cell: info => (
-        <Flex gap="6" align="center" justify="end" className="ml-6">
+        <Flex gap="5" align="center" justify="end" className="ml-4">
           <button
             onClick={() => handleSupplyClick(info.row.original.market)}
-            className="text-base-content hover:text-primary text-sm font-medium transition-colors"
+            className="market-action-primary"
           >
             Supply
           </button>
           <button
             onClick={() => handleLoopClick(info.row.original.market)}
-            className="text-base-content hover:text-primary text-sm font-medium transition-colors"
+            className="market-action"
           >
             Loop
           </button>
@@ -1120,7 +1120,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
   return (
     <Flex direction="column" gap="3">
       {/* Filter bar - responsive */}
-      <Flex align="center" gap="2" wrap="wrap" className="px-1">
+      <Flex align="center" gap="2" wrap="wrap" className="market-filter-bar">
         <Box className="w-full sm:w-auto sm:min-w-[200px] sm:max-w-[280px]">
           <TextField.Root
             size="1"
@@ -1204,7 +1204,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       ) : (
         <>
           {/* Mobile: Card-based layout */}
-          <div className="block space-y-2 md:hidden">
+          <div className="block space-y-1.5 md:hidden">
             {rows.map(row => (
               <MobileMarketRowItem
                 key={row.original.market.uniqueKey}
@@ -1227,12 +1227,12 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                       {headerGroup.headers.map(header => (
                         <th
                           key={header.id}
-                          className={`label-text-xs pb-2 ${
+                          className={`market-th ${
                             header.id === "market" ? "text-left" :
                             header.id === "util" ? "text-center" :
-                            header.id === "actions" ? "" :
+                            header.id === "actions" ? "border-0" :
                             "text-right"
-                          } ${header.column.getCanSort() ? "hover:text-base-content/60 cursor-pointer transition-colors" : ""}`}
+                          } ${header.column.getCanSort() ? "hover:text-base-content/50 cursor-pointer" : ""}`}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <span className={`inline-flex items-center gap-1 ${header.column.getIsSorted() ? "text-primary" : ""}`}>
@@ -1249,21 +1249,18 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                   {rows.map(row => (
                     <tr
                       key={row.id}
-                      className="hover:bg-base-200 transition-colors rounded-lg"
+                      className="market-row"
                     >
-                      {row.getVisibleCells().map((cell, idx, cells) => {
-                        const isFirst = idx === 0;
-                        const isLast = idx === cells.length - 1;
-
+                      {row.getVisibleCells().map((cell) => {
                         return (
                           <td
                             key={cell.id}
-                            className={`py-2.5 ${
+                            className={`market-td ${
                               cell.column.id === "market" ? "pl-3" :
                               cell.column.id === "util" ? "text-center" :
                               cell.column.id === "actions" ? "pr-3" :
                               "text-right tabular-nums"
-                            } ${isFirst ? "rounded-l-lg" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                            }`}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>

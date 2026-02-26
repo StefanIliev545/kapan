@@ -8,6 +8,7 @@ import { BorrowPosition } from "../../BorrowPosition";
 import { TokenSelectModal } from "../../modals/TokenSelectModal";
 import { MultiplyEvmModal } from "../../modals/MultiplyEvmModal";
 import { LTVAutomationModal } from "../../modals/LTVAutomationModal";
+import { CollateralSwapModal } from "../../modals/CollateralSwapModal";
 import { CollapsibleSection } from "~~/components/common/CollapsibleSection";
 import { BaseProtocolHeader, type HeaderMetric } from "../common/BaseProtocolHeader";
 import { CrossTopologyMarketsSection } from "../common/CrossTopologyMarketsSection";
@@ -89,7 +90,9 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
   const borrowSelectModal = useModal();
   const multiplyModal = useModal();
   const adlModal = useModal();
+  const swapModal = useModal();
 
+  const [selectedSwapPosition, setSelectedSwapPosition] = useState<ProtocolPosition | null>(null);
   const [isMarketsOpen, setIsMarketsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
 
@@ -289,6 +292,17 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
     });
   }, [isCollapsed]);
 
+  // ── Collateral swap handler ─────────────────────────────────────
+  const handleOpenSwap = useCallback((pos: ProtocolPosition) => {
+    setSelectedSwapPosition(pos);
+    swapModal.open();
+  }, [swapModal]);
+
+  const handleCloseSwap = useCallback(() => {
+    swapModal.close();
+    setSelectedSwapPosition(null);
+  }, [swapModal]);
+
   // ── Header metrics ─────────────────────────────────────────────
   const headerMetrics: HeaderMetric[] = useMemo(() => [
     { label: "Balance", value: metrics.netBalance, type: "currency" },
@@ -436,6 +450,8 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
                       networkType="evm"
                       chainId={chainId}
                       position={borrowPosition}
+                      availableActions={{ deposit: true, withdraw: true, swap: true }}
+                      onSwap={() => handleOpenSwap(pos)}
                       adlActive={
                         activeADL?.triggerParams?.collateralToken?.toLowerCase() === pos.tokenAddress.toLowerCase()
                       }
@@ -532,6 +548,25 @@ export const VenusProtocolView: FC<{ chainId?: number; enabledFeatures?: { swap?
           }}
           totalCollateralUsd={totalCollateralUsd}
           totalDebtUsd={totalDebtUsd}
+        />
+      )}
+
+      {/* Collateral Swap Modal */}
+      {selectedSwapPosition && swapModal.isOpen && (
+        <CollateralSwapModal
+          isOpen={swapModal.isOpen}
+          onClose={handleCloseSwap}
+          protocolName="Venus"
+          availableAssets={collateralAssets}
+          initialFromTokenAddress={selectedSwapPosition.tokenAddress}
+          chainId={chainId || 1}
+          position={{
+            name: selectedSwapPosition.name,
+            tokenAddress: selectedSwapPosition.tokenAddress,
+            decimals: selectedSwapPosition.tokenDecimals || 18,
+            balance: selectedSwapPosition.tokenBalance,
+            type: "supply",
+          }}
         />
       )}
     </div>
