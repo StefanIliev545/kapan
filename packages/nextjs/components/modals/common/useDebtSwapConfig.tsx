@@ -594,10 +594,10 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
         ? collateralBalance
         : (collateralBalance * repayAmountRaw) / currentDebtBalance;
 
-      // Both max and chunk flows use fixed collateral amounts — no GetSupplyBalance needed
-      // because Morpho debt swaps don't change the collateral token, only the market context.
+      // Max flow uses GetSupplyBalance to query full collateral on-chain;
+      // chunk flow uses a fixed proportional amount (no GetSupplyBalance needed).
       const postInstructions = isMax && numChunks === 1
-        ? buildMorphoMaxConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress, collateralBalance)
+        ? buildMorphoMaxConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress)
         : buildMorphoChunkConditionalPost(normalizedProtocol, debtFromToken, userAddress, oldMorphoContextEncoded, newMorphoContextEncoded, collateralTokenAddress, selectedTo.address, conditionalOrderManagerAddress, proportionalCollateral / BigInt(numChunks));
       return { preInstructions: [], postInstructions };
     }
