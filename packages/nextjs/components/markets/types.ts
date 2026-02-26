@@ -3,7 +3,7 @@
  */
 
 export type NetworkType = "evm" | "starknet";
-export type SupportedNetwork = "arbitrum" | "base" | "optimism" | "linea" | "starknet";
+export type SupportedNetwork = "arbitrum" | "base" | "optimism" | "linea" | "starknet" | "ethereum";
 
 export type MarketProps = {
   icon: string;

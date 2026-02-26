@@ -1,22 +1,25 @@
 import { FC } from "react";
 import Image from "next/image";
+import type { MarketData } from "./MarketsSection";
 
 interface RatePillProps {
   variant: "supply" | "borrow";
   label: string;
   rate: string;
   networkType: "evm" | "starknet";
-  protocol: "aave" | "nostra" | "venus" | "vesu" | "compound";
+  protocol: MarketData["protocol"];
   showIcons?: boolean;
   poolName?: string;
 }
 
-const protocolIcons: Record<"aave" | "nostra" | "venus" | "vesu" | "compound", string> = {
+const protocolIcons: Record<MarketData["protocol"], string> = {
   aave: "/logos/aave.svg",
   nostra: "/logos/nostra.svg",
   venus: "/logos/venus.svg",
   vesu: "/logos/vesu.svg",
   compound: "/logos/compound.svg",
+  morpho: "/logos/morpho.svg",
+  euler: "/logos/euler.svg",
 };
 
 export const RatePill: FC<RatePillProps> = ({ variant, rate, protocol, showIcons = true, poolName }) => {

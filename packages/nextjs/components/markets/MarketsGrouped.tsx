@@ -3,15 +3,9 @@
 import { FC, useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  createColumnHelper,
-  type SortingState,
-} from "@tanstack/react-table";
+import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+// TanStack Table is used by protocol-specific market sections (MorphoMarketsSection, etc.)
+// This grouped view uses custom sorting for unified layout with collapsible sections
 import { ScrollArea } from "@radix-ui/themes";
 import { ContractResponse } from "../specific/vesu/VesuMarkets";
 import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
@@ -27,13 +21,16 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
 import { useCompoundMarketData } from "~~/hooks/useCompoundMarketData";
 import { useVesuV2Assets } from "~~/hooks/useVesuV2Assets";
-import { arbitrum, base, linea, optimism } from "wagmi/chains";
+import { arbitrum, base, linea, optimism, mainnet } from "wagmi/chains";
 import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates } from "~~/utils/protocols";
 import formatPercentage from "~~/utils/formatPercentage";
 import { useExternalYields } from "~~/hooks/useExternalYields";
 import { aaveRateToAPY, venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
+import { useMorphoMarketsQuery } from "~~/utils/morpho/marketApi";
+import { useEulerVaultsQuery } from "~~/utils/euler/vaultApi";
+import { getMorphoMarketUrl } from "~~/utils/morpho";
 
 const TOKEN_ALIASES: Record<string, string> = {
   usdt: "USDT",
@@ -375,9 +372,109 @@ const useVesuData = (): MarketData[] => {
   ]);
 };
 
+// ── Morpho & Euler data hooks ────────────────────────────────────────
+
+/** Euler app network names for building vault URLs */
+const EULER_NETWORK_NAMES: Record<number, string> = {
+  1: "ethereum", 42161: "arbitrum", 8453: "base", 10: "optimism",
+};
+
+/**
+ * Morpho data hook — returns individual markets with per-market links and TVL.
+ * Grouping/collapse is handled by GroupMarketsTable for clean separation.
+ */
+const useMorphoData = (): MarketData[] => {
+  const mainnetQuery = useMorphoMarketsQuery(mainnet.id);
+  const arbitrumQuery = useMorphoMarketsQuery(arbitrum.id);
+  const baseQuery = useMorphoMarketsQuery(base.id);
+
+  return useMemo(() => {
+    const results: MarketData[] = [];
+    const queries = [
+      { data: mainnetQuery.data, chainId: mainnet.id },
+      { data: arbitrumQuery.data, chainId: arbitrum.id },
+      { data: baseQuery.data, chainId: base.id },
+    ];
+
+    queries.forEach(({ data, chainId }) => {
+      if (!data) return;
+      const network = CHAIN_ID_TO_NETWORK[chainId] || "ethereum";
+      data.forEach(market => {
+        const supplyApy = (market.state?.supplyApy ?? 0) * 100;
+        const borrowApy = (market.state?.borrowApy ?? 0) * 100;
+        const utilization = (market.state?.utilization ?? 0) * 100;
+        const collateralSymbol = market.collateralAsset?.symbol ?? "";
+        const loanSymbol = market.loanAsset.symbol;
+        results.push({
+          icon: tokenNameToLogo(loanSymbol.toLowerCase()),
+          name: loanSymbol,
+          supplyRate: `${formatPercentage(supplyApy, 2, false)}%`,
+          borrowRate: `${formatPercentage(borrowApy, 2, false)}%`,
+          price: market.loanAsset.priceUsd?.toFixed(2) ?? "0.00",
+          utilization: utilization.toFixed(2),
+          address: market.uniqueKey,
+          networkType: "evm",
+          network,
+          protocol: "morpho",
+          poolName: collateralSymbol || undefined,
+          tvlUsd: market.state?.supplyAssetsUsd ?? undefined,
+          marketUrl: getMorphoMarketUrl(chainId, market.uniqueKey, collateralSymbol, loanSymbol) ?? undefined,
+        });
+      });
+    });
+
+    return results;
+  }, [mainnetQuery.data, arbitrumQuery.data, baseQuery.data]);
+};
+
+const useEulerData = (): MarketData[] => {
+  const arbitrumQuery = useEulerVaultsQuery(arbitrum.id);
+  const baseQuery = useEulerVaultsQuery(base.id);
+  const optimismQuery = useEulerVaultsQuery(optimism.id);
+  const lineaQuery = useEulerVaultsQuery(linea.id);
+
+  return useMemo(() => {
+    const results: MarketData[] = [];
+    const queries = [
+      { data: arbitrumQuery.data, chainId: arbitrum.id },
+      { data: baseQuery.data, chainId: base.id },
+      { data: optimismQuery.data, chainId: optimism.id },
+      { data: lineaQuery.data, chainId: linea.id },
+    ];
+
+    queries.forEach(({ data, chainId }) => {
+      if (!data) return;
+      const network = CHAIN_ID_TO_NETWORK[chainId] || "arbitrum";
+      const eulerNetwork = EULER_NETWORK_NAMES[chainId] || "ethereum";
+      data.forEach(vault => {
+        const supplyApy = (vault.supplyApy ?? 0) * 100;
+        const borrowApy = (vault.borrowApy ?? 0) * 100;
+        const utilization = (vault.utilization ?? 0) * 100;
+        results.push({
+          icon: tokenNameToLogo(vault.asset.symbol.toLowerCase()),
+          name: vault.asset.symbol,
+          supplyRate: `${formatPercentage(supplyApy, 2, false)}%`,
+          borrowRate: `${formatPercentage(borrowApy, 2, false)}%`,
+          price: "0.00",
+          utilization: utilization.toFixed(2),
+          address: vault.address,
+          networkType: "evm",
+          network,
+          protocol: "euler",
+          poolName: vault.name,
+          marketUrl: `https://app.euler.finance/vault/${vault.address}?network=${eulerNetwork}`,
+        });
+      });
+    });
+
+    return results;
+  }, [arbitrumQuery.data, baseQuery.data, optimismQuery.data, lineaQuery.data]);
+};
+
 // ── TanStack Table for inner group markets ──────────────────────────
 
 const networkIcons: Record<MarketData["network"], string> = {
+  ethereum: "/logos/ethereum.svg",
   arbitrum: "/logos/arb.svg",
   base: "/logos/base.svg",
   optimism: "/logos/optimism.svg",
@@ -391,9 +488,12 @@ const protocolIcons: Record<MarketData["protocol"], string> = {
   venus: "/logos/venus.svg",
   vesu: "/logos/vesu.svg",
   compound: "/logos/compound.svg",
+  morpho: "/logos/morpho.svg",
+  euler: "/logos/euler.svg",
 };
 
 const networkNames: Record<MarketData["network"], string> = {
+  ethereum: "Ethereum",
   arbitrum: "Arbitrum",
   base: "Base",
   optimism: "Optimism",
@@ -407,148 +507,308 @@ const protocolNames: Record<MarketData["protocol"], string> = {
   venus: "Venus",
   vesu: "Vesu",
   compound: "Compound",
+  morpho: "Morpho",
+  euler: "Euler",
 };
 
-const groupColumnHelper = createColumnHelper<MarketData>();
+/** Format USD value compactly: $1.2M, $340K, $12.5B, etc. */
+const formatTvl = (usd: number | undefined): string => {
+  if (usd == null || usd <= 0) return "—";
+  if (usd >= 1e9) return `$${(usd / 1e9).toFixed(1)}B`;
+  if (usd >= 1e6) return `$${(usd / 1e6).toFixed(1)}M`;
+  if (usd >= 1e3) return `$${(usd / 1e3).toFixed(0)}K`;
+  return `$${usd.toFixed(0)}`;
+};
 
-const groupColumns = [
-  groupColumnHelper.accessor("network", {
-    id: "network",
-    header: "Network",
-    cell: info => {
-      const network = info.getValue();
-      return (
-        <div className="flex items-center gap-2">
-          <div className="relative size-4">
-            <Image src={networkIcons[network]} alt={network} fill className="object-contain" />
-          </div>
-          <span className="text-sm">{networkNames[network]}</span>
-        </div>
-      );
-    },
-    enableSorting: false,
-  }),
-  groupColumnHelper.accessor("protocol", {
-    id: "protocol",
-    header: "Protocol",
-    cell: info => {
-      const protocol = info.getValue();
-      const poolName = info.row.original.poolName;
-      return (
-        <div className="flex items-center gap-2">
-          <div className="relative size-4">
-            <Image src={protocolIcons[protocol]} alt={protocol} fill className="object-contain" />
-          </div>
-          <span className="text-sm">
-            {protocolNames[protocol]}
-            {poolName ? <span className="text-base-content/40"> · {poolName}</span> : ""}
-          </span>
-        </div>
-      );
-    },
-    enableSorting: false,
-  }),
-  groupColumnHelper.accessor("utilization", {
-    id: "utilization",
-    header: "Utilization",
-    cell: info => (
-      <span className="text-base-content/50 text-sm tabular-nums">{info.getValue()}%</span>
-    ),
-    sortingFn: (rowA, rowB) =>
-      parseFloat(rowA.original.utilization) - parseFloat(rowB.original.utilization),
-  }),
-  groupColumnHelper.accessor("supplyRate", {
-    id: "supplyRate",
-    header: "Supply APY",
-    cell: info => (
-      <span className="text-success text-sm font-semibold tabular-nums">{info.getValue()}</span>
-    ),
-    sortingFn: (rowA, rowB) =>
-      parseFloat(rowA.original.supplyRate) - parseFloat(rowB.original.supplyRate),
-  }),
-  groupColumnHelper.accessor("borrowRate", {
-    id: "borrowRate",
-    header: "Borrow APR",
-    cell: info => (
-      <span className="text-sm tabular-nums">{info.getValue()}</span>
-    ),
-    sortingFn: (rowA, rowB) =>
-      parseFloat(rowA.original.borrowRate) - parseFloat(rowB.original.borrowRate),
-  }),
+// Protocols with many entries per token — these get collapsed into expandable sections
+const COLLAPSIBLE_PROTOCOLS = new Set<MarketData["protocol"]>(["morpho", "euler"]);
+const COLLAPSIBLE_LABELS: Record<string, string> = { morpho: "Collateral / Loan pairs", euler: "Vaults" };
+
+type SortColumn = "borrowRate" | "supplyRate" | "utilization" | "tvlUsd";
+type SortDir = "asc" | "desc";
+
+/** A single row or a collapsible group, unified for sorting */
+type TableItem =
+  | { kind: "row"; key: string; market: MarketData; sortSupply: number; sortBorrow: number; sortUtil: number; sortTvl: number }
+  | { kind: "group"; key: string; protocol: MarketData["protocol"]; network: MarketData["network"]; markets: MarketData[]; bestSupply: number; bestBorrow: number; totalTvl: number; sortSupply: number; sortBorrow: number; sortUtil: number; sortTvl: number };
+
+function buildTableItems(markets: MarketData[]): TableItem[] {
+  const rows: TableItem[] = [];
+  // Groups keyed by "protocol:network"
+  const groups = new Map<string, { protocol: MarketData["protocol"]; network: MarketData["network"]; markets: MarketData[] }>();
+
+  markets.forEach(m => {
+    if (COLLAPSIBLE_PROTOCOLS.has(m.protocol)) {
+      const gk = `${m.protocol}:${m.network}`;
+      const g = groups.get(gk) || { protocol: m.protocol, network: m.network, markets: [] };
+      g.markets.push(m);
+      groups.set(gk, g);
+    } else {
+      rows.push({
+        kind: "row",
+        key: `${m.protocol}-${m.network}-${m.address}-${m.poolName ?? ""}`,
+        market: m,
+        sortSupply: parseFloat(m.supplyRate) || 0,
+        sortBorrow: parseFloat(m.borrowRate) || 0,
+        sortUtil: parseFloat(m.utilization) || 0,
+        sortTvl: m.tvlUsd ?? 0,
+      });
+    }
+  });
+
+  groups.forEach((g, gk) => {
+    const bestSupply = Math.max(...g.markets.map(m => parseFloat(m.supplyRate) || 0));
+    const bestBorrow = Math.min(...g.markets.map(m => parseFloat(m.borrowRate) || 0));
+    const totalTvl = g.markets.reduce((s, m) => s + (m.tvlUsd ?? 0), 0);
+    const avgUtil = g.markets.reduce((s, m) => s + (parseFloat(m.utilization) || 0), 0) / g.markets.length;
+    rows.push({
+      kind: "group",
+      key: gk,
+      protocol: g.protocol,
+      network: g.network,
+      markets: g.markets,
+      bestSupply,
+      bestBorrow,
+      totalTvl,
+      sortSupply: bestSupply,
+      sortBorrow: bestBorrow,
+      sortUtil: avgUtil,
+      sortTvl: totalTvl,
+    });
+  });
+
+  return rows;
+}
+
+function sortTableItems(items: TableItem[], col: SortColumn, dir: SortDir): TableItem[] {
+  const key = col === "supplyRate" ? "sortSupply" : col === "borrowRate" ? "sortBorrow" : col === "utilization" ? "sortUtil" : "sortTvl";
+  const mult = dir === "asc" ? 1 : -1;
+  return [...items].sort((a, b) => (a[key] - b[key]) * mult);
+}
+
+/** Header row for the unified layout */
+const COLUMNS = [
+  { id: "network" as const, label: "Network", center: false, sortable: false },
+  { id: "protocol" as const, label: "Protocol", center: false, sortable: false },
+  { id: "tvlUsd" as const, label: "TVL", center: true, sortable: true },
+  { id: "utilization" as const, label: "Utilization", center: true, sortable: true },
+  { id: "supplyRate" as const, label: "Supply APY", center: true, sortable: true },
+  { id: "borrowRate" as const, label: "Borrow APR", center: true, sortable: true },
 ];
 
-/** Inner table for a single token group — uses TanStack Table for sorting */
+/** Inner table for a single token group — unified sorted layout with collapsible protocol sections */
 const GroupMarketsTable: FC<{ markets: MarketData[] }> = ({ markets }) => {
-  const [sorting, setSorting] = useState<SortingState>([{ id: "borrowRate", desc: false }]);
+  const [sortCol, setSortCol] = useState<SortColumn>("borrowRate");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  const table = useReactTable({
-    data: markets,
-    columns: groupColumns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
+  const items = useMemo(() => buildTableItems(markets), [markets]);
+  const sorted = useMemo(() => sortTableItems(items, sortCol, sortDir), [items, sortCol, sortDir]);
+
+  const toggleSort = useCallback((col: SortColumn) => {
+    setSortCol(prev => {
+      if (prev === col) {
+        setSortDir(d => (d === "asc" ? "desc" : "asc"));
+        return col;
+      }
+      setSortDir("asc");
+      return col;
+    });
+  }, []);
 
   return (
     <div className="border-x border-b border-base-content/[0.05] overflow-hidden">
       <ScrollArea scrollbars="horizontal" type="auto">
-        <table className="w-full text-sm">
-          <thead>
-            {table.getHeaderGroups().map(headerGroup => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map(header => {
-                  const canSort = header.column.getCanSort();
-                  const columnId = header.column.id;
-                  const isCenter = columnId === "utilization" || columnId === "supplyRate" || columnId === "borrowRate";
+        {/* Header */}
+        <div className="flex items-center">
+          {COLUMNS.map(col => (
+            <div
+              key={col.id}
+              className={`market-th flex-1 ${col.center ? "text-center" : "text-left"} ${
+                col.sortable ? "hover:text-base-content/50 cursor-pointer select-none" : ""
+              }`}
+              onClick={col.sortable ? () => toggleSort(col.id as SortColumn) : undefined}
+            >
+              <span className={`inline-flex items-center gap-1 ${sortCol === col.id ? "text-base-content/60" : ""}`}>
+                {col.label}
+                {sortCol === col.id && sortDir === "desc" && <ChevronDown className="size-3" />}
+                {sortCol === col.id && sortDir === "asc" && <ChevronUp className="size-3" />}
+              </span>
+            </div>
+          ))}
+        </div>
 
-                  return (
-                    <th
-                      key={header.id}
-                      className={`market-th ${isCenter ? "text-center" : "text-left"} ${
-                        canSort ? "hover:text-base-content/50 cursor-pointer" : ""
-                      }`}
-                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
-                    >
-                      <span className={`inline-flex items-center gap-1 ${header.column.getIsSorted() ? "text-base-content/60" : ""}`}>
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getIsSorted() === "desc" && <ChevronDown className="size-3" />}
-                        {header.column.getIsSorted() === "asc" && <ChevronUp className="size-3" />}
-                      </span>
-                    </th>
-                  );
-                })}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map(row => (
-              <tr key={row.id} className="market-row">
-                {row.getVisibleCells().map(cell => {
-                  const columnId = cell.column.id;
-                  const isCenter = columnId === "utilization" || columnId === "supplyRate" || columnId === "borrowRate";
-
-                  return (
-                    <td
-                      key={cell.id}
-                      className={`market-td px-4 ${isCenter ? "text-center" : ""}`}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* Rows */}
+        {sorted.map(item =>
+          item.kind === "row" ? (
+            <div key={item.key} className="market-row flex items-center">
+              <div className="market-td flex-1 px-4">
+                <div className="flex items-center gap-2">
+                  <div className="relative size-4"><Image src={networkIcons[item.market.network]} alt={item.market.network} fill className="object-contain" /></div>
+                  <span className="text-sm">{networkNames[item.market.network]}</span>
+                </div>
+              </div>
+              <div className="market-td flex-1 px-4">
+                <div className="flex items-center gap-2">
+                  <div className="relative size-4"><Image src={protocolIcons[item.market.protocol]} alt={item.market.protocol} fill className="object-contain" /></div>
+                  {item.market.marketUrl ? (
+                    <a href={item.market.marketUrl} target="_blank" rel="noopener noreferrer" className="group/link flex items-center gap-1 text-sm hover:text-primary transition-colors">
+                      {protocolNames[item.market.protocol]}
+                      {item.market.poolName && <span className="text-base-content/40"> · {item.market.poolName}</span>}
+                      <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-50" />
+                    </a>
+                  ) : (
+                    <span className="text-sm">
+                      {protocolNames[item.market.protocol]}
+                      {item.market.poolName && <span className="text-base-content/40"> · {item.market.poolName}</span>}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="market-td flex-1 px-4 text-center"><span className="text-base-content/50 text-sm tabular-nums">{formatTvl(item.market.tvlUsd)}</span></div>
+              <div className="market-td flex-1 px-4 text-center"><span className="text-base-content/50 text-sm tabular-nums">{item.market.utilization}%</span></div>
+              <div className="market-td flex-1 px-4 text-center"><span className="text-success text-sm font-semibold tabular-nums">{item.market.supplyRate}</span></div>
+              <div className="market-td flex-1 px-4 text-center"><span className="text-sm tabular-nums">{item.market.borrowRate}</span></div>
+            </div>
+          ) : (
+            <CollapsibleProtocolGroup key={item.key} item={item} />
+          ),
+        )}
       </ScrollArea>
     </div>
   );
 };
 
+/** Column config for the inner expanded sub-table */
+const INNER_COLUMNS: { id: string; label: string; sortKey?: SortColumn }[] = [
+  { id: "market", label: "" },
+  { id: "tvlUsd", label: "TVL", sortKey: "tvlUsd" },
+  { id: "utilization", label: "Util", sortKey: "utilization" },
+  { id: "supplyRate", label: "Supply", sortKey: "supplyRate" },
+  { id: "borrowRate", label: "Borrow", sortKey: "borrowRate" },
+];
+
+/** Sort MarketData[] by a given column */
+function sortMarkets(markets: MarketData[], col: SortColumn, dir: SortDir): MarketData[] {
+  const mult = dir === "asc" ? 1 : -1;
+  return [...markets].sort((a, b) => {
+    const av = col === "tvlUsd" ? (a.tvlUsd ?? 0) : parseFloat((a as any)[col]) || 0;
+    const bv = col === "tvlUsd" ? (b.tvlUsd ?? 0) : parseFloat((b as any)[col]) || 0;
+    return (av - bv) * mult;
+  });
+}
+
+/** Expandable group row for Morpho/Euler within the unified sorted list */
+const CollapsibleProtocolGroup: FC<{
+  item: Extract<TableItem, { kind: "group" }>;
+}> = ({ item }) => {
+  const { protocol, network, markets, bestSupply, bestBorrow, totalTvl } = item;
+
+  // Independent sort state for the expanded sub-table
+  const [innerSortCol, setInnerSortCol] = useState<SortColumn>("borrowRate");
+  const [innerSortDir, setInnerSortDir] = useState<SortDir>("asc");
+
+  const sorted = useMemo(
+    () => sortMarkets(markets, innerSortCol, innerSortDir),
+    [markets, innerSortCol, innerSortDir],
+  );
+
+  const toggleInnerSort = useCallback((col: SortColumn) => {
+    setInnerSortCol(prev => {
+      if (prev === col) {
+        setInnerSortDir(d => (d === "asc" ? "desc" : "asc"));
+        return col;
+      }
+      setInnerSortDir("asc");
+      return col;
+    });
+  }, []);
+
+  return (
+    <details className="group/coll market-row">
+      {/* Summary row — same flex layout as regular rows */}
+      <summary className="cursor-pointer list-none flex items-center hover:bg-base-content/[0.02]">
+        <div className="market-td flex-1 px-4">
+          <div className="flex items-center gap-2">
+            <div className="relative size-4"><Image src={networkIcons[network]} alt={network} fill className="object-contain" /></div>
+            <span className="text-sm">{networkNames[network]}</span>
+          </div>
+        </div>
+        <div className="market-td flex-1 px-4">
+          <div className="flex items-center gap-2">
+            <div className="relative size-4"><Image src={protocolIcons[protocol]} alt={protocol} fill className="object-contain" /></div>
+            <span className="text-sm">
+              {protocolNames[protocol]}
+              <span className="text-base-content/40"> · {markets.length} mkts</span>
+            </span>
+            <svg className="text-base-content/30 group-open/coll:text-base-content/50 size-3 transition-transform duration-200 group-open/coll:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+        <div className="market-td flex-1 px-4 text-center"><span className="text-base-content/50 text-sm tabular-nums">{formatTvl(totalTvl)}</span></div>
+        <div className="market-td flex-1 px-4 text-center"><span className="text-base-content/50 text-sm tabular-nums">—</span></div>
+        <div className="market-td flex-1 px-4 text-center"><span className="text-success text-sm font-semibold tabular-nums">{formatPercentage(bestSupply, 2, false)}%</span></div>
+        <div className="market-td flex-1 px-4 text-center"><span className="text-sm tabular-nums">{formatPercentage(bestBorrow, 2, false)}%</span></div>
+      </summary>
+
+      {/* Expanded: sortable sub-table of individual markets */}
+      <div className="bg-base-content/[0.015] border-t border-base-content/[0.04]">
+        {/* Sub-table column headers */}
+        <div className="flex items-center px-4 py-1.5 border-b border-base-content/[0.03]">
+          <div className="min-w-[320px]">
+            <span className="text-[9px] tracking-[0.12em] text-base-content/25 font-normal uppercase">
+              {COLLAPSIBLE_LABELS[protocol] || "Markets"}
+            </span>
+          </div>
+          {INNER_COLUMNS.filter(c => c.sortKey).map(col => (
+            <div
+              key={col.id}
+              className="min-w-[80px] text-center cursor-pointer select-none hover:text-base-content/50"
+              onClick={() => toggleInnerSort(col.sortKey!)}
+            >
+              <span className={`inline-flex items-center gap-0.5 text-[9px] tracking-[0.12em] uppercase font-normal ${
+                innerSortCol === col.sortKey ? "text-base-content/50" : "text-base-content/25"
+              }`}>
+                {col.label}
+                {innerSortCol === col.sortKey && innerSortDir === "desc" && <ChevronDown className="size-2.5" />}
+                {innerSortCol === col.sortKey && innerSortDir === "asc" && <ChevronUp className="size-2.5" />}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Individual market rows */}
+        {sorted.map(m => (
+          <div key={`${m.address}-${m.poolName ?? ""}`} className="flex items-center px-4 py-2 border-t border-base-content/[0.03] hover:bg-base-content/[0.02] transition-colors">
+            <div className="min-w-[320px]">
+              {m.marketUrl ? (
+                <a href={m.marketUrl} target="_blank" rel="noopener noreferrer" className="group/link inline-flex items-center gap-1.5 text-sm hover:text-primary transition-colors">
+                  {m.poolName && <span className="text-base-content/60">{m.poolName}</span>}
+                  {m.poolName && <span className="text-base-content/25">/</span>}
+                  <span className="font-medium">{m.name}</span>
+                  <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-50" />
+                </a>
+              ) : (
+                <span className="text-sm">
+                  {m.poolName && <><span className="text-base-content/60">{m.poolName}</span><span className="text-base-content/25"> / </span></>}
+                  <span className="font-medium">{m.name}</span>
+                </span>
+              )}
+            </div>
+            <span className="text-base-content/50 text-sm tabular-nums text-center min-w-[80px]">{formatTvl(m.tvlUsd)}</span>
+            <span className="text-base-content/40 text-sm tabular-nums text-center min-w-[80px]">{m.utilization}%</span>
+            <span className="text-success/80 text-sm tabular-nums text-center min-w-[90px]">{m.supplyRate}</span>
+            <span className="text-base-content/80 text-sm tabular-nums text-center min-w-[90px]">{m.borrowRate}</span>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+};
+
 // ── Main component ──────────────────────────────────────────────────
 
-export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
+export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ search, network }) => {
   const aave = useAaveLikeData("AaveGatewayView", "aave", AAVE_CHAIN_IDS);
   const compoundArbitrum = useCompoundMarketData({ chainId: arbitrum.id });
   const compoundBase = useCompoundMarketData({ chainId: base.id });
@@ -561,12 +821,15 @@ export const MarketsGrouped: FC<{ search: string }> = ({ search }) => {
   const nostra = useNostraData();
   const venus = useVenusData();
   const vesu = useVesuData();
+  const morpho = useMorphoData();
+  const euler = useEulerData();
   const [sortBy, setSortBy] = useState<"supply" | "borrow">("supply");
 
-  const all = useMemo(
-    () => [...aave, ...compound, ...nostra, ...venus, ...vesu],
-    [aave, compound, nostra, venus, vesu],
-  );
+  const all = useMemo(() => {
+    const combined = [...aave, ...compound, ...nostra, ...venus, ...vesu, ...morpho, ...euler];
+    if (!network || network === "all") return combined;
+    return combined.filter(m => m.network === network);
+  }, [aave, compound, nostra, venus, vesu, morpho, euler, network]);
 
   const groups = useMemo(() => {
     const map = new Map<

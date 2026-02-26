@@ -11,10 +11,14 @@ export interface MarketData {
   utilization: string;
   address: string;
   networkType: "evm" | "starknet";
-  network: "arbitrum" | "base" | "optimism" | "linea" | "starknet";
-  protocol: "aave" | "nostra" | "venus" | "vesu" | "compound";
+  network: "arbitrum" | "base" | "optimism" | "linea" | "starknet" | "ethereum";
+  protocol: "aave" | "nostra" | "venus" | "vesu" | "compound" | "morpho" | "euler";
   allowDeposit?: boolean;
   poolName?: string;
+  /** Total value locked in USD (for display and sorting) */
+  tvlUsd?: number;
+  /** External link to market on protocol's app */
+  marketUrl?: string;
 }
 
 interface MarketsSectionProps {
