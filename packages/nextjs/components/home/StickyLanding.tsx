@@ -19,6 +19,11 @@ const HeroScene = dynamic(() => import("./HeroScene").then(m => m.HeroScene), {
   loading: () => null,
 });
 
+const HowItWorksScene = dynamic(() => import("./HowItWorksScene").then(m => m.HowItWorksScene), {
+  ssr: false,
+  loading: () => null,
+});
+
 // ================================
 // Static Animation Constants
 // ================================
@@ -75,8 +80,6 @@ const SPRING_SCALE_INITIAL = { scale: 0 };
 const SPRING_SCALE_ANIMATE = { scale: 1 };
 const SPRING_SCALE_TRANSITION = { type: "spring" as const, bounce: 0.4, duration: 0.8 };
 
-const LINE_INITIAL = { pathLength: 0 };
-const LINE_ANIMATE = { pathLength: 1 };
 
 const FADE_UP_INITIAL = { opacity: 0, scale: 0 };
 const FADE_UP_ANIMATE = { opacity: 1, scale: 1 };
@@ -465,53 +468,6 @@ const HowItWorks = () => {
     });
   }, [getPosition]);
 
-  // Pre-compute all traveling instruction animation data
-  const instructionAnimations = useMemo(() => {
-    const instructions = [
-      { instruction: "deposit", angle: 0, delay: 0, color: "bg-success/20 text-success border-success/30" },
-      { instruction: "borrow", angle: 45, delay: 1.5, color: "bg-error/20 text-error border-error/30" },
-      { instruction: "swap", angle: 135, delay: 3, color: "bg-primary/20 text-primary border-primary/30" },
-      { instruction: "swap PT", angle: 180, delay: 4.5, color: "bg-warning/20 text-warning border-warning/30" },
-      { instruction: "repay", angle: 225, delay: 6, color: "bg-info/20 text-info border-info/30" },
-      { instruction: "move", angle: 315, delay: 7.5, color: "bg-secondary/20 text-secondary border-secondary/30" },
-    ];
-
-    return instructions.map((item) => {
-      const endPos = getPosition(item.angle, 0.65);
-      return {
-        ...item,
-        outboundInitial: { left: "50%", top: "50%", opacity: 0 },
-        outboundAnimate: {
-          left: ["50%", "50%", `${endPos.x}%`, `${endPos.x}%`],
-          top: ["50%", "50%", `${endPos.y}%`, `${endPos.y}%`],
-          opacity: [0, 1, 1, 0],
-        },
-        outboundTransition: {
-          delay: item.delay,
-          duration: 2.5,
-          repeat: Infinity,
-          repeatDelay: 3.5,
-          times: [0, 0.1, 0.7, 1],
-          ease: "easeInOut" as const,
-        },
-        returnInitial: { left: `${endPos.x}%`, top: `${endPos.y}%`, opacity: 0 },
-        returnAnimate: {
-          left: [`${endPos.x}%`, `${endPos.x}%`, "50%", "50%"],
-          top: [`${endPos.y}%`, `${endPos.y}%`, "50%", "50%"],
-          opacity: [0, 1, 1, 0],
-        },
-        returnTransition: {
-          delay: item.delay + 2.8,
-          duration: 2.5,
-          repeat: Infinity,
-          repeatDelay: 3.5,
-          times: [0, 0.1, 0.7, 1],
-          ease: "easeInOut" as const,
-        },
-      };
-    });
-  }, [getPosition]);
-
   return (
     <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 px-4">
       {/* Mobile: Just Kapan logo centered */}
@@ -543,88 +499,12 @@ const HowItWorks = () => {
         </div>
       </div>
 
-      {/* Desktop: Full orchestrator visualization */}
+      {/* Desktop: 3D orchestrator visualization — Kapan in the center,
+          protocol logos on a ring, tracer beams shuttling back and forth
+          along each spoke. Same visual language as the hero background. */}
       <div className="hidden w-full items-center justify-center md:flex">
         <div className="relative h-[350px] w-full max-w-2xl">
-          {/* Connection lines using same percentage system */}
-          <svg className="absolute inset-0 size-full overflow-visible">
-            {protocolData.map((protocol, i) => (
-              <motion.line
-                key={i}
-                x1="50%"
-                y1="50%"
-                x2={`${protocol.pos.x}%`}
-                y2={`${protocol.pos.y}%`}
-                stroke="currentColor"
-                strokeWidth="1"
-                className="text-base-content/10"
-                initial={LINE_INITIAL}
-                animate={LINE_ANIMATE}
-                transition={protocol.lineTransition}
-              />
-            ))}
-          </svg>
-
-          {/* Traveling instructions */}
-          {instructionAnimations.map((item, i) => (
-            <React.Fragment key={i}>
-              {/* Outbound: instruction travels TO protocol */}
-              <motion.div
-                className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-                initial={item.outboundInitial}
-                animate={item.outboundAnimate}
-                transition={item.outboundTransition}
-              >
-                <span className={`rounded border px-2 py-0.5 font-mono text-[10px] font-medium ${item.color} whitespace-nowrap`}>
-                  {item.instruction}
-                </span>
-              </motion.div>
-
-              {/* Return: UTXO travels back FROM protocol */}
-              <motion.div
-                className="z-5 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-                initial={item.returnInitial}
-                animate={item.returnAnimate}
-                transition={item.returnTransition}
-              >
-                <span className="bg-base-content/10 text-base-content/60 border-base-content/20 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] font-medium">
-                  UTXO
-                </span>
-              </motion.div>
-            </React.Fragment>
-          ))}
-
-          {/* Center - Kapan Router */}
-          <motion.div
-            className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
-            initial={SPRING_SCALE_INITIAL}
-            animate={SPRING_SCALE_ANIMATE}
-            transition={SPRING_SCALE_TRANSITION}
-          >
-            <div className="bg-base-100 border-base-content/20 flex items-center gap-2 rounded-lg border px-4 py-2 shadow-lg">
-              <Image src="/seal-logo.png" alt="Kapan" width={24} height={24} />
-              <span className="text-sm font-bold tracking-wide">KAPAN</span>
-            </div>
-          </motion.div>
-
-          {/* Surrounding protocols */}
-          {protocolData.map((protocol) => (
-            <motion.div
-              key={protocol.name}
-              className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
-              style={protocol.style}
-              initial={FADE_UP_INITIAL}
-              animate={FADE_UP_ANIMATE}
-              transition={protocol.desktopTransition}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <div className="bg-base-100 border-base-content/10 flex size-12 items-center justify-center rounded-xl border shadow-md">
-                  <Image src={protocol.logo} alt={protocol.name} width={28} height={28} />
-                </div>
-                <span className="text-base-content/40 text-[10px] font-medium">{protocol.name}</span>
-              </div>
-            </motion.div>
-          ))}
+          <HowItWorksScene />
         </div>
       </div>
 
