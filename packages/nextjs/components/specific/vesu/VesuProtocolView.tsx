@@ -232,6 +232,19 @@ export const VesuProtocolView: FC = () => {
     v1: false,
     v2: false,
   }));
+  // Positions-list collapse state, mirrored per version. Keeps Vesu consistent
+  // with how Aave/Morpho/Compound views behave — user can minimize the
+  // positions block without losing the market-stats header above it.
+  const [isPositionsCollapsed, setIsPositionsCollapsed] = useState(() => ({
+    v1: false,
+    v2: false,
+  }));
+  const toggleCollapsedV1 = useCallback(() => {
+    setIsPositionsCollapsed(p => ({ ...p, v1: !p.v1 }));
+  }, []);
+  const toggleCollapsedV2 = useCallback(() => {
+    setIsPositionsCollapsed(p => ({ ...p, v2: !p.v2 }));
+  }, []);
 
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
@@ -460,50 +473,8 @@ export const VesuProtocolView: FC = () => {
 
   return (
     <div className="flex w-full flex-col space-y-6 p-4">
-      <div className="space-y-6">
-        <VesuMarketSection
-          isOpen={isMarketsOpen.v1}
-          onToggle={handleToggleMarketsV1}
-          isLoadingAssets={isLoadingAssetsV1}
-          assetsError={assetsErrorV1}
-          suppliablePositions={suppliablePositionsV1}
-          borrowablePositions={borrowablePositionsV1}
-          userAddress={userAddress}
-          hasPositions={hasPositionsV1}
-          netBalanceUsd={netBalanceUsdV1}
-          netYield30d={netYield30dV1}
-          netApyPercent={netApyPercentV1}
-          onDeposit={handleDepositV1}
-          canDeposit={!isViewingOtherAddress && assetsWithRatesV1.length > 0}
-          formatCurrency={formatCurrency}
-          protocolName="Vesu"
-          title="Vesu V1"
-          headerExtra={v1HeaderExtra}
-        />
-        {!userAddress && (
-          <div className="border-base-300 bg-base-100 text-base-content/80 rounded-xl border p-6 text-center">
-            <h3 className="text-base-content text-lg font-semibold">Connect a wallet to view your Vesu V1 positions</h3>
-            <p className="text-base-content/70 mt-2 text-sm">
-              Connect a Starknet wallet to load your deposits and borrows.
-            </p>
-          </div>
-        )}
-        {/* V1 Positions across all pools */}
-        <PoolPositionsList
-          poolEntries={v1PoolEntries}
-          version="v1"
-          defaultPoolName="Genesis"
-          getPoolDisplay={getV1PoolDisplay}
-          computeMetrics={computeMetrics}
-          userAddress={userAddress}
-          accountStatus={status}
-          isViewingOtherAddress={isViewingOtherAddress}
-          onBorrowRequest={setBorrowSelection}
-          openDepositModal={openDepositModal}
-        />
-      </div>
-
-      <div className="space-y-6">
+      {/* V2 first — newer + broader pool coverage; V1 is legacy-ish. */}
+      <div className="space-y-3">
         <VesuMarketSection
           isOpen={isMarketsOpen.v2}
           onToggle={handleToggleMarketsV2}
@@ -522,28 +493,81 @@ export const VesuProtocolView: FC = () => {
           protocolName="vesu_v2"
           title="Vesu V2"
           headerExtra={v2HeaderExtra}
+          isCollapsed={isPositionsCollapsed.v2}
+          onToggleCollapsed={toggleCollapsedV2}
         />
-        {!userAddress && (
-          <div className="border-base-300 bg-base-100 text-base-content/80 rounded-xl border p-6 text-center">
-            <h3 className="text-base-content text-lg font-semibold">Connect a wallet to view your Vesu V2 positions</h3>
-            <p className="text-base-content/70 mt-2 text-sm">
-              Connect a Starknet wallet to load your deposits and borrows.
-            </p>
-          </div>
+        {!isPositionsCollapsed.v2 && (
+          <>
+            {!userAddress && (
+              <div className="border-base-300 bg-base-100 text-base-content/80 rounded-xl border p-6 text-center">
+                <h3 className="text-base-content text-lg font-semibold">Connect a wallet to view your Vesu V2 positions</h3>
+                <p className="text-base-content/70 mt-2 text-sm">
+                  Connect a Starknet wallet to load your deposits and borrows.
+                </p>
+              </div>
+            )}
+            <PoolPositionsList
+              poolEntries={v2PoolEntries}
+              version="v2"
+              defaultPoolName="Prime"
+              getPoolDisplay={getV2PoolDisplay}
+              computeMetrics={computeMetrics}
+              userAddress={userAddress}
+              accountStatus={status}
+              isViewingOtherAddress={isViewingOtherAddress}
+              onBorrowRequest={setBorrowSelection}
+              openDepositModal={openDepositModal}
+            />
+          </>
         )}
-        {/* V2 Positions across all pools */}
-        <PoolPositionsList
-          poolEntries={v2PoolEntries}
-          version="v2"
-          defaultPoolName="Prime"
-          getPoolDisplay={getV2PoolDisplay}
-          computeMetrics={computeMetrics}
+      </div>
+
+      <div className="space-y-3">
+        <VesuMarketSection
+          isOpen={isMarketsOpen.v1}
+          onToggle={handleToggleMarketsV1}
+          isLoadingAssets={isLoadingAssetsV1}
+          assetsError={assetsErrorV1}
+          suppliablePositions={suppliablePositionsV1}
+          borrowablePositions={borrowablePositionsV1}
           userAddress={userAddress}
-          accountStatus={status}
-          isViewingOtherAddress={isViewingOtherAddress}
-          onBorrowRequest={setBorrowSelection}
-          openDepositModal={openDepositModal}
+          hasPositions={hasPositionsV1}
+          netBalanceUsd={netBalanceUsdV1}
+          netYield30d={netYield30dV1}
+          netApyPercent={netApyPercentV1}
+          onDeposit={handleDepositV1}
+          canDeposit={!isViewingOtherAddress && assetsWithRatesV1.length > 0}
+          formatCurrency={formatCurrency}
+          protocolName="Vesu"
+          title="Vesu V1"
+          headerExtra={v1HeaderExtra}
+          isCollapsed={isPositionsCollapsed.v1}
+          onToggleCollapsed={toggleCollapsedV1}
         />
+        {!isPositionsCollapsed.v1 && (
+          <>
+            {!userAddress && (
+              <div className="border-base-300 bg-base-100 text-base-content/80 rounded-xl border p-6 text-center">
+                <h3 className="text-base-content text-lg font-semibold">Connect a wallet to view your Vesu V1 positions</h3>
+                <p className="text-base-content/70 mt-2 text-sm">
+                  Connect a Starknet wallet to load your deposits and borrows.
+                </p>
+              </div>
+            )}
+            <PoolPositionsList
+              poolEntries={v1PoolEntries}
+              version="v1"
+              defaultPoolName="Genesis"
+              getPoolDisplay={getV1PoolDisplay}
+              computeMetrics={computeMetrics}
+              userAddress={userAddress}
+              accountStatus={status}
+              isViewingOtherAddress={isViewingOtherAddress}
+              onBorrowRequest={setBorrowSelection}
+              openDepositModal={openDepositModal}
+            />
+          </>
+        )}
       </div>
 
       {borrowSelection && (

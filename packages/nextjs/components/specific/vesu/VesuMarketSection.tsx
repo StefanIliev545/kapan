@@ -2,6 +2,10 @@ import Image from "next/image";
 import React, { type FC } from "react";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 
+// Helper: prevent header click (which toggles collapse) from firing on
+// interactive children like the Markets button, headerExtra dropdown, etc.
+const stopClick = (e: React.MouseEvent) => e.stopPropagation();
+
 // Static objects for disabled actions - extracted to avoid creating new objects on each render
 const DISABLED_SUPPLY_ACTIONS = { deposit: false, withdraw: false, move: false } as const;
 const DISABLED_BORROW_ACTIONS = { borrow: false, repay: false, move: false } as const;
@@ -31,6 +35,10 @@ interface VesuMarketSectionProps {
   headerExtra?: React.ReactElement;
   title?: string;
   iconSrc?: string;
+  /** Click on the header collapses the parent's positions list. Optional — when
+   *  absent the header isn't clickable. */
+  isCollapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
 
 export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
@@ -52,6 +60,8 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
   headerExtra,
   title = "Vesu",
   iconSrc = "/logos/vesu.svg",
+  isCollapsed,
+  onToggleCollapsed,
 }) => {
   const formatSignedPercentage = (value: number) => {
     const formatted = formatPercentage(Math.abs(value));
@@ -95,7 +105,7 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
               <button
                 className="btn btn-xs btn-outline"
                 type="button"
-                onClick={onDeposit}
+                onClick={e => { stopClick(e); onDeposit(); }}
                 disabled={!canDeposit}
               >
                 Deposit
@@ -137,9 +147,13 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
     );
   };
 
+  const collapsible = typeof onToggleCollapsed === "function";
   return (
-    <div className="card from-base-100 to-base-100/95 border-base-200/50 rounded-xl border bg-gradient-to-r shadow-lg transition-all duration-300 hover:shadow-xl">
-      <div className="card-body px-5 py-3">
+    <div
+      className={`header-surface shadow-[inset_3px_0_0_0_rgba(255,255,255,0.12)] transition-all duration-300 hover:shadow-xl ${collapsible ? "cursor-pointer" : ""}`}
+      onClick={collapsible ? onToggleCollapsed : undefined}
+    >
+      <div className="px-5 py-3">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
           {/* Protocol name + icon */}
           <div className="flex items-center gap-3">
@@ -192,11 +206,24 @@ export const VesuMarketSection: FC<VesuMarketSectionProps> = ({
               <span className="text-base-content/40 hidden text-[10px] md:inline">Managing positions</span>
             ) : null}
             <div className="border-base-300/50 flex items-center gap-2 border-l pl-2">
-              <button className="btn btn-sm btn-ghost gap-1.5" type="button" onClick={onToggle}>
+              <button
+                className="btn btn-sm btn-ghost gap-1.5"
+                type="button"
+                onClick={e => { stopClick(e); onToggle(); }}
+              >
                 <span className="text-[10px] font-semibold uppercase tracking-widest">Markets</span>
                 {isOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}
               </button>
-              {headerExtra}
+              {headerExtra && (
+                <span onClick={stopClick}>
+                  {headerExtra}
+                </span>
+              )}
+              {collapsible && (
+                <ChevronDownIcon
+                  className={`text-base-content/40 size-4 transition-transform duration-300 ${isCollapsed ? "-rotate-90" : ""}`}
+                />
+              )}
             </div>
           </div>
         </div>
