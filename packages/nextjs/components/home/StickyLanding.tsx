@@ -2,13 +2,22 @@
 
 import React, { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { motion, AnimatePresence, useScroll, useSpring, useTransform, useMotionValue, MotionValue } from "framer-motion";
+import dynamic from "next/dynamic";
+import { motion, AnimatePresence, useScroll, useSpring, useTransform, MotionValue } from "framer-motion";
 import { ChevronDownIcon, ChevronUpIcon, ArrowRightIcon, ShieldCheckIcon, BoltIcon, CurrencyDollarIcon, SparklesIcon, PlusIcon, MinusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@radix-ui/themes";
 import { track } from "@vercel/analytics";
 import { StickySection, SectionData } from "./StickySection";
 import { useKapanTheme } from "~~/hooks/useKapanTheme";
 import { useLandingSection } from "~~/contexts/LandingSectionContext";
+
+// r3f refers to `window` at module init, so bail out of SSR for the scene.
+// Loading fallback is null because the existing radial-glow + grid already
+// look fine on their own — scene just fades in when it mounts.
+const HeroScene = dynamic(() => import("./HeroScene").then(m => m.HeroScene), {
+  ssr: false,
+  loading: () => null,
+});
 
 // ================================
 // Static Animation Constants
@@ -1750,24 +1759,8 @@ export const StickyLanding = () => {
   // Force kapan dark theme on landing page
   useKapanTheme();
 
-  // Parallax grid effect - mouse tracking
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  // Smooth spring animation for mouse movement (inverse parallax)
-  const springConfig = useMemo(() => ({ stiffness: 50, damping: 20 }), []);
-  const gridX = useSpring(mouseX, springConfig);
-  const gridY = useSpring(mouseY, springConfig);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const { clientX, clientY } = e;
-    const { innerWidth, innerHeight } = window;
-    // Map mouse position to -40px to 40px range (inverse: subtract from center)
-    const xOffset = ((clientX / innerWidth) - 0.5) * -80;
-    const yOffset = ((clientY / innerHeight) - 0.5) * -80;
-    mouseX.set(xOffset);
-    mouseY.set(yOffset);
-  }, [mouseX, mouseY]);
+  // Background grid + mouse-parallax is gone — the 3D hero scene is the
+  // backdrop now.
 
   const sections: SectionData[] = useMemo(() => [
     {
@@ -1817,10 +1810,6 @@ export const StickyLanding = () => {
   const scrollSpringConfig = useMemo(() => ({ stiffness: 100, damping: 30 }), []);
   const smoothProgress = useSpring(scrollYProgress, scrollSpringConfig);
 
-  // Scroll-based parallax: grid shifts up as you scroll down
-  const scrollGridY = useTransform(scrollYProgress, [0, 1], [0, -100]);
-  const smoothScrollGridY = useSpring(scrollGridY, springConfig);
-
   // Track current section for header CTA visibility
   useEffect(() => {
     setTotalSections(sections.length);
@@ -1833,13 +1822,6 @@ export const StickyLanding = () => {
     return () => unsubscribe();
   }, [scrollYProgress, sections.length, setCurrentSection, setTotalSections]);
 
-  const gridStyle = useMemo(() => ({
-    x: gridX,
-    y: smoothScrollGridY,
-  }), [gridX, smoothScrollGridY]);
-
-  const innerGridStyle = useMemo(() => ({ y: gridY }), [gridY]);
-
   const scrollProgressStyle = useMemo(() => ({ height: "100%", scaleY: smoothProgress }), [smoothProgress]);
 
   const containerHeight = useMemo(() => ({ height: `${sections.length * 100}vh` }), [sections.length]);
@@ -1849,25 +1831,19 @@ export const StickyLanding = () => {
   const scrollHintStyle = useMemo(() => ({ opacity: scrollHintOpacity }), [scrollHintOpacity]);
 
   return (
-    <div
-      className="bg-base-100 text-base-content fixed inset-0 overflow-hidden"
-      onMouseMove={handleMouseMove}
-    >
-      {/* Background grid with parallax effect */}
-      <motion.div
-        className="absolute inset-0"
-        style={gridStyle}
-      >
-        {/* eslint-disable tailwindcss/no-contradicting-classname -- bg-[linear-gradient] and bg-[size] are different CSS properties */}
-        <motion.div
-          className="absolute -inset-24 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:4rem_4rem]"
-          style={innerGridStyle}
-        />
-        {/* eslint-enable tailwindcss/no-contradicting-classname */}
-      </motion.div>
-
+    <div className="bg-base-100 text-base-content fixed inset-0 overflow-hidden">
       {/* Radial glow - fixed position, no parallax */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
+
+      {/* 3D hero scene. Fades out as the user scrolls past the first sections
+         so it doesn't fight with the later content. Pointer-events disabled
+         inside HeroScene itself so scroll passes straight through. */}
+      <motion.div
+        className="absolute inset-0"
+        style={{ opacity: useTransform(smoothProgress, [0, 0.25, 0.5], [0.45, 0.25, 0.06]) }}
+      >
+        <HeroScene />
+      </motion.div>
 
       {/* Scroll container */}
       <div
