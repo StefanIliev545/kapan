@@ -37,8 +37,8 @@ export function usePendlePortfolio(address?: Address): UsePendlePortfolioResult 
 
   const query = useQuery({
     queryKey: ["pendle-portfolio", target?.toLowerCase()],
-    queryFn: async () => {
-      if (!target) return { positions: [], raw: undefined } as const;
+    queryFn: async (): Promise<{ positions: PendlePortfolioPosition[]; raw?: unknown }> => {
+      if (!target) return { positions: [], raw: undefined };
       return fetchPendlePortfolio(target);
     },
     enabled: !!target,

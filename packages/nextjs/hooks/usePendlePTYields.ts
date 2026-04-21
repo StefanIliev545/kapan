@@ -460,16 +460,23 @@ export function usePendlePTYields(
           const ptPriceUsd = m.pt.price?.usd || 0;
           const underlyingPriceUsd = m.underlyingAsset?.price?.usd || 0;
 
-          // Derive the APY from prices we have: 1 PT redeems to 1 underlying at
-          // maturity, so `(underlyingPriceUsd / ptPriceUsd) ^ (365/days) - 1` is
-          // the implied yield. Works for anything holding this PT — wallet,
-          // Morpho market, Aave, Euler vault — because it only uses market
-          // prices, not the user's balance or address. Fall back to Pendle's
-          // pre-computed `impliedApy` only if we can't see both prices.
+          // Pendle's API-supplied `impliedApy` is computed directly from the
+          // AMM's PT/asset rate and is the reliable source of truth. We used
+          // to compute it locally from `(underlyingUsd / ptUsd)^(365/days)`
+          // — mathematically correct but very sensitive to bad USD prices
+          // from Pendle for non-standard yield-wrapping underlyings (e.g.
+          // PT-apyxUSD), which blew up to ~688% APY on a position that
+          // should read ~8%. Falling back to the API's value by default
+          // and only preferring the local compute when it closely agrees
+          // with the API (proof it's well-formed for this market).
           const localApy = calculateFixedApy(ptPriceUsd, underlyingPriceUsd, daysToExpiry);
-          const fixedApy = Number.isFinite(localApy) && localApy > 0
-            ? localApy
-            : m.impliedApy * 100;
+          const apiApy = m.impliedApy * 100;
+          const localIsSane =
+            Number.isFinite(localApy) &&
+            localApy > 0 &&
+            apiApy > 0 &&
+            Math.abs(localApy - apiApy) <= Math.max(2, apiApy * 0.2); // within 2pp or 20% of API
+          const fixedApy = localIsSane ? localApy : apiApy;
 
           return {
             address: m.pt.address.toLowerCase() as Address,
