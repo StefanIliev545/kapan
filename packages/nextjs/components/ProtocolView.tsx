@@ -59,7 +59,7 @@ function matchesStableEMode(symbol: string): boolean {
 }
 
 /** Create E-Mode filter function based on user's E-Mode */
-function createEModeFilter(userEMode: EModeCategory | null | undefined): (assets: SwapAsset[]) => SwapAsset[] {
+export function createEModeFilter(userEMode: EModeCategory | null | undefined): (assets: SwapAsset[]) => SwapAsset[] {
   if (!userEMode || userEMode.id === 0) {
     return (assets) => assets;
   }
@@ -120,9 +120,15 @@ function positionToSwapAsset(p: ProtocolPosition): SwapAsset {
 
 /** Convert ProtocolPosition to Starknet token format */
 function positionToStarknetToken(pos: ProtocolPosition, isSupply: boolean) {
+  // Guard: BigInt("0x") / BigInt("") throw. A Starknet token with an empty
+  // on-chain symbol (e.g. ByteArray tokens the felt-symbol dispatcher can't
+  // decode) would otherwise crash the whole tab here.
+  const nameHex = Buffer.from(pos.name ?? "", "utf8").toString("hex");
+  const symbol = nameHex.length > 0 ? BigInt("0x" + nameHex) : 0n;
+  const addressStr = pos.tokenAddress && pos.tokenAddress !== "0x" ? pos.tokenAddress : "0x0";
   return {
-    address: BigInt(pos.tokenAddress),
-    symbol: BigInt("0x" + Buffer.from(pos.name).toString("hex")),
+    address: BigInt(addressStr),
+    symbol,
     decimals: pos.tokenDecimals || 18,
     rate_accumulator: 0n,
     utilization: 0n,

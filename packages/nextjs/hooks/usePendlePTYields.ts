@@ -58,8 +58,14 @@ export interface PTYield {
 }
 
 /**
- * Calculate fixed APY from PT and underlying prices.
- * Use this to calculate APY consistent with displayed balance values.
+ * Calculate the fixed (market-implied) APY from PT and underlying prices.
+ *
+ * 1 PT always redeems to exactly 1 unit of underlying at maturity, so the
+ * ratio `underlying / pt` is the growth factor to maturity. Annualizing
+ * with compound — not linear — matches Pendle's own `impliedApy` math and
+ * converges cleanly for both short- and long-dated PTs:
+ *
+ *     impliedApy = (underlying / pt) ^ (365 / daysToMaturity) - 1
  *
  * @param ptPriceUsd - Current PT price in USD
  * @param underlyingPriceUsd - Current underlying asset price in USD
@@ -74,12 +80,24 @@ export function calculateFixedApy(
   if (ptPriceUsd <= 0 || underlyingPriceUsd <= 0 || daysToMaturity <= 0) {
     return 0;
   }
-  // At maturity, 1 PT = 1 underlying
-  // Return = (underlying / pt) - 1
-  // Annualized = return * (365 / days)
-  const returnToMaturity = (underlyingPriceUsd / ptPriceUsd) - 1;
-  const annualizedReturn = returnToMaturity * (365 / daysToMaturity);
-  return annualizedReturn * 100; // As percentage
+  const growthFactor = underlyingPriceUsd / ptPriceUsd;
+  const annualized = Math.pow(growthFactor, 365 / daysToMaturity) - 1;
+  return annualized * 100;
+}
+
+/**
+ * Dollar yield remaining on a PT position if held to maturity, assuming the
+ * underlying's USD price holds (same assumption Pendle makes). Works for any
+ * PT regardless of where it's held (wallet, Morpho, Aave, Euler vault, ...),
+ * as long as you have the balance.
+ */
+export function calculatePtYieldRemainingUsd(
+  ptPriceUsd: number,
+  underlyingPriceUsd: number,
+  ptBalance: number,
+): number {
+  if (ptPriceUsd <= 0 || underlyingPriceUsd <= 0 || ptBalance <= 0) return 0;
+  return (underlyingPriceUsd - ptPriceUsd) * ptBalance;
 }
 
 // Map chain IDs to Pendle API chain names.
@@ -442,11 +460,22 @@ export function usePendlePTYields(
           const ptPriceUsd = m.pt.price?.usd || 0;
           const underlyingPriceUsd = m.underlyingAsset?.price?.usd || 0;
 
+          // Derive the APY from prices we have: 1 PT redeems to 1 underlying at
+          // maturity, so `(underlyingPriceUsd / ptPriceUsd) ^ (365/days) - 1` is
+          // the implied yield. Works for anything holding this PT — wallet,
+          // Morpho market, Aave, Euler vault — because it only uses market
+          // prices, not the user's balance or address. Fall back to Pendle's
+          // pre-computed `impliedApy` only if we can't see both prices.
+          const localApy = calculateFixedApy(ptPriceUsd, underlyingPriceUsd, daysToExpiry);
+          const fixedApy = Number.isFinite(localApy) && localApy > 0
+            ? localApy
+            : m.impliedApy * 100;
+
           return {
             address: m.pt.address.toLowerCase() as Address,
             symbol: m.pt.symbol,
             name: m.pt.name,
-            fixedApy: m.impliedApy * 100, // Convert to percentage (from Pendle API)
+            fixedApy,
             expiry,
             daysToExpiry,
             underlyingSymbol: m.underlyingAsset?.symbol || "",

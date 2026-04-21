@@ -8,7 +8,7 @@ if (typeof BigInt !== "undefined") {
   };
 }
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import {
   StarknetConfig,
@@ -31,6 +31,7 @@ import { LandingHeader } from "~~/components/LandingHeader";
 import { AppHeader } from "~~/components/AppHeader";
 import { WalletAnalytics } from "~~/components/WalletAnalytics";
 import { StarknetWalletAnalytics } from "~~/components/StarknetWalletAnalytics";
+import { StarknetSessionRecovery } from "~~/components/StarknetSessionRecovery";
 import { usePathname } from "next/navigation";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
@@ -115,28 +116,37 @@ export const ScaffoldEthAppWithProviders = ({
 
   const injected = useInjectedConnectors({
     recommended: [argent(), braavos(), new MetaMask(), new Keplr(), new Fordefi()],
-    includeRecommended: "onlyIfNoConnectors",
+    // "always" shows every recommended wallet in our picker regardless of
+    // whether the extension has been detected yet (injected wallets often
+    // aren't in `window.starknet_*` at initial render). "onlyIfNoConnectors"
+    // was hiding them whenever Cartridge was also present.
+    includeRecommended: "always",
     order: "alphabetical",
   });
   const liveConnectors = useMemo(() => injected.connectors ?? [], [injected.connectors]);
 
-  const connectorsRef = useRef<Connector[]>([cartridgeConnector]);
-
-  useEffect(() => {
-    const connectorsWithCartridge = [
-      ...liveConnectors.filter((connector) => connector.id !== cartridgeConnector.id),
+  // IMPORTANT: this must be a memoized value, not a ref. autoConnect in
+  // StarknetConfig runs on mount using whatever `connectors` was at first
+  // render — if we hand it a ref whose .current mutates later, the effect
+  // fires against the stale array and only the initially-included connectors
+  // (previously: Cartridge only) are considered for reconnection. That's
+  // exactly why Braavos auto-reconnect was broken. Passing a memoized array
+  // re-renders StarknetConfig when injected wallets arrive, so autoConnect
+  // targets the full set.
+  const connectors = useMemo<Connector[]>(
+    () => [
+      ...liveConnectors.filter(c => c.id !== cartridgeConnector.id),
       cartridgeConnector,
-    ];
-
-    connectorsRef.current = connectorsWithCartridge;
-  }, [liveConnectors]);
+    ],
+    [liveConnectors],
+  );
 
   return (
     <StarknetConfig
       chains={appChains}
       provider={provider}
       paymasterProvider={paymasterProvider}
-      connectors={connectorsRef.current}
+      connectors={connectors}
       explorer={starkscan}
       autoConnect={true}
     >
@@ -151,6 +161,7 @@ export const ScaffoldEthAppWithProviders = ({
                   theme={darkTheme()}
                 >
                   <ReferralProvider>
+                    <StarknetSessionRecovery />
                     <StarknetWalletAnalytics />
                     <WalletAnalytics />
                     <ScaffoldEthApp initialHost={initialHost}>{children}</ScaffoldEthApp>

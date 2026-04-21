@@ -13,6 +13,7 @@ import { BlockieAvatar, isENS } from "~~/components/scaffold-stark";
 import { useOutsideClick, useCopyToClipboard } from "~~/hooks/scaffold-stark";
 import { useScaffoldStarkProfile } from "~~/hooks/scaffold-stark/useScaffoldStarkProfile";
 import { truncateAddress } from "~~/utils/address";
+import { clearStarknetSession } from "~~/utils/starknetSession";
 
 type AddressInfoDropdownProps = {
   address: Address;
@@ -46,6 +47,9 @@ export const AddressInfoDropdown = ({
 
   const handleDisconnect = useCallback(() => {
     disconnect();
+    // Wipe `lastUsedConnector` so autoConnect won't silently re-bind the
+    // same wallet on next refresh — user explicitly chose to log out.
+    clearStarknetSession();
   }, [disconnect]);
 
   return (

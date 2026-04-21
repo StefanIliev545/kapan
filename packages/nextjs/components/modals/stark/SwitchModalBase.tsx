@@ -12,7 +12,7 @@ import { formatUsd } from "~~/utils/formatNumber";
 import { useVesuSwitch } from "~~/hooks/useVesuSwitch";
 import type { VesuProtocolKey } from "~~/utils/vesu";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { resolveTokenDisplayName } from "~~/contracts/tokenNameFallbacks";
 import type { TokenInfo } from "~~/hooks/useVesuSwitch";
 
 export type BasicToken = { name: string; address: string; decimals: number; icon: string };
@@ -95,8 +95,7 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
     if (!t) {
       return { name: "", icon: "" };
     }
-    const raw = t.name || "";
-    const name = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(t.address) ?? raw;
+    const name = resolveTokenDisplayName(t.name || "", t.address);
     const icon = tokenNameToLogo((name || "").toLowerCase());
     return { name, icon };
   };

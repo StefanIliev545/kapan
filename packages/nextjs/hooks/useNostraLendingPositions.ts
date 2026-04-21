@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import type { ProtocolPosition } from "~~/components/ProtocolView";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { resolveTokenDisplayName } from "~~/contracts/tokenNameFallbacks";
 import { useAccount } from "~~/hooks/useAccount";
 import { useNostraAssets } from "~~/hooks/useNostraAssets";
 import { useScaffoldReadContract } from "./scaffold-stark";
@@ -79,11 +80,14 @@ export const useNostraLendingPositions = () => {
     const borrowed: ProtocolPosition[] = [];
 
     assets.forEach(asset => {
-      const { address: tokenAddress, symbol } = asset;
+      const { address: tokenAddress, symbol: rawSymbol } = asset;
       const decimals = decimalsMap[tokenAddress];
       if (decimals === undefined) {
         return;
       }
+      // Canonical resolver: override > on-chain > fallback > "UNKNOWN".
+      // Also guards against downstream BigInt("0x") crashes in positionToStarknetToken.
+      const symbol = resolveTokenDisplayName(rawSymbol, tokenAddress);
       const position = positionMap[tokenAddress];
       const debtBalance = position?.debtBalance ?? 0n;
       const collateralBalance = position?.collateralBalance ?? 0n;

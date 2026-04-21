@@ -3,7 +3,6 @@ import { useMemo } from "react";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
 import { toAnnualRates } from "~~/utils/protocols";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import { useLogError } from "~~/hooks/common";
 import { toHexAddress } from "~~/hooks/useProtocolPositions/utils";
 
@@ -135,16 +134,9 @@ export const useVesuAssets = (poolId: bigint) => {
         asset.scale,
       );
 
-      // Fallback for empty symbol names
-      const symbol = asset.symbol as unknown as string;
-      if (!symbol || (typeof symbol === "bigint" && symbol === 0n)) {
-        const hexAddr = toHexAddress(asset.address);
-        const fallback = getTokenNameFallback(hexAddr);
-        if (fallback) {
-          // cast to any to override type, we only use display string further downstream when bigint missing
-          (asset as any).symbol = fallback;
-        }
-      }
+      // Note: display-name resolution (override > on-chain > fallback) happens at
+      // render sites via resolveTokenDisplayName. Don't mutate asset.symbol here —
+      // downstream feltToString() expects a bigint.
 
       return { ...asset, borrowAPR, supplyAPY };
     });
