@@ -1,12 +1,16 @@
 import { useCallback } from "react";
 import { useDisconnect } from "@starknet-react/core";
 import { ArrowLeftEndOnRectangleIcon, ChevronDownIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { clearStarknetSession } from "~~/utils/starknetSession";
 
 export const WrongNetworkDropdown = () => {
   const { disconnect } = useDisconnect();
 
   const handleDisconnect = useCallback(() => {
     disconnect();
+    // Wipe `lastUsedConnector` so the user gets a clean wallet chooser next
+    // time — matches the behavior in AddressInfoDropdown.
+    clearStarknetSession();
   }, [disconnect]);
 
   return (

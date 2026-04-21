@@ -15,6 +15,7 @@ import { Address } from "viem";
 import { usePendlePTYields, isPTToken, calculateFixedApy, type PTYield } from "./usePendlePTYields";
 import { useMapleYields, isSyrupToken, type MapleYield } from "./useMapleYields";
 import { useLSTYields, isLSTToken, type LSTYield } from "./useLSTYields";
+import { usePendlePortfolio, getPendlePortfolioKey } from "./usePendlePortfolio";
 
 /**
  * Unified yield type that can represent yields from any source
@@ -41,6 +42,12 @@ export interface ExternalYield {
     ptPriceUsd?: number;
     /** Underlying price in USD from Pendle (use for consistent APY calculation) */
     underlyingPriceUsd?: number;
+    /** APY the user locked in when they entered this PT position (portfolio-specific). */
+    entryApyPercent?: number;
+    /** Current valuation of the user's PT position in USD. */
+    valuationUsd?: number;
+    /** Unrealized P&L on the PT position in USD (positive = gain). */
+    unrealizedPnlUsd?: number;
     // Maple-specific
     dripsBoost?: number;
     baseApy?: number;
@@ -51,15 +58,35 @@ export interface ExternalYield {
 }
 
 /**
- * Convert PTYield to ExternalYield
+ * Convert PTYield to ExternalYield, optionally enriched with user-specific
+ * portfolio data (entry APY, valuation, unrealized P&L) if a lookup is
+ * provided. When present, these override nothing — they only show up in
+ * `metadata` so consumers that care about "my APY vs market APY" can render
+ * both.
  */
-function ptYieldToExternal(pt: PTYield): ExternalYield {
+function ptYieldToExternal(
+  pt: PTYield,
+  portfolioLookup?: (chainId: number, ptAddress: string) => {
+    entryApyPercent: number | null;
+    valuationUsd: number;
+    unrealizedPnlUsd: number | null;
+  } | undefined,
+  chainId?: number,
+): ExternalYield {
+  const position = chainId != null && portfolioLookup ? portfolioLookup(chainId, pt.address) : undefined;
+  // For positions we actually hold, prefer the APY the user locked in at
+  // entry over the live market implied APY — the market number shifts with
+  // the AMM every block and doesn't describe what this specific position
+  // earns. When Pendle's portfolio endpoint has no entry data (e.g. PT is
+  // held inside a Morpho market rather than the user's EOA), fall back to
+  // the market APY so we still show something sensible.
+  const resolvedApy = position?.entryApyPercent ?? pt.fixedApy;
   return {
     address: pt.address,
     symbol: pt.symbol,
     name: pt.name,
-    apy: pt.fixedApy,
-    fixedApy: pt.fixedApy, // Alias for backward compatibility
+    apy: resolvedApy,
+    fixedApy: resolvedApy,
     source: "pendle",
     metadata: {
       expiry: pt.expiry,
@@ -68,6 +95,9 @@ function ptYieldToExternal(pt: PTYield): ExternalYield {
       underlyingAddress: pt.underlyingAddress,
       ptPriceUsd: pt.ptPriceUsd,
       underlyingPriceUsd: pt.underlyingPriceUsd,
+      ...(position?.entryApyPercent != null ? { entryApyPercent: position.entryApyPercent } : {}),
+      ...(position != null ? { valuationUsd: position.valuationUsd } : {}),
+      ...(position?.unrealizedPnlUsd != null ? { unrealizedPnlUsd: position.unrealizedPnlUsd } : {}),
     },
   };
 }
@@ -162,6 +192,10 @@ export function useExternalYields(chainId?: number, enabled = true) {
   const pendle = usePendlePTYields(chainId, undefined, enabled);
   const maple = useMapleYields(enabled);
   const lst = useLSTYields(enabled);
+  // Pendle user-specific portfolio: entry APY, valuation, unrealized P&L.
+  // Connected-wallet only; falls back to market APY for users without a
+  // position (which is the sensible default for the showAll markets view).
+  const portfolio = usePendlePortfolio();
 
   const isLoading = pendle.isLoading || maple.isLoading || lst.isLoading;
 
@@ -173,16 +207,29 @@ export function useExternalYields(chainId?: number, enabled = true) {
   const pendleFindYield = pendle.findYield;
   const mapleFindYield = maple.findYield;
   const lstFindYield = lst.findYield;
+  const portfolioByPt = portfolio.byPtAddress;
 
   const findYield = useMemo(() => {
+    const portfolioLookup = (chainIdForPt: number, ptAddress: string) => {
+      const hit = portfolioByPt.get(getPendlePortfolioKey(chainIdForPt, ptAddress));
+      if (!hit) return undefined;
+      return {
+        entryApyPercent: hit.entryApyPercent,
+        valuationUsd: hit.valuationUsd,
+        unrealizedPnlUsd: hit.unrealizedPnlUsd,
+      };
+    };
+    const ptToExternal = (y: unknown): ExternalYield =>
+      ptYieldToExternal(y as PTYield, portfolioLookup, chainId);
+
     const sources: YieldSource<unknown>[] = [
-      { isMatch: isPTToken, findYield: pendleFindYield, toExternal: ptYieldToExternal as (y: unknown) => ExternalYield },
+      { isMatch: isPTToken, findYield: pendleFindYield, toExternal: ptToExternal },
       { isMatch: isSyrupToken, findYield: mapleFindYield, toExternal: mapleYieldToExternal as (y: unknown) => ExternalYield },
       { isMatch: isLSTToken, findYield: lstFindYield, toExternal: lstYieldToExternal as (y: unknown) => ExternalYield },
     ];
     return (address?: string, symbol?: string): ExternalYield | undefined =>
       findYieldFromSources(sources, address, symbol);
-  }, [pendleFindYield, mapleFindYield, lstFindYield]);
+  }, [pendleFindYield, mapleFindYield, lstFindYield, portfolioByPt, chainId]);
 
   /**
    * Get the effective supply rate for a token

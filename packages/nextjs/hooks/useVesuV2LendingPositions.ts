@@ -9,7 +9,7 @@ import type { CollateralWithAmount } from "~~/components/specific/collateral/Col
 import { feltToString } from "~~/utils/protocols";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { createVesuContextV2, normalizeStarknetAddress, type VesuProtocolKey } from "~~/utils/vesu";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { resolveTokenDisplayName } from "~~/contracts/tokenNameFallbacks";
 import {
   normalizePrice,
   computeUsdValue,
@@ -22,11 +22,8 @@ import { usePositionLoadingState } from "./useProtocolPositions/usePositionLoadi
 const ZERO_ADDRESS = normalizeStarknetAddress(0n);
 
 const resolveSymbol = (symbol: unknown, address: string): string => {
-  if (typeof symbol === "bigint") {
-    const symbolStr = feltToString(symbol);
-    if (symbolStr && symbolStr.trim().length > 0) return symbolStr;
-  }
-  return getTokenNameFallback(address) ?? "UNKNOWN";
+  const onChain = typeof symbol === "bigint" ? feltToString(symbol) : "";
+  return resolveTokenDisplayName(onChain, address);
 };
 
 const buildVesuContext = (
@@ -121,53 +118,75 @@ export const useVesuV2LendingPositions = (
   const normalizedPoolAddress = normalizeStarknetAddress(poolAddress);
   const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError } = useVesuV2Assets(normalizedPoolAddress);
 
-  const {
-    data: userPositionsPart1,
-    error: positionsError1,
-    isFetching: isFetching1,
-    isLoading: isLoading1,
-    refetch: refetchPositionsPart1,
-  } = useScaffoldReadContract({
+  // Paginate `get_all_positions_range` into small windows. Each call iterates
+  // `end - start` pairs and does a `pool.context()` read per pair — the wider
+  // the window, the closer we get to Starknet's per-call step limit. The Vesu
+  // V2 Prime pool recently started reverting at window width 7; width 2 is
+  // safely below the budget for all current pools. Windows 0..10 cover 10
+  // (collateral, debt) pairs per user — bump WINDOW count if pools grow
+  // further.
+  const windows = useMemo(
+    () => [
+      [0n, 2n],
+      [2n, 4n],
+      [4n, 6n],
+      [6n, 8n],
+      [8n, 10n],
+    ] as const,
+    [],
+  );
+
+  const part0 = useScaffoldReadContract({
     contractName: "VesuGatewayV2",
     functionName: "get_all_positions_range",
-    args: [userAddress, poolAddress, 0n, 3n],
+    args: [userAddress, poolAddress, windows[0][0], windows[0][1]],
+    watch: true,
+  });
+  const part1 = useScaffoldReadContract({
+    contractName: "VesuGatewayV2",
+    functionName: "get_all_positions_range",
+    args: [userAddress, poolAddress, windows[1][0], windows[1][1]],
+    watch: true,
+  });
+  const part2 = useScaffoldReadContract({
+    contractName: "VesuGatewayV2",
+    functionName: "get_all_positions_range",
+    args: [userAddress, poolAddress, windows[2][0], windows[2][1]],
+    watch: true,
+  });
+  const part3 = useScaffoldReadContract({
+    contractName: "VesuGatewayV2",
+    functionName: "get_all_positions_range",
+    args: [userAddress, poolAddress, windows[3][0], windows[3][1]],
+    watch: true,
+  });
+  const part4 = useScaffoldReadContract({
+    contractName: "VesuGatewayV2",
+    functionName: "get_all_positions_range",
+    args: [userAddress, poolAddress, windows[4][0], windows[4][1]],
     watch: true,
   });
 
-  const {
-    data: userPositionsPart2,
-    error: positionsError2,
-    isFetching: isFetching2,
-    isLoading: isLoading2,
-    refetch: refetchPositionsPart2,
-  } = useScaffoldReadContract({
-    contractName: "VesuGatewayV2",
-    functionName: "get_all_positions_range",
-    args: [userAddress, poolAddress, 3n, 10n],
-    watch: true,
-  });
+  const parts = [part0, part1, part2, part3, part4] as const;
 
   useEffect(() => {
-    if (positionsError1) {
-      console.error("Error fetching V2 user positions (part 1):", positionsError1);
-    }
-  }, [positionsError1]);
+    parts.forEach((p, idx) => {
+      if (p.error) {
+        console.error(`Error fetching V2 user positions (part ${idx}):`, p.error);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [part0.error, part1.error, part2.error, part3.error, part4.error]);
 
-  useEffect(() => {
-    if (positionsError2) {
-      console.error("Error fetching V2 user positions (part 2):", positionsError2);
-    }
-  }, [positionsError2]);
+  const mergedUserPositions = useMemo(
+    () => parts.flatMap(p => parsePositionTuples(p.data)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [part0.data, part1.data, part2.data, part3.data, part4.data],
+  );
 
-  const mergedUserPositions = useMemo(() => {
-    const firstBatch = parsePositionTuples(userPositionsPart1);
-    const secondBatch = parsePositionTuples(userPositionsPart2);
-    return [...firstBatch, ...secondBatch];
-  }, [userPositionsPart1, userPositionsPart2]);
-
-  const isLoadingPositions = isLoading1 || isLoading2;
-  const isFetchingPositions = isFetching1 || isFetching2;
-  const positionsError = positionsError1 || positionsError2;
+  const isLoadingPositions = parts.some(p => p.isLoading);
+  const isFetchingPositions = parts.some(p => p.isFetching);
+  const positionsError = parts.find(p => p.error)?.error;
 
   // Use shared loading state hook
   const { hasLoadedOnce, isUpdating, setCachedData, getCachedData } = usePositionLoadingState({
@@ -181,9 +200,9 @@ export const useVesuV2LendingPositions = (
 
   const refetchPositions = useCallback(() => {
     if (!userAddress) return;
-    refetchPositionsPart1();
-    refetchPositionsPart2();
-  }, [userAddress, refetchPositionsPart1, refetchPositionsPart2]);
+    parts.forEach(p => p.refetch());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userAddress, part0.refetch, part1.refetch, part2.refetch, part3.refetch, part4.refetch]);
 
   const refetchPositionsRef = useRef(refetchPositions);
 
@@ -212,14 +231,18 @@ export const useVesuV2LendingPositions = (
   const cachedPositions = getCachedData<PositionTuple[]>() ?? [];
 
   const suppliablePositions = useMemo(() => {
+    // Suppliable = union(collaterals, debts). Re7 USDC pools list USDC as a
+    // debt-only asset but users still lend it passively to earn yield — it
+    // must show up in the deposit picker. Gateway allowlists are UI-only;
+    // the pool itself is the real gatekeeper on the write path.
     return assetsWithRates
-      .filter(asset => collateralSet?.has(`0x${asset.address.toString(16).padStart(64, "0")}`))
+      .filter(asset => {
+        const a = `0x${asset.address.toString(16).padStart(64, "0")}`;
+        return collateralSet?.has(a) || debtSet?.has(a);
+      })
       .map(asset => {
       const address = `0x${asset.address.toString(16).padStart(64, "0")}`;
-      let symbol = feltToString(asset.symbol);
-      if (!symbol || symbol.trim().length === 0) {
-        symbol = getTokenNameFallback(address) ?? "UNKNOWN";
-      }
+      const symbol = resolveSymbol(asset.symbol, address);
       const price = normalizePrice(asset.price);
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),
@@ -236,17 +259,14 @@ export const useVesuV2LendingPositions = (
         },
       };
       });
-  }, [assetsWithRates, normalizedPoolAddress, collateralSet]);
+  }, [assetsWithRates, normalizedPoolAddress, collateralSet, debtSet]);
 
   const borrowablePositions = useMemo(() => {
     return assetsWithRates
       .filter(asset => debtSet?.has(`0x${asset.address.toString(16).padStart(64, "0")}`))
       .map(asset => {
       const address = `0x${asset.address.toString(16).padStart(64, "0")}`;
-      let symbol = feltToString(asset.symbol);
-      if (!symbol || symbol.trim().length === 0) {
-        symbol = getTokenNameFallback(address) ?? "UNKNOWN";
-      }
+      const symbol = resolveSymbol(asset.symbol, address);
       const price = normalizePrice(asset.price);
       return {
         icon: tokenNameToLogo(symbol.toLowerCase()),

@@ -4,7 +4,7 @@ import { FC, useCallback } from "react";
 import Image from "next/image";
 import { BaseModal } from "../BaseModal";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { resolveTokenDisplayName } from "~~/contracts/tokenNameFallbacks";
 
 export type SwitchKind = "debt" | "collateral";
 
@@ -32,8 +32,7 @@ export const SwitchTokenSelectModalStark: FC<SwitchTokenSelectModalStarkProps> =
     if (!t) {
       return t;
     }
-    const rawName = t.name || "";
-    const name = rawName && rawName.trim().length > 0 ? rawName : getTokenNameFallback(t.address) ?? rawName;
+    const name = resolveTokenDisplayName(t.name || "", t.address);
     const symbol = (t.symbol && t.symbol.trim().length > 0) ? t.symbol : name;
     const icon = tokenNameToLogo((name || symbol || "").toLowerCase());
     return { ...t, name, symbol, icon };

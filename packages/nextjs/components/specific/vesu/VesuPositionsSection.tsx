@@ -14,7 +14,7 @@ import SwitchTokenSelectModalStark from "~~/components/modals/stark/SwitchTokenS
 import { SwitchDebtModalStark } from "~~/components/modals/stark/SwitchDebtModalStark";
 import { SwitchCollateralModalStark } from "~~/components/modals/stark/SwitchCollateralModalStark";
 import { feltToString } from "~~/utils/protocols";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { resolveTokenDisplayName } from "~~/contracts/tokenNameFallbacks";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { isVesuContextV1, type VesuProtocolKey } from "~~/utils/vesu";
 import formatPercentage from "~~/utils/formatPercentage";
@@ -33,13 +33,12 @@ const AVAILABLE_ACTIONS_NO_SWAP = { deposit: true, withdraw: true, move: false, 
 const BORROW_ACTIONS_WITH_DEBT = { borrow: true, repay: true, move: true, close: true, swap: true } as const;
 const BORROW_ACTIONS_NO_DEBT = { borrow: true, repay: false, move: false, swap: false, close: false } as const;
 
-/** Resolve a token's display symbol, falling back to address-based lookup */
+/** Resolve a token's display symbol (override > on-chain > fallback > "UNKNOWN"). */
 function resolveTokenSymbol(token: TokenWithRates): string {
   const sym = (token as { symbol?: string | bigint }).symbol;
   const raw = typeof sym === "bigint" ? feltToString(sym) : String(sym ?? "");
-  if (raw && raw.trim().length > 0) return raw;
   const addr = `0x${token.address.toString(16).padStart(64, "0")}`;
-  return getTokenNameFallback(addr) ?? raw;
+  return resolveTokenDisplayName(raw, addr);
 }
 
 /** Convert a Starknet asset address to hex string with 0x prefix, padded to 64 chars */

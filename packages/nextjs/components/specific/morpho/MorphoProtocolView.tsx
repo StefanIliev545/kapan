@@ -25,6 +25,14 @@ interface PositionMetrics {
   netYield30d: number;
   netApyPercent: number | null;
   positionCount: number;
+  // totalSupplied / totalBorrowed are propagated here so the dashboard
+  // reporter and the in-row header read from the SAME numbers. Previously
+  // the reporter summed `rows.reduce(...collateralBalanceUsd)` directly
+  // while the header used `calculateNetYieldMetrics` (which filters
+  // rows without active debt and skips negative supply balances). That
+  // drift is the source of the ~$400 discrepancy the dashboard showed.
+  totalSupplied: number;
+  totalBorrowed: number;
 }
 
 /** Default metrics when no positions exist */
@@ -33,6 +41,8 @@ const EMPTY_METRICS: PositionMetrics = {
   netYield30d: 0,
   netApyPercent: null,
   positionCount: 0,
+  totalSupplied: 0,
+  totalBorrowed: 0,
 };
 
 /**
@@ -104,6 +114,8 @@ function calculatePositionMetrics(
     netYield30d: yieldMetrics.netYield30d,
     netApyPercent: yieldMetrics.netApyPercent,
     positionCount: rows.length,
+    totalSupplied: yieldMetrics.totalSupplied,
+    totalBorrowed: yieldMetrics.totalBorrowed,
   };
 }
 
@@ -192,11 +204,12 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
       return;
     }
 
-    const totalSupplied = rows.reduce((sum, row) => sum + row.collateralBalanceUsd, 0);
-    const totalBorrowed = rows.reduce((sum, row) => sum + row.borrowBalanceUsd, 0);
-
-    setProtocolTotals("Morpho", totalSupplied, totalBorrowed);
-  }, [hasLoadedOnce, rows, setProtocolTotals, effectiveChainId]);
+    // Single source of truth with the header: both read `totalSupplied` /
+    // `totalBorrowed` off the same `metrics` object, computed by
+    // `calculateNetYieldMetrics`. Header now equals dashboard, by
+    // construction.
+    setProtocolTotals("Morpho", metrics.totalSupplied, metrics.totalBorrowed);
+  }, [hasLoadedOnce, metrics.totalSupplied, metrics.totalBorrowed, setProtocolTotals, effectiveChainId]);
 
   const hasPositions = rows.length > 0;
 

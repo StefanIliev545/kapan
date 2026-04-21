@@ -8,7 +8,7 @@ import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 // This grouped view uses custom sorting for unified layout with collapsible sections
 import { ScrollArea } from "@radix-ui/themes";
 import { ContractResponse } from "../specific/vesu/VesuMarkets";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { resolveTokenDisplayName } from "~~/contracts/tokenNameFallbacks";
 import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolDisplay, getV2PoolDisplay } from "../specific/vesu/pools";
 import { MarketData } from "./MarketsSection";
 import { RatePill } from "./RatePill";
@@ -167,7 +167,7 @@ const useNostraData = (): MarketData[] => {
       const borrowAPR = Number(rate.borrowing_rate) / 1e16;
       const utilization = borrowAPR > 0 ? (supplyAPY / borrowAPR) * 100 : 0;
       const price = priceArr[idx] ? formatPrice(priceArr[idx]) : "0.00";
-      const display = symbol && symbol.trim().length > 0 ? symbol : getTokenNameFallback(address) ?? symbol;
+      const display = resolveTokenDisplayName(symbol, address);
       return {
         icon: tokenNameToLogo(display.toLowerCase()),
         name: display,
@@ -314,7 +314,7 @@ const useVesuData = (): MarketData[] => {
       (data as unknown as ContractResponse).forEach(asset => {
         const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
         const raw = typeof (asset as any).symbol === "bigint" ? feltToString((asset as any).symbol) : String((asset as any).symbol ?? "");
-        const symbol = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(address) ?? raw;
+        const symbol = resolveTokenDisplayName(raw, address);
         const { borrowAPR, supplyAPY } = toAnnualRates(
           asset.fee_rate,
           asset.total_nominal_debt,
@@ -344,7 +344,7 @@ const useVesuData = (): MarketData[] => {
       assetsWithRates.forEach(asset => {
         const address = `0x${asset.address.toString(16).padStart(64, "0")}`;
         const rawSymbol = typeof asset.symbol === "bigint" ? feltToString(asset.symbol) : String(asset.symbol ?? "");
-        const symbol = rawSymbol && rawSymbol.trim().length > 0 ? rawSymbol : getTokenNameFallback(address) ?? rawSymbol;
+        const symbol = resolveTokenDisplayName(rawSymbol, address);
         const borrowAPR = asset.borrowAPR ?? 0;
         const supplyAPY = asset.supplyAPY ?? 0;
         markets.push({
