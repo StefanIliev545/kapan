@@ -218,6 +218,11 @@ export function HeroScene() {
         // more of the frame instead of reading as a contained object.
         camera={{ position: [0, 0, 1.8], fov: 60 }}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+        // r3f's Canvas forces `pointerEvents: 'auto'` inline on its root div,
+        // which overrides the `pointer-events-none` class on our wrapper and
+        // swallows clicks meant for the Launch App CTA underneath. Inline
+        // style here wins because Canvas spreads user style after its default.
+        style={{ pointerEvents: "none" }}
       >
         <Network />
       </Canvas>
