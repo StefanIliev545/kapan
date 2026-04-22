@@ -1716,10 +1716,12 @@ export const StickyLanding = () => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
 
       {/* 3D hero scene. Fades out as the user scrolls past the first sections
-         so it doesn't fight with the later content. Pointer-events disabled
-         inside HeroScene itself so scroll passes straight through. */}
+         so it doesn't fight with the later content. `pointer-events-none` on
+         the wrapper AND inside HeroScene's Canvas style so clicks/scroll pass
+         straight through to the CTA underneath — r3f's Canvas otherwise
+         re-enables pointer-events inline and swallows the hero button click. */}
       <motion.div
-        className="absolute inset-0"
+        className="pointer-events-none absolute inset-0"
         style={{ opacity: useTransform(smoothProgress, [0, 0.25, 0.5], [0.45, 0.25, 0.06]) }}
       >
         <HeroScene />

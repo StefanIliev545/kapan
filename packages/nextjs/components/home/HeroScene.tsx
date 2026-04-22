@@ -209,7 +209,12 @@ function Network() {
 
 export function HeroScene() {
   return (
-    <div className="pointer-events-none absolute inset-0">
+    // `landing-canvas-wrapper` (globals.css) applies
+    // `pointer-events: none !important` to the wrapper and every descendant —
+    // necessary because r3f's <Canvas> writes `pointerEvents: 'auto'` inline
+    // on its root div, which otherwise overrides any parent inherited
+    // `pointer-events: none` and eats the Launch App CTA click.
+    <div className="landing-canvas-wrapper absolute inset-0">
       <Canvas
         dpr={[1, 1.5]}
         // Camera is intentionally inside the outer shell (radius 2.7 after
@@ -218,11 +223,6 @@ export function HeroScene() {
         // more of the frame instead of reading as a contained object.
         camera={{ position: [0, 0, 1.8], fov: 60 }}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-        // r3f's Canvas forces `pointerEvents: 'auto'` inline on its root div,
-        // which overrides the `pointer-events-none` class on our wrapper and
-        // swallows clicks meant for the Launch App CTA underneath. Inline
-        // style here wins because Canvas spreads user style after its default.
-        style={{ pointerEvents: "none" }}
       >
         <Network />
       </Canvas>
