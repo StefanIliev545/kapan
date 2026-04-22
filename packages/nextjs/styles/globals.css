@@ -313,3 +313,15 @@ img[src$="/logos/ethereum.svg"] {
   @apply text-sm font-medium text-base-content/80 hover:text-base-content
     transition-colors duration-150;
 }
+
+/* Landing page r3f <Canvas> wrappers (hero scene + how-it-works scene).
+   r3f writes `pointerEvents: 'auto'` inline on its root div, which wins over
+   parent `pointer-events: none` via inheritance — so a non-active sticky
+   section with scale/opacity driven pointerEvents: none still hosts a canvas
+   that eats clicks meant for the CTA underneath. Universal-selector
+   !important on the wrapper + all descendants beats the inline auto on
+   every element in the subtree. */
+.landing-canvas-wrapper,
+.landing-canvas-wrapper * {
+  pointer-events: none !important;
+}

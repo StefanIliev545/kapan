@@ -233,7 +233,12 @@ function Scene() {
 
 export function HowItWorksScene() {
   return (
-    <div className="absolute inset-0">
+    // `landing-canvas-wrapper` (globals.css) applies
+    // `pointer-events: none !important` to the wrapper and every descendant —
+    // without this, r3f writes `pointerEvents: 'auto'` inline on the canvas
+    // host, which wins over the inactive sticky section's inherited
+    // `pointer-events: none` and swallows clicks on the hero CTA beneath.
+    <div className="landing-canvas-wrapper absolute inset-0">
       <Canvas
         dpr={[1, 1.5]}
         // fov + z chosen so the ring (RX=1.95, RY=1.35) comfortably fills
