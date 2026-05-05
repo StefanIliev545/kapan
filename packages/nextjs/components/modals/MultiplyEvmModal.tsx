@@ -211,13 +211,27 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
 
   // ==================== Computed Values Using Helpers ====================
 
+  // Oracle ratio = collateralPrice / debtPrice. For 1:1-pegged pairs (USDC/USDC, DAI/USDC)
+  // this is essentially 1 and the leverage cap formula behaves as before. For pairs where
+  // the oracle disagrees with face-value 1:1 (PT-USDe, syrupUSDC, anything with a discount),
+  // r ≠ 1 tightens the cap so we don't suggest a leverage that would revert at execution.
+  // Both collateral.price and debt.price are 8-decimal raw bigints, so the ratio normalizes.
+  const oracleRatio = useMemo(() => {
+    const cp = collateral?.price ?? 0n;
+    const dp = debt?.price ?? 0n;
+    if (cp <= 0n || dp <= 0n) return 1;
+    // Use 1e6-scaled bigint math then convert to number to keep ~6 decimals of precision.
+    return Number((cp * 1_000_000n) / dp) / 1_000_000;
+  }, [collateral?.price, debt?.price]);
+
   const maxLeverage = useMemo(() =>
     computeMaxLeverage(
       predictiveMaxLeverage, collateralConfig, isEModeActive,
       maxLtvBps, protocolName, slippage,
       calculateMaxLeverageFromLtv, adjustMaxLeverageForSlippage,
+      oracleRatio,
     ),
-    [predictiveMaxLeverage, collateralConfig, isEModeActive, maxLtvBps, protocolName, slippage]);
+    [predictiveMaxLeverage, collateralConfig, isEModeActive, maxLtvBps, protocolName, slippage, oracleRatio]);
 
   const effectiveLltvBps = useMemo(() => {
     if (predictiveLiqThreshold > 0 && (collateralConfig || isEModeActive)) {

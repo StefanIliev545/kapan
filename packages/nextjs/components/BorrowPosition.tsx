@@ -287,6 +287,23 @@ export type BorrowPositionProps = ProtocolPosition & {
     usdValue?: number;
     price?: bigint;
   }>;
+  /**
+   * Collateral list for the close-with-collateral modal. Different from `availableAssets`
+   * because close needs the user's *supplied* assets (sellable collateral) while the debt-swap
+   * modal that shares this component needs the user's *other debt* tokens. When omitted,
+   * falls back to `availableAssets` for backwards compatibility with single-collateral
+   * protocols (Morpho, Compound, Alchemix) where the two lists overlap by definition.
+   */
+  availableCollateralsForClose?: Array<{
+    symbol: string;
+    address: string;
+    decimals: number;
+    rawBalance: bigint;
+    balance: number;
+    icon: string;
+    usdValue?: number;
+    price?: bigint;
+  }>;
   containerClassName?: string;
   hideBalanceColumn?: boolean;
   availableActions?: {
@@ -313,6 +330,14 @@ export type BorrowPositionProps = ProtocolPosition & {
   defaultExpanded?: boolean;
   /** ADL protected status - lights up right border when debt is protected */
   adlProtected?: boolean;
+  /**
+   * Optional override for the close-with-collateral modal's max-repayable amount. When set,
+   * the close modal uses this value instead of `tokenBalance` for the "Max" button and
+   * balance display. Used by Alchemix to subtract earmarked debt (which can't be burned via
+   * the alAsset path) plus a safety buffer for transmuter drift between order signing and
+   * settlement. Other protocols can ignore this prop.
+   */
+  closeDebtBalanceOverride?: bigint;
 };
 
 export const BorrowPosition: FC<BorrowPositionProps> = ({
@@ -331,6 +356,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   chainId,
   position,
   availableAssets: availableAssetsList,
+  availableCollateralsForClose,
   vesuContext,
   protocolContext,
   moveSupport,
@@ -355,6 +381,7 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
   demoOptimalOverride,
   defaultExpanded = false,
   adlProtected = false,
+  closeDebtBalanceOverride,
 }) => {
   const moveModal = useModal();
   const repayModal = useModal();
@@ -642,8 +669,15 @@ export const BorrowPosition: FC<BorrowPositionProps> = ({
             debtIcon={icon}
             debtDecimals={tokenDecimals || 18}
             debtPrice={tokenPrice}
-            debtBalance={tokenBalanceBn}
-            availableCollaterals={availableAssetsList as SwapAsset[]}
+            // Alchemix needs the close-modal max clamped to (debt − earmarked − transmuter buffer)
+            // because the alAsset path can't burn earmarked debt; over-buying via CoW would leave
+            // collateral locked and revert the post-hook withdraw. `closeDebtBalanceOverride` lets
+            // the protocol view supply the safe ceiling without distorting the borrow-side display.
+            debtBalance={closeDebtBalanceOverride ?? tokenBalanceBn}
+            // Prefer the dedicated close-collateral list (e.g. Aave's supplied assets) over the
+            // shared `availableAssetsList` (which is debt-side for Aave/Venus and would leave the
+            // close picker empty after the filter excludes the debt token being closed).
+            availableCollaterals={(availableCollateralsForClose ?? availableAssetsList) as SwapAsset[]}
             context={compoundAwareContext}
           />
           <DebtSwapEvmModal

@@ -21,8 +21,15 @@ import {
 } from "~~/components/modals/adlAutomationHelpers";
 import {
   createRouterInstruction,
+  createProtocolInstruction,
   encodeToOutput,
+  encodeApprove,
+  encodeSubtract,
+  encodePushToken,
+  encodeLendingInstruction,
+  LendingOp,
 } from "~~/utils/v2/instructionHelpers";
+import { ALCHEMIX_GATEWAY_NAME } from "~~/utils/alchemix/protocolConstants";
 import { notification } from "~~/utils/scaffold-stark/notification";
 import { dispatchOrderCreated } from "~~/utils/orderNotes";
 
@@ -81,6 +88,96 @@ interface FlashLoanAppDataConfig {
   token: Address;
   amount: bigint;
   useBalanceTransfer?: boolean;
+  recipient?: string;
+}
+
+// ============ Alchemix-specific instruction builders ============
+//
+// Alchemix AL uses a different topology than Aave/Morpho because alAsset has effectively no
+// flash-loan liquidity. The flash is on the COLLATERAL underlying (USDC), funded into the
+// router, and the manager pre-hook deposits + borrows + pushes the freshly-minted alAsset to
+// the manager so CoW can sell it. Mirrors `buildMultiplyFlow`'s alchemix branch in
+// `useTransactionBuilder.ts`.
+
+interface AlchemixALInstructionParams {
+  collateralToken: Address;        // underlying (USDC / WETH / …)
+  debtToken: Address;              // alAsset (alUSD / alETH / …)
+  userAddress: Address;
+  alchemixContext: Hex;            // (marketId, tokenId) abi-encoded
+  flashAmountUsdc: bigint;          // amount the adapter flashes & funds into the router
+  orderManagerAddress: Address;
+  cowAdapterAddress: Address;
+}
+
+/**
+ * Pre-instructions for alchemix AL. UTXO map after the manager auto-injects
+ * `ToOutput(sellAmount, alUSD)` at index 0:
+ *   [0] ToOutput(sellAmount, alUSD)        — manager-injected
+ *   [1] ToOutput(flashAmount, USDC)        — declares the router's flash USDC balance
+ *   [2] Approve(in=1, alchemix-v3)         — gateway can pull USDC from router
+ *   [3] DepositCollateral(USDC, in=1)      — auto-wraps to MYT, credits position (no output)
+ *   [4] Borrow(alUSD, in=0)                — mintFrom: produces sellAmount alUSD on the router
+ *   [5] PushToken(borrowOutIdx, manager)   — manager now holds the alUSD CoW will sell
+ */
+function buildAlchemixPreInstructions(params: AlchemixALInstructionParams): ProtocolInstruction[] {
+  return [
+    createRouterInstruction(encodeToOutput(params.flashAmountUsdc, params.collateralToken)),
+    createRouterInstruction(encodeApprove(1, ALCHEMIX_GATEWAY_NAME)),
+    createProtocolInstruction(
+      ALCHEMIX_GATEWAY_NAME,
+      encodeLendingInstruction(
+        LendingOp.DepositCollateral,
+        params.collateralToken,
+        params.userAddress,
+        0n,
+        params.alchemixContext,
+        1,
+      ),
+    ),
+    createProtocolInstruction(
+      ALCHEMIX_GATEWAY_NAME,
+      encodeLendingInstruction(
+        LendingOp.Borrow,
+        params.debtToken,
+        params.userAddress,
+        0n,
+        params.alchemixContext,
+        0,
+      ),
+    ),
+    // After approve(1) emits a UTXO, deposit emits 0, borrow emits 1 → borrow output sits at UTXO[3].
+    createRouterInstruction(encodePushToken(3, params.orderManagerAddress)),
+  ];
+}
+
+/**
+ * Post-instructions for alchemix AL. UTXO map after manager auto-injects two ToOutputs:
+ *   [0] ToOutput(actualSell, alUSD)
+ *   [1] ToOutput(actualBuy, USDC)
+ *   [2] ToOutput(flashAmount, USDC)        — declarative for the split
+ *   [3] Subtract(1, 2) = actualBuy - flash — surplus USDC (the leverage gain)
+ *   [4] Approve(in=3, alchemix-v3)         — approve only the surplus for re-deposit
+ *   [5] DepositCollateral(USDC, in=3)      — re-deposits surplus as additional collateral
+ *   [6] PushToken(2, adapter)              — exact flash amount → adapter for repayment
+ */
+function buildAlchemixPostInstructions(params: AlchemixALInstructionParams): ProtocolInstruction[] {
+  return [
+    createRouterInstruction(encodeToOutput(params.flashAmountUsdc, params.collateralToken)),
+    createRouterInstruction(encodeSubtract(1, 2)),
+    createRouterInstruction(encodeApprove(3, ALCHEMIX_GATEWAY_NAME)),
+    createProtocolInstruction(
+      ALCHEMIX_GATEWAY_NAME,
+      encodeLendingInstruction(
+        LendingOp.DepositCollateral,
+        params.collateralToken,
+        params.userAddress,
+        0n,
+        params.alchemixContext,
+        3,
+      ),
+    ),
+    createRouterInstruction(encodePushToken(2, params.cowAdapterAddress as Address)),
+  ];
 }
 
 function buildFlashLoanAppDataConfig(
@@ -218,6 +315,16 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
     chainId,
   } as any);
 
+  // Alchemix routes through TransientAutoLeverageTrigger because its AL flow has state-mutating
+  // preInstructions (deposit + borrow inside the manager pre-hook), which would desync the
+  // standard AutoLeverageTrigger's dynamic `calculateExecution` from the on-chain ERC-1271 sig
+  // check. The transient trigger snapshots its outputs to per-tx transient storage during a
+  // dedicated `prepareCacheBySalt` pre-interaction.
+  const { data: transientAutoLeverageTriggerInfo } = useDeployedContractInfo({
+    contractName: "TransientAutoLeverageTrigger",
+    chainId,
+  } as any);
+
   const { data: cowAdapterInfo } = useDeployedContractInfo({
     contractName: "KapanCowAdapter",
     chainId,
@@ -244,12 +351,21 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
       assertWalletConnected(walletClient);
       assertPublicClient(publicClient);
 
+      const isAlchemix = protocolName === ALCHEMIX_GATEWAY_NAME;
+
       const orderManagerAddress = conditionalOrderManagerInfo?.address as Address | undefined;
-      const triggerAddress = autoLeverageTriggerInfo?.address as Address | undefined;
+      const triggerAddress = (
+        isAlchemix
+          ? transientAutoLeverageTriggerInfo?.address
+          : autoLeverageTriggerInfo?.address
+      ) as Address | undefined;
       const cowAdapterAddress = cowAdapterInfo?.address as Address | undefined;
 
       assertContractDeployed(orderManagerAddress, "KapanConditionalOrderManager");
-      assertContractDeployed(triggerAddress, "AutoLeverageTrigger");
+      assertContractDeployed(
+        triggerAddress,
+        isAlchemix ? "TransientAutoLeverageTrigger" : "AutoLeverageTrigger",
+      );
       assertContractDeployed(cowAdapterAddress, "KapanCowAdapter");
       assertAddressMatch(connectedAddress, userAddress);
 
@@ -284,26 +400,51 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
       // Encode trigger static data
       const triggerStaticData = encodeAutoLeverageTriggerParams(triggerParams) as `0x${string}`;
 
-      // Auto-leverage (multiply) flow:
-      // 1. Flash loan DEBT token → Adapter → OrderManager (via fundOrderWithBalance)
-      // 2. VaultRelayer pulls debt from OrderManager for swap
-      // 3. Swap: debt → collateral
-      // 4. Collateral received by OrderManager
-      // 5. Post-hook: Deposit collateral, Borrow debt, Push debt to OrderManager
-      // 6. OrderManager refunds excess debt to Adapter for flash loan repayment
+      // Topology branches by protocol family:
       //
-      // Pre-instructions: EMPTY (like ADL) - fundOrderWithBalance handles token routing
-      const preInstructions: ProtocolInstruction[] = [];
+      //   Aave / Morpho / Compound / Venus / Euler — flash DEBT, fund manager directly:
+      //     pre   = empty (adapter.fundOrderWithBalance writes sellToken into manager)
+      //     CoW   = sells debt, manager receives collateral
+      //     post  = deposit collateral, borrow new debt, push to manager (refund flash)
+      //
+      //   Alchemix V3 — flash COLLATERAL underlying (alAsset has no flash liquidity):
+      //     pre   = ToOutput(flash) + Approve + DepositCollateral + Borrow alAsset + Push to manager
+      //     CoW   = sells alAsset, manager receives collateral underlying
+      //     post  = Subtract surplus, re-deposit surplus as collateral, push exact flash to adapter
+      //   The flash recipient is the ROUTER (not manager) so DepositCollateral can pull it.
+      //   The TransientAutoLeverageTrigger's prepareCacheBySalt is added as an extra pre-hook
+      //   between adapter funding and the manager pre-hook — without it, the manager pre-hook's
+      //   state mutations would desync the on-chain ERC-1271 sig check from the WatchTower-signed
+      //   amounts.
+      let preInstructions: ProtocolInstruction[];
+      let postInstructions: ProtocolInstruction[];
+      const flashTokenForAlchemix = triggerParams.collateralToken as Address;
 
-      // Post-instructions: Deposit collateral (UTXO[1]), Borrow debt, Push to OrderManager
-      const { instructions: postInstructions } = buildAutoLeveragePostInstructions(
-        protocolName,
-        triggerParams.collateralToken,
-        triggerParams.debtToken,
-        userAddress,
-        triggerParams.protocolContext,
-        validOrderManager,
-      );
+      if (isAlchemix) {
+        const alchemixParams: AlchemixALInstructionParams = {
+          collateralToken: triggerParams.collateralToken as Address,
+          debtToken: triggerParams.debtToken as Address,
+          userAddress,
+          alchemixContext: triggerParams.protocolContext as Hex,
+          flashAmountUsdc: flashLoanConfig.amount,
+          orderManagerAddress: validOrderManager,
+          cowAdapterAddress: validCowAdapter,
+        };
+        preInstructions = buildAlchemixPreInstructions(alchemixParams);
+        postInstructions = buildAlchemixPostInstructions(alchemixParams);
+      } else {
+        // Standard Aave/Morpho/Compound/Venus/Euler post-hook flow (empty pre).
+        preInstructions = [];
+        const { instructions } = buildAutoLeveragePostInstructions(
+          protocolName,
+          triggerParams.collateralToken,
+          triggerParams.debtToken,
+          userAddress,
+          triggerParams.protocolContext,
+          validOrderManager,
+        );
+        postInstructions = instructions;
+      }
 
       const encodedPreInstructions = encodeInstructions(preInstructions) as `0x${string}`;
       const encodedPostInstructions = encodeInstructions(postInstructions) as `0x${string}`;
@@ -325,15 +466,57 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
         // UTXO[1] = buy amount (collateral) - use max approval for flexibility
         createRouterInstruction(encodeToOutput(MAX_UINT256, triggerParams.collateralToken)),
       ];
-      const allInstructions = [...dummyUtxoInstructions, ...postInstructions];
+      // For alchemix the auth flow also needs to see the preInstructions (Borrow needs
+      // approveMint, Deposit needs ERC20 allowance) — those run on top of the same UTXOs.
+      const allInstructions = isAlchemix
+        ? [...dummyUtxoInstructions, ...preInstructions, ...postInstructions]
+        : [...dummyUtxoInstructions, ...postInstructions];
       const authCalls = await getAuthorizations(allInstructions);
 
-      // Build flash loan config for appData - flash loan DEBT token (not collateral!)
+      // Flash-loan token diverges by protocol family: Aave/Morpho-shaped flows flash the DEBT
+      // (manager already holds sellToken before CoW pulls). Alchemix-shaped flows flash the
+      // COLLATERAL underlying because alAsset has no flash liquidity, and the pre-hook needs
+      // the underlying available on the router for DepositCollateral.
+      const flashToken: Address = isAlchemix ? flashTokenForAlchemix : (triggerParams.debtToken as Address);
       const flashLoanAppDataConfig = buildFlashLoanAppDataConfig(
         chainId,
-        triggerParams.debtToken as Address, // Flash loan debt, swap to collateral
+        flashToken,
         flashLoanConfig.amount,
       );
+      // Alchemix routes the flashed underlying directly to the router; non-alchemix delivers to
+      // the manager (existing behavior).
+      if (isAlchemix && routerContract?.address) {
+        flashLoanAppDataConfig.recipient = routerContract.address;
+      }
+
+      // Alchemix also needs an extra pre-interaction: TransientAutoLeverageTrigger.prepareCacheBySalt(user, salt)
+      // — runs AFTER adapter funding (which already deposited the flashed underlying into the
+      // router) but BEFORE the manager pre-hook executes its mutating preInstructions, so the
+      // trigger snapshot reflects pre-mutation state. Without this hook the on-chain ERC-1271
+      // sig check would see post-mutation amounts and reject the trade.
+      const PREPARE_CACHE_IFACE = [
+        "function prepareCacheBySalt(address user, bytes32 salt) external",
+      ];
+      const prepareCacheCalldata = isAlchemix
+        ? encodeFunctionData({
+            abi: [{ name: "prepareCacheBySalt", type: "function", stateMutability: "nonpayable", inputs: [{ name: "user", type: "address" }, { name: "salt", type: "bytes32" }], outputs: [] }],
+            functionName: "prepareCacheBySalt",
+            args: [userAddress, salt],
+          })
+        : "0x";
+      const extraPreHooks = isAlchemix
+        ? [
+            {
+              target: validTrigger,
+              callData: prepareCacheCalldata,
+              gasLimit: "350000",
+              dappId: "kapan://flashloans/alchemix/prepare-cache",
+            },
+          ]
+        : undefined;
+      // Suppress lint for the iface constant — kept here for human reference even though we
+      // build calldata via encodeFunctionData inline.
+      void PREPARE_CACHE_IFACE;
 
       // Build and register appData with CoW Protocol
       const protocol = normalizeProtocolForAppCode(protocolName);
@@ -345,9 +528,11 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
         {
           operationType: "leverage-up", // Auto-leverage operation
           protocol,
-          preHookGasLimit: "500000", // Pre-hook: fund order from adapter + record balances
+          // Alchemix's pre-hook is non-empty (deposit + borrow + push); Aave/Morpho's is empty.
+          preHookGasLimit: isAlchemix ? "1500000" : "500000",
           postHookGasLimit: "1500000", // Post-hook: deposit collateral + borrow debt + push (Venus is gas-heavy)
           flashLoan: flashLoanAppDataConfig,
+          extraPreHooks,
         },
       );
 
@@ -434,6 +619,7 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
     publicClient,
     conditionalOrderManagerInfo,
     autoLeverageTriggerInfo,
+    transientAutoLeverageTriggerInfo,
     cowAdapterInfo,
     connectedAddress,
     userAddress,
@@ -468,6 +654,11 @@ export function useAutoLeverageContracts(chainId: number) {
     chainId,
   } as any);
 
+  const { data: transientAutoLeverageTriggerInfo, isLoading: isLoadingTransientTrigger } = useDeployedContractInfo({
+    contractName: "TransientAutoLeverageTrigger",
+    chainId,
+  } as any);
+
   const { data: viewRouterInfo, isLoading: isLoadingViewRouter } = useDeployedContractInfo({
     contractName: "KapanViewRouter",
     chainId,
@@ -476,8 +667,11 @@ export function useAutoLeverageContracts(chainId: number) {
   return {
     conditionalOrderManagerAddress: conditionalOrderManagerInfo?.address as Address | undefined,
     autoLeverageTriggerAddress: autoLeverageTriggerInfo?.address as Address | undefined,
+    transientAutoLeverageTriggerAddress: transientAutoLeverageTriggerInfo?.address as Address | undefined,
     viewRouterAddress: viewRouterInfo?.address as Address | undefined,
-    isLoading: isLoadingManager || isLoadingTrigger || isLoadingViewRouter,
+    isLoading: isLoadingManager || isLoadingTrigger || isLoadingTransientTrigger || isLoadingViewRouter,
+    // The cogwheel only needs the *standard* trigger to consider AL supported on a chain;
+    // alchemix-specific code paths additionally check `transientAutoLeverageTriggerAddress`.
     isSupported:
       !!conditionalOrderManagerInfo?.address &&
       !!autoLeverageTriggerInfo?.address &&

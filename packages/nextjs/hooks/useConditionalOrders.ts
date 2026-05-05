@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Address, decodeAbiParameters, encodeFunctionData, keccak256, toHex } from "viem";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { notification } from "~~/utils/scaffold-stark/notification";
+import { ALCHEMIX_GATEWAY_NAME, ALCHEMIX_PROTOCOL_ID } from "~~/utils/alchemix/protocolConstants";
 
 // ============ Protocol ID Constants ============
 // Must match LtvTrigger.sol and adlAutomationHelpers.ts
@@ -18,6 +19,7 @@ export const PROTOCOL_IDS = {
   MORPHO_BLUE: computeProtocolId("morpho-blue"),
   EULER_V2: computeProtocolId("euler-v2"),
   VENUS: computeProtocolId("venus"),
+  ALCHEMIX: ALCHEMIX_PROTOCOL_ID,
 } as const;
 
 // ============ Context Decoding ============
@@ -505,6 +507,7 @@ function getExpectedProtocolId(protocolName: string): `0x${string}` | undefined 
   if (normalized.includes("morpho")) return PROTOCOL_IDS.MORPHO_BLUE;
   if (normalized.includes("euler")) return PROTOCOL_IDS.EULER_V2;
   if (normalized.includes("venus")) return PROTOCOL_IDS.VENUS;
+  if (normalized.includes(ALCHEMIX_GATEWAY_NAME) || normalized.includes("alchemix")) return PROTOCOL_IDS.ALCHEMIX;
   return undefined;
 }
 

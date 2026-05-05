@@ -27,6 +27,7 @@ import {
   calculateAutoLeverageFlashLoanAmount,
   usdToTokenAmount,
   MorphoMarketContextForEncoding,
+  AlchemixContextForEncoding,
 } from "./adlAutomationHelpers";
 
 // ============ Types ============
@@ -53,6 +54,8 @@ export interface LTVAutomationModalProps {
   eulerCollateralVaults?: string[];
   eulerSubAccountIndex?: number;
   compoundMarket?: string;
+  /** Alchemix-specific context — (marketId, tokenId). Required when protocolName is alchemix. */
+  alchemixContext?: AlchemixContextForEncoding;
 }
 
 // ============ Computation Helpers ============
@@ -114,6 +117,7 @@ function calcAutoLevFlashLoanConfig(
   targetBps: number,
   chunks: number,
   debtToken: { decimals: number; balance?: bigint },
+  options?: { isAlchemix?: boolean; maxSlippageBps?: number },
 ): { amount: bigint; perChunkSellAmount: bigint } | null {
   // For auto-leverage, we only need collateral (user might have 0 debt, wanting to leverage up)
   if (!collateral || !totalCollateralUsd) return null;
@@ -125,7 +129,56 @@ function calcAutoLevFlashLoanConfig(
   );
   if (perChunkFlashLoanUsd === 0n) return null;
 
-  // For auto-leverage, we flash loan DEBT tokens (not collateral!)
+  // Auto-leverage flashes:
+  //   - non-alchemix: DEBT token (flash → swap to collateral → deposit → borrow → refund flash)
+  //   - alchemix:     COLLATERAL underlying (flash → deposit → borrow alAsset → swap → refund)
+  //
+  // CRITICAL INVARIANT: FLASH_AMOUNT must be ≤ minBuyAmount the swap returns. Otherwise the
+  // post-hook's `Subtract(actualBuy, FLASH)` underflows during the watchtower's
+  // `getTradeableOrder` simulation → order created on-chain but never enters the orderbook.
+  //
+  // Sizing formula:
+  //   minBuyAmount ≈ deltaDebt × peg × (1 − slippageBps/10000)
+  //   FLASH_AMOUNT = minBuyAmount × (1 − safetyBps/10000)
+  //
+  // The safety bps absorbs (a) wei-level rounding in the trigger's _truncatePrecision step,
+  // (b) tiny price-oracle drift between order creation and fill, and (c) gives the surplus
+  // re-deposit path a positive amount to work with even when the swap fills exactly at floor.
+  //
+  // Yield-compounding works automatically without any headroom on the flash: when MYT yield
+  // grows the position over an order's multi-iteration lifetime, the trigger's per-chunk
+  // sellAmount + minBuyAmount also grow proportionally → actualBuy grows → surplus
+  // (= actualBuy − static FLASH) grows → more collateral re-deposited. The flash is just the
+  // working-capital seed; the surplus is what scales.
+  if (options?.isAlchemix) {
+    const collateralPrice = calcCollateralPrice(collateral);
+    if (collateralPrice === 0n) return null;
+    // baseFlashCollateral is the trigger's pre-slippage `expectedCollateral` — i.e. how many
+    // collateral-token wei `deltaDebt` USD converts to at the current collateral price.
+    const baseFlashCollateral = usdToTokenAmount(perChunkFlashLoanUsd, collateralPrice, collateral.decimals);
+
+    // The trigger applies slippage to compute minBuyAmount = expectedCollateral × (1 − slippage).
+    // To stay strictly below the swap's worst-case return we apply BOTH the user's slippage
+    // AND a small extra safety cushion. Without these the post-hook's
+    // `Subtract(actualBuy, FLASH)` underflows when CoW fills exactly at the slippage floor,
+    // breaking the watchtower simulation and silently dropping the order from the orderbook.
+    const slippageBps = BigInt(options.maxSlippageBps ?? 100);
+    const SAFETY_BPS = 100n; // 1% extra cushion below minBuyAmount
+    const afterSlippage = (baseFlashCollateral * (10_000n - slippageBps)) / 10_000n;
+    const flashAmount = (afterSlippage * (10_000n - SAFETY_BPS)) / 10_000n;
+    console.log("[AutoLeverage] Alchemix flash loan config (sized < minBuyAmount):", {
+      perChunkFlashLoanUsd: perChunkFlashLoanUsd.toString(),
+      baseFlashCollateral_atPeg: baseFlashCollateral.toString(),
+      afterSlippage: afterSlippage.toString(),
+      flashAmount: flashAmount.toString(),
+      slippageBps: slippageBps.toString(),
+      safetyBps: SAFETY_BPS.toString(),
+      collateralPrice: collateralPrice.toString(),
+    });
+    return { amount: flashAmount, perChunkSellAmount: baseFlashCollateral };
+  }
+
+  // For non-alchemix auto-leverage, we flash loan DEBT tokens.
   const debtTokenPrice = calcDebtTokenPrice(debtToken.balance, totalDebtUsd, debtToken.decimals);
   const perChunkFlashLoanAmount = usdToTokenAmount(perChunkFlashLoanUsd, debtTokenPrice, debtToken.decimals);
 
@@ -136,8 +189,6 @@ function calcAutoLevFlashLoanConfig(
     debtTokenBalance: debtToken.balance?.toString(),
   });
 
-  // Sell amount should match flash loan (we sell what we flash loaned)
-  // perChunkSellAmount is used as a reference but the trigger calculates actual sell amount
   return { amount: perChunkFlashLoanAmount, perChunkSellAmount: perChunkFlashLoanAmount };
 }
 
@@ -343,6 +394,7 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
   eulerCollateralVaults,
   eulerSubAccountIndex,
   compoundMarket,
+  alchemixContext,
 }) => {
   const { address: userAddress } = useAccount();
   const { isSupported: isADLSupported, isLoading: isLoadingADL } = useADLContracts(chainId);
@@ -400,11 +452,12 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
           ? { borrowVault: eulerBorrowVault, collateralVault: eulerCollateralVaults || [], subAccountIndex: eulerSubAccountIndex }
           : undefined,
         compoundMarket,
+        alchemixContext,
       });
     } catch {
       return "0x";
     }
-  }, [protocolName, morphoContext, eulerBorrowVault, eulerCollateralVaults, eulerSubAccountIndex, compoundMarket]);
+  }, [protocolName, morphoContext, eulerBorrowVault, eulerCollateralVaults, eulerSubAccountIndex, compoundMarket, alchemixContext]);
 
   const adlValidation = useMemo(
     () => validateADLParams({
@@ -428,8 +481,18 @@ export const LTVAutomationModal: FC<LTVAutomationModalProps> = ({
   );
 
   const autoLevFlashLoanConfig = useMemo(
-    () => calcAutoLevFlashLoanConfig(selectedCollateral, totalCollateralUsd, totalDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, debtToken),
-    [selectedCollateral, totalCollateralUsd, totalDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, debtToken.decimals, debtToken.balance],
+    () => {
+      const isAlchemix = protocolName.toLowerCase().includes("alchemix");
+      return calcAutoLevFlashLoanConfig(
+        selectedCollateral, totalCollateralUsd, totalDebtUsd,
+        autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, debtToken,
+        // For alchemix, we pass slippage so the flash sizing can match minBuyAmount exactly
+        // (= expectedCollateral × (1 − slippage)); otherwise the post-hook's surplus subtract
+        // would underflow when actualBuy fills at the slippage floor.
+        { isAlchemix, maxSlippageBps },
+      );
+    },
+    [protocolName, selectedCollateral, totalCollateralUsd, totalDebtUsd, autoLevTriggerLtvBps, autoLevTargetLtvBps, numChunks, debtToken.decimals, debtToken.balance, maxSlippageBps],
   );
 
   const { createOrder: createADLOrder, isLoading: isCreatingADL } = useADLOrder({

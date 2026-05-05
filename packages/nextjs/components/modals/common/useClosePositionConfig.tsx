@@ -552,6 +552,15 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
     }
   }, [selectedTo, pendleAvailable]);
 
+  // Auto-select the only available collateral when there's exactly one option (e.g. Alchemix
+  // markets, single-collateral Morpho markets). Without this, selectedTo stays null forever
+  // and the swap UI looks empty even though the data is correct.
+  useEffect(() => {
+    if (toAssets.length === 1 && (!selectedTo || selectedTo.address.toLowerCase() !== toAssets[0].address.toLowerCase())) {
+      setSelectedTo(toAssets[0]);
+    }
+  }, [toAssets, selectedTo]);
+
   // Initialize limitOrderConfig
   useEffect(() => {
     if (executionType !== "limit" || limitOrderConfig?.selectedProvider) {

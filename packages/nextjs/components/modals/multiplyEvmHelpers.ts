@@ -21,6 +21,7 @@ import {
 } from "~~/utils/v2/instructionHelpers";
 import { calculateFlashLoanFee, getPreferredFlashLoanLender, type ChunkCalculationResult } from "~~/utils/cow";
 import { type FlashLoanProviderOption } from "~~/utils/flashLoan";
+import { ALCHEMIX_GATEWAY_NAME } from "~~/utils/alchemix/protocolConstants";
 
 // TODO: Migrate to new conditional order system - ChunkInstructions defined locally
 type ChunkInstructions = { preInstructions: ProtocolInstruction[]; postInstructions: ProtocolInstruction[]; flashLoanRepaymentUtxoIndex?: number };
@@ -397,6 +398,8 @@ export interface CowInstructionsBuildParams {
   marginAmountRaw: bigint;
   protocolName: string;
   morphoContext?: MorphoMarketContextForEncoding;
+  /** Pre-encoded Alchemix `(marketId, tokenId)` blob — used when `protocolName === ALCHEMIX_GATEWAY_NAME`. */
+  alchemixContext?: string;
   market?: Address;
   orderManagerAddress: Address;
   chunkParams: ChunkParamsResult;
@@ -423,17 +426,20 @@ function buildDepositInstructions(
 }
 
 function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInstructions[] {
-  const { collateral, debt, userAddress, flashLoanAmountRaw, marginAmountRaw, protocolName, morphoContext, market, chunkParams } = params;
+  const { collateral, debt, userAddress, flashLoanAmountRaw, marginAmountRaw, protocolName, morphoContext, alchemixContext, market, chunkParams } = params;
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
   const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
+  const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
 
   const context = isMorpho && morphoContext
     ? encodeMorphoContext(morphoContext)
-    : (isCompound && market ? market : "0x");
+    : isAlchemix && alchemixContext
+      ? alchemixContext
+      : (isCompound && market ? market : "0x");
 
-  const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+  const depositOp = (isCompound || isMorpho || isAlchemix) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
   const numChunks = chunkParams.numChunks;
   const selectedProviderType = chunkParams.selectedProviderType ?? "morpho";
@@ -487,15 +493,18 @@ function buildFlashLoanModeChunks(params: CowInstructionsBuildParams): ChunkInst
 }
 
 function buildMultiChunkModeChunks(params: CowInstructionsBuildParams): ChunkInstructions[] {
-  const { collateral, debt, userAddress, protocolName, morphoContext, market, orderManagerAddress, chunkParams } = params;
+  const { collateral, debt, userAddress, protocolName, morphoContext, alchemixContext, market, orderManagerAddress, chunkParams } = params;
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
   const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
+  const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
 
   const context = isMorpho && morphoContext
     ? encodeMorphoContext(morphoContext)
-    : (isCompound && market ? market : "0x");
+    : isAlchemix && alchemixContext
+      ? alchemixContext
+      : (isCompound && market ? market : "0x");
 
   const depositInstructions = buildDepositInstructions(normalizedProtocol, collateral.address, userAddress, context);
 
@@ -557,16 +566,20 @@ export function buildInitialDepositInstructions(
   marginAmountRaw: bigint,
   protocolName: string,
   morphoContext?: MorphoMarketContextForEncoding,
-  market?: Address
+  market?: Address,
+  alchemixContext?: string,
 ): ProtocolInstruction[] {
   if (!collateral || !userAddress || marginAmountRaw <= 0n) return [];
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
   const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
+  const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
 
   const context = isMorpho && morphoContext
     ? encodeMorphoContext(morphoContext)
+    : isAlchemix && alchemixContext
+      ? alchemixContext
     : (isCompound && market ? market : "0x");
 
   const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
@@ -643,14 +656,43 @@ export function calculateMaxLeverageFromLtv(ltvBps: bigint, protocolName: string
   return Math.round((1 / (1 - effectiveLtv)) * 100) / 100;
 }
 
-export function adjustMaxLeverageForSlippage(baseLeverage: number, slippagePercent: number): number {
+/**
+ * Adjust the theoretical max leverage downward to account for swap slippage AND any
+ * collateral-vs-debt oracle ratio that isn't 1:1.
+ *
+ * Derivation (where T = targetLtv, r = collateralPrice / debtPrice, s = slippage):
+ *   For a flash-debt-then-swap-to-collateral multiply flow, the on-chain LTV is
+ *     LTV = (L − 1) / (r + (L − 1)·(1 − s))
+ *   Solving LTV ≤ T for L:
+ *     L ≤ 1 + T·r / (1 − T·(1 − s))    →    (1 + T·(r − 1 + s)) / (1 − T·(1 − s))
+ *
+ * For r = 1 (perfect oracle peg, e.g. USDC↔DAI, the historical assumption), this reduces
+ * to the original `(1 + T·s) / (1 − T·(1 − s))` formula.  For r < 1 (collateral worth less
+ * than debt per unit, e.g. PT-USDe oracle = 0.97), the cap is *lower* — exactly the gap
+ * we hit on Alchemix and any face-value-sensitive market with off-peg debt tokens.
+ *
+ * Pass `oracleRatio = 1` (the default) for pegged stablecoin pairs to preserve old behavior.
+ */
+export function adjustMaxLeverageForSlippage(
+  baseLeverage: number,
+  slippagePercent: number,
+  oracleRatio = 1,
+): number {
   const slippageDecimal = slippagePercent / 100;
   const targetLtv = (baseLeverage - 1) / baseLeverage;
 
   if (targetLtv >= 0.99 || slippageDecimal >= 1) return baseLeverage;
 
-  const adjustedLeverage = (1 + targetLtv * slippageDecimal) / (1 - targetLtv * (1 - slippageDecimal));
-  return Math.round(Math.min(adjustedLeverage, baseLeverage) * 100) / 100;
+  // Guard against degenerate ratios (zero or negative oracle data).
+  const r = oracleRatio > 0 ? oracleRatio : 1;
+
+  const denom = 1 - targetLtv * (1 - slippageDecimal);
+  if (denom <= 0) return 1;
+
+  const adjustedLeverage = (1 + targetLtv * (r - 1 + slippageDecimal)) / denom;
+  // Clamp to [1, baseLeverage]: never give the user *more* leverage than the LTV cap allows,
+  // and never go below 1 if the formula produces a degenerate value.
+  return Math.round(Math.max(1, Math.min(adjustedLeverage, baseLeverage)) * 100) / 100;
 }
 
 export function calculateFlashLoanAmount(
@@ -681,6 +723,8 @@ export interface PreOrderInstructionsParams {
   numChunks: number;
   protocolName: string;
   morphoContext?: MorphoMarketContextForEncoding;
+  /** Pre-encoded Alchemix `(marketId, tokenId)` blob — used when `protocolName === ALCHEMIX_GATEWAY_NAME`. */
+  alchemixContext?: string;
   market?: Address;
   buildInitialDepositFlow: ProtocolInstruction[];
   seedBorrowInstruction?: ProtocolInstruction;
@@ -690,15 +734,18 @@ export function buildPreOrderInstructions(params: PreOrderInstructionsParams): P
   const {
     isFlashLoanMode, marginAmountRaw, collateral, debt, userAddress,
     flashLoanAmountRaw, flashLoanFee, numChunks, protocolName,
-    morphoContext, market, buildInitialDepositFlow, seedBorrowInstruction,
+    morphoContext, alchemixContext, market, buildInitialDepositFlow, seedBorrowInstruction,
   } = params;
 
   const normalizedProtocol = normalizeProtocolName(protocolName);
   const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
+  const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
   const context = isMorpho && morphoContext
     ? encodeMorphoContext(morphoContext)
-    : (isCompound && market ? market : "0x");
+    : isAlchemix && alchemixContext
+      ? alchemixContext
+      : (isCompound && market ? market : "0x");
 
   const preOrderInstructions: ProtocolInstruction[] = [];
 
@@ -734,14 +781,18 @@ export function createSeedBorrowInstruction(
   userAddress: Address,
   seedAmount: bigint,
   morphoContext?: MorphoMarketContextForEncoding,
-  market?: Address
+  market?: Address,
+  alchemixContext?: string,
 ): ProtocolInstruction {
   const normalizedProtocol = normalizeProtocolName(protocolName);
   const isMorpho = normalizedProtocol === PROTOCOL_MORPHO;
   const isCompound = normalizedProtocol === "compound";
+  const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
   const context = isMorpho && morphoContext
     ? encodeMorphoContext(morphoContext)
-    : (isCompound && market ? market : "0x");
+    : isAlchemix && alchemixContext
+      ? alchemixContext
+      : (isCompound && market ? market : "0x");
 
   return createProtocolInstruction(
     normalizedProtocol,
@@ -1064,7 +1115,8 @@ export function computeMaxLeverage(
   protocolName: string,
   slippage: number,
   calculateMaxLeverageFromLtvFn: (maxLtvBps: bigint, protocolName: string) => number,
-  adjustMaxLeverageForSlippageFn: (baseLeverage: number, slippage: number) => number,
+  adjustMaxLeverageForSlippageFn: (baseLeverage: number, slippage: number, oracleRatio?: number) => number,
+  oracleRatio = 1,
 ): number {
   let baseLeverage: number;
   if (predictiveMaxLeverage > 1 && (collateralConfig || isEModeActive)) {
@@ -1072,7 +1124,7 @@ export function computeMaxLeverage(
   } else {
     baseLeverage = calculateMaxLeverageFromLtvFn(maxLtvBps, protocolName);
   }
-  return adjustMaxLeverageForSlippageFn(baseLeverage, slippage);
+  return adjustMaxLeverageForSlippageFn(baseLeverage, slippage, oracleRatio);
 }
 
 // ==================== Provider Options Resolution ====================

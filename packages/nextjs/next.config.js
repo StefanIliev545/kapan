@@ -24,10 +24,23 @@ const commonConfig = {
   experimental: {
     // Reduce webpack memory usage during builds (v15+)
     webpackMemoryOptimizations: true,
+    // Per-icon barrel-file optimization — prevents parsing the whole icon set
+    // for every import site. Big build-memory savings when these libs are used widely.
+    optimizePackageImports: [
+      "lucide-react",
+      "@heroicons/react/24/outline",
+      "@heroicons/react/24/solid",
+      "@heroicons/react/20/solid",
+      "@radix-ui/themes",
+      "@tanstack/react-table",
+    ],
   },
   webpack: (config) => {
     config.resolve.fallback = { fs: false, net: false, tls: false };
     config.externals.push("pino-pretty", "lokijs", "encoding");
+    // Build-memory: serialize module compilation instead of N workers in parallel.
+    // Tradeoff: slightly slower build, much lower peak RAM. Required to fit Vercel's 8GB cap.
+    config.parallelism = 1;
     return config;
   },
   turbopack: {},
