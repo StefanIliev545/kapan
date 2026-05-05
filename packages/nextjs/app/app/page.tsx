@@ -57,6 +57,11 @@ const EulerProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Euler" /> }
 );
 
+const AlchemixProtocolView = dynamic(
+  () => import("~~/components/specific/alchemix/AlchemixProtocolView").then(m => m.AlchemixProtocolView),
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Alchemix" /> }
+);
+
 const WalletSection = dynamic(
   () => import("~~/components/specific/wallet/WalletSection").then(m => m.WalletSection),
   { ssr: false }
@@ -120,6 +125,7 @@ const App: NextPage = () => {
         import("~~/components/specific/morpho/MorphoProtocolView");
         import("~~/components/specific/spark/SparkProtocolView");
         import("~~/components/specific/euler/EulerProtocolView");
+        import("~~/components/specific/alchemix/AlchemixProtocolView");
       } else {
         import("~~/components/specific/vesu/VesuProtocolView");
         import("~~/components/specific/nostra/NostraProtocolView");
@@ -253,6 +259,9 @@ const App: NextPage = () => {
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <EulerProtocolView chainId={arbitrum.id} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <AlchemixProtocolView chainId={arbitrum.id} />
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />

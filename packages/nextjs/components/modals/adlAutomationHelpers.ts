@@ -14,6 +14,7 @@ import {
   MorphoMarketContextForEncoding,
   EulerVaultContextForEncoding,
 } from "~~/utils/v2/instructionHelpers";
+import { ALCHEMIX_GATEWAY_NAME, ALCHEMIX_PROTOCOL_ID } from "~~/utils/alchemix/protocolConstants";
 
 // Re-export types for consumers
 export type { MorphoMarketContextForEncoding, EulerVaultContextForEncoding, ProtocolInstruction };
@@ -29,6 +30,7 @@ export const PROTOCOL_IDS = {
   MORPHO_BLUE: keccak256(toUtf8Bytes("morpho-blue")).slice(0, 10) as `0x${string}`,
   EULER_V2: keccak256(toUtf8Bytes("euler-v2")).slice(0, 10) as `0x${string}`,
   VENUS: keccak256(toUtf8Bytes("venus")).slice(0, 10) as `0x${string}`,
+  ALCHEMIX: ALCHEMIX_PROTOCOL_ID,
 } as const;
 
 // ============ Types ============
@@ -72,6 +74,9 @@ export function getProtocolId(protocolName: string): `0x${string}` {
       return PROTOCOL_IDS.EULER_V2;
     case "venus":
       return PROTOCOL_IDS.VENUS;
+    case ALCHEMIX_GATEWAY_NAME:
+    case "alchemix":
+      return PROTOCOL_IDS.ALCHEMIX;
     default:
       throw new Error(`Unknown protocol: ${protocolName}`);
   }
@@ -123,6 +128,12 @@ export function encodeTriggerParams(params: TriggerParamsInput): string {
 
 // ============ Protocol Context Encoding ============
 
+/** Alchemix context format used by AlchemixGatewayWrite & AlchemixGatewayView. */
+export interface AlchemixContextForEncoding {
+  marketId: number | bigint;
+  tokenId: bigint;
+}
+
 /**
  * Encode protocol-specific context for ADL orders
  */
@@ -132,6 +143,7 @@ export function encodeProtocolContext(
     morphoContext?: MorphoMarketContextForEncoding;
     eulerContext?: EulerVaultContextForEncoding;
     compoundMarket?: string;
+    alchemixContext?: AlchemixContextForEncoding;
   },
 ): string {
   const normalized = normalizeProtocolName(protocolName);
@@ -163,6 +175,18 @@ export function encodeProtocolContext(
         return encodeEulerContext(options.eulerContext);
       }
       throw new Error("Euler requires eulerContext");
+
+    case ALCHEMIX_GATEWAY_NAME:
+    case "alchemix":
+      // Alchemix is NFT-shaped — context = (marketId, tokenId). Same encoding the gateway
+      // and view both decode (`AlchemixGatewayWrite._decodeContext`).
+      if (options.alchemixContext) {
+        return encodeAbiParameters(
+          [{ type: "uint256" }, { type: "uint256" }],
+          [BigInt(options.alchemixContext.marketId), options.alchemixContext.tokenId],
+        );
+      }
+      throw new Error("Alchemix requires alchemixContext { marketId, tokenId }");
 
     default:
       return "0x";

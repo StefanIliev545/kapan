@@ -1,0 +1,464 @@
+{
+  "address": "0x1A2dEeFFC1e0C497E6dFC1328aAb5BB66dDda091",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_viewRouter",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_orderManager",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_hooksTrampoline",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidParams",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotTrampoline",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AAVE_V3",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "COMPOUND_V3",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "EULER_V2",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MORPHO_BLUE",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VENUS",
+      "outputs": [
+        {
+          "internalType": "bytes4",
+          "name": "",
+          "type": "bytes4"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "staticData",
+          "type": "bytes"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "iterationCount",
+          "type": "uint256"
+        }
+      ],
+      "name": "calculateExecution",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "sellAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "minBuyAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes4",
+              "name": "protocolId",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "bytes",
+              "name": "protocolContext",
+              "type": "bytes"
+            },
+            {
+              "internalType": "uint256",
+              "name": "triggerLtvBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "targetLtvBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "debtToken",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "collateralDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "debtDecimals",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256",
+              "name": "maxSlippageBps",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "numChunks",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct TransientAutoLeverageTrigger.TriggerParams",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "name": "encodeTriggerParams",
+      "outputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes4",
+          "name": "protocolId",
+          "type": "bytes4"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "context",
+          "type": "bytes"
+        }
+      ],
+      "name": "getCurrentLtv",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "hooksTrampoline",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "isComplete",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "orderManager",
+      "outputs": [
+        {
+          "internalType": "contract IKapanConditionalOrderManager",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "salt",
+          "type": "bytes32"
+        }
+      ],
+      "name": "prepareCacheBySalt",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "staticData",
+          "type": "bytes"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "shouldExecute",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        },
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "triggerName",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "viewRouter",
+      "outputs": [
+        {
+          "internalType": "contract IKapanViewRouter",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x3d291defaff3c3b435c4b69ea0b618e1021335537bb48d18c3b1ce2f5e7d086a",
+  "receipt": {
+    "to": "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+    "from": "0x0BE61223F99E57b8b8B7033a77B54Adc7f7cF027",
+    "contractAddress": null,
+    "transactionIndex": 1,
+    "gasUsed": "1338074",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0x16d312e17badacadb58636daa93af48015cef76ede56eb3ce20fb9ffc93fa326",
+    "transactionHash": "0x3d291defaff3c3b435c4b69ea0b618e1021335537bb48d18c3b1ce2f5e7d086a",
+    "logs": [],
+    "blockNumber": 459754425,
+    "cumulativeGasUsed": "1338074",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0x79D4b55a88560d2EaA4CAF15C55139416bc2cb36",
+    "0x3B59E55AeE49a369A950E215B1C11e846F9Bd731",
+    "0x60Bf78233f48eC42eE3F101b9a05eC7878728006"
+  ],
+  "numDeployments": 2,
+  "solcInputHash": "1cfdbb448c762da06f401ee636672402",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_viewRouter\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_orderManager\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_hooksTrampoline\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"InvalidParams\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotTrampoline\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"AAVE_V3\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"COMPOUND_V3\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"EULER_V2\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MORPHO_BLUE\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"VENUS\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"staticData\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"iterationCount\",\"type\":\"uint256\"}],\"name\":\"calculateExecution\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"sellAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"minBuyAmount\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"bytes\",\"name\":\"protocolContext\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"triggerLtvBps\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"targetLtvBps\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"collateralToken\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"debtToken\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"collateralDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"debtDecimals\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"maxSlippageBps\",\"type\":\"uint256\"},{\"internalType\":\"uint8\",\"name\":\"numChunks\",\"type\":\"uint8\"}],\"internalType\":\"struct TransientAutoLeverageTrigger.TriggerParams\",\"name\":\"params\",\"type\":\"tuple\"}],\"name\":\"encodeTriggerParams\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"protocolId\",\"type\":\"bytes4\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"context\",\"type\":\"bytes\"}],\"name\":\"getCurrentLtv\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"hooksTrampoline\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"isComplete\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"orderManager\",\"outputs\":[{\"internalType\":\"contract IKapanConditionalOrderManager\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"salt\",\"type\":\"bytes32\"}],\"name\":\"prepareCacheBySalt\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"staticData\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"shouldExecute\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"},{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"triggerName\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"viewRouter\",\"outputs\":[{\"internalType\":\"contract IKapanViewRouter\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"calculateExecution(bytes,address,uint256)\":{\"details\":\"Tries the transient cache first; falls back to live computation. Both paths      converge on the same answer when called within the same block \\u2014 the cache only      meaningfully diverges from live when the pre-hook has mutated state, which is      exactly when we need it.\",\"params\":{\"iterationCount\":\"Number of executions completed so far (for chunked orders)\",\"owner\":\"The order owner\",\"staticData\":\"ABI-encoded trigger-specific parameters\"},\"returns\":{\"minBuyAmount\":\"Minimum amount to receive (includes slippage protection)\",\"sellAmount\":\"Amount of sell token to trade in this execution\"}},\"isComplete(bytes,address,uint256)\":{\"details\":\"Called after each execution to determine if order should be marked complete\",\"params\":{\"iterationCount\":\"Number of executions completed so far\",\"owner\":\"The order owner\",\"staticData\":\"ABI-encoded trigger-specific parameters\"},\"returns\":{\"_0\":\"True if the order goal has been reached\"}},\"prepareCacheBySalt(address,bytes32)\":{\"details\":\"Salt-based lookup (not orderHash) because at appData-signing time the orderHash         isn't known \\u2014 it includes `block.timestamp` from inside `createOrder`. Salt is         user-chosen and known up front, so `prepareCacheBySalt(user, salt)` calldata is         signable. Restricted to the CoW hooks trampoline so arbitrary callers can't         poison the cache.\"},\"shouldExecute(bytes,address)\":{\"details\":\"Reads live LTV \\u2014 same semantics as AutoLeverageTrigger.\",\"params\":{\"owner\":\"The order owner (user whose position is being monitored)\",\"staticData\":\"ABI-encoded trigger-specific parameters\"},\"returns\":{\"_0\":\"True if the trigger condition is met\",\"_1\":\"Human-readable reason for the result (for debugging/logging)\"}},\"triggerName()\":{\"returns\":{\"_0\":\"Trigger name (e.g., \\\"LTV\\\", \\\"Price\\\", \\\"HealthFactor\\\")\"}}},\"title\":\"TransientAutoLeverageTrigger\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"calculateExecution(bytes,address,uint256)\":{\"notice\":\"Calculate the execution amounts when the trigger fires\"},\"isComplete(bytes,address,uint256)\":{\"notice\":\"Check if the order is complete and should stop executing\"},\"prepareCacheBySalt(address,bytes32)\":{\"notice\":\"Snapshot the live `calculateExecution` output for the order owned by `user`         with `salt` into transient storage. Must be invoked as a CoW pre-interaction         BEFORE the manager pre-hook executes.\"},\"shouldExecute(bytes,address)\":{\"notice\":\"Check if the order should execute based on current conditions\"},\"triggerName()\":{\"notice\":\"Get human-readable name of the trigger type\"}},\"notice\":\"Self-caching auto-leverage trigger. Same external semantics as `AutoLeverageTrigger`         (LTV-gated firing, dynamic per-iteration amounts based on live state) but stable         under state-mutating preInstructions thanks to a trigger-internal transient cache. Why --- CoW's settle phases are fixed: pre-interactions run before sig validation, post-interactions after. For protocols whose AL flow needs to mutate position state in the manager pre-hook (e.g. Alchemix V3: deposit USDC + mint alAsset BEFORE CoW takes the sellToken), the on-chain `calculateExecution` called inside `manager.isValidSignature` reads post-mutation state and returns numbers that diverge from what the off-chain WatchTower signed \\u2192 manager's `_orderMatches` (1% tolerance) rejects \\u2192 settlement reverts. This trigger fixes it without touching the manager: it exposes a `prepareCache(orderHash)` entry point invoked as a separate CoW pre-interaction by the hooks trampoline. That call runs BEFORE the manager pre-hook (and therefore before any state mutation), reads the order's params from the manager, runs the live computation, and stashes (sellAmount, minBuyAmount) in transient storage keyed by `(staticData, owner, iter)`. The view-only `calculateExecution` (called both by the manager's pre-hook and by the handler's sig-check path) reads the cache when present and falls back to live computation otherwise. Multi-iteration orders work transparently: each iteration's `prepareCache` re-reads fresh chain state and writes a fresh cache entry. Transient storage auto-clears at tx end so nothing leaks across transactions or across off-chain WatchTower polls. Security -------- - `prepareCache` is `onlyTrampoline` \\u2014 only the CoW hooks trampoline can populate the   cache. EOAs and arbitrary contracts can't poison it. - The cache key includes the full `staticData`, `owner`, and `iterationCount`, so distinct   orders / users / iterations get isolated transient slots \\u2014 no cross-pollution possible   even when multiple orders settle in one batch. - The view-only `calculateExecution` can `tload` the cache (allowed under STATICCALL) but   cannot write to it. - Transient storage is per-transaction \\u2014 cannot be replayed. - The on-chain order's params are read from the manager via `getOrder(orderHash)`, which   is the same source the manager itself uses, so cache content can never disagree with   what `manager.calculateExecution` would compute against the same chain state. Frontend integration -------------------- The order's CoW appData needs to include THREE pre-interactions in this exact order:   [0] adapter.fundOrderWithBalance(user, salt, flashToken, router)   \\u2014 flash funding   [1] trigger.prepareCacheBySalt(user, salt)                          \\u2014 THIS contract   [2] manager.executePreHookBySalt(user, salt)                        \\u2014 manager pre-hook The trigger MUST come before the manager pre-hook so the cache is populated before preInstructions mutate state.\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/v2/triggers/TransientAutoLeverageTrigger.sol\":\"TransientAutoLeverageTrigger\"},\"evmVersion\":\"cancun\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":10},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/v2/interfaces/IOrderTrigger.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\n/// @title IOrderTrigger\\n/// @notice Interface for pluggable order triggers in the Kapan conditional order system\\n/// @dev Triggers determine when an order should execute and how much to trade\\ninterface IOrderTrigger {\\n    /// @notice Check if the order should execute based on current conditions\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner (user whose position is being monitored)\\n    /// @return shouldExecute True if the trigger condition is met\\n    /// @return reason Human-readable reason for the result (for debugging/logging)\\n    function shouldExecute(\\n        bytes calldata staticData,\\n        address owner\\n    ) external view returns (bool shouldExecute, string memory reason);\\n\\n    /// @notice Calculate the execution amounts when the trigger fires\\n    /// @dev Only called when shouldExecute returns true\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner\\n    /// @param iterationCount Number of executions completed so far (for chunked orders)\\n    /// @return sellAmount Amount of sell token to trade in this execution\\n    /// @return minBuyAmount Minimum amount to receive (includes slippage protection)\\n    function calculateExecution(\\n        bytes calldata staticData,\\n        address owner,\\n        uint256 iterationCount\\n    ) external view returns (uint256 sellAmount, uint256 minBuyAmount);\\n\\n    /// @notice Check if the order is complete and should stop executing\\n    /// @dev Called after each execution to determine if order should be marked complete\\n    /// @param staticData ABI-encoded trigger-specific parameters\\n    /// @param owner The order owner\\n    /// @param iterationCount Number of executions completed so far\\n    /// @return complete True if the order goal has been reached\\n    function isComplete(\\n        bytes calldata staticData,\\n        address owner,\\n        uint256 iterationCount\\n    ) external view returns (bool complete);\\n\\n    /// @notice Get human-readable name of the trigger type\\n    /// @return name Trigger name (e.g., \\\"LTV\\\", \\\"Price\\\", \\\"HealthFactor\\\")\\n    function triggerName() external pure returns (string memory name);\\n}\\n\",\"keccak256\":\"0x852a502f0d40f6547adddd882bdbe33f2993af371d691abd211cb372ff646c35\",\"license\":\"MIT\"},\"contracts/v2/triggers/TransientAutoLeverageTrigger.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.30;\\n\\nimport { IOrderTrigger } from \\\"../interfaces/IOrderTrigger.sol\\\";\\n\\n/// @notice Morpho Blue MarketParams (mirror).\\nstruct MarketParams {\\n    address loanToken;\\n    address collateralToken;\\n    address oracle;\\n    address irm;\\n    uint256 lltv;\\n}\\n\\ninterface IKapanViewRouter {\\n    function getCurrentLtv(bytes4 protocolId, address user, bytes calldata context) external view returns (uint256);\\n    function getPositionValue(bytes4 protocolId, address user, bytes calldata context) external view returns (uint256, uint256);\\n    function getCollateralPrice(bytes4 protocolId, address collateralToken, bytes calldata context) external view returns (uint256);\\n    function getDebtPrice(bytes4 protocolId, address debtToken, bytes calldata context) external view returns (uint256);\\n    function getMorphoOraclePrice(MarketParams calldata params) external view returns (uint256);\\n}\\n\\n/// @notice Minimal slice of KapanConditionalOrderManager to read order params from `orderHash`.\\ninterface IKapanConditionalOrderManager {\\n    enum OrderStatus { None, Active, Completed, Cancelled }\\n\\n    struct KapanOrderParams {\\n        address user;\\n        address trigger;\\n        bytes triggerStaticData;\\n        bytes preInstructions;\\n        address sellToken;\\n        address buyToken;\\n        bytes postInstructions;\\n        bytes32 appDataHash;\\n        uint256 maxIterations;\\n        address sellTokenRefundAddress;\\n        bool isKindBuy;\\n    }\\n\\n    struct OrderContext {\\n        KapanOrderParams params;\\n        OrderStatus status;\\n        uint256 iterationCount;\\n        uint256 createdAt;\\n    }\\n\\n    function getOrder(bytes32 orderHash) external view returns (OrderContext memory);\\n\\n    /// @notice (user, salt) \\u2192 orderHash. We use this for the salt-based lookup variant of\\n    ///         `prepareCache` because the order's hash isn't known at the time the user signs\\n    ///         the appData (it depends on `block.timestamp` set inside `createOrder`).\\n    function userSaltToOrderHash(address user, bytes32 salt) external view returns (bytes32);\\n}\\n\\n/// @title  TransientAutoLeverageTrigger\\n/// @notice Self-caching auto-leverage trigger. Same external semantics as `AutoLeverageTrigger`\\n///         (LTV-gated firing, dynamic per-iteration amounts based on live state) but stable\\n///         under state-mutating preInstructions thanks to a trigger-internal transient cache.\\n///\\n/// Why\\n/// ---\\n/// CoW's settle phases are fixed: pre-interactions run before sig validation, post-interactions\\n/// after. For protocols whose AL flow needs to mutate position state in the manager pre-hook\\n/// (e.g. Alchemix V3: deposit USDC + mint alAsset BEFORE CoW takes the sellToken), the on-chain\\n/// `calculateExecution` called inside `manager.isValidSignature` reads post-mutation state and\\n/// returns numbers that diverge from what the off-chain WatchTower signed \\u2192 manager's\\n/// `_orderMatches` (1% tolerance) rejects \\u2192 settlement reverts.\\n///\\n/// This trigger fixes it without touching the manager: it exposes a `prepareCache(orderHash)`\\n/// entry point invoked as a separate CoW pre-interaction by the hooks trampoline. That call\\n/// runs BEFORE the manager pre-hook (and therefore before any state mutation), reads the\\n/// order's params from the manager, runs the live computation, and stashes (sellAmount,\\n/// minBuyAmount) in transient storage keyed by `(staticData, owner, iter)`. The view-only\\n/// `calculateExecution` (called both by the manager's pre-hook and by the handler's sig-check\\n/// path) reads the cache when present and falls back to live computation otherwise.\\n///\\n/// Multi-iteration orders work transparently: each iteration's `prepareCache` re-reads fresh\\n/// chain state and writes a fresh cache entry. Transient storage auto-clears at tx end so\\n/// nothing leaks across transactions or across off-chain WatchTower polls.\\n///\\n/// Security\\n/// --------\\n/// - `prepareCache` is `onlyTrampoline` \\u2014 only the CoW hooks trampoline can populate the\\n///   cache. EOAs and arbitrary contracts can't poison it.\\n/// - The cache key includes the full `staticData`, `owner`, and `iterationCount`, so distinct\\n///   orders / users / iterations get isolated transient slots \\u2014 no cross-pollution possible\\n///   even when multiple orders settle in one batch.\\n/// - The view-only `calculateExecution` can `tload` the cache (allowed under STATICCALL) but\\n///   cannot write to it.\\n/// - Transient storage is per-transaction \\u2014 cannot be replayed.\\n/// - The on-chain order's params are read from the manager via `getOrder(orderHash)`, which\\n///   is the same source the manager itself uses, so cache content can never disagree with\\n///   what `manager.calculateExecution` would compute against the same chain state.\\n///\\n/// Frontend integration\\n/// --------------------\\n/// The order's CoW appData needs to include THREE pre-interactions in this exact order:\\n///   [0] adapter.fundOrderWithBalance(user, salt, flashToken, router)   \\u2014 flash funding\\n///   [1] trigger.prepareCacheBySalt(user, salt)                          \\u2014 THIS contract\\n///   [2] manager.executePreHookBySalt(user, salt)                        \\u2014 manager pre-hook\\n/// The trigger MUST come before the manager pre-hook so the cache is populated before\\n/// preInstructions mutate state.\\ncontract TransientAutoLeverageTrigger is IOrderTrigger {\\n    // ============ Errors ============\\n    error InvalidParams();\\n    error NotTrampoline();\\n\\n    // ============ Constants ============\\n    bytes4 public constant AAVE_V3 = bytes4(keccak256(\\\"aave-v3\\\"));\\n    bytes4 public constant COMPOUND_V3 = bytes4(keccak256(\\\"compound-v3\\\"));\\n    bytes4 public constant MORPHO_BLUE = bytes4(keccak256(\\\"morpho-blue\\\"));\\n    bytes4 public constant EULER_V2 = bytes4(keccak256(\\\"euler-v2\\\"));\\n    bytes4 public constant VENUS = bytes4(keccak256(\\\"venus\\\"));\\n\\n    // Transient slot prefixes \\u2014 final slot = keccak256(prefix, cacheKey).\\n    bytes32 private constant CACHE_PRESENT_PREFIX = keccak256(\\\"kapan.transAL.present\\\");\\n    bytes32 private constant CACHE_SELL_PREFIX = keccak256(\\\"kapan.transAL.sell\\\");\\n    bytes32 private constant CACHE_BUY_PREFIX = keccak256(\\\"kapan.transAL.buy\\\");\\n\\n    // ============ Immutables ============\\n    IKapanViewRouter public immutable viewRouter;\\n    IKapanConditionalOrderManager public immutable orderManager;\\n    address public immutable hooksTrampoline;\\n\\n    // ============ Structs ============\\n\\n    /// @notice Same shape as AutoLeverageTrigger.TriggerParams \\u2014 drop-in compatible.\\n    struct TriggerParams {\\n        bytes4 protocolId;\\n        bytes protocolContext;\\n        uint256 triggerLtvBps;\\n        uint256 targetLtvBps;\\n        address collateralToken;\\n        address debtToken;\\n        uint8 collateralDecimals;\\n        uint8 debtDecimals;\\n        uint256 maxSlippageBps;\\n        uint8 numChunks;\\n    }\\n\\n    // ============ Constructor ============\\n\\n    constructor(address _viewRouter, address _orderManager, address _hooksTrampoline) {\\n        if (_viewRouter == address(0) || _orderManager == address(0) || _hooksTrampoline == address(0)) {\\n            revert InvalidParams();\\n        }\\n        viewRouter = IKapanViewRouter(_viewRouter);\\n        orderManager = IKapanConditionalOrderManager(_orderManager);\\n        hooksTrampoline = _hooksTrampoline;\\n    }\\n\\n    // ============ Trampoline-driven cache writer ============\\n\\n    /// @notice Snapshot the live `calculateExecution` output for the order owned by `user`\\n    ///         with `salt` into transient storage. Must be invoked as a CoW pre-interaction\\n    ///         BEFORE the manager pre-hook executes.\\n    /// @dev    Salt-based lookup (not orderHash) because at appData-signing time the orderHash\\n    ///         isn't known \\u2014 it includes `block.timestamp` from inside `createOrder`. Salt is\\n    ///         user-chosen and known up front, so `prepareCacheBySalt(user, salt)` calldata is\\n    ///         signable. Restricted to the CoW hooks trampoline so arbitrary callers can't\\n    ///         poison the cache.\\n    function prepareCacheBySalt(address user, bytes32 salt) external {\\n        if (msg.sender != hooksTrampoline) revert NotTrampoline();\\n\\n        bytes32 orderHash = orderManager.userSaltToOrderHash(user, salt);\\n        if (orderHash == bytes32(0)) return; // Solver supplied a salt with no order \\u2014 no-op rather than revert.\\n\\n        IKapanConditionalOrderManager.OrderContext memory ctx = orderManager.getOrder(orderHash);\\n        if (ctx.status != IKapanConditionalOrderManager.OrderStatus.Active) return;\\n\\n        bytes memory staticData = ctx.params.triggerStaticData;\\n        (uint256 sellAmount, uint256 minBuyAmount) = _computeLiveMemory(staticData, ctx.params.user);\\n\\n        bytes32 key = _cacheKey(staticData, ctx.params.user, ctx.iterationCount);\\n        bytes32 presentSlot = keccak256(abi.encodePacked(CACHE_PRESENT_PREFIX, key));\\n        bytes32 sellSlot = keccak256(abi.encodePacked(CACHE_SELL_PREFIX, key));\\n        bytes32 buySlot = keccak256(abi.encodePacked(CACHE_BUY_PREFIX, key));\\n\\n        assembly {\\n            tstore(presentSlot, 1)\\n            tstore(sellSlot, sellAmount)\\n            tstore(buySlot, minBuyAmount)\\n        }\\n    }\\n\\n    // ============ IOrderTrigger ============\\n\\n    /// @inheritdoc IOrderTrigger\\n    /// @dev Reads live LTV \\u2014 same semantics as AutoLeverageTrigger.\\n    function shouldExecute(\\n        bytes calldata staticData,\\n        address owner\\n    ) external view override returns (bool, string memory) {\\n        TriggerParams memory params = abi.decode(staticData, (TriggerParams));\\n        uint256 currentLtv = viewRouter.getCurrentLtv(params.protocolId, owner, params.protocolContext);\\n\\n        if (currentLtv == 0) return (false, \\\"No position\\\");\\n        if (currentLtv < params.triggerLtvBps) return (true, \\\"LTV below threshold - under-leveraged\\\");\\n        return (false, \\\"LTV above threshold\\\");\\n    }\\n\\n    /// @inheritdoc IOrderTrigger\\n    /// @dev Tries the transient cache first; falls back to live computation. Both paths\\n    ///      converge on the same answer when called within the same block \\u2014 the cache only\\n    ///      meaningfully diverges from live when the pre-hook has mutated state, which is\\n    ///      exactly when we need it.\\n    function calculateExecution(\\n        bytes calldata staticData,\\n        address owner,\\n        uint256 iterationCount\\n    ) external view override returns (uint256 sellAmount, uint256 minBuyAmount) {\\n        bytes32 key = _cacheKey(staticData, owner, iterationCount);\\n        bytes32 presentSlot = keccak256(abi.encodePacked(CACHE_PRESENT_PREFIX, key));\\n        uint256 present;\\n        assembly { present := tload(presentSlot) }\\n\\n        if (present != 0) {\\n            bytes32 sellSlot = keccak256(abi.encodePacked(CACHE_SELL_PREFIX, key));\\n            bytes32 buySlot = keccak256(abi.encodePacked(CACHE_BUY_PREFIX, key));\\n            assembly {\\n                sellAmount := tload(sellSlot)\\n                minBuyAmount := tload(buySlot)\\n            }\\n            return (sellAmount, minBuyAmount);\\n        }\\n\\n        return _computeLive(staticData, owner);\\n    }\\n\\n    /// @inheritdoc IOrderTrigger\\n    function isComplete(\\n        bytes calldata,\\n        address,\\n        uint256\\n    ) external pure override returns (bool) {\\n        return false;\\n    }\\n\\n    /// @inheritdoc IOrderTrigger\\n    function triggerName() external pure override returns (string memory) {\\n        return \\\"TransientAutoLeverage\\\";\\n    }\\n\\n    // ============ View Helpers ============\\n\\n    function getCurrentLtv(bytes4 protocolId, address owner, bytes calldata context) external view returns (uint256) {\\n        return viewRouter.getCurrentLtv(protocolId, owner, context);\\n    }\\n\\n    function encodeTriggerParams(TriggerParams memory params) external pure returns (bytes memory) {\\n        return abi.encode(params);\\n    }\\n\\n    // ============ Internal ============\\n\\n    function _cacheKey(bytes memory staticData, address owner, uint256 iterationCount)\\n        internal pure returns (bytes32)\\n    {\\n        return keccak256(abi.encode(staticData, owner, iterationCount));\\n    }\\n\\n    /// @dev Live computation off `bytes calldata` (used by the read path).\\n    function _computeLive(bytes calldata staticData, address owner)\\n        internal view returns (uint256 sellAmount, uint256 minBuyAmount)\\n    {\\n        TriggerParams memory params = abi.decode(staticData, (TriggerParams));\\n        return _computeFromParams(params, owner);\\n    }\\n\\n    /// @dev Live computation off `bytes memory` (used by the cache writer, which gets the\\n    ///      blob from the manager via `getOrder`).\\n    function _computeLiveMemory(bytes memory staticData, address owner)\\n        internal view returns (uint256 sellAmount, uint256 minBuyAmount)\\n    {\\n        TriggerParams memory params = abi.decode(staticData, (TriggerParams));\\n        return _computeFromParams(params, owner);\\n    }\\n\\n    /// @dev Identical math to AutoLeverageTrigger.calculateExecution.\\n    function _computeFromParams(TriggerParams memory params, address owner)\\n        internal view returns (uint256 sellAmount, uint256 minBuyAmount)\\n    {\\n        (uint256 collateralValueUsd, uint256 debtValueUsd) = viewRouter.getPositionValue(\\n            params.protocolId,\\n            owner,\\n            params.protocolContext\\n        );\\n\\n        if (collateralValueUsd == 0) return (0, 0);\\n\\n        uint256 currentLtv = (debtValueUsd * 10000) / collateralValueUsd;\\n        if (currentLtv >= params.targetLtvBps) return (0, 0);\\n\\n        uint256 targetDebtUsd = (params.targetLtvBps * collateralValueUsd) / 10000;\\n        if (targetDebtUsd <= debtValueUsd) return (0, 0);\\n\\n        uint256 numerator = targetDebtUsd - debtValueUsd;\\n        uint256 denominator = 10000 - params.targetLtvBps;\\n        if (denominator == 0) return (0, 0);\\n\\n        uint256 deltaDebtUsd = (numerator * 10000) / denominator;\\n\\n        uint256 debtPrice = viewRouter.getDebtPrice(params.protocolId, params.debtToken, params.protocolContext);\\n        sellAmount = (deltaDebtUsd * (10 ** params.debtDecimals)) / debtPrice;\\n\\n        uint8 chunks = params.numChunks > 0 ? params.numChunks : 1;\\n        if (chunks > 1) sellAmount = sellAmount / chunks;\\n\\n        if (sellAmount == 0) return (0, 0);\\n        sellAmount = _truncatePrecision(sellAmount, params.debtDecimals);\\n        if (sellAmount == 0) return (0, 0);\\n\\n        uint256 expectedCollateral;\\n        if (params.protocolId == MORPHO_BLUE) {\\n            MarketParams memory marketParams = abi.decode(params.protocolContext, (MarketParams));\\n            uint256 morphoOraclePrice = viewRouter.getMorphoOraclePrice(marketParams);\\n            if (morphoOraclePrice > 0) {\\n                expectedCollateral = (sellAmount * 1e36) / morphoOraclePrice;\\n            }\\n        } else {\\n            uint256 collateralPrice = viewRouter.getCollateralPrice(\\n                params.protocolId,\\n                params.collateralToken,\\n                params.protocolContext\\n            );\\n            if (collateralPrice > 0) {\\n                expectedCollateral = (sellAmount * debtPrice) / collateralPrice;\\n                expectedCollateral = (expectedCollateral * (10 ** params.collateralDecimals)) / (10 ** params.debtDecimals);\\n            }\\n        }\\n\\n        expectedCollateral = _truncatePrecision(expectedCollateral, params.collateralDecimals);\\n        minBuyAmount = (expectedCollateral * (10000 - params.maxSlippageBps)) / 10000;\\n    }\\n\\n    function _truncatePrecision(uint256 amount, uint8 decimals) internal pure returns (uint256) {\\n        if (decimals <= 4) return amount;\\n        uint256 keep;\\n        if (decimals > 12) keep = 5;\\n        else if (decimals > 6) keep = 6;\\n        else keep = 4;\\n        uint256 precision = 10 ** (decimals - keep);\\n        return (amount / precision) * precision;\\n    }\\n}\\n\",\"keccak256\":\"0x2c65c22b9459dba2fcfe9bbacea12ea63b1d29d5223ca381f046b3aa79b273ec\",\"license\":\"MIT\"}},\"version\":1}",
+  "bytecode": "0x60e03461010d57601f61180238819003918201601f19168301916001600160401b038311848410176101115780849260609460405283398101031261010d5761004781610125565b90610060604061005960208401610125565b9201610125565b916001600160a01b0316801580156100fc575b80156100eb575b6100dc576080526001600160a01b031660a05260c0526040516116c8908161013a82396080518181816103c40152818161056901528181610e370152611104015260a05181818160d60152610971015260c05181818161049d015261091c0152f35b635435b28960e11b5f5260045ffd5b506001600160a01b0383161561007a565b506001600160a01b03821615610073565b5f80fd5b634e487b7160e01b5f52604160045260245ffd5b51906001600160a01b038216820361010d5756fe6080806040526004361015610012575f80fd5b5f3560e01c9081631a78ccc11461062b57508063303189b7146105f85780633131489f146105d657806332139496146105b457806343fc0865146105985780634f1cb29114610554578063632224a7146104f457806368c4be25146104cc57806381e6d3ce1461048857806390359bcc1461046657806399fec7a0146104445780639de7308514610321578063b030ddb314610164578063dd90a891146101095763f9b6117f146100c1575f80fd5b34610105575f366003190112610105576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b5f80fd5b34610105575f3660031901126101055761016060405161012a604082610750565b60158152745472616e7369656e744175746f4c6576657261676560581b60208201526040519182916020835260208301906106e7565b0390f35b34610105576020366003190112610105576004356001600160401b038111610105576101406003198236030112610105576040516101a181610720565b6101ad8260040161070b565b815260248201356001600160401b038111610105578201366023820112156101055736600482013591602401916101e39261078e565b91602082019283526040820190604481013582526060830190606481013582526084810161021090610660565b6080850190815261022360a48301610660565b60a0860190815261023660c484016107c4565b60c087019081529061024a60e485016107c4565b9260e0880193845261010088019461010481013586526101240161026d906107c4565b956101208901968752604051998a9960208b016020905263ffffffff60e01b90511660408b01525160608a0161014090526101808a016102ac916106e7565b975160808a01525160a0890152516001600160a01b0390811660c089015290511660e08701525160ff90811661010087015290518116610120860152905161014085015290511661016083015203601f198101825261030b9082610750565b60405180916020825260208201610160916106e7565b346101055760603660031901126101055760043563ffffffff60e01b81168091036101055761034e61064a565b604435906001600160401b0382116101055760846103726020933690600401610674565b604051639de7308560e01b815260048101969096526001600160a01b0390931660248601526060604486015260648501839052849283918190848401375f828201840152601f01601f191681010301817f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165afa8015610439575f90610406575b602090604051908152f35b506020813d602011610431575b8161042060209383610750565b8101031261010557602090516103fb565b3d9150610413565b6040513d5f823e3d90fd5b34610105575f36600319011261010557604051633028125760e01b8152602090f35b34610105575f36600319011261010557604051633c724fef60e11b8152602090f35b34610105575f366003190112610105576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346101055760406104e86104df366106a1565b92919091610f5f565b82519182526020820152f35b34610105576040366003190112610105576004356001600160401b03811161010557610527610535913690600401610674565b61052f61064a565b91610df6565b90610160604051928392151583526040602084015260408301906106e7565b34610105575f366003190112610105576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b34610105576105a6366106a1565b5050505060206040515f8152f35b34610105575f3660031901126101055760405163bbbf88eb60e01b8152602090f35b34610105575f36600319011261010557604051633af167ff60e01b8152602090f35b34610105576040366003190112610105576004356001600160a01b038116810361010557610629906024359061091a565b005b34610105575f366003190112610105576308ee5f0360e31b8152602090f35b602435906001600160a01b038216820361010557565b35906001600160a01b038216820361010557565b9181601f84011215610105578235916001600160401b038311610105576020838186019501011161010557565b606060031982011261010557600435906001600160401b038211610105576106cb91600401610674565b90916024356001600160a01b0381168103610105579060443590565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b35906001600160e01b03198216820361010557565b61014081019081106001600160401b0382111761073c57604052565b634e487b7160e01b5f52604160045260245ffd5b601f909101601f19168101906001600160401b0382119082101761073c57604052565b6001600160401b03811161073c57601f01601f191660200190565b92919261079a82610773565b916107a86040519384610750565b829481845281830111610105578281602093845f960137010152565b359060ff8216820361010557565b602081830312610105578035906001600160401b038211610105570161014081830312610105576040519161080683610720565b61080f8261070b565b835260208201356001600160401b0381116101055782019181601f8401121561010557610848610120928460206108b79635910161078e565b6020850152604081013560408501526060810135606085015261086d60808201610660565b608085015261087e60a08201610660565b60a085015261088f60c082016107c4565b60c08501526108a060e082016107c4565b60e0850152610100810135610100850152016107c4565b61012082015290565b51906001600160a01b038216820361010557565b81601f82011215610105578051906108eb82610773565b926108f96040519485610750565b8284526020838301011161010557815f9260208093018386015e8301015290565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03163303610db1576040516367525a1b60e11b81526001600160a01b03918216600482015260248101929092527f00000000000000000000000000000000000000000000000000000000000000001690602081604481855afa908115610439575f91610d7f575b508015610d7b575f90602460405180948193632bbc239560e11b835260048301525afa908115610439575f91610bd1575b5060208101516004811015610bbd575f1901610bba5780516040810151905181519192918301906001600160a01b03166020848303126101055760208401516001600160401b038111610105578401906101408284031261010557604051610a4181610720565b60208301516001600160e01b0319811681036101055781526040830151936001600160401b03851161010557610140610b0794610a8c610b2097602080610afc9601918401016108d4565b60208501526060810151604085015260808101516060850152610ab160a082016108c0565b6080850152610ac260c082016108c0565b60a0850152610ad360e08201611031565b60c0850152610ae56101008201611031565b60e085015261012081015161010085015201611031565b6101208201526110ec565b939092604060018060a01b03825151169101519161103f565b9060405160208101905f5160206116735f395f51905f52825283604082015260408152610b4e606082610750565b51902091600160405160208101905f5160206116335f395f51905f52825283604082015260408152610b81606082610750565b5190209160405160208101915f5160206116535f395f51905f528352604082015260408152610bb1606082610750565b519020935d5d5d565b50565b634e487b7160e01b5f52602160045260245ffd5b90503d805f833e610be28183610750565b810190602081830312610105578051906001600160401b03821161010557016080818303126101055760405191608083016001600160401b0381118482101761073c5760405281516001600160401b0381116101055782019061016082820312610105576040519161016083016001600160401b0381118482101761073c57604052610c6d816108c0565b8352610c7b602082016108c0565b602084015260408101516001600160401b0381116101055782610c9f9183016108d4565b604084015260608101516001600160401b0381116101055782610cc39183016108d4565b6060840152610cd4608082016108c0565b6080840152610ce560a082016108c0565b60a084015260c08101516001600160401b0381116101055761014092610d0c9183016108d4565b60c084015260e081015160e0840152610100810151610100840152610d3461012082016108c0565b61012084015201518015158103610105576101408201528252602081015190600482101561010557606091602084015260408101516040840152015160608201525f6109da565b5050565b90506020813d602011610da9575b81610d9a60209383610750565b8101031261010557515f6109a9565b3d9150610d8d565b6307fcce5360e01b5f5260045ffd5b6001600160e01b031990911681526001600160a01b039091166020820152606060408201819052610df3929101906106e7565b90565b610e02918101906107d2565b602063ffffffff60e01b825116928183015193610e336040519586938493639de7308560e01b855260048501610dc0565b03817f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165afa918215610439575f92610f2b575b508115610efe576040015111610eb2575f90604051610e8f604082610750565b60138152721315158818589bdd99481d1a1c995cda1bdb19606a1b602082015290565b600190604051610ec3606082610750565b602581527f4c54562062656c6f77207468726573686f6c64202d20756e6465722d6c6576656020820152641c9859d95960da1b604082015290565b50505f90604051610f10604082610750565b600b81526a2737903837b9b4ba34b7b760a91b602082015290565b9091506020813d602011610f57575b81610f4760209383610750565b810103126101055751905f610e6f565b3d9150610f3a565b9392610f769083610f7136858961078e565b61103f565b60405160208101905f5160206116735f395f51905f52825282604082015260408152610fa3606082610750565b5190205c610fc6575083610fbd91610fc2949501906107d2565b6110ec565b9091565b9350505060405160208101905f5160206116335f395f51905f52825283604082015260408152610ff7606082610750565b5190209160405160208101915f5160206116535f395f51905f528352604082015260408152611027606082610750565b519020915c915c90565b519060ff8216820361010557565b916110839060405192839161106060208401966060885260808501906106e7565b6001600160a01b039092166040840152606083015203601f198101835282610750565b51902090565b8181029291811591840414171561109c57565b634e487b7160e01b5f52601160045260245ffd5b81156110ba570490565b634e487b7160e01b5f52601260045260245ffd5b9190820391821161109c57565b60ff16604d811161109c57600a0a90565b8051602082018051604080516326a9d0f960e21b81527f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03169796939490939192849283926111519291906001600160e01b03191660048501610dc0565b0381885afa8015610439575f915f9161159b575b508115611581576127108102818104612710148215171561109c578261118a916110b0565b91606085019283518091101561158d57612710916111a791611089565b048181111561152757906111ba916110ce565b9051806127100390612710821161109c576127101461158157612710820291808304612710149015171561109c576111f1916110b0565b825160a08401518351604051630ee9078360e01b8152939793949260209286928392611234926001600160a01b0316906001600160e01b03191660048501610dc0565b0381855afa928315610439575f9361154d575b5061126c8361126760e087019861126160ff8b51166110db565b90611089565b6110b0565b61012085015160ff1680156115435760ff905b1660018111611534575b5080156115275761129f9060ff885116906115d4565b9586156115275784515f94906001600160e01b031916633028125760e01b810361144957505050519060a082805181010312610105576040519060a082016001600160401b0381118382101761073c5760209260a4916040526113038486016108c0565b8152611311604086016108c0565b92848201938452611324606087016108c0565b956040830196875260a061133a608083016108c0565b606085019081529101516080840190815260405163168be4db60e01b815293516001600160a01b03908116600486015295518616602485015296518516604484015251909316606482015293516084850152839182905afa908115610439575f91611417575b50806113e0575b506113be610100915b60ff60c085015116906115d4565b9101516127100390612710821161109c57612710916113dc91611089565b0490565b6a0c097ce7bc90715b34b9f160241b8581029250858304148515171561109c576114106113be91610100936110b0565b91506113a7565b90506020813d602011611441575b8161143260209383610750565b8101031261010557515f6113a0565b3d9150611425565b6020919295946114809460018060a01b0360808a01511690519260405196879485938493630794e50360e01b855260048501610dc0565b03915afa918215610439575f926114eb575b509281610100946113be94936114ab575b5050506113b0565b6114e393506114d56114c66114dd9361126760ff948d611089565b6112618360c08b0151166110db565b9251166110db565b906110b0565b5f80806114a3565b929150926020833d60201161151f575b8161150860209383610750565b810103126101055791519192909190610100611492565b3d91506114fb565b505050505090505f905f90565b61153d916110b0565b5f611289565b5060ff600161127f565b9092506020813d602011611579575b8161156960209383610750565b810103126101055751915f611247565b3d915061155c565b5050505090505f905f90565b50505050505090505f905f90565b9150506040813d6040116115cc575b816115b760409383610750565b8101031261010557602081519101515f611165565b3d91506115aa565b9060ff16600481111561162e576115f690600c811115611615576005906110ce565b90604d821161109c57611610610df392600a0a80926110b0565b611089565b6006811115611626576006906110ce565b6004906110ce565b509056fe4a9f767ef3151c24333be1ccc70b60ee436dcdeb109648329a6fd6bb2389b502ff65702a93c84302446049e062631ff3928a69efbaf36d10c8db30b0724524e23b71b545389465b8d0b2b740be9a2536024e39260192c5c92178e6396d26d65da2646970667358221220d597d816ae62b0080b081c893d8b2d2fbd5e1f8c624f9dc6d41e202171b3140864736f6c634300081e0033",
+  "deployedBytecode": "0x6080806040526004361015610012575f80fd5b5f3560e01c9081631a78ccc11461062b57508063303189b7146105f85780633131489f146105d657806332139496146105b457806343fc0865146105985780634f1cb29114610554578063632224a7146104f457806368c4be25146104cc57806381e6d3ce1461048857806390359bcc1461046657806399fec7a0146104445780639de7308514610321578063b030ddb314610164578063dd90a891146101095763f9b6117f146100c1575f80fd5b34610105575f366003190112610105576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b5f80fd5b34610105575f3660031901126101055761016060405161012a604082610750565b60158152745472616e7369656e744175746f4c6576657261676560581b60208201526040519182916020835260208301906106e7565b0390f35b34610105576020366003190112610105576004356001600160401b038111610105576101406003198236030112610105576040516101a181610720565b6101ad8260040161070b565b815260248201356001600160401b038111610105578201366023820112156101055736600482013591602401916101e39261078e565b91602082019283526040820190604481013582526060830190606481013582526084810161021090610660565b6080850190815261022360a48301610660565b60a0860190815261023660c484016107c4565b60c087019081529061024a60e485016107c4565b9260e0880193845261010088019461010481013586526101240161026d906107c4565b956101208901968752604051998a9960208b016020905263ffffffff60e01b90511660408b01525160608a0161014090526101808a016102ac916106e7565b975160808a01525160a0890152516001600160a01b0390811660c089015290511660e08701525160ff90811661010087015290518116610120860152905161014085015290511661016083015203601f198101825261030b9082610750565b60405180916020825260208201610160916106e7565b346101055760603660031901126101055760043563ffffffff60e01b81168091036101055761034e61064a565b604435906001600160401b0382116101055760846103726020933690600401610674565b604051639de7308560e01b815260048101969096526001600160a01b0390931660248601526060604486015260648501839052849283918190848401375f828201840152601f01601f191681010301817f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165afa8015610439575f90610406575b602090604051908152f35b506020813d602011610431575b8161042060209383610750565b8101031261010557602090516103fb565b3d9150610413565b6040513d5f823e3d90fd5b34610105575f36600319011261010557604051633028125760e01b8152602090f35b34610105575f36600319011261010557604051633c724fef60e11b8152602090f35b34610105575f366003190112610105576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b346101055760406104e86104df366106a1565b92919091610f5f565b82519182526020820152f35b34610105576040366003190112610105576004356001600160401b03811161010557610527610535913690600401610674565b61052f61064a565b91610df6565b90610160604051928392151583526040602084015260408301906106e7565b34610105575f366003190112610105576040517f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03168152602090f35b34610105576105a6366106a1565b5050505060206040515f8152f35b34610105575f3660031901126101055760405163bbbf88eb60e01b8152602090f35b34610105575f36600319011261010557604051633af167ff60e01b8152602090f35b34610105576040366003190112610105576004356001600160a01b038116810361010557610629906024359061091a565b005b34610105575f366003190112610105576308ee5f0360e31b8152602090f35b602435906001600160a01b038216820361010557565b35906001600160a01b038216820361010557565b9181601f84011215610105578235916001600160401b038311610105576020838186019501011161010557565b606060031982011261010557600435906001600160401b038211610105576106cb91600401610674565b90916024356001600160a01b0381168103610105579060443590565b805180835260209291819084018484015e5f828201840152601f01601f1916010190565b35906001600160e01b03198216820361010557565b61014081019081106001600160401b0382111761073c57604052565b634e487b7160e01b5f52604160045260245ffd5b601f909101601f19168101906001600160401b0382119082101761073c57604052565b6001600160401b03811161073c57601f01601f191660200190565b92919261079a82610773565b916107a86040519384610750565b829481845281830111610105578281602093845f960137010152565b359060ff8216820361010557565b602081830312610105578035906001600160401b038211610105570161014081830312610105576040519161080683610720565b61080f8261070b565b835260208201356001600160401b0381116101055782019181601f8401121561010557610848610120928460206108b79635910161078e565b6020850152604081013560408501526060810135606085015261086d60808201610660565b608085015261087e60a08201610660565b60a085015261088f60c082016107c4565b60c08501526108a060e082016107c4565b60e0850152610100810135610100850152016107c4565b61012082015290565b51906001600160a01b038216820361010557565b81601f82011215610105578051906108eb82610773565b926108f96040519485610750565b8284526020838301011161010557815f9260208093018386015e8301015290565b7f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03163303610db1576040516367525a1b60e11b81526001600160a01b03918216600482015260248101929092527f00000000000000000000000000000000000000000000000000000000000000001690602081604481855afa908115610439575f91610d7f575b508015610d7b575f90602460405180948193632bbc239560e11b835260048301525afa908115610439575f91610bd1575b5060208101516004811015610bbd575f1901610bba5780516040810151905181519192918301906001600160a01b03166020848303126101055760208401516001600160401b038111610105578401906101408284031261010557604051610a4181610720565b60208301516001600160e01b0319811681036101055781526040830151936001600160401b03851161010557610140610b0794610a8c610b2097602080610afc9601918401016108d4565b60208501526060810151604085015260808101516060850152610ab160a082016108c0565b6080850152610ac260c082016108c0565b60a0850152610ad360e08201611031565b60c0850152610ae56101008201611031565b60e085015261012081015161010085015201611031565b6101208201526110ec565b939092604060018060a01b03825151169101519161103f565b9060405160208101905f5160206116735f395f51905f52825283604082015260408152610b4e606082610750565b51902091600160405160208101905f5160206116335f395f51905f52825283604082015260408152610b81606082610750565b5190209160405160208101915f5160206116535f395f51905f528352604082015260408152610bb1606082610750565b519020935d5d5d565b50565b634e487b7160e01b5f52602160045260245ffd5b90503d805f833e610be28183610750565b810190602081830312610105578051906001600160401b03821161010557016080818303126101055760405191608083016001600160401b0381118482101761073c5760405281516001600160401b0381116101055782019061016082820312610105576040519161016083016001600160401b0381118482101761073c57604052610c6d816108c0565b8352610c7b602082016108c0565b602084015260408101516001600160401b0381116101055782610c9f9183016108d4565b604084015260608101516001600160401b0381116101055782610cc39183016108d4565b6060840152610cd4608082016108c0565b6080840152610ce560a082016108c0565b60a084015260c08101516001600160401b0381116101055761014092610d0c9183016108d4565b60c084015260e081015160e0840152610100810151610100840152610d3461012082016108c0565b61012084015201518015158103610105576101408201528252602081015190600482101561010557606091602084015260408101516040840152015160608201525f6109da565b5050565b90506020813d602011610da9575b81610d9a60209383610750565b8101031261010557515f6109a9565b3d9150610d8d565b6307fcce5360e01b5f5260045ffd5b6001600160e01b031990911681526001600160a01b039091166020820152606060408201819052610df3929101906106e7565b90565b610e02918101906107d2565b602063ffffffff60e01b825116928183015193610e336040519586938493639de7308560e01b855260048501610dc0565b03817f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03165afa918215610439575f92610f2b575b508115610efe576040015111610eb2575f90604051610e8f604082610750565b60138152721315158818589bdd99481d1a1c995cda1bdb19606a1b602082015290565b600190604051610ec3606082610750565b602581527f4c54562062656c6f77207468726573686f6c64202d20756e6465722d6c6576656020820152641c9859d95960da1b604082015290565b50505f90604051610f10604082610750565b600b81526a2737903837b9b4ba34b7b760a91b602082015290565b9091506020813d602011610f57575b81610f4760209383610750565b810103126101055751905f610e6f565b3d9150610f3a565b9392610f769083610f7136858961078e565b61103f565b60405160208101905f5160206116735f395f51905f52825282604082015260408152610fa3606082610750565b5190205c610fc6575083610fbd91610fc2949501906107d2565b6110ec565b9091565b9350505060405160208101905f5160206116335f395f51905f52825283604082015260408152610ff7606082610750565b5190209160405160208101915f5160206116535f395f51905f528352604082015260408152611027606082610750565b519020915c915c90565b519060ff8216820361010557565b916110839060405192839161106060208401966060885260808501906106e7565b6001600160a01b039092166040840152606083015203601f198101835282610750565b51902090565b8181029291811591840414171561109c57565b634e487b7160e01b5f52601160045260245ffd5b81156110ba570490565b634e487b7160e01b5f52601260045260245ffd5b9190820391821161109c57565b60ff16604d811161109c57600a0a90565b8051602082018051604080516326a9d0f960e21b81527f00000000000000000000000000000000000000000000000000000000000000006001600160a01b03169796939490939192849283926111519291906001600160e01b03191660048501610dc0565b0381885afa8015610439575f915f9161159b575b508115611581576127108102818104612710148215171561109c578261118a916110b0565b91606085019283518091101561158d57612710916111a791611089565b048181111561152757906111ba916110ce565b9051806127100390612710821161109c576127101461158157612710820291808304612710149015171561109c576111f1916110b0565b825160a08401518351604051630ee9078360e01b8152939793949260209286928392611234926001600160a01b0316906001600160e01b03191660048501610dc0565b0381855afa928315610439575f9361154d575b5061126c8361126760e087019861126160ff8b51166110db565b90611089565b6110b0565b61012085015160ff1680156115435760ff905b1660018111611534575b5080156115275761129f9060ff885116906115d4565b9586156115275784515f94906001600160e01b031916633028125760e01b810361144957505050519060a082805181010312610105576040519060a082016001600160401b0381118382101761073c5760209260a4916040526113038486016108c0565b8152611311604086016108c0565b92848201938452611324606087016108c0565b956040830196875260a061133a608083016108c0565b606085019081529101516080840190815260405163168be4db60e01b815293516001600160a01b03908116600486015295518616602485015296518516604484015251909316606482015293516084850152839182905afa908115610439575f91611417575b50806113e0575b506113be610100915b60ff60c085015116906115d4565b9101516127100390612710821161109c57612710916113dc91611089565b0490565b6a0c097ce7bc90715b34b9f160241b8581029250858304148515171561109c576114106113be91610100936110b0565b91506113a7565b90506020813d602011611441575b8161143260209383610750565b8101031261010557515f6113a0565b3d9150611425565b6020919295946114809460018060a01b0360808a01511690519260405196879485938493630794e50360e01b855260048501610dc0565b03915afa918215610439575f926114eb575b509281610100946113be94936114ab575b5050506113b0565b6114e393506114d56114c66114dd9361126760ff948d611089565b6112618360c08b0151166110db565b9251166110db565b906110b0565b5f80806114a3565b929150926020833d60201161151f575b8161150860209383610750565b810103126101055791519192909190610100611492565b3d91506114fb565b505050505090505f905f90565b61153d916110b0565b5f611289565b5060ff600161127f565b9092506020813d602011611579575b8161156960209383610750565b810103126101055751915f611247565b3d915061155c565b5050505090505f905f90565b50505050505090505f905f90565b9150506040813d6040116115cc575b816115b760409383610750565b8101031261010557602081519101515f611165565b3d91506115aa565b9060ff16600481111561162e576115f690600c811115611615576005906110ce565b90604d821161109c57611610610df392600a0a80926110b0565b611089565b6006811115611626576006906110ce565b6004906110ce565b509056fe4a9f767ef3151c24333be1ccc70b60ee436dcdeb109648329a6fd6bb2389b502ff65702a93c84302446049e062631ff3928a69efbaf36d10c8db30b0724524e23b71b545389465b8d0b2b740be9a2536024e39260192c5c92178e6396d26d65da2646970667358221220d597d816ae62b0080b081c893d8b2d2fbd5e1f8c624f9dc6d41e202171b3140864736f6c634300081e0033",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {
+      "calculateExecution(bytes,address,uint256)": {
+        "details": "Tries the transient cache first; falls back to live computation. Both paths      converge on the same answer when called within the same block — the cache only      meaningfully diverges from live when the pre-hook has mutated state, which is      exactly when we need it.",
+        "params": {
+          "iterationCount": "Number of executions completed so far (for chunked orders)",
+          "owner": "The order owner",
+          "staticData": "ABI-encoded trigger-specific parameters"
+        },
+        "returns": {
+          "minBuyAmount": "Minimum amount to receive (includes slippage protection)",
+          "sellAmount": "Amount of sell token to trade in this execution"
+        }
+      },
+      "isComplete(bytes,address,uint256)": {
+        "details": "Called after each execution to determine if order should be marked complete",
+        "params": {
+          "iterationCount": "Number of executions completed so far",
+          "owner": "The order owner",
+          "staticData": "ABI-encoded trigger-specific parameters"
+        },
+        "returns": {
+          "_0": "True if the order goal has been reached"
+        }
+      },
+      "prepareCacheBySalt(address,bytes32)": {
+        "details": "Salt-based lookup (not orderHash) because at appData-signing time the orderHash         isn't known — it includes `block.timestamp` from inside `createOrder`. Salt is         user-chosen and known up front, so `prepareCacheBySalt(user, salt)` calldata is         signable. Restricted to the CoW hooks trampoline so arbitrary callers can't         poison the cache."
+      },
+      "shouldExecute(bytes,address)": {
+        "details": "Reads live LTV — same semantics as AutoLeverageTrigger.",
+        "params": {
+          "owner": "The order owner (user whose position is being monitored)",
+          "staticData": "ABI-encoded trigger-specific parameters"
+        },
+        "returns": {
+          "_0": "True if the trigger condition is met",
+          "_1": "Human-readable reason for the result (for debugging/logging)"
+        }
+      },
+      "triggerName()": {
+        "returns": {
+          "_0": "Trigger name (e.g., \"LTV\", \"Price\", \"HealthFactor\")"
+        }
+      }
+    },
+    "title": "TransientAutoLeverageTrigger",
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "calculateExecution(bytes,address,uint256)": {
+        "notice": "Calculate the execution amounts when the trigger fires"
+      },
+      "isComplete(bytes,address,uint256)": {
+        "notice": "Check if the order is complete and should stop executing"
+      },
+      "prepareCacheBySalt(address,bytes32)": {
+        "notice": "Snapshot the live `calculateExecution` output for the order owned by `user`         with `salt` into transient storage. Must be invoked as a CoW pre-interaction         BEFORE the manager pre-hook executes."
+      },
+      "shouldExecute(bytes,address)": {
+        "notice": "Check if the order should execute based on current conditions"
+      },
+      "triggerName()": {
+        "notice": "Get human-readable name of the trigger type"
+      }
+    },
+    "notice": "Self-caching auto-leverage trigger. Same external semantics as `AutoLeverageTrigger`         (LTV-gated firing, dynamic per-iteration amounts based on live state) but stable         under state-mutating preInstructions thanks to a trigger-internal transient cache. Why --- CoW's settle phases are fixed: pre-interactions run before sig validation, post-interactions after. For protocols whose AL flow needs to mutate position state in the manager pre-hook (e.g. Alchemix V3: deposit USDC + mint alAsset BEFORE CoW takes the sellToken), the on-chain `calculateExecution` called inside `manager.isValidSignature` reads post-mutation state and returns numbers that diverge from what the off-chain WatchTower signed → manager's `_orderMatches` (1% tolerance) rejects → settlement reverts. This trigger fixes it without touching the manager: it exposes a `prepareCache(orderHash)` entry point invoked as a separate CoW pre-interaction by the hooks trampoline. That call runs BEFORE the manager pre-hook (and therefore before any state mutation), reads the order's params from the manager, runs the live computation, and stashes (sellAmount, minBuyAmount) in transient storage keyed by `(staticData, owner, iter)`. The view-only `calculateExecution` (called both by the manager's pre-hook and by the handler's sig-check path) reads the cache when present and falls back to live computation otherwise. Multi-iteration orders work transparently: each iteration's `prepareCache` re-reads fresh chain state and writes a fresh cache entry. Transient storage auto-clears at tx end so nothing leaks across transactions or across off-chain WatchTower polls. Security -------- - `prepareCache` is `onlyTrampoline` — only the CoW hooks trampoline can populate the   cache. EOAs and arbitrary contracts can't poison it. - The cache key includes the full `staticData`, `owner`, and `iterationCount`, so distinct   orders / users / iterations get isolated transient slots — no cross-pollution possible   even when multiple orders settle in one batch. - The view-only `calculateExecution` can `tload` the cache (allowed under STATICCALL) but   cannot write to it. - Transient storage is per-transaction — cannot be replayed. - The on-chain order's params are read from the manager via `getOrder(orderHash)`, which   is the same source the manager itself uses, so cache content can never disagree with   what `manager.calculateExecution` would compute against the same chain state. Frontend integration -------------------- The order's CoW appData needs to include THREE pre-interactions in this exact order:   [0] adapter.fundOrderWithBalance(user, salt, flashToken, router)   — flash funding   [1] trigger.prepareCacheBySalt(user, salt)                          — THIS contract   [2] manager.executePreHookBySalt(user, salt)                        — manager pre-hook The trigger MUST come before the manager pre-hook so the cache is populated before preInstructions mutate state.",
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}

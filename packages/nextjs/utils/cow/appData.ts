@@ -71,7 +71,8 @@ export type KapanProtocol =
   | "compound"
   | "venus"
   | "morpho"
-  | "euler";
+  | "euler"
+  | "alchemix";
 
 /**
  * Build the appCode string with operation type and optional protocol
@@ -108,6 +109,9 @@ export function normalizeProtocolForAppCode(protocolName: string): KapanProtocol
   if (lower.includes("euler")) {
     return "euler";
   }
+  if (lower.includes("alchemix")) {
+    return "alchemix";
+  }
   return undefined;
 }
 
@@ -140,7 +144,7 @@ export function parseProtocolFromAppCode(appCode: string): KapanProtocol | undef
     return undefined;
   }
   const protocol = parts[1] as KapanProtocol;
-  const validProtocols: KapanProtocol[] = ["aave", "compound", "venus", "morpho", "euler"];
+  const validProtocols: KapanProtocol[] = ["aave", "compound", "venus", "morpho", "euler", "alchemix"];
   return validProtocols.includes(protocol) ? protocol : undefined;
 }
 
@@ -427,7 +431,22 @@ export function buildKapanAppData(
        * swap amount is dynamic (determined by trigger at execution time).
        */
       useBalanceTransfer?: boolean;
+      /**
+       * Override the recipient of the flashed tokens. Defaults to the OrderManager (which is
+       * what Aave/Morpho-shaped flows want — the manager already holds the sellToken before
+       * CoW pulls it). Alchemix-shaped flows pass `router` here because their pre-hook needs
+       * the flashed underlying available on the router for the DepositCollateral instruction.
+       */
+      recipient?: string;
     };
+    /**
+     * Extra pre-interaction hooks inserted BETWEEN the adapter funding hook and the manager
+     * pre-hook. Used by alchemix AL to inject a `TransientAutoLeverageTrigger.prepareCacheBySalt`
+     * call that snapshots the trigger's dynamic outputs into transient storage before the
+     * manager pre-hook mutates position state. Order matters — these run in array order, all
+     * after fund and all before the manager pre-hook.
+     */
+    extraPreHooks?: CowHook[];
   }
 ): AppDataDocument {
   // Gas limits - generous limits for complex operations
@@ -457,26 +476,28 @@ export function buildKapanAppData(
     if (kapanAdapter) {
       // Use KapanCowAdapter - our custom borrower that works with HooksTrampoline
       // For ADL/conditional orders, use fundOrderWithBalance (transfers entire balance)
-      // For regular orders, use fundOrderBySalt (transfers fixed amount)
+      // For regular orders, use fundOrderBySalt (transfers fixed amount).
+      // `recipient` defaults to the OrderManager (the typical pattern for Aave/Morpho-shaped
+      // flows) but can be overridden — alchemix AL routes the flashed underlying directly to
+      // the router so the DepositCollateral instruction in the manager pre-hook has it ready.
+      const fundRecipient = options.flashLoan.recipient ?? orderManagerAddress;
       const fundOrderCalldata = options.flashLoan.useBalanceTransfer
         ? encodeAdapterFundOrderWithBalance(
             user,
             salt,
             options.flashLoan.token,
-            orderManagerAddress
+            fundRecipient
           )
         : encodeAdapterFundOrderBySalt(
             user,
             salt,
             options.flashLoan.token,
-            orderManagerAddress,
+            fundRecipient,
             options.flashLoan.amount
           );
 
       preHooks = [
-        // First: Transfer flash-loaned tokens from Adapter to OrderManager
-        // fundOrderWithBalance transfers entire balance (for dynamic ADL amounts)
-        // fundOrderBySalt transfers fixed amount (for regular orders)
+        // First: Transfer flash-loaned tokens from Adapter to recipient (OrderManager or router)
         {
           target: kapanAdapter,
           callData: fundOrderCalldata,
@@ -485,7 +506,12 @@ export function buildKapanAppData(
             ? "kapan://flashloans/adapter/fund-balance"
             : "kapan://flashloans/adapter/fund",
         },
-        // Second: Execute any pre-hook logic on OrderManager
+        // Optional middle hooks (e.g. TransientAutoLeverageTrigger.prepareCacheBySalt) — these
+        // need to run AFTER the adapter has dropped the flash tokens but BEFORE the manager
+        // pre-hook executes its mutating preInstructions, so the trigger snapshot reflects
+        // pre-mutation state.
+        ...(options.extraPreHooks ?? []),
+        // Last: Execute the manager's pre-hook (which runs preInstructions).
         {
           target: orderManagerAddress,
           callData: preHookCalldata,

@@ -239,6 +239,7 @@ export const PROTOCOL_ICONS: Record<string, string> = {
   morpho: "/logos/morpho.svg",
   venus: "/logos/venus.svg",
   euler: "/logos/euler.svg",
+  alchemix: "/logos/alchemix.svg",
 };
 
 export const contractNameToLogo = (contractName: keyof typeof contractLogos) => {
@@ -316,6 +317,8 @@ const PNG_LOGO_MAP: Record<string, string> = {
   jrt: "/logos/jrt.png",
   rex: "/logos/rex.png",
   xpet: "/logos/xpet.png",
+  alusd: "/logos/alusd.svg",
+  aleth: "/logos/aleth.svg",
 };
 
 function isEulerPrefixed(lower: string): boolean {

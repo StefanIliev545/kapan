@@ -514,6 +514,9 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, c
                       // not the user's currently-held collaterals. `collateralValue` still
                       // uses the user's actual collateral balances for health-factor math.
                       availableAssets={allBorrowAssets}
+                      // Close-with-collateral needs the user's *supplied* collaterals, which
+                      // are different from the debt-swap reserve list above.
+                      availableCollateralsForClose={allSupplyAssets}
                       collateralValue={collateralAssets.reduce((s, c) => s + (c.usdValue || 0), 0)}
                       adlProtected={
                         activeADL?.triggerParams?.debtToken?.toLowerCase() === pos.tokenAddress.toLowerCase()

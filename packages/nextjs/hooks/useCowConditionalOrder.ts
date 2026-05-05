@@ -21,6 +21,7 @@ import {
   normalizeProtocolForAppCode,
   type KapanOperationType,
 } from "~~/utils/cow";
+import { ALCHEMIX_GATEWAY_NAME, ALCHEMIX_PROTOCOL_ID } from "~~/utils/alchemix/protocolConstants";
 import {
   ProtocolInstruction,
   createRouterInstruction,
@@ -184,6 +185,9 @@ export function getProtocolId(protocolName: string): Hex {
   }
   if (normalized.includes("euler")) {
     return keccak256(toHex("euler-v2")).slice(0, 10) as Hex;
+  }
+  if (normalized.includes(ALCHEMIX_GATEWAY_NAME) || normalized.includes("alchemix")) {
+    return ALCHEMIX_PROTOCOL_ID;
   }
   // Default to aave
   return keccak256(toHex("aave-v3")).slice(0, 10) as Hex;

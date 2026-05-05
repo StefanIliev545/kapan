@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import { MarketParams } from "./interfaces/morpho/IMorphoBlue.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { AlchemixConstants } from "./gateways/alchemix/AlchemixConstants.sol";
 
 /**
  * @title Gateway View Interfaces
@@ -71,6 +72,14 @@ interface IVenusGatewayView {
     function getUserAccountData(address user) external view returns (uint256 totalCollateralUsd, uint256 totalDebtUsd);
 }
 
+interface IAlchemixGatewayView {
+    /// Alchemix is NFT-shaped — `user` is unused by the read path; positions are keyed by tokenId.
+    function getCurrentLtvBps(uint256 marketId, uint256 tokenId) external view returns (uint256);
+    function getLiquidationLtvBps(uint256 marketId) external view returns (uint256);
+    function getPositionValue(uint256 marketId, uint256 tokenId) external view returns (uint256 collateralValueUsd, uint256 debtValueUsd);
+    function getAssetPrice(uint256 marketId, address token) external view returns (uint256);
+}
+
 /**
  * @title KapanViewRouter
  * @notice Unified read-only router for querying position data across lending protocols
@@ -103,6 +112,7 @@ contract KapanViewRouter {
     bytes4 public constant MORPHO_BLUE = bytes4(keccak256("morpho-blue"));
     bytes4 public constant EULER_V2 = bytes4(keccak256("euler-v2"));
     bytes4 public constant VENUS = bytes4(keccak256("venus"));
+    bytes4 public constant ALCHEMIX = AlchemixConstants.PROTOCOL_ID;
 
     // ============ State ============
 
@@ -527,6 +537,7 @@ contract KapanViewRouter {
         if (protocolId == MORPHO_BLUE) return "morpho-blue";
         if (protocolId == EULER_V2) return "euler-v2";
         if (protocolId == VENUS) return "venus";
+        if (protocolId == ALCHEMIX) return AlchemixConstants.GATEWAY_NAME;
         revert UnsupportedProtocolId(protocolId);
     }
 
@@ -568,6 +579,11 @@ contract KapanViewRouter {
         if (protocolId == VENUS) {
             return IVenusGatewayView(gateway).getCurrentLtvBps(address(0), user);
         }
+        if (protocolId == ALCHEMIX) {
+            // Alchemix context format: (uint256 marketId, uint256 tokenId).
+            (uint256 marketId, uint256 tokenId) = abi.decode(context, (uint256, uint256));
+            return IAlchemixGatewayView(gateway).getCurrentLtvBps(marketId, tokenId);
+        }
 
         revert UnsupportedProtocolId(protocolId);
     }
@@ -606,6 +622,10 @@ contract KapanViewRouter {
             // Context format: (borrowVault, collateralVaults[], subAccountIndex)
             (address vault, , uint8 subAccountIndex) = abi.decode(context, (address, address[], uint8));
             return IEulerGatewayView(gateway).getUserAccountData(vault, user, subAccountIndex);
+        }
+        if (protocolId == ALCHEMIX) {
+            (uint256 marketId, uint256 tokenId) = abi.decode(context, (uint256, uint256));
+            return IAlchemixGatewayView(gateway).getPositionValue(marketId, tokenId);
         }
 
         revert UnsupportedProtocolId(protocolId);
@@ -688,6 +708,10 @@ contract KapanViewRouter {
             }
             return priceInUoa;
         }
+        if (protocolId == ALCHEMIX) {
+            (uint256 marketId, ) = abi.decode(context, (uint256, uint256));
+            return IAlchemixGatewayView(gateway).getAssetPrice(marketId, collateralToken);
+        }
         // Fallback: return placeholder (caller should handle)
         return 1e8;
     }
@@ -745,6 +769,10 @@ contract KapanViewRouter {
                 return priceInUoa * (10 ** (8 - uoaDecimals));
             }
             return priceInUoa;
+        }
+        if (protocolId == ALCHEMIX) {
+            (uint256 marketId, ) = abi.decode(context, (uint256, uint256));
+            return IAlchemixGatewayView(gateway).getAssetPrice(marketId, debtToken);
         }
         // Fallback: return placeholder (caller should handle)
         return 1e8;

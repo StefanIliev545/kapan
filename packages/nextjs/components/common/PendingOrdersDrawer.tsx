@@ -102,6 +102,9 @@ function getProtocolNameFromId(protocolId: `0x${string}`): KapanProtocol | undef
   if (protocolId === PROTOCOL_IDS.VENUS) {
     return "venus";
   }
+  if (protocolId === PROTOCOL_IDS.ALCHEMIX) {
+    return "alchemix";
+  }
   return undefined;
 }
 
