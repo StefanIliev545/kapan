@@ -577,12 +577,16 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
 
       const hasMargin = marginRaw > 0n;
 
-      // Output index map. With margin (10 instructions, indexes 0-9):
+      // Output index map. With margin (output indexes 0-10):
       //   [0] margin (PullToken), [1] flash template (ToOutput), [2] flash repay (FlashLoan),
-      //   [3] total collateral (Add), [4] approve dummy, deposit (no output),
-      //   [5] alUSD borrowed (Borrow), [6] approve dummy,
-      //   [7] usdc out, [8] alUSD refund (=0 for exact-in), [9] surplus = [7]-[2]
-      // Without margin (8 instructions, indexes 0-7): all indexes shift down by 2.
+      //   [3] total collateral (Add), [4] approve dummy (initial deposit), deposit (no output),
+      //   [5] alUSD borrowed (Borrow), [6] approve dummy (swap),
+      //   [7] usdc out, [8] alUSD refund (=0 for exact-in), [9] surplus = [7]-[2],
+      //   [10] approve dummy (surplus deposit), surplus deposit (no output)
+      // Without margin: indexes shift down by 2 (no PullToken, no Add).
+      // We deposit the surplus back into the position rather than refunding to the user — at
+      // higher leverage the leftover post-swap collateral is non-trivial (often $5-$50 on a
+      // $1k loop) and folding it in keeps the user's effective LTV closer to the slider value.
       const flashTemplateIdx = hasMargin ? 1 : 0;
       const flashRepayIdx = hasMargin ? 2 : 1;
       const depositInputIdx = hasMargin ? 3 : flashTemplateIdx;
@@ -623,10 +627,18 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
           swapRouter,
           encodeLendingInstruction(LendingOp.Swap, debtToken, userAddress, 0n, swapContext, borrowOutIdx),
         ),
-        // Compute surplus collateral (usdcOut - flashRepay) as a virtual UTXO and push it to user.
-        // This leaves exactly `flashRepay` collateral on the router for the flash provider to pull.
+        // Compute surplus collateral (usdcOut - flashRepay) as a virtual UTXO. Leaves exactly
+        // `flashRepay` collateral on the router for the flash provider to pull.
         createRouterInstruction(encodeSubtract(usdcOutIdx, flashRepayIdx)),
-        createRouterInstruction(encodePushToken(surplusIdx, userAddress)),
+        // Approve + deposit surplus into the same position so it lands as collateral instead
+        // of being refunded to the wallet. The earlier approve at instruction [4] was for the
+        // initial collateral and is fully consumed by the first DepositCollateral, so a fresh
+        // approve referencing `surplusIdx` is required here.
+        createRouterInstruction(encodeApprove(surplusIdx, ALCHEMIX_GATEWAY_NAME)),
+        createProtocolInstruction(
+          ALCHEMIX_GATEWAY_NAME,
+          encodeLendingInstruction(LendingOp.DepositCollateral, collateralToken, userAddress, 0n, alchemixContext, surplusIdx),
+        ),
       );
 
       logger.debug(`[buildMultiplyFlow:alchemix] ${flow.length} instructions, hasMargin=${hasMargin}`);

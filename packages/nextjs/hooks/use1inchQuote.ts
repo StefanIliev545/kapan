@@ -59,6 +59,11 @@ const fetchKyberQuote = async (
         dstAmount: r.amountOut,
         srcToken: { address: src },
         dstToken: { address: dst },
+        // Kyber's /swap endpoint includes amountInUsd/amountOutUsd on the route summary, but
+        // fetchKyberSwap currently only exposes the build-tx fields. Surfacing them as
+        // srcUSD/dstUSD here keeps useAutoSlippage's price-impact calc working uniformly
+        // across 1inch and Kyber wins. See utils/kyber.ts:KyberSwapResponse — extending that
+        // wrapper to expose amountInUsd/amountOutUsd is a follow-up.
         tx: {
             to: r.routerAddress,
             data: r.data,

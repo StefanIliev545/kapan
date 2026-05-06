@@ -22,6 +22,25 @@ const RPC_ENDPOINTS: Record<number, string> = {
   31337: "http://127.0.0.1:8545", // Hardhat local node
 };
 
+// Euler's GovernedPerspective contract per chain — the canonical "curated/safe vaults" list
+// that Euler's own UI uses. Calling `verifiedArray()` on this address returns every vault
+// the Euler Labs team has manually verified as production-ready. Filtering our subgraph
+// results through this set hides the long tail of permissionless-deploy junk that pollutes
+// the raw `eulerVaults` query. Source: https://github.com/euler-xyz/euler-interfaces (per-chain
+// `addresses/<chainId>/PeripheryAddresses.json`).
+const GOVERNED_PERSPECTIVE_ADDRESSES: Record<number, string> = {
+  1: "0xC0121817FF224a018840e4D15a864747d36e6Eb2",
+  42161: "0xc7693ceEf74Bc7c8Af703c5519F24bB5e6642643",
+  8453: "0xafC8545c49DF2c8216305922D9753Bf60bf8c14A",
+  59144: "0x74f9fD22aA0Dd5Bbf6006a4c9818248eb476C50A",
+  // 10 (Optimism) intentionally omitted — Euler has not deployed a governed perspective there
+  // as of 2026-05. Falls back to "show everything" via the `unverified` path below.
+};
+
+// `verifiedArray()` selector — returns address[]. Same ABI shape as the LTVList call below
+// so we can reuse `decodeAddressArray`.
+const VERIFIED_ARRAY_SELECTOR = "0x9caa49bd";
+
 // Euler subgraph endpoints by chain
 const EULER_SUBGRAPH_URLS: Record<number, string> = {
   // Ethereum Mainnet
@@ -211,6 +230,43 @@ async function getValidCollaterals(
   return validPairs;
 }
 
+/**
+ * Fetch the set of vault addresses that are verified in Euler's GovernedPerspective for the
+ * given chain. Returns an empty Set if the chain has no perspective deployed (Optimism today)
+ * — callers should treat that as "no curation available, show everything".
+ */
+async function fetchGovernedVaultSet(chainId: number): Promise<Set<string>> {
+  const perspective = GOVERNED_PERSPECTIVE_ADDRESSES[chainId];
+  const rpcUrl = RPC_ENDPOINTS[chainId];
+  if (!perspective || !rpcUrl) return new Set();
+
+  try {
+    const response = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "eth_call",
+        params: [{ to: perspective, data: VERIFIED_ARRAY_SELECTOR }, "latest"],
+        id: 1,
+      }),
+    });
+    if (!response.ok) {
+      console.error(`[euler/vaults] verifiedArray RPC error: ${response.status}`);
+      return new Set();
+    }
+    const result = await response.json();
+    if (!result?.result || result.result === "0x" || result.error || result.result.length <= 66) {
+      console.warn(`[euler/vaults] verifiedArray returned empty result on chain ${chainId}`);
+      return new Set();
+    }
+    return new Set(decodeAddressArray(result.result));
+  } catch (error) {
+    console.error(`[euler/vaults] verifiedArray fetch failed:`, error);
+    return new Set();
+  }
+}
+
 /** Fetch vault symbol/asset lookup map from the subgraph. */
 async function fetchVaultInfoLookup(
   subgraphUrl: string,
@@ -241,9 +297,12 @@ function resolveAssetSymbol(assetAddr: string, vaultSymbol?: string): { symbol: 
   const tokenMeta = KNOWN_TOKENS[assetAddr] || { symbol: "???", decimals: 18 };
   if (tokenMeta.symbol !== "???" || !vaultSymbol) return tokenMeta;
 
-  const match = vaultSymbol.match(/^e([A-Z]+)/i);
+  // Fall back to the full extracted token name (e.g. "PT-sUSDai-18JUN2026") rather than a
+  // greedy `[A-Z]+` match which stops at the first dash and reduces "ePT-sUSDai-..." to just
+  // "PT". The full extraction also lets `tokenNameToLogo` route to the correct PT/Pendle
+  // icon via its `pt-` prefix branch.
   return {
-    symbol: match ? match[1].toUpperCase() : tokenMeta.symbol,
+    symbol: extractTokenFromVaultSymbol(vaultSymbol),
     decimals: tokenMeta.decimals,
   };
 }
@@ -342,6 +401,9 @@ export async function GET(
   const first = Math.min(parseInt(searchParams.get("first") || "100"), 500);
   const skip = parseInt(searchParams.get("skip") || "0");
   const search = searchParams.get("search")?.toLowerCase();
+  // Strict-curation filter is on by default — `?includeUnverified=true` opts out for
+  // power users / debugging. Once the Euler-only path is stable we can remove the escape.
+  const includeUnverified = searchParams.get("includeUnverified") === "true";
 
   try {
     const vaultInfoLookup = await fetchVaultInfoLookup(subgraphUrl);
@@ -364,9 +426,24 @@ export async function GET(
       return NextResponse.json({ error: "GraphQL query failed", details: data.errors }, { status: 500 });
     }
 
-    const vaults = (data.data?.eulerVaults || []).filter(
+    let vaults = (data.data?.eulerVaults || []).filter(
       (v: any) => parseFloat(v.state?.totalShares || "0") > 0,
     );
+
+    // Curation filter — by default keep only vaults verified in Euler's GovernedPerspective.
+    // Skips on chains with no perspective deployed (e.g. Optimism today) so we don't
+    // accidentally hide everything when curation infra hasn't shipped yet. The escape
+    // hatch (`?includeUnverified=true`) is for debugging only.
+    if (!includeUnverified) {
+      const verifiedSet = await fetchGovernedVaultSet(chainId);
+      if (verifiedSet.size > 0) {
+        const beforeCount = vaults.length;
+        vaults = vaults.filter((v: any) => verifiedSet.has((v.id || "").toLowerCase()));
+        console.log(`[euler/vaults] curation filter: ${vaults.length}/${beforeCount} vaults kept (governedPerspective)`);
+      } else {
+        console.log(`[euler/vaults] curation filter skipped — no governedPerspective on chain ${chainId}`);
+      }
+    }
 
     const vaultAddresses = vaults.map((v: any) => (v.id || "").toLowerCase());
     const validLtvPairs = await getValidCollaterals(chainId, vaultAddresses);

@@ -1,10 +1,10 @@
 import { FC, useState, useMemo, useEffect, useCallback, ReactNode } from "react";
-import Image from "next/image";
 import { formatUnits, Address } from "viem";
 import { CheckIcon, ArrowDownIcon, InformationCircleIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { SegmentedActionBar, SegmentedAction } from "../common/SegmentedActionBar";
 import { ErrorDisplay } from "../common/ErrorDisplay";
 import { ButtonLoading } from "../common/Loading";
+import { TokenPicker } from "./common/TokenPicker";
 import { FlashLoanProviderOption } from "~~/hooks/useMovePositionData";
 import { SLIPPAGE_OPTIONS } from "~~/hooks/useAutoSlippage";
 import { getPriceImpactSeverity, getPriceImpactColorClass, formatPriceImpact } from "~~/utils/slippage";
@@ -125,11 +125,13 @@ interface TokenSectionProps {
     value: string;
     isLoading?: boolean;
     usdValue: number;
-    onTokenChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+    onTokenSelect: (asset: SwapAsset) => void;
     onValueChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onSetMax?: () => void;
-    /** Custom token picker to replace the default select dropdown */
+    /** Custom token picker to replace the default popover dropdown */
     customTokenPicker?: ReactNode;
+    /** Aligns the popover dropdown — `start` for left-anchored (From), `end` for right-anchored (To). */
+    pickerAlign?: "start" | "end";
 }
 
 const TokenSection: FC<TokenSectionProps> = ({
@@ -141,10 +143,11 @@ const TokenSection: FC<TokenSectionProps> = ({
     value,
     isLoading = false,
     usdValue,
-    onTokenChange,
+    onTokenSelect,
     onValueChange,
     onSetMax,
     customTokenPicker,
+    pickerAlign = "start",
 }) => (
     <div className="bg-base-200/50 border-base-300/50 rounded-lg border px-3 py-2">
         <div className="text-base-content/50 mb-1 flex items-center justify-between text-[10px]">
@@ -166,26 +169,13 @@ const TokenSection: FC<TokenSectionProps> = ({
                 {customTokenPicker ? (
                     customTokenPicker
                 ) : (
-                    <>
-                        {asset && (
-                            <div className="relative size-5 flex-shrink-0">
-                                <Image src={asset.icon} alt={asset.symbol} fill className="rounded-full object-contain" />
-                            </div>
-                        )}
-                        {isReadOnly ? (
-                            <span className="text-sm font-medium">{asset?.symbol || "-"}</span>
-                        ) : (
-                            <select
-                                className="select select-ghost select-xs h-auto min-h-0 bg-transparent pl-0 text-sm font-medium focus:outline-none"
-                                value={asset?.symbol || ""}
-                                onChange={onTokenChange}
-                            >
-                                {assets.map(t => (
-                                    <option key={t.address} value={t.symbol}>{t.symbol}</option>
-                                ))}
-                            </select>
-                        )}
-                    </>
+                    <TokenPicker
+                        asset={asset}
+                        assets={assets}
+                        onSelect={onTokenSelect}
+                        disabled={isReadOnly}
+                        align={pickerAlign}
+                    />
                 )}
             </div>
 
@@ -502,11 +492,11 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
     const handleSetSwapTab = useCallback(() => setActiveTab("swap"), []);
     const handleSetInfoTab = useCallback(() => setActiveTab("info"), []);
 
-    // From token selector handler
-    const handleFromTokenChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        const token = fromAssets.find(t => t.symbol === e.target.value);
-        if (token) setSelectedFrom(token);
-    }, [fromAssets, setSelectedFrom]);
+    // From token selector handler — now receives the SwapAsset directly from TokenPicker
+    // instead of needing to resolve a symbol string out of a synthetic select event.
+    const handleFromTokenSelect = useCallback((asset: SwapAsset) => {
+        setSelectedFrom(asset);
+    }, [setSelectedFrom]);
 
     // Amount in change handler
     const handleAmountInChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -515,10 +505,9 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
     }, [setAmountIn, setIsMax]);
 
     // To token selector handler
-    const handleToTokenChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        const token = toAssets.find(t => t.symbol === e.target.value);
-        if (token) setSelectedTo(token);
-    }, [toAssets, setSelectedTo]);
+    const handleToTokenSelect = useCallback((asset: SwapAsset) => {
+        setSelectedTo(asset);
+    }, [setSelectedTo]);
 
     // Batching toggle handler
     const handleToggleBatching = useCallback(() => {
@@ -598,9 +587,12 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
         );
     };
 
-    // Render the swap tab content
+    // Render the swap tab content. `flex flex-col flex-1` + `mt-auto` on the action bar pins
+    // the submit button to the bottom of the main column so it lines up with the right
+    // panel's bottom edge, instead of floating just after the token inputs with empty space
+    // below (which happens when the right panel is taller than the swap content).
     const renderSwapTab = () => (
-        <div className="space-y-3">
+        <div className="flex flex-1 flex-col gap-3">
 
             {/* Token swap sections with overlapping arrow - wrapped to avoid space-y gap */}
             <div className="relative space-y-0.5">
@@ -613,9 +605,10 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                     showAvailable={true}
                     value={amountIn}
                     usdValue={usdValueIn}
-                    onTokenChange={handleFromTokenChange}
+                    onTokenSelect={handleFromTokenSelect}
                     onValueChange={handleAmountInChange}
                     onSetMax={handleSetMax}
+                    pickerAlign="start"
                 />
 
                 {/* TO Section */}
@@ -627,9 +620,10 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
                     value={amountOut}
                     isLoading={isQuoteLoading}
                     usdValue={usdValueOut}
-                    onTokenChange={handleToTokenChange}
+                    onTokenSelect={handleToTokenSelect}
                     onValueChange={onAmountOutChange ? (e) => onAmountOutChange(e.target.value) : undefined}
                     customTokenPicker={customToTokenPicker}
+                    pickerAlign="start"
                 />
 
                 {/* Limit price adjustment buttons (for limit orders) */}
@@ -659,13 +653,17 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
             )}
             {warnings}
 
-            {/* Actions */}
-            <SwapActions
-                preferBatching={preferBatching}
-                setPreferBatching={setPreferBatching}
-                onToggleBatching={handleToggleBatching}
-                swapActions={swapActions}
-            />
+            {/* Actions — `mt-auto` pushes to the bottom of the column so when the right
+                panel is taller (cost breakdown + flash provider) the button sits at the floor
+                of the modal rather than mid-height. */}
+            <div className="mt-auto">
+                <SwapActions
+                    preferBatching={preferBatching}
+                    setPreferBatching={setPreferBatching}
+                    onToggleBatching={handleToggleBatching}
+                    swapActions={swapActions}
+                />
+            </div>
         </div>
     );
 
@@ -676,9 +674,11 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
         <dialog className={`modal ${isOpen ? "modal-open" : ""}`}>
             <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
             <div className={`modal-box bg-base-100 border-base-300/50 relative ${modalMaxWidth} overflow-hidden rounded-xl border p-0`}>
-                <div className="flex flex-col md:flex-row">
-                    {/* Main Content */}
-                    <div className="flex-1 p-5">
+                <div className="flex flex-col md:flex-row md:items-stretch">
+                    {/* Main Content — flex-col so the swap tab's `mt-auto` action bar pins to the
+                        column's bottom edge, lining up with the right panel's floor when the
+                        right panel is the taller of the two. */}
+                    <div className="flex flex-1 flex-col p-5">
                         <div className="mb-4 flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <h3 className="text-base-content text-lg font-semibold">{title}</h3>

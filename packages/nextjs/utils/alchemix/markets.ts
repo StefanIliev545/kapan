@@ -44,7 +44,9 @@ export const ALCHEMIX_MARKETS: Record<number, AlchemixMarket[]> = {
       debtToken: "0xCB8FA9a76b8e203D8C3797bF438d8FB81Ea3326A",
       debtSymbol: "alUSD",
       debtDecimals: 18,
-      positionNft: "0x4bd4Faad509c4Bc5BA6D68A15C8b1b54A10288B4",
+      // Updated 2026-05 — alchemist's `positionNft()` getter returns this; the older registry
+      // value (0x4bd4Faad…) was a pre-redeploy address that drifted after Alchemix's V3 update.
+      positionNft: "0xf700c7e40efca6f7a810e172afcee3592ff4ad33",
     },
     {
       id: "arb-aleth",

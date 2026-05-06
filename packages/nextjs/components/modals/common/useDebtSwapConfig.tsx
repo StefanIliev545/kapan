@@ -28,6 +28,8 @@ import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData, type FlashLoanProviderOption } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
+import { useSwapCostBreakdown } from "./useSwapCostBreakdown";
+import { CostBreakdownRows } from "./CostBreakdownRows";
 import {
   useCowConditionalOrder,
   encodeLimitPriceTriggerParams,
@@ -397,7 +399,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
   const isUnitQuoteLoading = swapRouter === "pendle" ? isPendleUnitQuoteLoading : isOneInchUnitQuoteLoading;
 
   // Calculate required new debt
-  const { requiredNewDebt, requiredNewDebtFormatted, exchangeRate } = useMemo(() => {
+  const { requiredNewDebt, requiredNewDebtFormatted } = useMemo(() => {
     return calculateRequiredNewDebt({
       selectedTo,
       repayAmountRaw: bufferedRepayAmount,
@@ -861,7 +863,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
     return !isNaN(parsed) && parsed > 0 ? parsed * Number(formatUnits(debtFromPrice, 8)) : undefined;
   }, [debtFromPrice, expectedOutput]);
 
-  const { priceImpact, formattedPriceImpact } = useAutoSlippage({
+  const { priceImpact } = useAutoSlippage({
     slippage,
     setSlippage,
     oneInchQuote: oneInchSwapQuote,
@@ -870,6 +872,19 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
     resetDep: selectedTo?.address,
     srcUsdFallback,
     dstUsdFallback,
+  });
+
+  // USD cost breakdown — replaces the bare "Price Impact %" row in the right panel.
+  // Flash amount is the new debt being borrowed (sized in selectedTo's decimals/price).
+  const costBreakdown = useSwapCostBreakdown({
+    selectedProvider,
+    flashAmountRaw: requiredNewDebt,
+    flashTokenDecimals: selectedTo?.decimals ?? 18,
+    flashTokenPriceRaw: selectedTo?.price,
+    srcUsdFallback,
+    dstUsdFallback,
+    priceImpact,
+    slippage,
   });
 
   // ============ Analytics Tracking ============
@@ -1042,11 +1057,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       flashLoanProviders={flashLoanProviders}
       selectedProvider={selectedProvider}
       setSelectedProvider={setSelectedProvider}
-      priceImpact={priceImpact}
-      formattedPriceImpact={formattedPriceImpact}
-      exchangeRate={exchangeRate}
-      expectedOutput={expectedOutput}
-      outputCoversRepay={outputCoversRepay}
+      costBreakdown={costBreakdown}
       debtFromName={debtFromName}
       debtFromDecimals={debtFromDecimals}
       selectedTo={selectedTo}
@@ -1058,7 +1069,7 @@ export function useDebtSwapConfig(props: ExtendedDebtSwapConfigProps): SwapOpera
       isCowQuoteLoading={isCowQuoteLoading}
       repayAmountRaw={repayAmountRaw}
     />
-  ), [executionType, setExecutionType, cowAvailable, conditionalOrderReady, slippage, setSlippage, swapRouter, setSwapRouter, oneInchAvailable, pendleAvailable, flashLoanProviders, selectedProvider, setSelectedProvider, priceImpact, formattedPriceImpact, exchangeRate, expectedOutput, outputCoversRepay, debtFromName, debtFromDecimals, selectedTo, limitOrderConfig, numChunks, setNumChunks, effectiveLimitOrderNewDebt, limitOrderNewDebt, isCowQuoteLoading, repayAmountRaw]);
+  ), [executionType, setExecutionType, cowAvailable, conditionalOrderReady, slippage, setSlippage, swapRouter, setSwapRouter, oneInchAvailable, pendleAvailable, flashLoanProviders, selectedProvider, setSelectedProvider, costBreakdown, debtFromName, debtFromDecimals, selectedTo, limitOrderConfig, numChunks, setNumChunks, effectiveLimitOrderNewDebt, limitOrderNewDebt, isCowQuoteLoading, repayAmountRaw]);
 
   // ============ Return Config ============
   return {
@@ -1146,11 +1157,15 @@ interface DebtSwapRightPanelProps {
   flashLoanProviders?: FlashLoanProviderOption[];
   selectedProvider?: FlashLoanProviderOption | null;
   setSelectedProvider: (p: FlashLoanProviderOption) => void;
-  priceImpact: number | null | undefined;
-  formattedPriceImpact: string | null | undefined;
-  exchangeRate: string;
-  expectedOutput: string;
-  outputCoversRepay: boolean;
+  costBreakdown: {
+    flashFeeUsd: number;
+    priceImpactUsd: number;
+    priceImpactPct: number;
+    maxSlippageUsd: number;
+    slippagePct: number;
+    totalCostUsd: number;
+    hasAnyData: boolean;
+  };
   debtFromName: string;
   debtFromDecimals: number;
   selectedTo: SwapAsset | null;
@@ -1179,11 +1194,7 @@ function DebtSwapRightPanel(props: DebtSwapRightPanelProps): ReactNode {
     flashLoanProviders,
     selectedProvider,
     setSelectedProvider,
-    priceImpact,
-    formattedPriceImpact,
-    exchangeRate,
-    expectedOutput,
-    outputCoversRepay,
+    costBreakdown,
     debtFromName,
     debtFromDecimals,
     selectedTo,
@@ -1253,30 +1264,18 @@ function DebtSwapRightPanel(props: DebtSwapRightPanelProps): ReactNode {
             )}
           </div>
 
-          <div className="border-base-300/30 space-y-1 border-t pt-2">
-            {priceImpact !== undefined && priceImpact !== null && (
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/50">Price Impact</span>
-                <span className={priceImpact > 1 ? "text-warning" : priceImpact > 3 ? "text-error" : "text-base-content/80"}>
-                  {formattedPriceImpact || `${priceImpact.toFixed(2)}%`}
-                </span>
-              </div>
-            )}
-            {exchangeRate && (
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/50">Rate</span>
-                <span className="text-base-content/80">1:{parseFloat(exchangeRate).toFixed(4)}</span>
-              </div>
-            )}
-            {expectedOutput && (
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/50">Output</span>
-                <span className={outputCoversRepay === false ? "text-warning" : outputCoversRepay === true ? "text-success" : "text-base-content/80"}>
-                  {parseFloat(expectedOutput).toFixed(4)} {debtFromName}
-                </span>
-              </div>
-            )}
-          </div>
+          {costBreakdown.hasAnyData && (
+            <div className="border-base-300/30 border-t pt-2">
+              <CostBreakdownRows
+                flashFeeUsd={costBreakdown.flashFeeUsd}
+                priceImpactUsd={costBreakdown.priceImpactUsd}
+                priceImpactPct={costBreakdown.priceImpactPct}
+                maxSlippageUsd={costBreakdown.maxSlippageUsd}
+                slippagePct={costBreakdown.slippagePct}
+                totalCostUsd={costBreakdown.totalCostUsd}
+              />
+            </div>
+          )}
         </div>
       )}
 

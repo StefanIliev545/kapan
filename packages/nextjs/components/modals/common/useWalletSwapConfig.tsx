@@ -23,6 +23,8 @@ import { is1inchSupported, isPendleSupported, isPendleToken } from "~~/utils/cha
 import type { SwapAsset, SwapRouter } from "../SwapModalShell";
 import { SearchableTokenPicker, type TokenOption } from "./SearchableTokenPicker";
 import type { SwapOperationConfig, UseWalletSwapConfigProps, ExecutionType } from "./swapConfigTypes";
+import { useSwapCostBreakdown } from "./useSwapCostBreakdown";
+import { CostBreakdownRows } from "./CostBreakdownRows";
 
 // Common tokens to swap to (by chainId) - fallback when API tokens are loading
 const COMMON_SWAP_TARGETS: Record<number, Array<{ address: Address; symbol: string; decimals: number }>> = {
@@ -548,6 +550,48 @@ export function useWalletSwapConfig(props: UseWalletSwapConfigProps): SwapOperat
     return selectedTo;
   }, [selectedTo, selectedFrom, swapRouter, oneInchQuote, rawAmountIn]);
 
+  // ============ USD cost breakdown ============
+  // Wallet swaps don't use a flash loan (it's a direct user-side swap), so flashFeeUsd is
+  // always zero. The breakdown still surfaces realized impact + max-slippage in $, which is
+  // the more useful signal for the user — slippage % alone is hard to translate to dollars.
+  const srcUsdFallback = useMemo(() => {
+    if (!selectedFrom?.price || !amountIn) return undefined;
+    const parsed = parseFloat(amountIn);
+    if (!isFinite(parsed) || parsed <= 0) return undefined;
+    return parsed * Number(formatUnits(selectedFrom.price, 8));
+  }, [selectedFrom?.price, amountIn]);
+
+  const dstUsdFallback = useMemo(() => {
+    if (!selectedTo?.price || !amountOut) return undefined;
+    const parsed = parseFloat(amountOut);
+    if (!isFinite(parsed) || parsed <= 0) return undefined;
+    return parsed * Number(formatUnits(selectedTo.price, 8));
+  }, [selectedTo?.price, amountOut]);
+
+  const costBreakdown = useSwapCostBreakdown({
+    selectedProvider: undefined,
+    flashAmountRaw: 0n,
+    flashTokenDecimals: 18,
+    flashTokenPriceRaw: undefined,
+    srcUsdFallback,
+    dstUsdFallback,
+    priceImpact,
+    slippage,
+  });
+
+  const rightPanel: ReactNode = costBreakdown.hasAnyData ? (
+    <div className="space-y-2">
+      <CostBreakdownRows
+        flashFeeUsd={costBreakdown.flashFeeUsd}
+        priceImpactUsd={costBreakdown.priceImpactUsd}
+        priceImpactPct={costBreakdown.priceImpactPct}
+        maxSlippageUsd={costBreakdown.maxSlippageUsd}
+        slippagePct={costBreakdown.slippagePct}
+        totalCostUsd={costBreakdown.totalCostUsd}
+      />
+    </div>
+  ) : undefined;
+
   // ============ Warnings ============
   const warnings: ReactNode = error ? (
     <div className="alert alert-error text-sm">{error}</div>
@@ -601,10 +645,14 @@ export function useWalletSwapConfig(props: UseWalletSwapConfigProps): SwapOperat
     preferBatching,
     setPreferBatching,
 
-    // UI customization
+    // UI customization — `rightPanel` carries the cost breakdown; `hideDefaultStats: true`
+    // suppresses the bottom StatsGrid since the breakdown supersedes its slippage/min-output
+    // rows. When prices aren't yet available, `rightPanel` is undefined and the modal falls
+    // back to the default StatsGrid via the shell's null-check.
     infoContent,
     warnings,
     customToTokenPicker,
-    hideDefaultStats: false,
+    rightPanel,
+    hideDefaultStats: !!rightPanel,
   };
 }

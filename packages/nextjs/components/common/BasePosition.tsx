@@ -179,13 +179,29 @@ export interface BasePositionProps {
 }
 
 
+/**
+ * Format a USD price for display under the token symbol. Compact (`$1.23K`, `$1.23M`),
+ * sub-cent prices show with extra precision so micro-cap tokens don't all read `$0.00`.
+ */
+function formatPriceForSubtitle(priceUsd: number): string | null {
+  if (!isFinite(priceUsd) || priceUsd <= 0) return null;
+  if (priceUsd >= 1) return formatCurrencyCompact(priceUsd);
+  if (priceUsd >= 0.01) return `$${priceUsd.toFixed(2)}`;
+  if (priceUsd >= 0.0001) return `$${priceUsd.toFixed(4)}`;
+  return `<$0.0001`;
+}
+
 /** Token name display - handles renderName, PT tokens, and fallback. Shared by mobile/desktop. */
 const TokenNameContent: FC<{
   name: string;
   renderName?: (name: string) => ReactNode;
   subtitle?: ReactNode;
+  /** USD price (already converted from raw 1e8). When set and no `subtitle` is provided,
+   *  shown under the token symbol so users can read prices at a glance from any position
+   *  row. PT tokens skip this — their second row is the maturity date. */
+  priceUsd?: number;
   variant: "mobile" | "desktop";
-}> = ({ name, renderName: renderNameFn, subtitle, variant }) => {
+}> = ({ name, renderName: renderNameFn, subtitle, priceUsd, variant }) => {
   if (renderNameFn) {
     return variant === "desktop" ? <>{renderNameFn(name)}</> : <>{renderNameFn(name)}</>;
   }
@@ -194,17 +210,28 @@ const TokenNameContent: FC<{
       ? <TokenSymbolDisplay symbol={name} size="sm" variant="stacked" />
       : <TokenSymbolDisplay symbol={name} size="xs" />;
   }
+  // Price subtitle takes priority over an explicit subtitle prop only when one isn't passed.
+  // Callers that already pass a subtitle (rare today) still win — we don't clobber them.
+  const priceLabel = subtitle ? null : formatPriceForSubtitle(priceUsd ?? 0);
   if (variant === "desktop") {
     return (
       <>
         <span className="truncate text-base font-bold leading-tight tracking-tight" title={name}>{name}</span>
         {subtitle ? (
           <span className="text-base-content/40 truncate text-[10px] uppercase leading-tight tracking-wider">{subtitle}</span>
+        ) : priceLabel ? (
+          <span className="text-base-content/50 truncate font-mono text-[10px] tabular-nums leading-tight">{priceLabel}</span>
         ) : null}
       </>
     );
   }
-  return <>{name}</>;
+  // Mobile: stacked name + tiny price. Skip when no price (preserves the existing behavior).
+  return priceLabel ? (
+    <span className="flex flex-col leading-tight">
+      <span className="truncate">{name}</span>
+      <span className="text-base-content/50 font-mono text-[9px] tabular-nums">{priceLabel}</span>
+    </span>
+  ) : <>{name}</>;
 };
 
 
@@ -453,7 +480,7 @@ export const BasePosition: FC<BasePositionProps> = ({
               <Image src={icon} alt={`${name} icon`} fill className="rounded object-contain" />
             </div>
             <span className="max-w-[100px] truncate text-sm font-bold leading-none tracking-tight" title={name}>
-              <TokenNameContent name={name} renderName={renderName} variant="mobile" />
+              <TokenNameContent name={name} renderName={renderName} priceUsd={tokenPriceUsd} variant="mobile" />
             </span>
             {infoButtonNode && (
               <div className="hidden flex-shrink-0 sm:block" onClick={stopPropagation}>
@@ -506,7 +533,7 @@ export const BasePosition: FC<BasePositionProps> = ({
             </div>
             <div className="ml-3 flex min-w-0 items-center gap-1.5">
               <div className="flex min-w-0 flex-col">
-                <TokenNameContent name={name} renderName={renderName} subtitle={subtitle} variant="desktop" />
+                <TokenNameContent name={name} renderName={renderName} subtitle={subtitle} priceUsd={tokenPriceUsd} variant="desktop" />
               </div>
             </div>
             {infoButtonNode && (
