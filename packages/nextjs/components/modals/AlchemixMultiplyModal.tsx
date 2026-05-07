@@ -12,7 +12,8 @@ import { getOneInchAdapterInfo, getKyberAdapterInfo, is1inchSupported, isKyberSu
 import { getAvailableFlashLoanProviders, getDefaultFlashLoanProvider } from "~~/utils/flashLoan";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { FlashLoanProviderSelector } from "~~/components/modals/common/FlashLoanProviderSelector";
-import { useTokenPrice, formatUsdValue } from "~~/hooks/useTokenPrice";
+import { useTokenPrice } from "~~/hooks/useTokenPrice";
+import { CostBreakdownRows } from "~~/components/modals/common/CostBreakdownRows";
 import { encodeAlchemixContext, type AlchemixMarket } from "~~/utils/alchemix/markets";
 import { ALCHEMIX_GATEWAY_NAME } from "~~/utils/alchemix/protocolConstants";
 import type { AlchemixPosition } from "~~/hooks/useAlchemixLendingPositions";
@@ -309,7 +310,14 @@ export const AlchemixMultiplyModal: FC<AlchemixMultiplyModalProps> = ({ isOpen, 
 
   const costBreakdown = useMemo(() => {
     if (!flashShape || !finalBorrowAmount) {
-      return { flashFeeUsd: 0, priceImpactUsd: 0, totalCostUsd: 0, priceImpactPct: 0 };
+      return {
+        flashFeeUsd: 0,
+        priceImpactUsd: 0,
+        priceImpactPct: 0,
+        maxSlippageUsd: 0,
+        slippagePct: slippage,
+        totalCostUsd: 0,
+      };
     }
     // Flash-loan fee in underlying (Balancer V2/V3 + Morpho = 0; Aave = 5 bps).
     const flashFeeRaw = flashShape.flashRepayCollateral - flashShape.flashAmountCollateral;
@@ -333,13 +341,25 @@ export const AlchemixMultiplyModal: FC<AlchemixMultiplyModalProps> = ({ isOpen, 
     }
     const priceImpactUsd = priceImpactUnderlying * underlyingUsd;
 
+    // Max slippage = upper bound on swap loss within tolerance, sized against expected output
+    // value (underlying we expect to receive). The user's worst-case beyond price impact.
+    const expectedOutUnderlying = Number(formatUnits(quotedOutRaw, market.underlyingDecimals));
+    const expectedOutUsd = expectedOutUnderlying * underlyingUsd;
+    const maxSlippageUsd = (slippage / 100) * expectedOutUsd;
+
+    // Worst case = flash + max(realized impact, slippage allowance) — they're alternate
+    // ceilings rather than additive. See useClosePositionConfig for the same convention.
+    const swapWorstCaseUsd = Math.max(priceImpactUsd, maxSlippageUsd);
+
     return {
       flashFeeUsd,
       priceImpactUsd,
-      totalCostUsd: flashFeeUsd + priceImpactUsd,
       priceImpactPct,
+      maxSlippageUsd,
+      slippagePct: slippage,
+      totalCostUsd: flashFeeUsd + swapWorstCaseUsd,
     };
-  }, [flashShape, finalBorrowAmount, probeOutRaw, probeAmount, quotedOutRaw, collateralToDebtScale, market.underlyingDecimals, underlyingUsd]);
+  }, [flashShape, finalBorrowAmount, probeOutRaw, probeAmount, quotedOutRaw, collateralToDebtScale, market.underlyingDecimals, underlyingUsd, slippage]);
 
   // ============ Build flow ============
   const { buildMultiplyFlow } = useKapanRouterV2();
@@ -557,27 +577,18 @@ export const AlchemixMultiplyModal: FC<AlchemixMultiplyModalProps> = ({ isOpen, 
             </div>
           </div>
 
-          {/* Cost breakdown — flash fee + swap price impact, in USD. Mirrors MultiplyEvmModal's
-              fee row so users see the *true* cost of looping rather than just slippage % */}
+          {/* Cost breakdown — flash fee + swap price impact, in USD. Shared with the close-with-
+              collateral modal via CostBreakdownRows so the two views stay consistent. */}
           {computedParams && finalBorrowAmount && underlyingUsd > 0 && (
             <div className="border-base-300/40 mt-3 border-t pt-2">
-              <div className="text-base-content/40 mb-1 text-[10px] uppercase tracking-wider">Cost</div>
-              <div className="space-y-1 font-mono tabular-nums">
-                <div className="text-base-content/60 flex justify-between text-[11px]">
-                  <span>Flash fee</span>
-                  <span>{formatUsdValue(costBreakdown.flashFeeUsd, { compact: false })}</span>
-                </div>
-                <div className="text-base-content/60 flex justify-between text-[11px]">
-                  <span>
-                    Price impact{costBreakdown.priceImpactPct > 0 && ` (${costBreakdown.priceImpactPct.toFixed(2)}%)`}
-                  </span>
-                  <span>{formatUsdValue(costBreakdown.priceImpactUsd, { compact: false })}</span>
-                </div>
-                <div className="flex justify-between text-xs font-semibold">
-                  <span>Total cost</span>
-                  <span>{formatUsdValue(costBreakdown.totalCostUsd, { compact: false })}</span>
-                </div>
-              </div>
+              <CostBreakdownRows
+                flashFeeUsd={costBreakdown.flashFeeUsd}
+                priceImpactUsd={costBreakdown.priceImpactUsd}
+                priceImpactPct={costBreakdown.priceImpactPct}
+                maxSlippageUsd={costBreakdown.maxSlippageUsd}
+                slippagePct={costBreakdown.slippagePct}
+                totalCostUsd={costBreakdown.totalCostUsd}
+              />
             </div>
           )}
 

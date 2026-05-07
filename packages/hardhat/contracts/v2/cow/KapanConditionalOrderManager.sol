@@ -347,10 +347,11 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
 
     // ============ Hook Execution ============
 
-    /// @notice Execute pre-hook (called by HooksTrampoline)
+    /// @notice Execute pre-hook (called by HooksTrampoline, or by GPv2Settlement during
+    ///         orderbook balance simulation — see `_onlyHookCaller`).
     /// @param orderHash The order hash
     function executePreHook(bytes32 orderHash) external nonReentrant {
-        if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
+        _onlyHookCaller();
         _executePreHookInternal(orderHash);
     }
 
@@ -358,7 +359,7 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     /// @param user The user address
     /// @param salt The order salt
     function executePreHookBySalt(address user, bytes32 salt) external nonReentrant {
-        if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
+        _onlyHookCaller();
         bytes32 orderHash = userSaltToOrderHash[user][salt];
         if (orderHash == bytes32(0)) revert OrderNotFound();
         _executePreHookInternal(orderHash);
@@ -367,7 +368,7 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     /// @notice Execute post-hook (called by HooksTrampoline)
     /// @param orderHash The order hash
     function executePostHook(bytes32 orderHash) external nonReentrant {
-        if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
+        _onlyHookCaller();
         _executePostHookInternal(orderHash);
     }
 
@@ -375,10 +376,27 @@ contract KapanConditionalOrderManager is Ownable, ReentrancyGuard, IERC1271 {
     /// @param user The user address
     /// @param salt The order salt
     function executePostHookBySalt(address user, bytes32 salt) external nonReentrant {
-        if (msg.sender != hooksTrampoline) revert NotHooksTrampoline();
+        _onlyHookCaller();
         bytes32 orderHash = userSaltToOrderHash[user][salt];
         if (orderHash == bytes32(0)) revert OrderNotFound();
         _executePostHookInternal(orderHash);
+    }
+
+    /// @dev Hook entrypoints accept calls from EITHER the CoW HooksTrampoline (real settlement)
+    ///      OR the GPv2Settlement contract directly (orderbook balance simulation).
+    ///      The orderbook simulator delegatecalls into Balances.sol from the Settlement context
+    ///      and then `call()`s each appData hook target — so during simulation `msg.sender`
+    ///      is the Settlement contract, not the trampoline. Without this allowance the
+    ///      pre-hook reverts in simulation, which for orders that mint their sellToken
+    ///      inside the pre-hook (e.g. Alchemix AL: deposit + mintFrom) causes the simulator
+    ///      to see a zero sellToken balance and reject the order with `InsufficientBalance`.
+    ///      Settlement is trusted because (a) it's the only contract that can produce a
+    ///      validly-routed simulation context for our orders, and (b) it never makes such
+    ///      calls outside the simulation/settlement code paths.
+    function _onlyHookCaller() internal view {
+        if (msg.sender != hooksTrampoline && msg.sender != address(settlement)) {
+            revert NotHooksTrampoline();
+        }
     }
 
     /// @dev Internal pre-hook execution logic

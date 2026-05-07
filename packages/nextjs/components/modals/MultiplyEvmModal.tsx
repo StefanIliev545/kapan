@@ -39,6 +39,8 @@ import { type LimitOrderResult } from "~~/components/LimitOrderConfig";
 import { saveOrderNote, createLeverageUpNote } from "~~/utils/orderNotes";
 import { extractOrderHash } from "~~/utils/orderHashExtractor";
 import { useSaveOrder } from "~~/hooks/useOrderHistory";
+import { useSwapCostBreakdown } from "./common/useSwapCostBreakdown";
+import { CostBreakdownRows } from "./common/CostBreakdownRows";
 
 // Import helper functions to reduce cognitive complexity
 import {
@@ -993,6 +995,30 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
     [shortAmount, debtPrice, selectedProvider, swapRouter, pendleQuote, metrics.totalCollateralUsd]
   );
 
+  // ==================== USD cost breakdown (shared component) ====================
+  // Computes flash fee + realized impact + max-slippage in USD using the same hook the
+  // close/collateral-swap/debt-swap configs use. Replaces the bare "Loop Fee" % row in
+  // DetailsSection so users see absolute dollar cost across all leverage flows uniformly.
+  const multiplySrcUsd = shortAmount * debtPrice;
+  const multiplyDstUsd = oneInchQuote?.dstAmount && collateral
+    ? Number(formatUnits(BigInt(oneInchQuote.dstAmount), collateral.decimals)) * collateralPrice
+    : undefined;
+  const multiplyPriceImpact = swapRouter === "pendle"
+    ? (pendleQuote?.data?.priceImpact !== undefined ? Math.abs(pendleQuote.data.priceImpact * 100) : null)
+    : (oneInchQuote?.srcUSD && oneInchQuote?.dstUSD
+        ? ((parseFloat(oneInchQuote.srcUSD) - parseFloat(oneInchQuote.dstUSD)) / parseFloat(oneInchQuote.srcUSD)) * 100
+        : null);
+  const costBreakdown = useSwapCostBreakdown({
+    selectedProvider,
+    flashAmountRaw: flashLoanAmountRaw,
+    flashTokenDecimals: debt?.decimals ?? 18,
+    flashTokenPriceRaw: debt?.price,
+    srcUsdFallback: multiplySrcUsd > 0 ? multiplySrcUsd : undefined,
+    dstUsdFallback: multiplyDstUsd,
+    priceImpact: multiplyPriceImpact,
+    slippage,
+  });
+
   const ticks = useMemo(() => [1, (1 + maxLeverage) / 2, maxLeverage], [maxLeverage]);
 
   // ==================== Render ====================
@@ -1099,6 +1125,7 @@ export const MultiplyEvmModal: FC<MultiplyEvmModalProps> = ({
             shortAmount={shortAmount}
             minCollateralOut={minCollateralOut}
             fees={fees}
+            costBreakdown={costBreakdown}
             collateral={collateral}
             debt={debt}
             supplyApyMap={supplyApyMap}
@@ -1689,6 +1716,15 @@ interface DetailsSectionProps {
   shortAmount: number;
   minCollateralOut: { formatted: string };
   fees: { totalFeeUsd: number; feeOfPositionPercent: number; totalFeePercent: number; flashLoanFeePercent: number; priceImpactPercent: number };
+  costBreakdown: {
+    flashFeeUsd: number;
+    priceImpactUsd: number;
+    priceImpactPct: number;
+    maxSlippageUsd: number;
+    slippagePct: number;
+    totalCostUsd: number;
+    hasAnyData: boolean;
+  };
   collateral: SwapAsset | undefined;
   debt: SwapAsset | undefined;
   supplyApyMap: Record<string, number>;
@@ -1698,7 +1734,7 @@ interface DetailsSectionProps {
 }
 
 const DetailsSection: FC<DetailsSectionProps> = ({
-  executionType, isSwapQuoteLoading, flashLoanAmountRaw, shortAmount, minCollateralOut, fees,
+  executionType, isSwapQuoteLoading, flashLoanAmountRaw, shortAmount, minCollateralOut, costBreakdown,
   collateral, debt, supplyApyMap, borrowApyMap, metrics, leverage,
 }) => (
   <div className="bg-base-200/40 border-base-300/20 mb-3 rounded-lg border p-2.5 text-xs">
@@ -1714,20 +1750,6 @@ const DetailsSection: FC<DetailsSectionProps> = ({
         </span>
       </div>
       <div className="flex justify-between">
-        <span className="text-base-content/50">{executionType === "limit" ? "Order Fee" : "Loop Fee"}</span>
-        <span className={executionType === "limit" ? "text-success" : fees.totalFeeUsd > 0 ? "text-warning" : ""}>
-          {executionType === "limit" ? (
-            "No flash loan fee"
-          ) : fees.totalFeeUsd > 0.01 ? (
-            `$${fees.totalFeeUsd.toFixed(2)} (${fees.feeOfPositionPercent.toFixed(3)}%)`
-          ) : fees.totalFeePercent > 0 ? (
-            `${fees.totalFeePercent.toFixed(3)}%`
-          ) : (
-            "free"
-          )}
-        </span>
-      </div>
-      <div className="flex justify-between">
         <span className="text-base-content/50">Supply APY</span>
         <span className="text-success">+{(supplyApyMap[collateral?.address.toLowerCase() ?? ""] ?? 0).toFixed(2)}%</span>
       </div>
@@ -1736,10 +1758,20 @@ const DetailsSection: FC<DetailsSectionProps> = ({
         <span className="text-error">-{(borrowApyMap[debt?.address.toLowerCase() ?? ""] ?? 0).toFixed(2)}%</span>
       </div>
     </div>
-    {executionType === "market" && fees.totalFeeUsd > 0 && (
-      <div className="border-base-300/30 text-base-content/40 mt-1.5 border-t pt-1.5 text-[10px]">
-        <span>FL: {fees.flashLoanFeePercent > 0 ? `${fees.flashLoanFeePercent}%` : "free"}</span>
-        {fees.priceImpactPercent > 0.001 && <span className="ml-2">Impact: {fees.priceImpactPercent.toFixed(3)}%</span>}
+
+    {/* Cost breakdown — replaces the old "Loop Fee" pseudo-row + "FL/Impact" subline.
+        For limit (CoW) orders the solver bakes fees into price, so we hide the breakdown. */}
+    {executionType === "market" && costBreakdown.hasAnyData && (
+      <div className="border-base-300/30 mt-1.5 border-t pt-1.5">
+        <CostBreakdownRows
+          flashFeeUsd={costBreakdown.flashFeeUsd}
+          priceImpactUsd={costBreakdown.priceImpactUsd}
+          priceImpactPct={costBreakdown.priceImpactPct}
+          maxSlippageUsd={costBreakdown.maxSlippageUsd}
+          slippagePct={costBreakdown.slippagePct}
+          totalCostUsd={costBreakdown.totalCostUsd}
+          compact
+        />
       </div>
     )}
     {executionType === "limit" && (

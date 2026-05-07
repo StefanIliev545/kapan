@@ -10,12 +10,14 @@ import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { SupplyPosition } from "~~/components/SupplyPosition";
 import { BorrowPosition } from "~~/components/BorrowPosition";
 import { useAlchemixLendingPositions, type AlchemixPosition } from "~~/hooks/useAlchemixLendingPositions";
+import { useAlchemixTransmuterPositions } from "~~/hooks/useAlchemixTransmuterPositions";
 import { useAlchemixVaultYields } from "~~/hooks/useAlchemixVaultYields";
 import { useTokenPricesByAddress } from "~~/hooks/useTokenPrice";
 import { getEffectiveChainId } from "~~/utils/forkChain";
 import { encodeAlchemixContext, getAlchemixMarkets } from "~~/utils/alchemix/markets";
 import { ALCHEMIX_GATEWAY_NAME } from "~~/utils/alchemix/protocolConstants";
 import { AlchemixMarketsSection } from "./AlchemixMarketsSection";
+import { AlchemixTransmuterSection } from "./AlchemixTransmuterSection";
 import { AlchemixMultiplyModal } from "~~/components/modals/AlchemixMultiplyModal";
 import type { SwapAsset } from "~~/components/modals/SwapModalShell";
 import { useModal } from "~~/hooks/useModal";
@@ -158,11 +160,33 @@ export const AlchemixProtocolView: FC<AlchemixProtocolViewProps> = ({ chainId: p
 
   const hasPositions = positions.length > 0;
 
-  // Auto-expand when positions load
+  // Probe transmuter positions for both markets at the parent level so auto-collapse can
+  // factor them in. React-query dedupes against AlchemixTransmuterSection's identical
+  // queries via shared queryKey — no double fetch. Markets list is stable on Arbitrum
+  // (alUSD + alETH); call the hook for slot 0 and slot 1 unconditionally.
+  const marketsForChain = useMemo(() => getAlchemixMarkets(effectiveChainId), [effectiveChainId]);
+  const transmuterQ0 = useAlchemixTransmuterPositions({
+    alchemist: marketsForChain[0]?.alchemist as `0x${string}` | undefined,
+    marketId: marketsForChain[0]?.marketId ?? -1,
+    chainId: effectiveChainId,
+    enabled: !!marketsForChain[0] && !!connectedAddress,
+  });
+  const transmuterQ1 = useAlchemixTransmuterPositions({
+    alchemist: marketsForChain[1]?.alchemist as `0x${string}` | undefined,
+    marketId: marketsForChain[1]?.marketId ?? -1,
+    chainId: effectiveChainId,
+    enabled: !!marketsForChain[1] && !!connectedAddress,
+  });
+  const hasTransmuterPositions = transmuterQ0.positions.length + transmuterQ1.positions.length > 0;
+
+  // Auto-expand when *either* CDP positions or transmuter stakes load. A user can have a
+  // transmuter redemption open without an active alchemist NFT (after burning all debt) —
+  // collapsing the panel in that case would hide the only data they have.
+  const hasAnyPositions = hasPositions || hasTransmuterPositions;
   useEffect(() => {
     if (!hasLoadedOnce) return;
-    setIsCollapsed(!hasPositions);
-  }, [hasLoadedOnce, hasPositions]);
+    setIsCollapsed(!hasAnyPositions);
+  }, [hasLoadedOnce, hasAnyPositions]);
 
   const toggleCollapsed = useCallback(() => setIsCollapsed(prev => !prev), []);
 
@@ -225,29 +249,40 @@ export const AlchemixProtocolView: FC<AlchemixProtocolViewProps> = ({ chainId: p
             <LoadingSpinner />
           </div>
         ) : !hasPositions ? (
-          <div className="text-base-content/50 px-3 py-6 text-center text-xs">
-            No Alchemix positions on this network.
+          <div className="space-y-2">
+            <div className="text-base-content/50 px-3 py-6 text-center text-xs">
+              No Alchemix positions on this network.
+            </div>
+            {/* Transmuter positions can exist independently of borrow positions — a user
+                can have alAsset staked for redemption without an open alchemist NFT. Render
+                here too so they're visible even when the borrow list is empty. */}
+            <AlchemixTransmuterSection chainId={effectiveChainId} pricesRaw={pricesRaw} />
           </div>
         ) : (
-          <div className="card bg-base-200/40 border-base-300/50 border shadow-md">
-            <div className="card-body p-4">
-              <div className="divide-base-content/10 divide-y space-y-2">
-                {positions.map(p => {
-                  const yieldEntry = vaultYields?.[p.market.myt.toLowerCase()];
-                  const vaultApyPct = yieldEntry?.netApyPct ?? 0;
-                  return (
-                    <AlchemixPositionRow
-                      key={`${p.market.alchemist}-${p.tokenId}`}
-                      position={p}
-                      chainId={chainId}
-                      underlyingPriceRaw={getPriceRaw(p.market.underlying)}
-                      debtPriceRaw={getDebtPriceRaw(p.market.debtToken, p.market.underlying)}
-                      vaultApyPct={vaultApyPct}
-                    />
-                  );
-                })}
+          <div className="space-y-2">
+            <div className="card bg-base-200/40 border-base-300/50 border shadow-md">
+              <div className="card-body p-4">
+                <div className="divide-base-content/10 divide-y space-y-2">
+                  {positions.map(p => {
+                    const yieldEntry = vaultYields?.[p.market.myt.toLowerCase()];
+                    const vaultApyPct = yieldEntry?.netApyPct ?? 0;
+                    return (
+                      <AlchemixPositionRow
+                        key={`${p.market.alchemist}-${p.tokenId}`}
+                        position={p}
+                        chainId={chainId}
+                        underlyingPriceRaw={getPriceRaw(p.market.underlying)}
+                        debtPriceRaw={getDebtPriceRaw(p.market.debtToken, p.market.underlying)}
+                        vaultApyPct={vaultApyPct}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             </div>
+            {/* Separate card for transmuter positions — same width treatment, but explicitly
+                a different "kind" of position (vesting redemption rather than CDP). */}
+            <AlchemixTransmuterSection chainId={effectiveChainId} pricesRaw={pricesRaw} />
           </div>
         )}
       </CollapsibleSection>
@@ -405,17 +440,12 @@ const AlchemixPositionRow: FC<AlchemixPositionRowProps> = ({ position, chainId, 
           <span className="text-base-content/60">
             LTV: <span className={`font-semibold ${ltvHealthClass}`}>{ltvLabel}</span>
           </span>
-          {/* AL / ADL automation cogwheel disabled for alchemix until the watch-tower / orderbook
-              path stops dropping our pre-hook-funded orders. CoW's OrderBook API runs a balance
-              simulation against the order owner that DOES include pre-interactions
-              (`shared/src/order_validation.rs::simulate_token_transfer` passes
-              `interactions: app_data.interactions.pre.clone()`), but our chain — adapter funds
-              router, manager pre-hook deposits + borrows + pushes — is too elaborate / private
-              for a generic simulator to reason about, so the alchemix AL order never makes it
-              into the orderbook. Re-enable once we either (a) ship a dedicated solver bot that
-              calls `flashLoanAndSettle` directly and bypasses the orderbook validation, or
-              (b) restructure the topology so the manager genuinely owns the sellToken before
-              the orderbook simulates the trade. */}
+          {/* AL / ADL automation disabled for alchemix — CoW orderbook rejects the resulting
+              orders with `InvalidEip1271Signature` despite manager.isValidSignature returning
+              the magic value when called directly. Root cause is something specific to CoW's
+              sig validator simulation environment that we can't replicate from a plain eth_call.
+              The Loop (one-shot multiply) flow still works since it doesn't go through
+              ConditionalOrder. Re-enable once the CoW-side discrepancy is resolved. */}
           <button
             type="button"
             onClick={loopModal.open}
