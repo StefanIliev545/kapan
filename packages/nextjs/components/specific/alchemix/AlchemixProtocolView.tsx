@@ -440,17 +440,12 @@ const AlchemixPositionRow: FC<AlchemixPositionRowProps> = ({ position, chainId, 
           <span className="text-base-content/60">
             LTV: <span className={`font-semibold ${ltvHealthClass}`}>{ltvLabel}</span>
           </span>
-          {/* AL / ADL automation cogwheel disabled for alchemix until the watch-tower / orderbook
-              path stops dropping our pre-hook-funded orders. CoW's OrderBook API runs a balance
-              simulation against the order owner that DOES include pre-interactions
-              (`shared/src/order_validation.rs::simulate_token_transfer` passes
-              `interactions: app_data.interactions.pre.clone()`), but our chain — adapter funds
-              router, manager pre-hook deposits + borrows + pushes — is too elaborate / private
-              for a generic simulator to reason about, so the alchemix AL order never makes it
-              into the orderbook. Re-enable once we either (a) ship a dedicated solver bot that
-              calls `flashLoanAndSettle` directly and bypasses the orderbook validation, or
-              (b) restructure the topology so the manager genuinely owns the sellToken before
-              the orderbook simulates the trade. */}
+          {/* AL / ADL automation disabled for alchemix — CoW orderbook rejects the resulting
+              orders with `InvalidEip1271Signature` despite manager.isValidSignature returning
+              the magic value when called directly. Root cause is something specific to CoW's
+              sig validator simulation environment that we can't replicate from a plain eth_call.
+              The Loop (one-shot multiply) flow still works since it doesn't go through
+              ConditionalOrder. Re-enable once the CoW-side discrepancy is resolved. */}
           <button
             type="button"
             onClick={loopModal.open}

@@ -151,29 +151,50 @@ function buildAlchemixPreInstructions(params: AlchemixALInstructionParams): Prot
 }
 
 /**
- * Post-instructions for alchemix AL. UTXO map after manager auto-injects two ToOutputs:
- *   [0] ToOutput(actualSell, alUSD)
- *   [1] ToOutput(actualBuy, USDC)
- *   [2] ToOutput(flashAmount, USDC)        — declarative for the split
- *   [3] Subtract(1, 2) = actualBuy - flash — surplus USDC (the leverage gain)
- *   [4] Approve(in=3, alchemix-v3)         — approve only the surplus for re-deposit
- *   [5] DepositCollateral(USDC, in=3)      — re-deposits surplus as additional collateral
- *   [6] PushToken(2, adapter)              — exact flash amount → adapter for repayment
+ * Post-instructions for alchemix AL — WITHDRAW-DEFICIT topology.
+ *
+ * The pre-hook flashes an OUTSIZED amount of USDC and deposits the entire flash as
+ * collateral. CoW then sells alAsset and returns `actualBuy` USDC — which is *less* than
+ * `flashAmount` because the flash is sized larger by HEADROOM_FACTOR. Net of the deposit,
+ * `actualBuy` worth of collateral effectively stays in the position (the leverage gain). To
+ * balance the flash repay we withdraw the *deficit* (`flashAmount − actualBuy`) back out of
+ * the position; the router now holds `actualBuy + deficit = flashAmount` USDC and pushes it
+ * all to the adapter for flash repayment.
+ *
+ * Net effect on position per iteration:
+ *   collateral: +flashAmount (deposit) − deficit (withdraw) = +actualBuy
+ *   debt:       +sellAmount (mintFrom)
+ *
+ * UTXO map after manager auto-injects two ToOutputs:
+ *   [0] ToOutput(actualSell, alAsset)         — manager-injected
+ *   [1] ToOutput(actualBuy, USDC)             — manager-injected (CoW return on router)
+ *   [2] ToOutput(flashAmount, USDC)           — declarative; original flash size
+ *   [3] Subtract(2, 1) = flashAmount − actualBuy = deficit
+ *   [4] WithdrawCollateral(USDC, in=3)        — pull deficit out of position back to router
+ *   [5] PushToken(2, adapter)                 — push exact flashAmount → adapter (repay)
+ *
+ * CRITICAL invariant: flashAmount ≥ actualBuy (deficit ≥ 0). The sizing in
+ * `LTVAutomationModal.calcAutoLevFlashLoanConfig` oversizes the flash with HEADROOM_FACTOR
+ * so this holds across multi-iteration orders even as the position's MYT yield accrues.
+ *
+ * Known caveat: `WithdrawCollateral` round-trips the position NFT through the gateway, which
+ * resets Alchemist's per-position mintAllowance. Multi-iteration orders therefore consume the
+ * full mintAllowance grant on the first iteration. For single-iteration AL (target reached
+ * in one fill, which is the typical Alchemix case where peg is tight), this is irrelevant.
  */
 function buildAlchemixPostInstructions(params: AlchemixALInstructionParams): ProtocolInstruction[] {
   return [
     createRouterInstruction(encodeToOutput(params.flashAmountUsdc, params.collateralToken)),
-    createRouterInstruction(encodeSubtract(1, 2)),
-    createRouterInstruction(encodeApprove(3, ALCHEMIX_GATEWAY_NAME)),
+    createRouterInstruction(encodeSubtract(2, 1)), // flashAmount − actualBuy = deficit
     createProtocolInstruction(
       ALCHEMIX_GATEWAY_NAME,
       encodeLendingInstruction(
-        LendingOp.DepositCollateral,
+        LendingOp.WithdrawCollateral,
         params.collateralToken,
         params.userAddress,
         0n,
         params.alchemixContext,
-        3,
+        3, // input pointer = deficit
       ),
     ),
     createRouterInstruction(encodePushToken(2, params.cowAdapterAddress as Address)),
@@ -509,7 +530,13 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
             {
               target: validTrigger,
               callData: prepareCacheCalldata,
-              gasLimit: "350000",
+              // prepareCacheBySalt does 4 view-router lookups (LTV, positionValue, debtPrice,
+              // collateralPrice) plus the trigger's _computeFromParams math. Measured ~340K
+              // with warm slots in trace; cold first-iteration could push to ~600K. The
+              // previously-accepted AL order on prod orderbook used 800K here so we match
+              // that as a known-good reference. Total hook budget: 150K + 800K + 3M + 3M = 6.95M
+              // under CoW's ~8M per-order cap.
+              gasLimit: "800000",
               dappId: "kapan://flashloans/alchemix/prepare-cache",
             },
           ]
@@ -529,8 +556,33 @@ export function useAutoLeverageOrder(input: UseAutoLeverageOrderInput): UseAutoL
           operationType: "leverage-up", // Auto-leverage operation
           protocol,
           // Alchemix's pre-hook is non-empty (deposit + borrow + push); Aave/Morpho's is empty.
-          preHookGasLimit: isAlchemix ? "1500000" : "500000",
-          postHookGasLimit: "1500000", // Post-hook: deposit collateral + borrow debt + push (Venus is gas-heavy)
+          // Alchemix pre-hook is gas-heavy: flash-sweep + MYT (Morpho V2 metavault) deposit
+          // (~360K, includes Allocate to underlying market) + alchemist.deposit (sync + CDP
+          // update, ~250K) + mintFrom (~200K) + push. Solady's reentrancy guard inside the
+          // alchemist needs ~4K headroom on entry; with EIP-150 1/64 budget loss per subcall,
+          // 1.5M was running out and surfacing as ReentrancySentryOOG inside alchemist.deposit.
+          // 4M leaves room for cold sloads on first iteration. Aave/Morpho-shaped flows have
+          // empty preInstructions and only need the manager's bookkeeping.
+          // Alchemix budgets sized to fit under CoW orderbook's `max_gas_per_order` cap (~8M
+          // total per order including base settle ~250K and all hooks). With 4M+4M the order
+          // got rejected with `TooMuchGas`. Measured budgets:
+          //   - pre-hook actual usage ≈ 1.7-2M (MYT.deposit ~360K + alchemist.deposit ~600K
+          //     incl. Solady guard + sync + mintFrom ~250K + transfers/router ~400K)
+          //   - post-hook actual usage ≈ similar profile (alchemist.withdraw + MYT.redeem +
+          //     NFT round-trip + Morpho deallocate)
+          // 3M each leaves ~1M headroom on each side for cold sloads and warm-state edge
+          // cases; total hooks 3M+3M+400K(trigger)+150K(fund)=6.55M, comfortably under 8M.
+          // Restoring the gas budgets that produced the order CoW orderbook ACCEPTED
+          // (`0x32ac3647...` / appData `0x82e54785...`):
+          //   pre = 4M, post = 1.5M, trigger prepareCacheBySalt = 800K (the value below).
+          // That order entered the orderbook (status=open) and only failed to fill — likely
+          // because solver settle hit OOG inside the post-hook with 1.5M against an
+          // alchemist.withdraw + MYT.redeem + NFT round-trip + Morpho deallocate path. Bumping
+          // post past 1.5M gave `TooMuchGas` (8M+ total). The user's case is single-iteration
+          // (target ≈ trigger + 200bps from current LTV, fills in one shot), so multi-iter
+          // mintAllowance reset isn't relevant.
+          preHookGasLimit: isAlchemix ? "4000000" : "500000",
+          postHookGasLimit: isAlchemix ? "1500000" : "1500000",
           flashLoan: flashLoanAppDataConfig,
           extraPreHooks,
         },

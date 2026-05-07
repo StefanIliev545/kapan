@@ -22499,6 +22499,11 @@ const TransientAutoLeverageTriggerAbi = [
         "internalType": "address",
         "name": "_hooksTrampoline",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_settlement",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -22784,6 +22789,19 @@ const TransientAutoLeverageTriggerAbi = [
     "name": "prepareCacheBySalt",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "settlement",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -23523,12 +23541,12 @@ const contracts = {
       inheritedFunctions: {"owner":"@openzeppelin/contracts/access/Ownable.sol","renounceOwnership":"@openzeppelin/contracts/access/Ownable.sol","transferOwnership":"@openzeppelin/contracts/access/Ownable.sol"},
     },
     KapanConditionalOrderHandler: {
-      address: "0x537D18417bb2C94701CdB0D1d3730B3536869D19",
+      address: "0x7D9045e3cf538eF1eb85BddA09B03973099475BF",
       abi: KapanConditionalOrderHandlerAbi,
       inheritedFunctions: {"supportsInterface":"@openzeppelin/contracts/utils/introspection/IERC165.sol"},
     },
     KapanConditionalOrderManager: {
-      address: "0x3B59E55AeE49a369A950E215B1C11e846F9Bd731",
+      address: "0xA1AA1B2985031826750B2d6409AFC38f3B5b22AE",
       abi: KapanConditionalOrderManagerAbi,
       inheritedFunctions: {"owner":"@openzeppelin/contracts/access/Ownable.sol","renounceOwnership":"@openzeppelin/contracts/access/Ownable.sol","transferOwnership":"@openzeppelin/contracts/access/Ownable.sol","isValidSignature":"contracts/v2/interfaces/cow/IERC1271.sol"},
     },
@@ -23613,7 +23631,7 @@ const contracts = {
       inheritedFunctions: {"authorize":"contracts/v2/interfaces/IGateway.sol","deauthorize":"contracts/v2/interfaces/IGateway.sol","processLendingInstruction":"contracts/v2/interfaces/IGateway.sol","ROUTER":"contracts/gateways/ProtocolGateway.sol","owner":"@openzeppelin/contracts/access/Ownable.sol","renounceOwnership":"@openzeppelin/contracts/access/Ownable.sol","transferOwnership":"@openzeppelin/contracts/access/Ownable.sol"},
     },
     TransientAutoLeverageTrigger: {
-      address: "0x1A2dEeFFC1e0C497E6dFC1328aAb5BB66dDda091",
+      address: "0x570e95e8355765EacE39DEfC004092F84C8d9611",
       abi: TransientAutoLeverageTriggerAbi,
       inheritedFunctions: {"calculateExecution":"contracts/v2/interfaces/IOrderTrigger.sol","isComplete":"contracts/v2/interfaces/IOrderTrigger.sol","shouldExecute":"contracts/v2/interfaces/IOrderTrigger.sol","triggerName":"contracts/v2/interfaces/IOrderTrigger.sol"},
     },

@@ -81,8 +81,10 @@ interface IKapanConditionalOrderManager {
 ///
 /// Security
 /// --------
-/// - `prepareCache` is `onlyTrampoline` — only the CoW hooks trampoline can populate the
-///   cache. EOAs and arbitrary contracts can't poison it.
+/// - `prepareCache` is gated to the CoW HooksTrampoline OR the GPv2Settlement contract.
+///   Settlement is allowed because the orderbook's balance simulation runs appData hooks
+///   with `msg.sender == settlement` (delegatecall from Balances.sol). Both callers are
+///   trusted CoW infrastructure; arbitrary EOAs/contracts still can't poison the cache.
 /// - The cache key includes the full `staticData`, `owner`, and `iterationCount`, so distinct
 ///   orders / users / iterations get isolated transient slots — no cross-pollution possible
 ///   even when multiple orders settle in one batch.
@@ -122,6 +124,13 @@ contract TransientAutoLeverageTrigger is IOrderTrigger {
     IKapanViewRouter public immutable viewRouter;
     IKapanConditionalOrderManager public immutable orderManager;
     address public immutable hooksTrampoline;
+    /// @notice GPv2Settlement contract. Permitted as a `prepareCacheBySalt` caller in addition
+    ///         to the HooksTrampoline because the CoW orderbook's balance simulation
+    ///         (Balances.sol, invoked via `simulateDelegatecall` from Settlement) executes
+    ///         appData pre-interactions with `msg.sender == address(settlement)` — bypassing
+    ///         the trampoline. Allowing Settlement here lets the simulator successfully
+    ///         populate the transient cache so downstream hooks behave consistently.
+    address public immutable settlement;
 
     // ============ Structs ============
 
@@ -141,13 +150,24 @@ contract TransientAutoLeverageTrigger is IOrderTrigger {
 
     // ============ Constructor ============
 
-    constructor(address _viewRouter, address _orderManager, address _hooksTrampoline) {
-        if (_viewRouter == address(0) || _orderManager == address(0) || _hooksTrampoline == address(0)) {
+    constructor(
+        address _viewRouter,
+        address _orderManager,
+        address _hooksTrampoline,
+        address _settlement
+    ) {
+        if (
+            _viewRouter == address(0) ||
+            _orderManager == address(0) ||
+            _hooksTrampoline == address(0) ||
+            _settlement == address(0)
+        ) {
             revert InvalidParams();
         }
         viewRouter = IKapanViewRouter(_viewRouter);
         orderManager = IKapanConditionalOrderManager(_orderManager);
         hooksTrampoline = _hooksTrampoline;
+        settlement = _settlement;
     }
 
     // ============ Trampoline-driven cache writer ============
@@ -161,7 +181,7 @@ contract TransientAutoLeverageTrigger is IOrderTrigger {
     ///         signable. Restricted to the CoW hooks trampoline so arbitrary callers can't
     ///         poison the cache.
     function prepareCacheBySalt(address user, bytes32 salt) external {
-        if (msg.sender != hooksTrampoline) revert NotTrampoline();
+        if (msg.sender != hooksTrampoline && msg.sender != settlement) revert NotTrampoline();
 
         bytes32 orderHash = orderManager.userSaltToOrderHash(user, salt);
         if (orderHash == bytes32(0)) return; // Solver supplied a salt with no order — no-op rather than revert.

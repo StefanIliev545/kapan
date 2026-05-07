@@ -180,15 +180,18 @@ export interface BasePositionProps {
 
 
 /**
- * Format a USD price for display under the token symbol. Compact (`$1.23K`, `$1.23M`),
- * sub-cent prices show with extra precision so micro-cap tokens don't all read `$0.00`.
+ * Format a USD price for display under the token symbol. 3 decimals across the board so
+ * sub-dollar tokens (alUSD discount, stablecoin de-pegs) read precisely without forcing
+ * users to mentally extrapolate from `$0.97`. K/M abbreviation kicks in above $1k so prices
+ * like $2.4k WETH stay compact instead of bloating to `$2,400.000`.
  */
 function formatPriceForSubtitle(priceUsd: number): string | null {
   if (!isFinite(priceUsd) || priceUsd <= 0) return null;
-  if (priceUsd >= 1) return formatCurrencyCompact(priceUsd);
-  if (priceUsd >= 0.01) return `$${priceUsd.toFixed(2)}`;
-  if (priceUsd >= 0.0001) return `$${priceUsd.toFixed(4)}`;
-  return `<$0.0001`;
+  if (priceUsd >= 1_000_000) return `$${(priceUsd / 1_000_000).toFixed(3)}M`;
+  if (priceUsd >= 1_000) return `$${(priceUsd / 1_000).toFixed(3)}K`;
+  if (priceUsd >= 0.001) return `$${priceUsd.toFixed(3)}`;
+  if (priceUsd >= 0.0000001) return `$${priceUsd.toFixed(7)}`; // micro-caps
+  return `<$0.0000001`;
 }
 
 /** Token name display - handles renderName, PT tokens, and fallback. Shared by mobile/desktop. */
