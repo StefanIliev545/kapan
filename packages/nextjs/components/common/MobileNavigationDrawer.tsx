@@ -61,7 +61,7 @@ export const MobileNavigationDrawer = ({
                   <div className="relative size-10">
                     <Image
                       alt="Kapan logo"
-                      className="object-contain opacity-60"
+                      className="object-contain"
                       fill
                       src="/seal-logo.png"
                     />

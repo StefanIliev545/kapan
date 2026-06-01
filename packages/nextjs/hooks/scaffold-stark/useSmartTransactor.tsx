@@ -3,7 +3,7 @@ import { usePaymasterGasTokens } from "@starknet-react/core";
 import { useTransactor } from "./useTransactor";
 import { usePaymasterTransactor } from "./usePaymasterTransactor";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
-import { universalStrkAddress } from "~~/utils/Constants";
+import { universalStrkAddress } from "~~/utils/starkConstants";
 
 /**
  * Smart transactor that automatically chooses between regular and paymaster transactions

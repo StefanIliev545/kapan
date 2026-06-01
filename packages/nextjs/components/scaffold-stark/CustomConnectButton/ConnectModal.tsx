@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useConnect } from "@starknet-react/core";
 import { type StarknetkitConnector, useStarknetkitConnectModal } from "starknetkit";
-import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
+import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/starkConstants";
 
 const ConnectModal = () => {
   const { connect, connectors } = useConnect();

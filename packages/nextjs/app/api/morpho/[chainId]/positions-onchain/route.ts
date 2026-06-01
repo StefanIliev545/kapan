@@ -26,7 +26,9 @@ interface MorphoMarketState {
 }
 
 interface MorphoMarket {
-  id: string;
+  // `uniqueKey` is our internal name for the market's bytes32 id. The Morpho
+  // GraphQL API now exposes this as `marketId` (the `id`/`uniqueKey` fields were
+  // removed); see mapApiMarket where the API shape is normalized to this one.
   uniqueKey: string;
   collateralAsset: MorphoMarketAsset | null;
   loanAsset: MorphoMarketAsset;
@@ -150,8 +152,7 @@ const LISTED_MARKETS_QUERY = `
       }
     ) {
       items {
-        id
-        uniqueKey
+        marketId
         collateralAsset {
           address
           symbol
@@ -184,14 +185,19 @@ const LISTED_MARKETS_QUERY = `
   }
 `;
 
+// Uses the plural `marketPositions` root query (the old `userByAddress.marketPositions`
+// traversal and the per-position `supplyAssets`/`borrowAssets`/`collateral` fields were
+// removed; amounts now live under `state`, which mapApiPosition flattens back out).
 const USER_POSITIONS_QUERY = `
   query GetUserPositions($userAddress: String!, $chainId: Int!) {
-    userByAddress(address: $userAddress, chainId: $chainId) {
-      address
-      marketPositions {
+    marketPositions(
+      first: 500
+      where: { userAddress_in: [$userAddress], chainId_in: [$chainId] }
+    ) {
+      items {
+        healthFactor
         market {
-          id
-          uniqueKey
+          marketId
           collateralAsset {
             address
             symbol
@@ -210,19 +216,18 @@ const USER_POSITIONS_QUERY = `
           irmAddress
           lltv
           state {
-            supplyAssets
-            borrowAssets
             utilization
             supplyApy
             borrowApy
           }
         }
-        supplyShares
-        supplyAssets
-        borrowShares
-        borrowAssets
-        collateral
-        healthFactor
+        state {
+          supplyShares
+          supplyAssets
+          borrowShares
+          borrowAssets
+          collateral
+        }
       }
     }
   }
@@ -236,6 +241,41 @@ function chunkArray<T>(array: T[], size: number): T[][] {
     chunks.push(array.slice(i, i + size));
   }
   return chunks;
+}
+
+/**
+ * Normalize a market object from the Morpho GraphQL API (keyed by `marketId`) into our
+ * internal MorphoMarket shape (keyed by `uniqueKey`). Shared by the listed-markets query
+ * and the market embedded in each user position. Input is the raw `any` JSON from the API.
+ */
+function mapApiMarket(m: any): MorphoMarket {
+  return {
+    uniqueKey: m.marketId,
+    collateralAsset: m.collateralAsset ?? null,
+    loanAsset: m.loanAsset,
+    oracle: m.oracle ?? null,
+    irmAddress: m.irmAddress,
+    lltv: m.lltv,
+    state: m.state,
+  };
+}
+
+/**
+ * Flatten a `marketPositions.items` entry into our internal MorphoPosition. The API nests
+ * amounts under `state` as BigInt-strings; we coerce asset/collateral balances to numbers
+ * (matching the on-chain path, which downstream code relies on) and keep shares as strings.
+ */
+function mapApiPosition(item: any): MorphoPosition {
+  const state = item.state ?? {};
+  return {
+    market: mapApiMarket(item.market),
+    supplyShares: String(state.supplyShares ?? "0"),
+    supplyAssets: Number(state.supplyAssets ?? 0),
+    borrowShares: String(state.borrowShares ?? "0"),
+    borrowAssets: Number(state.borrowAssets ?? 0),
+    collateral: Number(state.collateral ?? 0),
+    healthFactor: item.healthFactor ?? null,
+  };
 }
 
 function marketToParams(market: MorphoMarket): MarketParams {
@@ -299,7 +339,7 @@ async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
       return [];
     }
 
-    return data.data?.markets?.items || [];
+    return (data.data?.markets?.items || []).map(mapApiMarket);
   } catch (error) {
     console.error("[positions-onchain] Failed to fetch markets:", error);
     return [];
@@ -329,7 +369,7 @@ async function fetchGraphQLPositions(
       return [];
     }
 
-    return data.data?.userByAddress?.marketPositions || [];
+    return (data.data?.marketPositions?.items || []).map(mapApiPosition);
   } catch (error) {
     console.error("[positions-onchain] Failed to fetch GraphQL positions:", error);
     return [];

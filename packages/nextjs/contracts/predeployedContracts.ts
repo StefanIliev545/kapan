@@ -11,7 +11,7 @@ import {
     universalStrkAddress,
     sepoliaMainnetStrkClassHash,
     universalErc20Abi,
-  } from "../utils/Constants";
+  } from "../utils/starkConstants";
   
   const preDeployedContracts = {
     devnet: {
