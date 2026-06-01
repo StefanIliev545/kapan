@@ -9,7 +9,7 @@ import {
   toAnnualRates,
   type TokenMetadata,
 } from "~~/utils/protocols";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { resolveTokenDisplayName } from "~~/contracts/tokenNameFallbacks";
 
 import { VESU_V1_POOLS } from "./pools";
 
@@ -32,8 +32,7 @@ export const VesuMarkets: FC<VesuMarketsProps> = ({ supportedAssets, viewMode, s
     return (supportedAssets as ContractResponse).map(asset => {
       const address = `0x${BigInt(asset.address).toString(16).padStart(64, "0")}`;
       const raw = typeof (asset as any).symbol === "bigint" ? feltToString((asset as any).symbol) : String((asset as any).symbol ?? "");
-      console.log("raw:", raw, "fallback:", getTokenNameFallback(address));
-      const symbol = raw && raw.trim().length > 0 ? raw : getTokenNameFallback(address) ?? raw;
+      const symbol = resolveTokenDisplayName(raw, address);
       const { borrowAPR, supplyAPY } = toAnnualRates(
         asset.fee_rate,
         asset.total_nominal_debt,

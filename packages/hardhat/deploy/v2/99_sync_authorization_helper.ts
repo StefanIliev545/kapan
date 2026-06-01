@@ -1,6 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { waitForPendingTxs } from "../../utils/safeExecute";
+import { ALCHEMIX_GATEWAY_NAME } from "../../utils/alchemixConstants";
 
 /**
  * Final sync script - ensures all contract links are properly configured.
@@ -94,6 +95,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     { name: "pendle", deploymentName: "PendleGateway" },
     { name: "spark", deploymentName: "SparkGatewayWrite" },
     { name: "euler", deploymentName: "EulerGatewayWrite" },
+    { name: ALCHEMIX_GATEWAY_NAME, deploymentName: "AlchemixGatewayWrite" },
   ];
 
   let syncedCount = 0;
@@ -175,6 +177,7 @@ func.dependencies = [
   "SparkGatewayWrite",
   "MorphoBlueGateway",
   "EulerGateway",
+  "AlchemixGateway",
   "UiHelper",
   "KapanConditionalOrderManager",
   "KapanConditionalOrderHandler",

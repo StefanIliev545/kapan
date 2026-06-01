@@ -14,7 +14,7 @@ import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import { useVesuAssets } from "~~/hooks/useVesuAssets";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import { feltToString } from "~~/utils/protocols";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { resolveTokenDisplayName } from "~~/contracts/tokenNameFallbacks";
 import {
   toHexAddress,
   normalizePrice,
@@ -60,53 +60,59 @@ export const useVesuLendingPositions = (
 ): UseVesuLendingPositionsResult => {
   const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError } = useVesuAssets(poolId);
 
-  const {
-    data: userPositionsPart1,
-    error: positionsError1,
-    isFetching: isFetching1,
-    isLoading: isLoading1,
-    refetch: refetchPositionsPart1,
-  } = useScaffoldReadContract({
+  // See note on V2 hook — paginate into small windows to stay under Starknet's
+  // per-call step budget. Each window reads `pool.context()` per pair.
+  const part0 = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_all_positions_range",
-    args: [userAddress, poolId, 0n, 3n],
+    args: [userAddress, poolId, 0n, 2n],
+    watch: true,
+  });
+  const part1 = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_all_positions_range",
+    args: [userAddress, poolId, 2n, 4n],
+    watch: true,
+  });
+  const part2 = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_all_positions_range",
+    args: [userAddress, poolId, 4n, 6n],
+    watch: true,
+  });
+  const part3 = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_all_positions_range",
+    args: [userAddress, poolId, 6n, 8n],
+    watch: true,
+  });
+  const part4 = useScaffoldReadContract({
+    contractName: "VesuGateway",
+    functionName: "get_all_positions_range",
+    args: [userAddress, poolId, 8n, 10n],
     watch: true,
   });
 
-  const {
-    data: userPositionsPart2,
-    error: positionsError2,
-    isFetching: isFetching2,
-    isLoading: isLoading2,
-    refetch: refetchPositionsPart2,
-  } = useScaffoldReadContract({
-    contractName: "VesuGateway",
-    functionName: "get_all_positions_range",
-    args: [userAddress, poolId, 3n, 10n],
-    watch: true,
-  });
+  const parts = [part0, part1, part2, part3, part4] as const;
 
   useEffect(() => {
-    if (positionsError1) {
-      console.error("Error fetching user positions (part 1):", positionsError1);
-    }
-  }, [positionsError1]);
+    parts.forEach((p, idx) => {
+      if (p.error) {
+        console.error(`Error fetching V1 user positions (part ${idx}):`, p.error);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [part0.error, part1.error, part2.error, part3.error, part4.error]);
 
-  useEffect(() => {
-    if (positionsError2) {
-      console.error("Error fetching user positions (part 2):", positionsError2);
-    }
-  }, [positionsError2]);
+  const mergedUserPositions = useMemo(
+    () => parts.flatMap(p => parsePositionTuples(p.data)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [part0.data, part1.data, part2.data, part3.data, part4.data],
+  );
 
-  const mergedUserPositions = useMemo(() => {
-    const firstBatch = parsePositionTuples(userPositionsPart1);
-    const secondBatch = parsePositionTuples(userPositionsPart2);
-    return [...firstBatch, ...secondBatch];
-  }, [userPositionsPart1, userPositionsPart2]);
-
-  const isLoadingPositions = isLoading1 || isLoading2;
-  const isFetchingPositions = isFetching1 || isFetching2;
-  const positionsError = positionsError1 || positionsError2;
+  const isLoadingPositions = parts.some(p => p.isLoading);
+  const isFetchingPositions = parts.some(p => p.isFetching);
+  const positionsError = parts.find(p => p.error)?.error;
 
   // Use shared loading state hook
   const { hasLoadedOnce, isUpdating, setCachedData, getCachedData } = usePositionLoadingState({
@@ -120,9 +126,9 @@ export const useVesuLendingPositions = (
 
   const refetchPositions = useCallback(() => {
     if (!userAddress) return;
-    refetchPositionsPart1();
-    refetchPositionsPart2();
-  }, [userAddress, refetchPositionsPart1, refetchPositionsPart2]);
+    parts.forEach(p => p.refetch());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userAddress, part0.refetch, part1.refetch, part2.refetch, part3.refetch, part4.refetch]);
 
   const refetchPositionsRef = useRef(refetchPositions);
 
@@ -152,14 +158,18 @@ export const useVesuLendingPositions = (
 
   const suppliablePositions = useMemo<ProtocolPosition[]>(() => {
     const zeroCounterpart = normalizeStarknetAddress(0n);
+    // Suppliable = union(collaterals, debts). A pool's debt-only asset (e.g.
+    // USDC on Re7 Ecosystem V1) is still passively lent — users need to be
+    // able to pick it as a deposit target. The gateway's allowlists are
+    // UI-only hints anyway; the pool/extension is the real gatekeeper.
     return assetsWithRates
-      .filter(asset => collateralSet?.has(toHexAddress(asset.address)))
+      .filter(asset => {
+        const a = toHexAddress(asset.address);
+        return collateralSet?.has(a) || debtSet?.has(a);
+      })
       .map(asset => {
       const address = toHexAddress(asset.address);
-      let symbol = feltToString(asset.symbol);
-      if (!symbol || symbol.trim().length === 0) {
-        symbol = getTokenNameFallback(address) ?? "UNKNOWN";
-      }
+      const symbol = resolveTokenDisplayName(feltToString(asset.symbol), address);
       const price = normalizePrice(asset.price);
 
       return {
@@ -177,17 +187,14 @@ export const useVesuLendingPositions = (
         },
       };
       });
-  }, [assetsWithRates, poolId, collateralSet]);
+  }, [assetsWithRates, poolId, collateralSet, debtSet]);
 
   const borrowablePositions = useMemo<ProtocolPosition[]>(() => {
     return assetsWithRates
       .filter(asset => debtSet?.has(toHexAddress(asset.address)))
       .map(asset => {
       const address = toHexAddress(asset.address);
-      let symbol = feltToString(asset.symbol);
-      if (!symbol || symbol.trim().length === 0) {
-        symbol = getTokenNameFallback(address) ?? "UNKNOWN";
-      }
+      const symbol = resolveTokenDisplayName(feltToString(asset.symbol), address);
       const price = normalizePrice(asset.price);
 
       return {
@@ -215,10 +222,10 @@ export const useVesuLendingPositions = (
       const collateralMetadata = assetMap.get(collateralAddress);
       if (!collateralMetadata) return [];
 
-      let collateralSymbol = feltToString(collateralMetadata.symbol);
-      if (!collateralSymbol || collateralSymbol.trim().length === 0) {
-        collateralSymbol = getTokenNameFallback(collateralAddress) ?? "UNKNOWN";
-      }
+      const collateralSymbol = resolveTokenDisplayName(
+        feltToString(collateralMetadata.symbol),
+        collateralAddress,
+      );
       const collateralPrice = normalizePrice(collateralMetadata.price);
       const collateralUsd = computeUsdValue(positionData.collateral_amount, collateralMetadata.decimals, collateralPrice);
       const formattedCollateral = formatUnits(positionData.collateral_amount, collateralMetadata.decimals);
@@ -267,11 +274,7 @@ export const useVesuLendingPositions = (
       let debtUsd: number | null = null;
 
       if (debtMetadata) {
-        let resolvedDebtSymbol = feltToString(debtMetadata.symbol);
-        if (!resolvedDebtSymbol || resolvedDebtSymbol.trim().length === 0) {
-          resolvedDebtSymbol = getTokenNameFallback(debtAddress) ?? "UNKNOWN";
-        }
-        debtSymbol = resolvedDebtSymbol;
+        debtSymbol = resolveTokenDisplayName(feltToString(debtMetadata.symbol), debtAddress);
         const debtPrice = normalizePrice(debtMetadata.price);
 
         debtUsd = computeUsdValue(positionData.nominal_debt, debtMetadata.decimals, debtPrice);

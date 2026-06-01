@@ -32,11 +32,13 @@ import {
   encodeFlashLoan,
   encodeSplit,
   encodeAdd,
+  encodeSubtract,
   LendingOp,
   normalizeProtocolName,
 } from "~~/utils/v2/instructionHelpers";
 import { FlashLoanProvider, FlashLoanVersion, versionToProviderEnum } from "~~/utils/flashLoan";
 import { ERC20ABI } from "~~/contracts/externalContracts";
+import { ALCHEMIX_GATEWAY_NAME } from "~~/utils/alchemix/protocolConstants";
 import { logger } from "~~/utils/logger";
 import { AAVE_FEE_BUFFER_BPS, type UseKapanRouterV2Options } from "./types";
 
@@ -55,6 +57,19 @@ export type BuildMultiplyFlowParams = {
   flashLoanProvider?: FlashLoanProvider;
   market?: Address;
   morphoContext?: string;  // Pre-encoded Morpho market context (from encodeMorphoContext)
+  alchemixContext?: string;  // Pre-encoded Alchemix context (marketId, tokenId) — see encodeAlchemixContext
+  /**
+   * Alchemix-only: amount of alAsset (debt token) to borrow against the existing position,
+   * sized so that swapping it to underlying produces >= flashRepay (= flashAmount + provider fee).
+   * Frontend computes this from the current quote rate plus a slippage buffer.
+   * Required when protocolName === ALCHEMIX_GATEWAY_NAME.
+   */
+  alchemixBorrowAmount?: string;
+  /**
+   * Alchemix-only: the exact USDC amount the swap MUST produce (encoded as `minOut` inside
+   * `swapData` and used as the surplus computation reference). Equals `flashAmount + fee`.
+   */
+  alchemixFlashRepay?: string;
   includeRefundPush?: boolean;
   swapRouter?: "oneinch" | "kyber" | "pendle";
   // Zap mode: deposit debt token and swap everything (deposit + flash loan) to collateral
@@ -125,9 +140,10 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
     const isCompound = normalizedProtocol === "compound";
     const isMorpho = normalizedProtocol === "morpho-blue";
     const isEuler = normalizedProtocol === "euler";
-    // Morpho, Compound, and Euler use DepositCollateral for collateral deposits
+    const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
+    // Morpho, Compound, Euler and Alchemix use DepositCollateral for collateral deposits
     // Other protocols use Deposit
-    const lendingOp = (isCompound || isMorpho || isEuler) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    const lendingOp = (isCompound || isMorpho || isEuler || isAlchemix) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
     return [
       createRouterInstruction(encodePullToken(amountBigInt, tokenAddress, userAddress)),
@@ -190,7 +206,8 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
     const isCompound = normalizedProtocol === "compound";
     const isMorpho = normalizedProtocol === "morpho-blue";
     const isEuler = normalizedProtocol === "euler";
-    const depositOp = (isCompound || isMorpho || isEuler) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
+    const depositOp = (isCompound || isMorpho || isEuler || isAlchemix) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
     return [
       // 0. Pull collateral from user → Output[0]
@@ -516,6 +533,9 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
       flashLoanProvider = FlashLoanProvider.BalancerV2,
       market,
       morphoContext,
+      alchemixContext,
+      alchemixBorrowAmount,
+      alchemixFlashRepay,
       includeRefundPush = true,
       swapRouter = "oneinch",
       zapMode = false,
@@ -525,10 +545,114 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const isCompound = normalizedProtocol === "compound";
     const isMorpho = normalizedProtocol === "morpho-blue";
-    // Use pre-encoded Morpho context if provided, otherwise Compound market encoding, otherwise empty
-    const context = isMorpho && morphoContext ? morphoContext : (isCompound && market ? encodeCompoundMarket(market) : "0x");
-    // Morpho and Compound use DepositCollateral, others use Deposit
-    const depositOp = (isCompound || isMorpho) ? LendingOp.DepositCollateral : LendingOp.Deposit;
+    const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
+
+    // Alchemix multiply uses a fundamentally different topology because alAssets have no
+    // flash-loan liquidity: we flash-loan COLLATERAL (USDC), deposit it, borrow alAsset
+    // against the existing position, then swap alAsset → collateral exact-in (with minOut
+    // pinned to flashRepay) to clear the flash. Surplus collateral is the user's leverage.
+    if (isAlchemix) {
+      if (!alchemixContext) {
+        logger.error("[buildMultiplyFlow] alchemix requires alchemixContext");
+        return [];
+      }
+      if (!alchemixBorrowAmount || !alchemixFlashRepay) {
+        logger.error("[buildMultiplyFlow] alchemix requires alchemixBorrowAmount + alchemixFlashRepay");
+        return [];
+      }
+
+      const marginRaw = parseUnits(initialCollateral, collateralDecimals);
+      // For Alchemix, `flashLoanAmount` is interpreted in COLLATERAL decimals (not debt).
+      const flashAmountRaw = parseUnits(flashLoanAmount, collateralDecimals);
+      const borrowAmountRaw = parseUnits(alchemixBorrowAmount, debtDecimals);
+      const flashRepayRaw = parseUnits(alchemixFlashRepay, collateralDecimals);
+
+      // Swap context: (tokenOut=collateral, minOut=flashRepay, swapData encoding alUSD→USDC).
+      // The swap is exact-in with minOut enforced — if the actual rate undershoots the buffer
+      // baked into borrowAmount, the swap reverts atomically and the whole tx unwinds.
+      const swapContext = encodeAbiParameters(
+        [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+        [collateralToken as Address, flashRepayRaw, swapData as Hex],
+      );
+
+      const hasMargin = marginRaw > 0n;
+
+      // Output index map. With margin (output indexes 0-10):
+      //   [0] margin (PullToken), [1] flash template (ToOutput), [2] flash repay (FlashLoan),
+      //   [3] total collateral (Add), [4] approve dummy (initial deposit), deposit (no output),
+      //   [5] alUSD borrowed (Borrow), [6] approve dummy (swap),
+      //   [7] usdc out, [8] alUSD refund (=0 for exact-in), [9] surplus = [7]-[2],
+      //   [10] approve dummy (surplus deposit), surplus deposit (no output)
+      // Without margin: indexes shift down by 2 (no PullToken, no Add).
+      // We deposit the surplus back into the position rather than refunding to the user — at
+      // higher leverage the leftover post-swap collateral is non-trivial (often $5-$50 on a
+      // $1k loop) and folding it in keeps the user's effective LTV closer to the slider value.
+      const flashTemplateIdx = hasMargin ? 1 : 0;
+      const flashRepayIdx = hasMargin ? 2 : 1;
+      const depositInputIdx = hasMargin ? 3 : flashTemplateIdx;
+      const borrowOutIdx = hasMargin ? 5 : 3;
+      const usdcOutIdx = hasMargin ? 7 : 5;
+      const surplusIdx = hasMargin ? 9 : 7;
+
+      const flow: ProtocolInstruction[] = [];
+
+      if (hasMargin) {
+        flow.push(createRouterInstruction(encodePullToken(marginRaw, collateralToken, userAddress)));
+      }
+
+      flow.push(
+        createRouterInstruction(encodeToOutput(flashAmountRaw, collateralToken)),
+        createRouterInstruction(encodeFlashLoan(flashLoanProvider, flashTemplateIdx)),
+      );
+
+      if (hasMargin) {
+        flow.push(createRouterInstruction(encodeAdd(0, flashTemplateIdx)));
+      }
+
+      flow.push(
+        // Approve combined collateral for alchemix gateway, then deposit into the existing tokenId.
+        createRouterInstruction(encodeApprove(depositInputIdx, ALCHEMIX_GATEWAY_NAME)),
+        createProtocolInstruction(
+          ALCHEMIX_GATEWAY_NAME,
+          encodeLendingInstruction(LendingOp.DepositCollateral, collateralToken, userAddress, 0n, alchemixContext, depositInputIdx),
+        ),
+        // Borrow alUSD against the position (mintFrom under the hood).
+        createProtocolInstruction(
+          ALCHEMIX_GATEWAY_NAME,
+          encodeLendingInstruction(LendingOp.Borrow, debtToken, userAddress, borrowAmountRaw, alchemixContext, 999),
+        ),
+        // Approve borrowed alAsset for the swap router and execute alAsset → collateral swap.
+        createRouterInstruction(encodeApprove(borrowOutIdx, swapRouter)),
+        createProtocolInstruction(
+          swapRouter,
+          encodeLendingInstruction(LendingOp.Swap, debtToken, userAddress, 0n, swapContext, borrowOutIdx),
+        ),
+        // Compute surplus collateral (usdcOut - flashRepay) as a virtual UTXO. Leaves exactly
+        // `flashRepay` collateral on the router for the flash provider to pull.
+        createRouterInstruction(encodeSubtract(usdcOutIdx, flashRepayIdx)),
+        // Approve + deposit surplus into the same position so it lands as collateral instead
+        // of being refunded to the wallet. The earlier approve at instruction [4] was for the
+        // initial collateral and is fully consumed by the first DepositCollateral, so a fresh
+        // approve referencing `surplusIdx` is required here.
+        createRouterInstruction(encodeApprove(surplusIdx, ALCHEMIX_GATEWAY_NAME)),
+        createProtocolInstruction(
+          ALCHEMIX_GATEWAY_NAME,
+          encodeLendingInstruction(LendingOp.DepositCollateral, collateralToken, userAddress, 0n, alchemixContext, surplusIdx),
+        ),
+      );
+
+      logger.debug(`[buildMultiplyFlow:alchemix] ${flow.length} instructions, hasMargin=${hasMargin}`);
+      return flow;
+    }
+    // Use pre-encoded protocol context based on protocol — Alchemix takes priority for its market,
+    // then Morpho's pre-encoded context, then Compound's market encoding, otherwise empty.
+    const context = isAlchemix && alchemixContext
+      ? alchemixContext
+      : isMorpho && morphoContext
+        ? morphoContext
+        : (isCompound && market ? encodeCompoundMarket(market) : "0x");
+    // Morpho, Compound and Alchemix use DepositCollateral, others use Deposit
+    const depositOp = (isCompound || isMorpho || isAlchemix) ? LendingOp.DepositCollateral : LendingOp.Deposit;
 
     const initialCollateralAmount = parseUnits(initialCollateral, collateralDecimals);
     const flashAmount = parseUnits(flashLoanAmount, debtDecimals);
@@ -673,6 +797,101 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
   ): ProtocolInstruction[] => {
     if (!userAddress) return [];
     const normalizedProtocol = normalizeProtocolName(protocolName);
+
+    // ============================================================
+    // Alchemix V3 — inverted topology
+    // ============================================================
+    // Alchemix's debt token (alAsset) has no flash-loan liquidity, so the standard
+    // "flash debt → repay → swap collateral to debt" pattern doesn't work. We instead
+    // flash the COLLATERAL, swap exact-in to alAsset (with minOut sized to clear unearmarked
+    // debt), burn it via Repay/Burn, withdraw all collateral (no LTV constraint once debt = 0),
+    // then repay the flash from the withdrawn collateral. Surplus collateral is the user's exit.
+    //
+    // BONUS: Because alAsset trades at a discount to face value, swapping at market rate uses
+    // less collateral than the protocol's face-value debt — the user keeps the peg-discount
+    // arbitrage as extra collateral retained.
+    if (normalizedProtocol === ALCHEMIX_GATEWAY_NAME) {
+      // Flash → swap → repay → withdraw → flash-repay topology.
+      //
+      // Why a flash loan: ordering matters. We need to *clear the debt* before we can withdraw
+      // enough collateral, because the alchemist locks `debt × minimumCollateralization` worth
+      // of collateral while debt is outstanding. The flash provides the working capital so the
+      // sequence (swap → burn → withdraw) executes inside the same callback.
+      //
+      // Why we don't withdraw "max" collateral: we only need to withdraw exactly the amount
+      // needed to net out the flash repayment. That amount is `flashRepay − swapRefund` — the
+      // collateral the swap actually consumed plus any flash fee. After the burn, debt = 0 (or
+      // = earmarked, in the rare case where the user's position has earmarked-only debt), so
+      // the withdraw lands well within `(collateral − lockedCollateral)` and the alchemist
+      // doesn't reject. The user's residual position keeps the rest of the collateral.
+      const swapContext = encodeAbiParameters(
+        [{ type: "address" }, { type: "uint256" }, { type: "bytes" }],
+        [debtToken as Address, exactDebtOut, swapData as Hex],
+      );
+
+      // Output index map (10 instructions, indexes 0..9):
+      //   [0] flash template (ToOutput, USDC, amount = maxCollateralIn)
+      //   [1] flash repay obligation (FlashLoan, in=0) = maxCollateralIn + provider fee
+      //   [2] approve dummy (Approve 0 for swapRouter)
+      //   [3] exactDebtOut alAsset received (SwapExactOut, in=0)
+      //   [4] USDC refund from swap (SwapExactOut second output)
+      //   [5] approve dummy (Approve 3 for alchemix)
+      //   [6] repay refund (alAsset leftover after burn, ~0 for typical positions)
+      //   [7] needed-withdraw amount = flashRepay − swapRefund (Subtract 1, 4)
+      //   [8] withdrawn collateral (WithdrawCollateral, in=7) — exactly Output[7]
+      //   [9] (no further computation needed — Output[4] + Output[8] balances Output[1] precisely
+      //       because Output[7] = Output[1] − Output[4] by construction)
+      //
+      // After all instructions: router holds (Output[4].amount + Output[8].amount) USDC =
+      // swapRefund + neededWithdraw = swapRefund + (flashRepay − swapRefund) = flashRepay.
+      // The flash provider pulls exactly that on callback close. Surplus is 0 by construction.
+      return [
+        // 0. ToOutput: declare flash amount in collateral
+        createRouterInstruction(encodeToOutput(maxCollateralIn, collateralToken)),
+
+        // 1. Flash loan COLLATERAL
+        createRouterInstruction(encodeFlashLoan(flashLoanProvider, 0)),
+
+        // 2. Approve swap router on flashed collateral (Output[0])
+        createRouterInstruction(encodeApprove(0, swapRouter)),
+
+        // 3. SwapExactOut collateral → alAsset: produce exactly exactDebtOut alAsset, refund unused USDC
+        createProtocolInstruction(
+          swapRouter,
+          encodeLendingInstruction(LendingOp.SwapExactOut, collateralToken, userAddress, 0n, swapContext as string, 0),
+        ),
+
+        // 4. Approve alchemix gateway on the swapped alAsset (Output[3])
+        createRouterInstruction(encodeApprove(3, normalizedProtocol)),
+
+        // 5. Repay debt — gateway dispatches to alchemist.burn (clears unearmarked debt face value)
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.Repay, debtToken, userAddress, 0n, context, 3),
+        ),
+
+        // 6. Compute exact collateral to withdraw: flashRepay − swapRefund. This is the amount
+        //    the swap actually consumed (plus any provider fee for Aave). Subtract(1, 4).
+        createRouterInstruction(encodeSubtract(1, 4)),
+
+        // 7. WithdrawCollateral exactly that amount (in=7). Debt is now 0 (or = earmarked) so
+        //    lockedCollateral collapsed and this withdraw fits comfortably under the alchemist's
+        //    `collateral − lockedCollateral ≥ amount` check.
+        createProtocolInstruction(
+          normalizedProtocol,
+          encodeLendingInstruction(LendingOp.WithdrawCollateral, collateralToken, userAddress, 0n, context, 7),
+        ),
+
+        // 8. Push the alAsset refund (Output[6]) back to the user — almost always 0 for
+        //    SwapExactOut, but covers the edge case where the burn clamped to unearmarked.
+        createRouterInstruction(encodePushToken(6, userAddress)),
+
+        // No surplus push needed — Output[4] (swap refund) + Output[8] (withdrawn) balance
+        // Output[1] (flash repay) exactly. The flash provider pulls flashRepay on callback,
+        // router ends with 0 USDC. The user's position retains (originalCollateral − Output[8])
+        // collateral with debt cleared.
+      ];
+    }
 
     // Swap context: (tokenOut, minAmountOut, swapData)
     // We swap collateral -> debt, need at least exactDebtOut to repay flash loan

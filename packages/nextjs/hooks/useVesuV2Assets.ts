@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
 import { useLogError } from "~~/hooks/common";
 
@@ -271,12 +270,9 @@ export const useVesuV2Assets = (poolAddress: string) => {
       const normalizedAddress = hexAddress.toLowerCase();
       const rates = poolRates[normalizedAddress];
 
-      if (!asset.symbol || (typeof asset.symbol === "bigint" && asset.symbol === 0n)) {
-        const fallback = getTokenNameFallback(hexAddress);
-        if (fallback) {
-          asset.symbol = fallback;
-        }
-      }
+      // Note: display-name resolution (override > on-chain > fallback) happens at
+      // render sites via resolveTokenDisplayName. Don't mutate asset.symbol here —
+      // downstream feltToString() expects a bigint.
 
       return {
         ...asset,

@@ -33,6 +33,8 @@ import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
+import { useSwapCostBreakdown } from "./useSwapCostBreakdown";
+import { CostBreakdownRows } from "./CostBreakdownRows";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { useMorphoCollateralSwapMarkets, marketToContext } from "~~/hooks/useMorphoCollateralSwapMarkets";
 import { useEulerCollateralSwapVaults } from "~~/hooks/useEulerCollateralSwapVaults";
@@ -1318,6 +1320,20 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
         dstUsdFallback,
     });
 
+    // Worst-case cost breakdown shared across swap modals — flash fee + max(realized impact,
+    // slippage allowance). Replaces the old bare "Price Impact %" + "Min Output" rows so users
+    // see a dollar figure instead of a percent. Flash amount is sized in input-token (selectedFrom).
+    const costBreakdown = useSwapCostBreakdown({
+        selectedProvider,
+        flashAmountRaw: amountInBigInt,
+        flashTokenDecimals: selectedFrom?.decimals ?? 18,
+        flashTokenPriceRaw: selectedFrom?.price,
+        srcUsdFallback,
+        dstUsdFallback,
+        priceImpact,
+        slippage,
+    });
+
     // Min buy amount
     const minBuyAmount = useMemo(
         () => computeMinBuyAmount(selectedTo, executionType, useCustomBuyAmount, customBuyAmount, bestQuote, limitSlippage, slippage),
@@ -1862,24 +1878,18 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
                             )}
                         </div>
 
-                        <div className="border-base-300/30 space-y-1 border-t pt-2">
-                            {priceImpact !== undefined && priceImpact !== null && (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-base-content/50">Price Impact</span>
-                                    <span className={priceImpact > 1 ? "text-warning" : priceImpact > 3 ? "text-error" : "text-base-content/80"}>
-                                        {priceImpact.toFixed(2)}%
-                                    </span>
-                                </div>
-                            )}
-                            {amountOut && Number.parseFloat(amountOut) > 0 && (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-base-content/50">Min Output</span>
-                                    <span className="text-base-content/80">
-                                        {(Number.parseFloat(amountOut) * (1 - slippage / 100)).toFixed(4)} {selectedTo?.symbol}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
+                        {costBreakdown.hasAnyData && (
+                            <div className="border-base-300/30 border-t pt-2">
+                                <CostBreakdownRows
+                                    flashFeeUsd={costBreakdown.flashFeeUsd}
+                                    priceImpactUsd={costBreakdown.priceImpactUsd}
+                                    priceImpactPct={costBreakdown.priceImpactPct}
+                                    maxSlippageUsd={costBreakdown.maxSlippageUsd}
+                                    slippagePct={costBreakdown.slippagePct}
+                                    totalCostUsd={costBreakdown.totalCostUsd}
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -23,6 +23,7 @@ import { track } from "@vercel/analytics";
 import { Tooltip } from "@radix-ui/themes";
 import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
+import { CostBreakdownRows } from "./CostBreakdownRows";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
 import { useEvmTransactionFlow } from "~~/hooks/useEvmTransactionFlow";
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
@@ -551,6 +552,15 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       setSwapRouter("pendle");
     }
   }, [selectedTo, pendleAvailable]);
+
+  // Auto-select the only available collateral when there's exactly one option (e.g. Alchemix
+  // markets, single-collateral Morpho markets). Without this, selectedTo stays null forever
+  // and the swap UI looks empty even though the data is correct.
+  useEffect(() => {
+    if (toAssets.length === 1 && (!selectedTo || selectedTo.address.toLowerCase() !== toAssets[0].address.toLowerCase())) {
+      setSelectedTo(toAssets[0]);
+    }
+  }, [toAssets, selectedTo]);
 
   // Initialize limitOrderConfig
   useEffect(() => {
@@ -1258,7 +1268,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
     return parsed * Number(formatUnits(debtPrice, 8));
   }, [debtPrice, expectedOutput]);
 
-  const { priceImpact, formattedPriceImpact } = useAutoSlippage({
+  const { priceImpact } = useAutoSlippage({
     slippage,
     setSlippage,
     oneInchQuote: oneInchSwapQuote,
@@ -1268,6 +1278,74 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
     srcUsdFallback,
     dstUsdFallback,
   });
+
+  // ============ USD cost breakdown (flash fee + price impact + max slippage) ============
+  // Three figures so users see both the *realized* impact at the current quote and the
+  // *worst-case* slippage they could pay. Mirrors AlchemixMultiplyModal so the two views
+  // present cost the same way.
+  const costBreakdown = useMemo(() => {
+    const feeBps = selectedProvider?.feeBps ?? 0;
+    // Flash fee in collateral units, valued at the collateral price.
+    let flashFeeUsd = 0;
+    if (feeBps > 0 && requiredCollateral > 0n && selectedTo?.price && selectedTo?.decimals) {
+      const flashFeeRaw = (requiredCollateral * BigInt(feeBps)) / 10000n;
+      const flashFeeAmount = Number.parseFloat(formatUnits(flashFeeRaw, selectedTo.decimals));
+      const collateralPriceUsd = Number(formatUnits(selectedTo.price, 8));
+      flashFeeUsd = flashFeeAmount * collateralPriceUsd;
+    }
+
+    // Realized price impact — only positive when src USD value > dst USD value (ie the swap
+    // genuinely loses value vs spot). Favorable swaps clamp to 0 rather than showing as
+    // negative cost; the user isn't *paying* anything when the rate is at or better than spot.
+    let priceImpactUsd = 0;
+    let priceImpactPct = 0;
+    if (srcUsdFallback !== undefined && dstUsdFallback !== undefined) {
+      const diff = srcUsdFallback - dstUsdFallback;
+      if (diff > 0) {
+        priceImpactUsd = diff;
+        if (srcUsdFallback > 0) priceImpactPct = (diff / srcUsdFallback) * 100;
+      }
+    } else if (priceImpact !== null && priceImpact !== undefined && priceImpact > 0 && srcUsdFallback) {
+      priceImpactUsd = (priceImpact / 100) * srcUsdFallback;
+      priceImpactPct = priceImpact;
+    }
+
+    // Max slippage = upper bound on swap loss within the user's slippage tolerance. Sized
+    // against the larger USD side so we don't under-report on favorable in-the-money quotes
+    // (where dst > src and using src would hide value the user could still lose to MEV).
+    const valueBasisUsd = Math.max(srcUsdFallback ?? 0, dstUsdFallback ?? 0);
+    const maxSlippageUsd = (slippage / 100) * valueBasisUsd;
+
+    // Worst-case total = flash + max(realized, slippage). Use max() not sum: if realized
+    // already exceeds slippage the on-chain minOut would revert; if slippage hits, that's
+    // what bounds the loss. They're alternative cost ceilings, not additive.
+    const swapWorstCaseUsd = Math.max(priceImpactUsd, maxSlippageUsd);
+
+    const hasAnyData =
+      flashFeeUsd > 0 ||
+      priceImpactUsd > 0 ||
+      maxSlippageUsd > 0 ||
+      srcUsdFallback !== undefined ||
+      dstUsdFallback !== undefined;
+
+    return {
+      flashFeeUsd,
+      priceImpactUsd,
+      priceImpactPct,
+      maxSlippageUsd,
+      slippagePct: slippage,
+      totalCostUsd: flashFeeUsd + swapWorstCaseUsd,
+      hasAnyData,
+    };
+  }, [
+    selectedProvider,
+    requiredCollateral,
+    selectedTo,
+    srcUsdFallback,
+    dstUsdFallback,
+    priceImpact,
+    slippage,
+  ]);
 
   // ============ Execution Type Handler ============
   const handleExecutionTypeChange = useCallback(
@@ -1314,13 +1392,12 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
             flashLoanProviders={flashLoanProviders}
             selectedProvider={selectedProvider}
             setSelectedProvider={setSelectedProvider}
-            priceImpact={priceImpact}
-            formattedPriceImpact={formattedPriceImpact}
             exchangeRate={exchangeRate}
             swapQuote={swapQuote}
             expectedOutput={expectedOutput}
             outputCoversRepay={outputCoversRepay}
             debtName={debtName}
+            costBreakdown={costBreakdown}
           />
         )}
 
@@ -1346,8 +1423,6 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       cowAvailable,
       conditionalOrderReady,
       slippage,
-      priceImpact,
-      formattedPriceImpact,
       exchangeRate,
       debtName,
       swapQuote,
@@ -1363,6 +1438,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       isCowQuoteLoading,
       repayAmountRaw,
       debtDecimals,
+      costBreakdown,
     ]
   );
 
@@ -1594,19 +1670,27 @@ interface MarketOrderRightPanelProps {
   flashLoanProviders: FlashLoanProviderOption[] | undefined;
   selectedProvider: FlashLoanProviderOption | undefined;
   setSelectedProvider: (p: FlashLoanProviderOption) => void;
-  priceImpact: number | null | undefined;
-  formattedPriceImpact: string | null | undefined;
   exchangeRate: string | null;
   swapQuote: { dstAmount: string } | null | undefined;
   expectedOutput: string;
   outputCoversRepay: boolean;
   debtName: string;
+  costBreakdown: {
+    flashFeeUsd: number;
+    priceImpactUsd: number;
+    priceImpactPct: number;
+    maxSlippageUsd: number;
+    slippagePct: number;
+    totalCostUsd: number;
+    hasAnyData: boolean;
+  };
 }
 
-/** Right panel content for market order mode: slippage, flash loan, price impact, rate, output. */
+/** Right panel content for market order mode: slippage, flash loan, rate, output, cost breakdown. */
 function MarketOrderRightPanel({
   slippage, setSlippage, flashLoanProviders, selectedProvider, setSelectedProvider,
-  priceImpact, formattedPriceImpact, exchangeRate, swapQuote, expectedOutput, outputCoversRepay, debtName,
+  exchangeRate, swapQuote, expectedOutput, outputCoversRepay, debtName,
+  costBreakdown,
 }: MarketOrderRightPanelProps) {
   return (
     <div className="space-y-2 text-xs">
@@ -1649,14 +1733,6 @@ function MarketOrderRightPanel({
       </div>
 
       <div className="border-base-300/30 space-y-1 border-t pt-2">
-        {priceImpact !== undefined && priceImpact !== null && (
-          <div className="flex items-center justify-between">
-            <span className="text-base-content/50">Price Impact</span>
-            <span className={priceImpact > 1 ? "text-warning" : priceImpact > 3 ? "text-error" : "text-base-content/80"}>
-              {formattedPriceImpact || `${priceImpact.toFixed(2)}%`}
-            </span>
-          </div>
-        )}
         {exchangeRate && (
           <div className="flex items-center justify-between">
             <span className="text-base-content/50">Rate</span>
@@ -1680,6 +1756,22 @@ function MarketOrderRightPanel({
           </div>
         )}
       </div>
+
+      {/* USD cost breakdown — flash fee + price impact $ + total. Renders whenever there's
+          any USD basis to derive figures from (collateral price, debt price, or USD fallbacks);
+          shows $0.00 explicitly when a value is genuinely zero (e.g. Balancer's 0-bps flash). */}
+      {costBreakdown.hasAnyData && (
+        <div className="border-base-300/30 border-t pt-2">
+          <CostBreakdownRows
+            flashFeeUsd={costBreakdown.flashFeeUsd}
+            priceImpactUsd={costBreakdown.priceImpactUsd}
+            priceImpactPct={costBreakdown.priceImpactPct}
+            maxSlippageUsd={costBreakdown.maxSlippageUsd}
+            slippagePct={costBreakdown.slippagePct}
+            totalCostUsd={costBreakdown.totalCostUsd}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
 } from "../common/TokenListItem";
 import { useTokenSelectModal } from "../common/useTokenSelectModal";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import { getTokenNameFallback } from "~~/contracts/tokenNameFallbacks";
+import { resolveTokenDisplayName } from "~~/contracts/tokenNameFallbacks";
 import type { VesuContext } from "~~/utils/vesu";
 import { getDisplayRate } from "~~/utils/protocol";
 import { PositionManager } from "~~/utils/position";
@@ -44,11 +44,11 @@ function normalizeStarkAddress(address: string | bigint): string {
 }
 
 /**
- * Helper to get token symbol with fallback for tokens like xSTRK.
+ * Helper to get a display symbol for a token.
+ * Priority: override > on-chain symbol (when non-empty) > fallback > "UNKNOWN".
  */
 function getTokenSymbol(token: TokenMetadata, address: string): string {
-  const raw = feltToString(token.symbol);
-  return raw && raw.trim().length > 0 ? raw : getTokenNameFallback(address) ?? raw;
+  return resolveTokenDisplayName(feltToString(token.symbol), address);
 }
 
 export const TokenSelectModalStark: FC<TokenSelectModalStarkProps> = ({

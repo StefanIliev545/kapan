@@ -25,6 +25,7 @@ import type { TokenPosition } from "~~/types/positions";
 import { MetricColors } from "~~/utils/protocolMetrics";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { useAaveLikeLendingPositions, type AaveLikeViewContractName } from "~~/hooks/useAaveLikeLendingPositions";
+import { createEModeFilter } from "~~/components/ProtocolView";
 import { useAavePositionGroups } from "~~/hooks/adapters/useAavePositionGroups";
 import { useGatewayWithRiskParams, type ViewGatewayContractName } from "~~/hooks/useGatewayContract";
 import { useAaveLikeEMode, type AaveLikeWriteContractName } from "~~/hooks/useAaveEMode";
@@ -175,14 +176,19 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, c
     [activeSupply],
   );
 
-  // All available market assets for the multiply modal (loop works without existing positions)
+  // All available market assets for the multiply modal (loop works without existing positions).
+  // Aave's E-Mode restricts which assets can be used together, so filter these lists with
+  // the user's current E-Mode when present — that way debt-swap and collateral-swap pickers
+  // show the full market (not just currently-held tokens) while still respecting E-Mode.
+  const filterByEMode = useMemo(() => createEModeFilter(userEMode), [userEMode]);
+
   const allSupplyAssets: SwapAsset[] = useMemo(
-    () => suppliedPositions.map(positionToSwapAsset),
-    [suppliedPositions],
+    () => filterByEMode(suppliedPositions.map(positionToSwapAsset)),
+    [suppliedPositions, filterByEMode],
   );
   const allBorrowAssets: SwapAsset[] = useMemo(
-    () => borrowedPositions.map(positionToSwapAsset),
-    [borrowedPositions],
+    () => filterByEMode(borrowedPositions.map(positionToSwapAsset)),
+    [borrowedPositions, filterByEMode],
   );
   const debtOptions: SwapAsset[] = useMemo(
     () => allBorrowAssets.length > 0 ? allBorrowAssets : allSupplyAssets,
@@ -504,7 +510,13 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, c
                       networkType="evm"
                       chainId={chainId}
                       position={borrowPosition}
-                      availableAssets={collateralAssets}
+                      // Debt-swap pickers need the full set of borrowable Aave reserves,
+                      // not the user's currently-held collaterals. `collateralValue` still
+                      // uses the user's actual collateral balances for health-factor math.
+                      availableAssets={allBorrowAssets}
+                      // Close-with-collateral needs the user's *supplied* collaterals, which
+                      // are different from the debt-swap reserve list above.
+                      availableCollateralsForClose={allSupplyAssets}
                       collateralValue={collateralAssets.reduce((s, c) => s + (c.usdValue || 0), 0)}
                       adlProtected={
                         activeADL?.triggerParams?.debtToken?.toLowerCase() === pos.tokenAddress.toLowerCase()
@@ -592,7 +604,10 @@ export const AaveForkProtocolView: FC<AaveForkProtocolViewProps> = ({ chainId, c
           isOpen={swapModal.isOpen}
           onClose={handleCloseSwap}
           protocolName={protocolName}
-          availableAssets={collateralAssets}
+          // Target collateral for a swap should be ANY Aave reserve the user
+          // could supply as collateral, not just tokens they already hold.
+          // `allSupplyAssets` is already E-Mode-filtered upstream.
+          availableAssets={allSupplyAssets}
           initialFromTokenAddress={selectedSwapPosition.tokenAddress}
           chainId={chainId || 1}
           position={{

@@ -239,6 +239,7 @@ export const PROTOCOL_ICONS: Record<string, string> = {
   morpho: "/logos/morpho.svg",
   venus: "/logos/venus.svg",
   euler: "/logos/euler.svg",
+  alchemix: "/logos/alchemix.svg",
 };
 
 export const contractNameToLogo = (contractName: keyof typeof contractLogos) => {
@@ -256,18 +257,18 @@ function stripPtSuffixes(name: string): string {
 
 function resolveEulerVaultLogo(lower: string): string | null {
   if (lower.startsWith("ept-")) {
-    return `/logos/pt${stripPtSuffixes(lower.slice(4))}.svg`;
+    return morphoOrLocalLogo(`pt${stripPtSuffixes(lower.slice(4))}`);
   }
   const m = lower.match(/^e([a-z0-9]+)-\d+$/);
   if (!m) return null;
   const eulerMap: Record<string, string> = { usdai: "/logos/susdai.svg" };
-  return eulerMap[m[1]] ?? `/logos/${m[1]}.svg`;
+  return eulerMap[m[1]] ?? morphoOrLocalLogo(m[1]);
 }
 
 function resolvePtTokenLogo(lower: string): string {
   let w = lower.startsWith("pt ") ? lower.slice(3) : lower.slice(3);
   if (lower.startsWith("pt ") && w.startsWith("ept-")) w = w.slice(4);
-  return `/logos/pt${stripPtSuffixes(w)}.svg`;
+  return morphoOrLocalLogo(`pt${stripPtSuffixes(w)}`);
 }
 
 const TOKEN_FALLBACKS: Record<string, string> = {
@@ -316,7 +317,72 @@ const PNG_LOGO_MAP: Record<string, string> = {
   jrt: "/logos/jrt.png",
   rex: "/logos/rex.png",
   xpet: "/logos/xpet.png",
+  alusd: "/logos/alusd.svg",
+  aleth: "/logos/aleth.svg",
 };
+
+// Maps local lowercase key → Morpho CDN filename (without `.svg`). Verified by HEAD requests
+// against cdn.morpho.org/assets/logos. When the value differs from the key it's because
+// Morpho's filename uses a different separator convention (e.g. `pt-usdg` vs our `ptusdg`),
+// or because the local key wraps an underlying token whose icon we reuse (`n-st-mapollo` →
+// `mapollo`). New Morpho-curated tokens get a one-line entry here rather than a committed SVG.
+const MORPHO_CDN_LOGOS: Record<string, string> = {
+  // Direct (key matches Morpho filename)
+  apxusd: "apxusd",
+  apyusd: "apyusd",
+  susdd: "susdd",
+  susdat: "susdat",
+  siusd: "siusd",
+  savusd: "savusd",
+  usp: "usp",
+  wstlink: "wstlink",
+  wspyx: "wspyx",
+  mhyperbtc: "mhyperbtc",
+  mhyper: "mhyper",
+  wjaaa: "wjaaa",
+  srroyusdc: "srroyusdc",
+  aznd: "aznd",
+  syrup: "syrup",
+  ondo: "ondo",
+  srnusd: "srnusd",
+  srmhyper: "srmhyper",
+  wousd: "wousd",
+  msy: "msy",
+  syzusd: "syzusd",
+  rlusd: "rlusd",
+  stusds: "stusds",
+  "stakedao-frxmsusd": "stakedao-frxmsusd",
+  "stakedao-frxusdousd": "stakedao-frxusdousd",
+  crv: "crv",
+  mapollo: "mapollo",
+  // Pendle PT tokens — local convention is `pt{name}` (no dash), Morpho is `pt-{name}`.
+  ptusdg: "pt-usdg",
+  ptreusd: "pt-reusd",
+  ptavusd: "pt-avusd",
+  ptsavusd: "pt-savusd",
+  ptapxusd: "pt-apxusd",
+  ptsrnusd: "pt-srnusd",
+  ptsnusd: "pt-snusd",
+  ptmhyper: "pt-mhyper",
+  ptstcusd: "pt-stcusd",
+  ptsrusde: "pt-srusde",
+  ptslvlusd: "pt-slvlusd",
+  // Misc remappings where Morpho's naming differs from ours
+  aa_falconxusdc: "aafalconxusdc",
+  "mf-one": "mfone",
+  // Wrapped tokens with no dedicated icon — fall back to the underlying's logo
+  "n-st-mapollo": "mapollo",
+};
+
+/**
+ * Return the Morpho CDN URL for a token if we've registered one, otherwise the local path.
+ * Used as the final step before returning a logo URL so PT/Euler paths can also benefit.
+ */
+function morphoOrLocalLogo(basename: string): string {
+  const morphoFile = MORPHO_CDN_LOGOS[basename];
+  if (morphoFile) return `https://cdn.morpho.org/assets/logos/${morphoFile}.svg`;
+  return `/logos/${basename}.svg`;
+}
 
 function isEulerPrefixed(lower: string): boolean {
   return lower.startsWith("e") && !lower.startsWith("eth") && !lower.startsWith("ezeth") && !lower.startsWith("eurs");
@@ -344,7 +410,7 @@ export const tokenNameToLogo = (tokenName: string) => {
   if (png) return png;
   // Guard against invalid characters in token names (e.g., "???" from unresolved symbols)
   if (!lower || /[^a-z0-9._-]/.test(lower)) return "/logos/token.svg";
-  return `/logos/${lower}.svg`;
+  return morphoOrLocalLogo(lower);
 };
 
 export const ERC20ABI = [

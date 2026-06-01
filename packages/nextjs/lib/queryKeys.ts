@@ -57,6 +57,13 @@ export const qk = {
     statusPoll: (routeIds: string[]) => ["bridges", "status-poll", ...routeIds] as const,
   },
 
+  // Alchemix V3
+  alchemix: {
+    all: (chainId: number) => ["alchemix", chainId] as const,
+    positions: (chainId: number, userAddress?: string) =>
+      ["alchemix", chainId, "positions", userAddress?.toLowerCase() ?? ""] as const,
+  },
+
   // Euler V2
   euler: {
     // Base key for all euler queries on a chain

@@ -40,7 +40,10 @@ const ADDR = {
     TOKENS: {
       ETH: "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7" as AddressHex,
       WBTC: "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac" as AddressHex,
-      USDC: "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8" as AddressHex,
+      // Bridged USDC (formerly "the" USDC on Starknet, now referred to as USDC.e).
+      USDC_E: "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8" as AddressHex,
+      // Circle-native USDC on Starknet (ByteArray symbol() — see tokenNameFallbacks).
+      USDC: "0x033068F6539f8e6e6b131e6B2B814e6c34A5224bC66947c47DaB9dFeE93b35fb" as AddressHex,
       USDT: "0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8" as AddressHex,
       STRK: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d" as AddressHex,
       WSTETH: "0x0057912720381af14b0e5c87aa4718ed5e527eab60b3801ebf702ab09139e38b" as AddressHex,
@@ -439,10 +442,11 @@ const initializeContracts = async (addresses: {
       ],
     },
     {
+      // Nostra only lists bridged USDC (USDC.e). No native-USDC market.
       contractAddress: addresses.nostraGatewayAddress,
       entrypoint: "add_supported_asset",
       calldata: [
-        T.USDC,
+        T.USDC_E,
         N.USDC_DEBT,
         N.USDC_COLLATERAL,
         N.USDC_IBCOLLATERAL,
@@ -493,14 +497,15 @@ const initializeContracts = async (addresses: {
     // Genesis Pool (DEFAULT_POOL_ID)
     { contractAddress: addresses.vesuGatewayAddress, entrypoint: "add_pool", calldata: [GENESIS_POOL] },
     {
+      // Genesis V1 pool lists bridged USDC only (confirmed via asset_config on mainnet).
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_collaterals",
-      calldata: encodePoolAssets(GENESIS_POOL, [T.ETH, T.WBTC, T.WSTETH, T.STRK, T.USDC, T.USDT]),
+      calldata: encodePoolAssets(GENESIS_POOL, [T.ETH, T.WBTC, T.WSTETH, T.STRK, T.USDC_E, T.USDT]),
     },
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_debts",
-      calldata: encodePoolAssets(GENESIS_POOL, [T.ETH, T.WBTC, T.WSTETH, T.STRK, T.USDC, T.USDT]),
+      calldata: encodePoolAssets(GENESIS_POOL, [T.ETH, T.WBTC, T.WSTETH, T.STRK, T.USDC_E, T.USDT]),
     },
     // ------- Vesu V2 default pool allowlists -------
     {
@@ -514,10 +519,11 @@ const initializeContracts = async (addresses: {
     {
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_collaterals",
+      // Carmine Runes V1 lists bridged USDC only.
       calldata: encodePoolAssets(CARMINE_RUNES_POOL, [
         T.WBTC,
         T.ETH,
-        T.USDC,
+        T.USDC_E,
         T.STRK,
         T.DOG,
       ]),
@@ -551,13 +557,15 @@ const initializeContracts = async (addresses: {
       ]),
     },
     {
+      // Re7 Starknet Ecosystem V1 lists bridged USDC only as debt.
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_debts",
       calldata: encodePoolAssets(RE7_STARKNET_ECOSYSTEM_POOL, [
-        T.USDC,
+        T.USDC_E,
       ]),
     },
     {
+      // Carmine Runes V1 debts — bridged USDC only.
       contractAddress: addresses.vesuGatewayAddress,
       entrypoint: "add_pool_debts",
       calldata: encodePoolAssets(CARMINE_RUNES_POOL, [
@@ -565,21 +573,22 @@ const initializeContracts = async (addresses: {
         T.STRK,
         T.ETH,
         T.WBTC,
-        T.USDC,
+        T.USDC_E,
       ]),
     },
     {
+      // V2 Default pool lists BOTH bridged USDC.e and native USDC.
       contractAddress: addresses.vesuGatewayV2Address,
       entrypoint: "add_pool_collaterals",
       calldata: encodePoolAddrAssets(V2.DEFAULT_POOL_ADDRESS, [
-        T.ETH, T.WBTC, T.USDC, T.USDT, T.STRK, T.WSTETH, T.XWBTC, T.XSTRK,
+        T.ETH, T.WBTC, T.USDC_E, T.USDC, T.USDT, T.STRK, T.WSTETH, T.XWBTC, T.XSTRK,
       ]),
     },
     {
       contractAddress: addresses.vesuGatewayV2Address,
       entrypoint: "add_pool_debts",
       calldata: encodePoolAddrAssets(V2.DEFAULT_POOL_ADDRESS, [
-        T.ETH, T.WBTC, T.USDC, T.USDT, T.STRK, T.WSTETH,
+        T.ETH, T.WBTC, T.USDC_E, T.USDC, T.USDT, T.STRK, T.WSTETH,
       ]),
     },
 
@@ -596,10 +605,11 @@ const initializeContracts = async (addresses: {
       ]),
     },
     {
+      // Re7 USDC Core V2 — both USDC variants are listed as debt on-chain.
       contractAddress: addresses.vesuGatewayV2Address,
       entrypoint: "add_pool_debts",
       calldata: encodePoolAddrAssets(V2.RE7_USDC_CORE_POOL_ADDRESS, [
-        T.USDC,
+        T.USDC_E, T.USDC,
       ]),
     },
 
@@ -613,10 +623,11 @@ const initializeContracts = async (addresses: {
       ]),
     },
     {
+      // Re7 USDC Prime V2 — both USDC variants are listed as debt on-chain.
       contractAddress: addresses.vesuGatewayV2Address,
       entrypoint: "add_pool_debts",
       calldata: encodePoolAddrAssets(V2.RE7_USDC_PRIME_POOL_ADDRESS, [
-        T.USDC,
+        T.USDC_E, T.USDC,
       ]),
     },
 
@@ -630,10 +641,11 @@ const initializeContracts = async (addresses: {
       ]),
     },
     {
+      // Re7 USDC Stable Core V2 — both USDC variants are listed as debt on-chain.
       contractAddress: addresses.vesuGatewayV2Address,
       entrypoint: "add_pool_debts",
       calldata: encodePoolAddrAssets(V2.RE7_USDC_STABLE_CORE_POOL_ADDRESS, [
-        T.USDC,
+        T.USDC_E, T.USDC,
       ]),
     },
 

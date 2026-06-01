@@ -80,12 +80,14 @@ export const StableArea = ({
     transition: "min-height 0.5s ease-in-out",
   }), [isContentLoaded, actualHeight, minHeightPx, minHeightValue]);
 
-  return (
-    <Component className={className}>
-      <div ref={contentRef} className={combinedInnerClassName} style={style}>
-        {children}
-      </div>
-    </Component>
+  // `React.createElement` avoids a React 19 / TS regression where JSX can't
+  // infer the `children` prop type on a dynamic `ElementType` tag.
+  return React.createElement(
+    Component,
+    { className },
+    <div ref={contentRef} className={combinedInnerClassName} style={style}>
+      {children}
+    </div>,
   );
 };
 
