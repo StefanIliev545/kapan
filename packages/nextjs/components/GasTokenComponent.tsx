@@ -5,7 +5,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { useReadContract } from "@starknet-react/core";
 import { useAccount } from "~~/hooks/useAccount";
-import { universalErc20Abi } from "~~/utils/Constants";
+import { universalErc20Abi } from "~~/utils/starkConstants";
 import { feltToString, formatTokenAmount } from "~~/utils/protocols";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";

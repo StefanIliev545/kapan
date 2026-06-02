@@ -2,7 +2,7 @@ import { useReadLocalStorage } from "usehooks-ts";
 import { useEffect, useState } from "react";
 import { useConnect } from "@starknet-react/core";
 import scaffoldConfig from "~~/scaffold.config";
-import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
+import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/starkConstants";
 
 /**
  * Automatically connect to a wallet/connector based on config and prior wallet

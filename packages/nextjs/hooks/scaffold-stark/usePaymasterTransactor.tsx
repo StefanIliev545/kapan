@@ -4,7 +4,7 @@ import { useAccount } from "~~/hooks/useAccount";
 import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-stark";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
 import { usePaymasterSendTransaction, usePaymasterGasTokens } from "@starknet-react/core";
-import { universalStrkAddress } from "~~/utils/Constants";
+import { universalStrkAddress } from "~~/utils/starkConstants";
 import providerFactory from "~~/services/web3/provider";
 import { TransactionToast } from "~~/components/TransactionToast";
 import { logger } from "~~/utils/logger";

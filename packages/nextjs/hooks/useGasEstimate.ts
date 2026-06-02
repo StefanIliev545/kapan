@@ -7,7 +7,7 @@ import { useAccount } from "~~/hooks/useAccount";
 import { useSelectedGasToken } from "~~/contexts/SelectedGasTokenContext";
 import { useGlobalState } from "~~/services/store/store";
 import { weiToEth, friToStrk } from "~~/lib/feeUnits";
-import { universalStrkAddress } from "~~/utils/Constants";
+import { universalStrkAddress } from "~~/utils/starkConstants";
 import { DEBOUNCE_DELAYS } from "~~/hooks/useDebouncedEffect";
 
 type BuildCalls =

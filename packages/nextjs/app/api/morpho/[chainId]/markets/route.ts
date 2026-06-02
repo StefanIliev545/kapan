@@ -29,8 +29,7 @@ const QUERY_MARKETS = `
       }
     ) {
       items {
-        id
-        uniqueKey
+        marketId
         listed
         warnings {
           type
@@ -230,7 +229,10 @@ const fetchMarketsBatch = async (
     return { items: [], hasMore: false, error: msg };
   }
 
-  const items = data.data?.markets?.items || [];
+  // The API now keys markets by `marketId` (the `id`/`uniqueKey` fields were removed).
+  // Alias it to `uniqueKey` so downstream map keys and the client response — which still
+  // read `uniqueKey` — keep working unchanged.
+  const items = (data.data?.markets?.items || []).map((m: any) => ({ ...m, uniqueKey: m.marketId }));
   return { items, hasMore: items.length === first };
 };
 

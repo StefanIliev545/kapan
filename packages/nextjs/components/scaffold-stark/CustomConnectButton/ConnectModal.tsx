@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useAccount, useConnect, type Connector } from "@starknet-react/core";
-import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
+import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/starkConstants";
 import { clearStarknetSession } from "~~/utils/starknetSession";
 import { useOutsideClick } from "~~/hooks/scaffold-stark";
 

@@ -56,7 +56,7 @@ export const LandingHeader = () => {
           <div className="relative size-8 md:size-10">
             <Image
               alt="Kapan logo"
-              className="object-contain opacity-60 transition-opacity duration-300 group-hover:opacity-100"
+              className="object-contain"
               fill
               src="/seal-logo.png"
               priority
