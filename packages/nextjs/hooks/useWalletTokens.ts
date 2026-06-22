@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useAccount, usePublicClient } from "wagmi";
-import { type Address, erc20Abi, formatUnits } from "viem";
+import { type Address, erc20Abi, formatUnits, isAddress } from "viem";
 import { useExternalYields, type ExternalYield } from "./useExternalYields";
 import { useMorphoMarkets } from "./useMorphoLendingPositions";
 import { usePendleTokens } from "./usePendleTokens";
@@ -16,7 +16,7 @@ const MAJOR_TOKENS: Record<number, Array<{ address: Address; symbol: string; dec
     { address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", symbol: "WETH", decimals: 18 },
     { address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", symbol: "USDC", decimals: 6 },
     { address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", symbol: "USDT", decimals: 6 },
-    { address: "0x6B175474E89094C44Da98b954EescdeCB5e8fBe6", symbol: "DAI", decimals: 18 },
+    { address: "0x6B175474E89094C44Da98b954EedeAC495271d0F", symbol: "DAI", decimals: 18 },
     { address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", symbol: "WBTC", decimals: 8 },
     { address: "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0", symbol: "wstETH", decimals: 18 },
     { address: "0xae78736Cd615f374D3085123A210448E74Fc6393", symbol: "rETH", decimals: 18 },
@@ -42,6 +42,20 @@ const MAJOR_TOKENS: Record<number, Array<{ address: Address; symbol: string; dec
     { address: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb", symbol: "DAI", decimals: 18 },
     { address: "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452", symbol: "wstETH", decimals: 18 },
     { address: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22", symbol: "cbETH", decimals: 18 },
+  ],
+  9745: [ // Plasma (addresses sourced from the live Aave V3 reserve list on Plasma)
+    { address: "0x6100E367285b01F48D07953803A2d8dCA5D19873", symbol: "WXPL", decimals: 18 },
+    { address: "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb", symbol: "USDT0", decimals: 6 },
+    { address: "0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34", symbol: "USDe", decimals: 18 },
+    { address: "0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2", symbol: "sUSDe", decimals: 18 },
+    { address: "0x9895D81bB462A195b4922ED7De0e3ACD007c32CB", symbol: "WETH", decimals: 18 },
+    { address: "0xA3D68b74bF0528fdD07263c60d6488749044914b", symbol: "weETH", decimals: 18 },
+    { address: "0xe48D935e6C9e735463ccCf29a7F11e32bC09136E", symbol: "wstETH", decimals: 18 },
+    { address: "0xe561FE05C39075312Aa9Bc6af79DdaE981461359", symbol: "wrsETH", decimals: 18 },
+    { address: "0xb77E872A68C62CfC0dFb02C067Ecc3DA23B4bbf3", symbol: "GHO", decimals: 18 },
+    { address: "0x1B64B9025EEbb9A6239575dF9Ea4b9Ac46D4d193", symbol: "XAUt0", decimals: 6 },
+    { address: "0xC4374775489CB9C56003BF2C9b12495fC64F0771", symbol: "syrupUSDT", decimals: 6 },
+    // PT tokens (the bulk of Plasma's Aave reserves) are discovered dynamically via usePendleTokens.
   ],
 };
 
@@ -87,6 +101,14 @@ function upsertTokenMetadata(
   price: number | undefined,
   source: WalletToken["source"],
 ): void {
+  // Guard against malformed addresses (e.g. a typo in the whitelist or bad API data).
+  // A single invalid address would otherwise make the whole balance multicall throw at
+  // encoding time, blanking the entire wallet section. strict:false accepts any valid
+  // casing (Pendle/Morpho sources may be lowercased).
+  if (!isAddress(addr, { strict: false })) {
+    console.warn(`[useWalletTokens] Skipping invalid token address: ${addr} (${symbol})`);
+    return;
+  }
   const key = addr.toLowerCase();
   const existing = tokens.get(key);
   if (!existing) {
@@ -223,29 +245,39 @@ export function useWalletTokens(chainId?: number) {
       const tokenList = Array.from(tokenWhitelist.values());
       const results: WalletToken[] = [];
 
-      // Fetch native ETH balance
+      // Fetch native currency balance (chain-aware: ETH on most chains, XPL on Plasma, etc.)
       try {
         const nativeBalance = await publicClient.getBalance({ address: userAddress });
         if (nativeBalance > 0n) {
-          const balanceFormatted = parseFloat(formatUnits(nativeBalance, 18));
-          // Use WETH price for native ETH — check whitelist first (may have Morpho price),
-          // then fall back to fetched price from CoinGecko
-          const wethToken = MAJOR_TOKENS[chainId || 1]?.find(t => t.symbol === "WETH");
-          const wethKey = wethToken?.address.toLowerCase();
-          const wethFromWhitelist = wethKey ? tokenWhitelist.get(wethKey) : undefined;
-          const ethPrice = wethFromWhitelist?.price || (wethKey ? fetchedPricesByAddress[wethKey] : 0) || globalEthPrice || 0;
-          const usdValue = balanceFormatted * ethPrice;
+          // Derive the native currency from the chain config rather than assuming ETH.
+          const nativeCurrency = publicClient.chain?.nativeCurrency;
+          const nativeSymbol = nativeCurrency?.symbol ?? "ETH";
+          const nativeDecimals = nativeCurrency?.decimals ?? 18;
+          const nativeName = nativeCurrency?.name ?? "Ether";
+          const balanceFormatted = parseFloat(formatUnits(nativeBalance, nativeDecimals));
+
+          // Price the native token via its wrapped equivalent ("W" + symbol, e.g. WETH / WXPL):
+          // check the whitelist first (may carry a Morpho price), then CoinGecko by address.
+          // The global ETH price is only a valid fallback when the native currency is ETH.
+          const wrappedSymbol = `W${nativeSymbol}`;
+          const wrappedToken = MAJOR_TOKENS[chainId || 1]?.find(t => t.symbol === wrappedSymbol);
+          const wrappedKey = wrappedToken?.address.toLowerCase();
+          const wrappedFromWhitelist = wrappedKey ? tokenWhitelist.get(wrappedKey) : undefined;
+          const ethFallback = nativeSymbol === "ETH" ? globalEthPrice : 0;
+          const nativePrice =
+            wrappedFromWhitelist?.price || (wrappedKey ? fetchedPricesByAddress[wrappedKey] : 0) || ethFallback || 0;
+          const usdValue = balanceFormatted * nativePrice;
 
           results.push({
             address: "0x0000000000000000000000000000000000000000" as Address,
-            symbol: "ETH",
-            name: "Ether",
-            decimals: 18,
+            symbol: nativeSymbol,
+            name: nativeName,
+            decimals: nativeDecimals,
             balance: nativeBalance,
             balanceFormatted,
             usdValue,
-            price: ethPrice,
-            icon: tokenNameToLogo("eth"),
+            price: nativePrice,
+            icon: tokenNameToLogo(nativeSymbol.toLowerCase()),
             externalYield: undefined,
             source: "major",
           });

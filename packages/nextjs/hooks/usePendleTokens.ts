@@ -5,8 +5,8 @@ import { Address } from "viem";
 // Pendle API base URL
 const PENDLE_API = "https://api-v2.pendle.finance/core/v1";
 
-// Chain IDs supported by Pendle
-const PENDLE_CHAIN_IDS = [1, 42161, 10, 8453, 56];
+// Chain IDs supported by Pendle (mainnet, arbitrum, optimism, base, bnb, plasma)
+const PENDLE_CHAIN_IDS = [1, 42161, 10, 8453, 56, 9745];
 
 export interface PendleToken {
   address: Address;
