@@ -245,7 +245,7 @@ const MARKET_BORROW_ACTIONS = { borrow: false, repay: false, move: false, close:
 // --- Sub-components to reduce cognitive complexity ---
 
 /** Get value class based on sign */
-function getValueClass(value: number | null | undefined, defaultClass = "text-base-content/40"): string {
+function getValueClass(value: number | null | undefined, defaultClass = "text-base-content/70"): string {
   if (value == null) return defaultClass;
   return value >= 0 ? TEXT_SUCCESS : TEXT_ERROR;
 }
@@ -304,7 +304,7 @@ const EmptyState: FC<EmptyStateProps> = ({
   loopTitle,
 }) => {
   const buttonClass = buttonDisabled
-    ? "bg-base-200/30 text-base-content/30 cursor-not-allowed"
+    ? "bg-base-200/30 text-base-content/60 cursor-not-allowed"
     : "bg-primary/10 hover:bg-primary/20 text-primary";
 
   return (
@@ -354,7 +354,7 @@ const AddButton: FC<AddButtonProps> = ({ onClick, label, disabled, title, varian
   const enabledClasses = variant === "primary"
     ? "border-base-300 hover:border-primary/50 bg-base-200/30 hover:bg-primary/5 text-base-content/60 hover:text-primary"
     : "border-base-300 hover:border-secondary/50 bg-base-200/30 hover:bg-secondary/5 text-base-content/60 hover:text-secondary";
-  const disabledClasses = "border-base-300/50 bg-base-200/20 text-base-content/30 cursor-not-allowed";
+  const disabledClasses = "border-base-300/50 bg-base-200/20 text-base-content/60 cursor-not-allowed";
 
   return (
     <button
@@ -456,7 +456,7 @@ const CollateralLtvBreakdown: FC<CollateralLtvBreakdownProps> = ({ items, totalD
       </div>
       {/* Per-collateral rows */}
       <div className="flex flex-col gap-1.5">
-        <div className="text-base-content/40 flex items-center gap-2 text-[10px]">
+        <div className="text-base-content/70 flex items-center gap-2 text-[10px]">
           <span className="flex-1">Asset</span>
           <span className="w-16 text-right">Value</span>
           <span className="w-12 text-right">Max LTV</span>
@@ -568,7 +568,7 @@ const ProtocolHeaderMobile: FC<ProtocolHeaderMobileProps> = ({
       <div className="flex items-center gap-1.5">
         <MarketsButton show={!forceShowAll && !disableMarkets} isOpen={isMarketsOpen} onToggle={onToggleMarkets} isMobile />
         <ConnectHint show={forceShowAll && !readOnly} isMobile />
-        <ChevronDownIcon className={`text-base-content/30 size-4 transition-transform duration-300${isCollapsed ? ' -rotate-90' : ''}`} />
+        <ChevronDownIcon className={`text-base-content/60 size-4 transition-transform duration-300${isCollapsed ? ' -rotate-90' : ''}`} />
       </div>
     </div>
     <div className="flex items-center justify-evenly">
@@ -665,7 +665,7 @@ const ProtocolHeaderDesktop: FC<ProtocolHeaderDesktopProps> = ({
       <div className="flex items-center gap-2 pl-3">
         <MarketsButton show={!forceShowAll && !disableMarkets} isOpen={isMarketsOpen} onToggle={onToggleMarkets} />
         <ConnectHint show={forceShowAll && !readOnly} />
-        <ChevronDownIcon className={`text-base-content/30 size-5 transition-transform duration-300${isCollapsed ? ' -rotate-90' : ''}`} />
+        <ChevronDownIcon className={`text-base-content/60 size-5 transition-transform duration-300${isCollapsed ? ' -rotate-90' : ''}`} />
       </div>
     </div>
     {headerElement && (

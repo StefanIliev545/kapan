@@ -13,6 +13,8 @@ export interface SectionData {
   compactHeader?: boolean;
   /** If provided, cycles through these titles with scramble effect */
   titlePhrases?: string[];
+  /** Heading tag for the title. Defaults to "h2"; the hero section uses "h1" for SEO/a11y. */
+  headingLevel?: "h1" | "h2";
 }
 
 // Props that can be injected into content components
@@ -74,6 +76,13 @@ export const StickySection = ({
 
   const isCompact = section.compactHeader;
 
+  // Hero renders its title as <h1> (SEO/a11y); all other sections stay <h2>.
+  const Heading = section.headingLevel ?? "h2";
+
+  // Split the eyebrow tag ("00 / KAPAN") so the index reads in the accent color — a striking
+  // hit that uses an existing theme token (no new hues), with the label kept legible at /60.
+  const tagParts = section.tag.split(" / ");
+
   // Clone content element and inject isActive prop if it accepts it
   const contentWithProps = section.content && isValidElement(section.content)
     ? cloneElement(section.content as React.ReactElement<SectionContentProps>, { isActive: hasBeenActive })
@@ -104,26 +113,33 @@ export const StickySection = ({
           />
           
           {/* Section tag */}
-          <span className="landing-tag text-base-content/40">
-            {section.tag}
+          <span className="landing-tag">
+            {tagParts.length === 2 ? (
+              <>
+                <span className="text-accent">{tagParts[0]}</span>
+                <span className="text-base-content/60"> / {tagParts[1]}</span>
+              </>
+            ) : (
+              <span className="text-base-content/70">{section.tag}</span>
+            )}
           </span>
-          
+
           {/* Main title */}
-          <h2 className={`landing-title text-base-content ${isCompact ? "text-3xl sm:text-4xl md:text-5xl lg:text-6xl" : "text-5xl sm:text-6xl md:text-7xl lg:text-8xl"}`}>
+          <Heading className={`landing-title text-base-content ${isCompact ? "text-3xl sm:text-4xl md:text-5xl lg:text-6xl" : "text-5xl sm:text-6xl md:text-7xl lg:text-8xl"}`}>
             {section.titlePhrases ? (
-              <TextScramble 
-                phrases={section.titlePhrases} 
+              <TextScramble
+                phrases={section.titlePhrases}
                 displayDuration={3000}
                 revealDuration={750}
               />
             ) : (
               section.title
             )}
-          </h2>
+          </Heading>
         </div>
 
         {/* Description */}
-        <p className={`text-base-content/60 max-w-2xl font-light leading-relaxed ${isCompact ? "mb-4 text-base md:mb-6 md:text-lg" : "mb-8 text-lg md:mb-12 md:text-xl lg:text-2xl"}`}>
+        <p className={`text-base-content/80 max-w-2xl font-normal leading-relaxed ${isCompact ? "mb-4 text-base md:mb-6 md:text-lg" : "mb-8 text-lg md:mb-12 md:text-xl lg:text-2xl"}`}>
           {section.description}
         </p>
 

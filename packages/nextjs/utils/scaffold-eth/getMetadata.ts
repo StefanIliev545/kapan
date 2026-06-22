@@ -23,20 +23,30 @@ export const getMetadata = ({
       template: titleTemplate,
     },
     description: description,
+    applicationName: "Kapan Finance",
     openGraph: {
       title: {
         default: title,
         template: titleTemplate,
       },
       description: description,
+      siteName: "Kapan Finance",
+      type: "website",
+      locale: "en_US",
+      url: baseUrl,
       images: [
         {
           url: imageUrl,
+          width: 1200,
+          height: 630,
+          alt: title,
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
+      site: "@KapanFinance",
+      creator: "@KapanFinance",
       title: {
         default: title,
         template: titleTemplate,
@@ -45,7 +55,10 @@ export const getMetadata = ({
       images: [imageUrl],
     },
     icons: {
+      // TODO: the declared 32x32 is actually a full-size image (~560KB). Generate real 32x32 /
+      // 16x16 favicons + a 180x180 apple-touch-icon and point to them here.
       icon: [{ url: "/favicon.png", sizes: "32x32", type: "image/png" }],
+      apple: [{ url: "/favicon.png", sizes: "180x180", type: "image/png" }],
     },
   };
 };

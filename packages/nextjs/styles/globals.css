@@ -135,15 +135,25 @@ img[src$="/logos/ethereum.svg"] {
 
 /* Label text - small uppercase tracking labels */
 .label-text-xs {
-  @apply text-[10px] uppercase tracking-wider text-base-content/40 font-medium;
+  @apply text-[10px] uppercase tracking-wider text-base-content/65 font-medium;
 }
 
 .label-text-xs-semibold {
-  @apply text-[10px] uppercase tracking-widest text-base-content/35 font-semibold;
+  @apply text-[10px] uppercase tracking-widest text-base-content/60 font-semibold;
 }
 
 .label-text-xs-muted {
-  @apply text-[10px] uppercase tracking-wider text-base-content/30;
+  @apply text-[10px] uppercase tracking-wider text-base-content/60;
+}
+
+/* Semantic text-contrast helpers — centralize secondary/tertiary text opacity so future
+   tuning is a one-line edit. Use these instead of ad-hoc text-base-content/30–50 on text. */
+.text-muted {
+  @apply text-base-content/70;
+}
+
+.text-subtle {
+  @apply text-base-content/60;
 }
 
 /* Token icon wrappers - gradient background with ring */
@@ -186,7 +196,7 @@ img[src$="/logos/ethereum.svg"] {
 
 /* Header stat label — refined, lowercase, airy */
 .header-label {
-  @apply text-[9px] tracking-[0.12em] text-base-content/30 font-normal;
+  @apply text-[10px] tracking-[0.12em] text-base-content/60 font-normal;
 }
 
 /* Header stat value — clean, confident */
@@ -267,7 +277,7 @@ img[src$="/logos/ethereum.svg"] {
 
 /* Table header cell — quiet, refined labels */
 .market-th {
-  @apply text-[9px] tracking-[0.12em] text-base-content/30 font-normal
+  @apply text-[10px] tracking-[0.12em] text-base-content/60 font-normal
     pb-3 border-b border-base-content/[0.06];
 }
 
@@ -305,7 +315,7 @@ img[src$="/logos/ethereum.svg"] {
 
 /* Action link — subtle text that lifts on hover */
 .market-action {
-  @apply text-sm font-medium text-base-content/50 hover:text-base-content
+  @apply text-sm font-medium text-base-content/65 hover:text-base-content
     transition-colors duration-150;
 }
 

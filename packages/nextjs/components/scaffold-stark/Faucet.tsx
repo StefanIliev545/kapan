@@ -186,7 +186,7 @@ export const Faucet = () => {
           </div>
           <div className="flex flex-col gap-8">
             <div className="flex flex-col gap-2">
-              <span className="text-sm text-gray-400">Connected Account (Recipient)</span>
+              <span className="text-base-content/70 text-sm">Connected Account (Recipient)</span>
               <AddressInput
                 placeholder="Destination Address"
                 value={inputAddress ?? ""}

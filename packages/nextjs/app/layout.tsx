@@ -12,8 +12,9 @@ import { QueryProvider } from "~~/app/providers/QueryProvider";
 import { RedactedAnalytics } from "~~/components/RedactedAnalytics";
 
 const baseMetadata = getMetadata({
-  title: "Kapan Finance | DeFi Lending Aggregator",
-  description: "Optimize your DeFi APY rates by transferring your debt between protocols",
+  title: "Kapan Finance | Manage Your DeFi Positions",
+  description:
+    "View, compare, and manage your lending and borrowing positions across Aave, Compound, Morpho, and Venus — on Arbitrum, Base, Ethereum and more. See the best rates and act on them in one place.",
 });
 
 export const metadata: Metadata = {

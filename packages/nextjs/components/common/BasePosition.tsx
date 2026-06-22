@@ -221,7 +221,7 @@ const TokenNameContent: FC<{
       <>
         <span className="truncate text-base font-bold leading-tight tracking-tight" title={name}>{name}</span>
         {subtitle ? (
-          <span className="text-base-content/40 truncate text-[10px] uppercase leading-tight tracking-wider">{subtitle}</span>
+          <span className="text-base-content/70 truncate text-[10px] uppercase leading-tight tracking-wider">{subtitle}</span>
         ) : priceLabel ? (
           <span className="text-base-content/50 truncate font-mono text-[10px] tabular-nums leading-tight">{priceLabel}</span>
         ) : null}
@@ -272,7 +272,7 @@ function buildStatColumns(opts: {
       hasBorder: true,
       content: (
         <>
-          <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">Balance</div>
+          <div className="text-base-content/70 mb-0.5 text-[10px] font-medium uppercase tracking-widest">Balance</div>
           <div className="font-mono text-xs font-semibold tabular-nums">
             <BalanceDisplay {...opts.balanceProps} />
           </div>
@@ -286,7 +286,7 @@ function buildStatColumns(opts: {
     hasBorder: true,
     content: (
       <>
-        <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{opts.rateLabel}</div>
+        <div className="text-base-content/70 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{opts.rateLabel}</div>
         <div className="text-base-content font-mono text-xs font-semibold tabular-nums">
           {formatPercentage(opts.currentRate)}%
         </div>
@@ -296,7 +296,7 @@ function buildStatColumns(opts: {
 
   // 30-day projected yield with raw token tooltip on hover
   const yieldColorClass = opts.yield30dUsd === 0
-    ? "text-base-content/40"
+    ? "text-base-content/70"
     : opts.isNegative ? "text-error" : "text-success";
   const signPrefix = opts.isNegative && opts.yield30dUsd !== 0 ? "-" : "";
   const rawYieldFormatted = Math.abs(opts.yield30dRaw).toLocaleString(undefined, { maximumFractionDigits: 4 });
@@ -305,7 +305,7 @@ function buildStatColumns(opts: {
     key: "30d-yield",
     content: (
       <>
-        <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">30D Yield</div>
+        <div className="text-base-content/70 mb-0.5 text-[10px] font-medium uppercase tracking-widest">30D Yield</div>
         <div className="group/yield relative cursor-help">
           <div className={`font-mono text-xs font-semibold tabular-nums ${yieldColorClass}`}>
             {opts.yield30dUsd === 0 ? "—" : `${signPrefix}${formatCurrencyCompact(Math.abs(opts.yield30dUsd))}`}
@@ -327,7 +327,7 @@ function buildStatColumns(opts: {
       hasBorder: !isLast,
       content: (
         <>
-          <div className="text-base-content/40 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{stat.label}</div>
+          <div className="text-base-content/70 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{stat.label}</div>
           <div className="font-mono text-xs font-semibold tabular-nums">{stat.value}</div>
         </>
       ),
@@ -497,22 +497,22 @@ export const BasePosition: FC<BasePositionProps> = ({
           <div className="flex min-w-0 flex-1 items-center justify-around">
             {!hideBalanceColumn && (
               <div className="flex flex-col items-center text-center">
-                <div className="text-base-content/40 text-[8px] font-medium uppercase tracking-widest">Bal</div>
+                <div className="text-base-content/70 text-[8px] font-medium uppercase tracking-widest">Bal</div>
                 <div className="font-mono text-[11px] font-semibold tabular-nums">
                   <BalanceDisplay {...balanceProps} compact />
                 </div>
               </div>
             )}
             <div className="flex flex-col items-center text-center">
-              <div className="text-base-content/40 text-[8px] font-medium uppercase tracking-widest">{rateLabel}</div>
+              <div className="text-base-content/70 text-[8px] font-medium uppercase tracking-widest">{rateLabel}</div>
               <div className="text-base-content font-mono text-[11px] font-semibold tabular-nums">
                 {formatPercentage(currentRate)}%
               </div>
             </div>
             {/* 30D yield - hidden on very narrow screens */}
             <div className="hidden flex-col items-center text-center min-[400px]:flex">
-              <div className="text-base-content/40 text-[8px] font-medium uppercase tracking-widest">30D</div>
-              <div className={`font-mono text-[11px] font-semibold tabular-nums ${yield30dUsd === 0 ? "text-base-content/40" : isNegativeBalance ? "text-error" : "text-success"}`}>
+              <div className="text-base-content/70 text-[8px] font-medium uppercase tracking-widest">30D</div>
+              <div className={`font-mono text-[11px] font-semibold tabular-nums ${yield30dUsd === 0 ? "text-base-content/70" : isNegativeBalance ? "text-error" : "text-success"}`}>
                 {yield30dUsd === 0 ? "—" : `${isNegativeBalance ? "-" : ""}${formatCurrencyCompact(Math.abs(yield30dUsd))}`}
               </div>
             </div>

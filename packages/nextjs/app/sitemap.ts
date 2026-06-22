@@ -14,13 +14,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: post.date ? new Date(post.date) : now,
   }));
 
+  // Only public, indexable content pages belong here.
+  // The wallet-gated app (`/app`) and user/order-specific routes (`/orders`) are
+  // intentionally excluded — they render an empty shell to crawlers and waste crawl budget.
+  // When the programmatic rate/market pages land (the `(rates)` route group), shard this
+  // with generateSitemaps() — see the SEO plan.
   return [
-    { url: `${baseUrl}/`, lastModified: now },
-    { url: `${baseUrl}/app`, lastModified: now },
-    { url: `${baseUrl}/markets`, lastModified: now },
-    { url: `${baseUrl}/info`, lastModified: now },
-    { url: `${baseUrl}/blog`, lastModified: now },
-    { url: `${baseUrl}/privacy`, lastModified: now },
+    { url: `${baseUrl}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
+    { url: `${baseUrl}/markets`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    { url: `${baseUrl}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${baseUrl}/info`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${baseUrl}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${baseUrl}/license`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${baseUrl}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     ...postUrls,
   ];
 }

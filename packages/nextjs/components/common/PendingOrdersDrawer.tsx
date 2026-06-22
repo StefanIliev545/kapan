@@ -555,7 +555,7 @@ export function PendingOrdersDrawer() {
 
           {/* Footer */}
           {(recentOrders.length > 0 || bridges.length > 0) && (
-            <div className="border-base-200 text-base-content/40 flex items-center justify-between border-t px-4 py-2 text-xs">
+            <div className="border-base-200 text-base-content/70 flex items-center justify-between border-t px-4 py-2 text-xs">
               <span>
                 {activeCount > 0 ? `${activeCount} active` : ''}
                 {activeCount > 0 && bridgePendingCount > 0 ? ' · ' : ''}
@@ -566,7 +566,7 @@ export function PendingOrdersDrawer() {
               </span>
               <div className="flex items-center gap-3">
                 {cowExplorerUrl && (
-                  <a href={cowExplorerUrl} target="_blank" rel="noopener noreferrer" className="text-base-content/40 hover:text-primary flex items-center gap-1 transition-colors">
+                  <a href={cowExplorerUrl} target="_blank" rel="noopener noreferrer" className="text-base-content/70 hover:text-primary flex items-center gap-1 transition-colors">
                     <ArrowTopRightOnSquareIcon className="size-3" />
                     CoW Explorer
                   </a>
@@ -638,10 +638,10 @@ export function PendingOrdersDrawer() {
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-medium">{bridge.fromTokenSymbol} → {bridge.toTokenSymbol}</span>
-              <span className="text-base-content/40 text-[10px]">{capitalize(fromChain)} → {capitalize(toChain)}</span>
+              <span className="text-base-content/70 text-[10px]">{capitalize(fromChain)} → {capitalize(toChain)}</span>
             </div>
           </div>
-          <span className="text-base-content/40 text-xs">{timeAgo(Math.floor(bridge.createdAt / 1000), true)}</span>
+          <span className="text-base-content/70 text-xs">{timeAgo(Math.floor(bridge.createdAt / 1000), true)}</span>
         </div>
 
         {/* Row 2: Amount details */}
@@ -650,14 +650,14 @@ export function PendingOrdersDrawer() {
             <span className="text-base-content/60">Sent</span>
             <span className="font-medium">
               {bridge.fromAmount} {bridge.fromTokenSymbol}
-              {bridge.fromAmountUSD && <span className="text-base-content/40 ml-1">(${bridge.fromAmountUSD})</span>}
+              {bridge.fromAmountUSD && <span className="text-base-content/70 ml-1">(${bridge.fromAmountUSD})</span>}
             </span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-base-content/60">{isDone ? "Received" : "Expected"}</span>
             <span className="font-medium">
               {bridge.toAmount} {bridge.toTokenSymbol}
-              {bridge.toAmountUSD && <span className="text-base-content/40 ml-1">(${bridge.toAmountUSD})</span>}
+              {bridge.toAmountUSD && <span className="text-base-content/70 ml-1">(${bridge.toAmountUSD})</span>}
             </span>
           </div>
         </div>
@@ -665,23 +665,23 @@ export function PendingOrdersDrawer() {
         {/* Row 3: Tx links */}
         <div className="flex items-center gap-3 text-xs">
           {bridge.sendingTxLink ? (
-            <a href={bridge.sendingTxLink} target="_blank" rel="noopener noreferrer" className="text-base-content/40 hover:text-primary flex items-center gap-0.5 transition-colors">
+            <a href={bridge.sendingTxLink} target="_blank" rel="noopener noreferrer" className="text-base-content/70 hover:text-primary flex items-center gap-0.5 transition-colors">
               <ArrowTopRightOnSquareIcon className="size-3" />
               Source tx
             </a>
           ) : isPending ? (
-            <span className="text-base-content/30 flex items-center gap-1">
+            <span className="text-base-content/60 flex items-center gap-1">
               <span className="loading loading-spinner loading-xs"></span>
               Waiting...
             </span>
           ) : null}
           {bridge.receivingTxLink ? (
-            <a href={bridge.receivingTxLink} target="_blank" rel="noopener noreferrer" className="text-base-content/40 hover:text-primary flex items-center gap-0.5 transition-colors">
+            <a href={bridge.receivingTxLink} target="_blank" rel="noopener noreferrer" className="text-base-content/70 hover:text-primary flex items-center gap-0.5 transition-colors">
               <ArrowTopRightOnSquareIcon className="size-3" />
               Dest tx
             </a>
           ) : isPending && bridge.sendingTxHash ? (
-            <span className="text-base-content/30 flex items-center gap-1">
+            <span className="text-base-content/60 flex items-center gap-1">
               <span className="loading loading-spinner loading-xs"></span>
               Bridging...
             </span>
@@ -750,7 +750,7 @@ export function PendingOrdersDrawer() {
             </div>
             <span className="text-sm font-medium">{sellSymbol} → {buySymbol}</span>
           </div>
-          <span className="text-base-content/40 text-xs">{timeAgo(createdAt, true)}</span>
+          <span className="text-base-content/70 text-xs">{timeAgo(createdAt, true)}</span>
         </div>
 
         {/* Row 2: LTV info for ADL/Auto-Leverage orders */}
@@ -811,7 +811,7 @@ export function PendingOrdersDrawer() {
               />
             </div>
             <div className="mt-1 flex justify-between">
-              <span className="text-base-content/40 text-xs">{completedIterations}/{maxIterations} iterations</span>
+              <span className="text-base-content/70 text-xs">{completedIterations}/{maxIterations} iterations</span>
               <span className="text-base-content/50 text-xs font-medium">{progressPercent.toFixed(0)}%</span>
             </div>
           </div>
@@ -819,7 +819,7 @@ export function PendingOrdersDrawer() {
 
         {/* Row 4: Actions */}
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-base-content/40">{truncateAddress(orderHash)}</span>
+          <span className="text-base-content/70">{truncateAddress(orderHash)}</span>
           {isActive && (
             <button
               onClick={() => cancelOrder(orderHash)}
