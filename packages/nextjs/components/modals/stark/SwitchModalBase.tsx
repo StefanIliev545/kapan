@@ -126,7 +126,7 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
           <ErrorDisplay message={error} size="sm" className="bg-error/10" />
         )}
         {!selectedQuote ? (
-          <div className="mt-2 text-xs text-gray-500">Fetching quote...</div>
+          <div className="text-base-content/60 mt-2 text-xs">Fetching quote...</div>
         ) : (
           <>
             <div className="space-y-3">
@@ -143,10 +143,10 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
                       {formatTokenAmount(leftAmount.toString(), leftToken?.decimals || 18)}{" "}
                       {resolveDisplay(leftToken).name}
                     </div>
-                    <div className="text-[11px] text-gray-500">{formatUsd(leftAmountUsd ?? 0)}</div>
+                    <div className="text-base-content/60 text-[11px]">{formatUsd(leftAmountUsd ?? 0)}</div>
                   </div>
                 </div>
-                <div className="text-gray-400">→</div>
+                <div className="text-base-content/70">→</div>
                 <div className="flex items-center gap-2">
                   {(() => {
                     const d = resolveDisplay(rightToken);
@@ -159,32 +159,32 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
                       {formatTokenAmount(rightAmount.toString(), rightToken?.decimals || 18)}{" "}
                       {resolveDisplay(rightToken).name}
                     </div>
-                    <div className="text-[11px] text-gray-500">{formatUsd(rightAmountUsd ?? 0)}</div>
+                    <div className="text-base-content/60 text-[11px]">{formatUsd(rightAmountUsd ?? 0)}</div>
                   </div>
                 </div>
               </div>
               <div className="space-y-1 border-t border-gray-100 pt-2">
                 <div className="flex justify-between text-[12px]">
-                  <span className="text-gray-600">AVNU fee</span>
+                  <span className="text-base-content/55">AVNU fee</span>
                   <span>
                     {formatTokenAmount(
                       selectedQuote.avnuFees.toString(),
                       feeToken?.decimals || 18
                     )}{" "}
                     {resolveDisplay(feeToken).name}
-                    <span className="text-gray-500"> · {formatUsd(selectedQuote.avnuFeesInUsd)}</span>
+                    <span className="text-base-content/60"> · {formatUsd(selectedQuote.avnuFeesInUsd)}</span>
                   </span>
                 </div>
                 {selectedQuote.integratorFees > 0n && (
                   <div className="flex justify-between text-[12px]">
-                    <span className="text-gray-600">Integrator fee</span>
+                    <span className="text-base-content/55">Integrator fee</span>
                     <span>
                       {formatTokenAmount(
                         selectedQuote.integratorFees.toString(),
                         feeToken?.decimals || 18
                       )}{" "}
                       {resolveDisplay(feeToken).name}
-                      <span className="text-gray-500">
+                      <span className="text-base-content/60">
                         {" "}
                         · {formatUsd(selectedQuote.integratorFeesInUsd)}
                       </span>
@@ -192,8 +192,8 @@ export const SwitchModalBase: FC<SwitchModalBaseProps> = ({
                   </div>
                 )}
                 <div className="flex justify-between text-[12px]">
-                  <span className="text-gray-600">Network fee</span>
-                  <span className="text-gray-700">{formatUsd(selectedQuote.gasFeesInUsd)}</span>
+                  <span className="text-base-content/55">Network fee</span>
+                  <span className="text-base-content/60">{formatUsd(selectedQuote.gasFeesInUsd)}</span>
                 </div>
               </div>
             </div>

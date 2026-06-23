@@ -1,7 +1,6 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithProviders";
 import { ThemeProvider } from "~~/components/ThemeProvider";
@@ -12,8 +11,9 @@ import { QueryProvider } from "~~/app/providers/QueryProvider";
 import { RedactedAnalytics } from "~~/components/RedactedAnalytics";
 
 const baseMetadata = getMetadata({
-  title: "Kapan Finance | DeFi Lending Aggregator",
-  description: "Optimize your DeFi APY rates by transferring your debt between protocols",
+  title: "Kapan Finance | Manage Your DeFi Positions",
+  description:
+    "View, compare, and manage your lending and borrowing positions across Aave, Compound, Morpho, and Venus — on Arbitrum, Base, Ethereum and more. See the best rates and act on them in one place.",
 });
 
 export const metadata: Metadata = {
@@ -42,10 +42,10 @@ const themeScript = {
   `,
 };
 
-const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
-  const headersList = await headers();
-  const initialHost = headersList.get("host");
-
+// NOTE: this layout must stay free of dynamic functions (headers()/cookies()) — using them here
+// opts EVERY route into per-request dynamic rendering, which blocks SSG/ISR for the programmatic
+// /rates pages. Host detection now happens client-side in ScaffoldEthAppWithProviders.
+const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   return (
     <html lang="en" suppressHydrationWarning data-theme="kapan" className="dark">
       <head>
@@ -65,7 +65,7 @@ const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
       <body className={`${inter.className}`}>
         <ThemeProvider>
           <QueryProvider>
-            <ScaffoldEthAppWithProviders initialHost={initialHost}>
+            <ScaffoldEthAppWithProviders>
               {children}
             </ScaffoldEthAppWithProviders>
           </QueryProvider>

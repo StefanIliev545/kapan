@@ -94,7 +94,7 @@ const baseColumns = [
     cell: info => {
       const value = info.getValue();
       return (
-        <span className={`font-mono tabular-nums ${value > 0 ? "text-success" : "text-base-content/30"}`}>
+        <span className={`font-mono tabular-nums ${value > 0 ? "text-success" : "text-base-content/60"}`}>
           {formatApy(value)}
         </span>
       );
@@ -107,7 +107,7 @@ const baseColumns = [
     cell: info => {
       const value = info.getValue();
       if (value === null || value === 0) {
-        return <span className="text-base-content/30 font-mono tabular-nums">{"\u2014"}</span>;
+        return <span className="text-base-content/60 font-mono tabular-nums">{"\u2014"}</span>;
       }
       return <span className="font-mono tabular-nums">{formatApy(value)}</span>;
     },
@@ -119,7 +119,7 @@ const baseColumns = [
     cell: info => {
       const value = info.getValue();
       if (value === null) {
-        return <span className="text-base-content/30 font-mono tabular-nums">{"\u2014"}</span>;
+        return <span className="text-base-content/60 font-mono tabular-nums">{"\u2014"}</span>;
       }
       return <span className="text-base-content/70 font-mono tabular-nums">{formatLtvBps(value)}</span>;
     },
@@ -221,7 +221,7 @@ export const CrossTopologyMarketsSection: FC<CrossTopologyMarketsSectionProps> =
   if (rows.length === 0) {
     return (
       <Flex align="center" justify="center" py="6">
-        <Text size="2" className="text-base-content/40">
+        <Text size="2" className="text-base-content/70">
           No markets found
         </Text>
       </Flex>
@@ -323,18 +323,18 @@ export const CrossTopologyMarketsSection: FC<CrossTopologyMarketsSectionProps> =
                 )}
               </div>
               <div className="flex items-center gap-3 text-[11px]">
-                <span className={`font-mono tabular-nums ${row.supplyApy > 0 ? "text-success" : "text-base-content/30"}`}>
+                <span className={`font-mono tabular-nums ${row.supplyApy > 0 ? "text-success" : "text-base-content/60"}`}>
                   {formatApy(row.supplyApy)}
                 </span>
                 {row.borrowApy !== null && row.borrowApy > 0 ? (
                   <span className="font-mono tabular-nums">{formatApy(row.borrowApy)}</span>
                 ) : (
-                  <span className="text-base-content/30">{"\u2014"}</span>
+                  <span className="text-base-content/60">{"\u2014"}</span>
                 )}
                 {row.ltvBps !== null ? (
                   <span className="text-base-content/70 font-mono tabular-nums">{formatLtvBps(row.ltvBps)}</span>
                 ) : (
-                  <span className="text-base-content/30">{"\u2014"}</span>
+                  <span className="text-base-content/60">{"\u2014"}</span>
                 )}
               </div>
               {renderRowExtra && (

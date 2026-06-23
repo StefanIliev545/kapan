@@ -126,47 +126,33 @@ const SWAP_ARROW_TRANSITION = { duration: 1.2, repeat: Infinity };
 // Protocol and Network Data
 // ================================
 
-const protocols = [
-  { name: "Aave", logo: "/logos/aave.svg" },
-  { name: "Compound", logo: "/logos/compound.svg" },
-  { name: "Vesu", logo: "/logos/vesu.svg" },
-  { name: "Nostra", logo: "/logos/nostra.svg" },
-  { name: "Venus", logo: "/logos/venus.svg" },
-];
-
-// Duplicate for seamless loop
-const duplicatedProtocols = [...protocols, ...protocols];
-
-const ProtocolMarquee = () => {
+// Brighter, generic marquee row used in the hero (protocols / networks).
+const HeroMarquee = ({
+  items,
+  reverse = false,
+}: {
+  items: { name: string; logo: string }[];
+  reverse?: boolean;
+}) => {
+  const animate = useMemo(
+    () => (reverse ? { x: ["-50%", "0%"] as [string, string] } : MARQUEE_ANIMATE),
+    [reverse],
+  );
   return (
-    <div className="relative w-full max-w-md overflow-hidden">
-      <motion.div
-        className="flex gap-6"
-        animate={MARQUEE_ANIMATE}
-        transition={MARQUEE_TRANSITION}
-      >
-        {duplicatedProtocols.map((protocol, index) => (
-          <div
-            key={`${protocol.name}-${index}`}
-            className="flex flex-shrink-0 items-center gap-2"
-          >
+    <div className="relative w-full overflow-hidden">
+      <motion.div className="flex gap-8" animate={animate} transition={MARQUEE_TRANSITION}>
+        {items.map((item, index) => (
+          <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
             <div className="relative size-5">
-              <Image
-                src={protocol.logo}
-                alt={protocol.name}
-                fill
-                className="object-contain"
-              />
+              <Image src={item.logo} alt={item.name} fill className="object-contain" />
             </div>
-            <span className="text-base-content/50 text-sm font-medium">
-              {protocol.name}
-            </span>
+            <span className="text-base-content/70 text-sm font-medium">{item.name}</span>
           </div>
         ))}
       </motion.div>
       {/* Fade edges */}
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r to-transparent" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l to-transparent" />
     </div>
   );
 };
@@ -194,22 +180,53 @@ const LaunchAppButton = () => {
       onClick={handleClick}
       className="bg-primary text-primary-content group relative flex h-16 items-center justify-center overflow-hidden px-10 text-[11px] font-black uppercase tracking-[0.3em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] md:h-20 md:px-14 md:text-xs"
     >
-      <div className="relative z-10 flex items-center gap-4">
-        <span className="translate-x-2 transition-transform duration-500 group-hover:translate-x-0">
-          Launch App
-        </span>
-        <ArrowRightIcon className="size-4 opacity-0 transition-all duration-500 group-hover:translate-x-1 group-hover:opacity-100" />
+      <div className="relative z-10 flex items-center gap-3">
+        <span>See my positions</span>
+        <ArrowRightIcon className="size-4 transition-transform duration-500 group-hover:translate-x-1" />
       </div>
     </a>
   );
 };
 
-const HeroContent = () => (
-  <div className="flex flex-col items-center gap-8">
-    <ProtocolMarquee />
-    <LaunchAppButton />
-  </div>
-);
+const HeroContent = () => {
+  // Breadth, derived from the data (not a financial claim) — gives the hero substance.
+  const stats = [
+    { value: supportedProtocols.length, label: "Protocols" },
+    { value: networks.length, label: "Networks" },
+    { value: 1, label: "Screen" },
+  ];
+  return (
+    <div className="relative flex w-full flex-col items-center gap-7">
+      {/* Accent glow — drama within the palette (accent #3b82f6), no new hue */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-[42rem] -translate-x-1/2 translate-y-[-65%] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.12),transparent_65%)] blur-2xl" />
+
+      {/* Live breadth strip — terminal-styled, monospace */}
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-xs uppercase tracking-[0.22em] sm:text-sm">
+        <span className="relative flex size-2">
+          <span className="bg-accent absolute inline-flex size-2 animate-ping rounded-full opacity-75" />
+          <span className="bg-accent relative inline-flex size-2 rounded-full" />
+        </span>
+        {stats.map((s, i) => (
+          <span key={s.label} className="flex items-center gap-4">
+            {i > 0 && <span className="text-accent/50">/</span>}
+            <span>
+              <span className="text-base-content font-bold">{s.value}</span>{" "}
+              <span className="text-base-content/55">{s.label}</span>
+            </span>
+          </span>
+        ))}
+      </div>
+
+      {/* Protocol + network marquees — brighter and more present than a single faint row */}
+      <div className="w-full max-w-xl space-y-2.5">
+        <HeroMarquee items={duplicatedSupportedProtocols} />
+        <HeroMarquee items={duplicatedNetworks} reverse />
+      </div>
+
+      <LaunchAppButton />
+    </div>
+  );
+};
 
 // Supported networks
 const networks = [
@@ -252,7 +269,7 @@ const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; 
 
   return (
     <div className="flex w-full items-center gap-4">
-      <span className="text-base-content/30 w-20 flex-shrink-0 text-right text-[10px] uppercase tracking-wider">{label}</span>
+      <span className="text-base-content/60 w-20 flex-shrink-0 text-right text-[10px] uppercase tracking-wider">{label}</span>
       <div className="relative flex-1 overflow-hidden">
         <motion.div
           className="flex gap-6"
@@ -264,7 +281,7 @@ const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; 
               <div className="relative size-5">
                 <Image src={item.logo} alt={item.name} fill className="object-contain" />
               </div>
-              <span className="text-base-content/40 text-xs">{item.name}</span>
+              <span className="text-base-content/70 text-xs">{item.name}</span>
             </div>
           ))}
         </motion.div>
@@ -278,10 +295,10 @@ const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; 
 
 const FeatureList = () => {
   const features = useMemo(() => [
-    { icon: ShieldCheckIcon, title: "Non-Custodial", desc: "Your assets stay yours. Verify on any protocol's frontend." },
-    { icon: BoltIcon, title: "Atomic Transactions", desc: "All operations execute in a single transaction using flash loans." },
-    { icon: CurrencyDollarIcon, title: "Zero Protocol Fees", desc: "You only pay network gas and swap fees. No Kapan fees." },
-    { icon: SparklesIcon, title: "Any Gas Token", desc: "Pay gas in any token with AVNU Paymaster integration." },
+    { icon: ShieldCheckIcon, title: "Non-Custodial", desc: "Your assets never leave your wallet. Verify every move on the protocol's own frontend." },
+    { icon: BoltIcon, title: "Atomic Transactions", desc: "Six steps, one signature." },
+    { icon: CurrencyDollarIcon, title: "Zero Protocol Fees", desc: "No Kapan fee, ever. You pay gas and swap fees, nothing to us." },
+    { icon: SparklesIcon, title: "Any Gas Token", desc: "Pay gas in any token you hold — no native-token scramble (via AVNU Paymaster)." },
   ], []);
 
   return (
@@ -295,7 +312,7 @@ const FeatureList = () => {
             </div>
             <div className="pt-0.5">
               <div className="text-base-content mb-1 text-sm font-semibold">{f.title}</div>
-              <div className="text-base-content/40 text-sm leading-relaxed">{f.desc}</div>
+              <div className="text-base-content/70 text-sm leading-relaxed">{f.desc}</div>
             </div>
           </div>
         ))}
@@ -408,7 +425,7 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
         animate={linksAnimate}
         transition={LINKS_TRANSITION}
       >
-        <div className="text-base-content/30 flex items-center gap-6 text-xs">
+        <div className="text-base-content/60 flex items-center gap-6 text-xs">
           <a href="https://discord.gg/Vjk6NhkxGv" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Discord</a>
           <a href="https://t.me/+vYCKr2TrOXRiODg0" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Telegram</a>
           <a href="https://x.com/KapanFinance" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Twitter</a>
@@ -418,7 +435,7 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
           href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-base-content/20 hover:text-base-content/40 text-[10px] uppercase tracking-wider transition-colors"
+          className="text-base-content/60 hover:text-base-content/90 text-[10px] uppercase tracking-wider transition-colors"
         >
           Starknet Audit by Codespect
         </a>
@@ -517,8 +534,8 @@ const HowItWorks = () => {
           transition={STEP_01_TRANSITION}
         >
           <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">01</div>
-          <div className="mb-1 text-sm font-medium">Bundle Instructions</div>
-          <div className="text-base-content/40 text-xs">Combine deposit, borrow, swap, and repay into one bundle.</div>
+          <div className="mb-1 text-sm font-medium">Bundle the steps</div>
+          <div className="text-base-content/70 text-xs">Deposit, borrow, swap, repay — stacked into one transaction.</div>
         </motion.div>
         <motion.div
           className="max-w-[200px]"
@@ -527,8 +544,8 @@ const HowItWorks = () => {
           transition={STEP_02_TRANSITION}
         >
           <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">02</div>
-          <div className="mb-1 text-sm font-medium">Flash Loan Powered</div>
-          <div className="text-base-content/40 text-xs">No upfront capital needed. Borrow, execute, repay atomically.</div>
+          <div className="mb-1 text-sm font-medium">No capital up front</div>
+          <div className="text-base-content/70 text-xs">A flash loan fronts the funds — borrowed and repaid inside the same transaction.</div>
         </motion.div>
         <motion.div
           className="max-w-[200px]"
@@ -537,8 +554,8 @@ const HowItWorks = () => {
           transition={STEP_03_TRANSITION}
         >
           <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">03</div>
-          <div className="mb-1 text-sm font-medium">All or Nothing</div>
-          <div className="text-base-content/40 text-xs">Transaction succeeds completely or reverts. No partial states.</div>
+          <div className="mb-1 text-sm font-medium">All or nothing</div>
+          <div className="text-base-content/70 text-xs">It all goes through, or none of it does. No half-finished position to clean up.</div>
         </motion.div>
       </div>
     </div>
@@ -710,7 +727,7 @@ const MockMorphoView = () => (
               <div className="flex items-center gap-1.5">
                 <Image src="/logos/morpho.svg" alt="Morpho" width={14} height={14} />
                 <MockTooltip tip="View on Morpho">
-                  <a href="#" className="text-base-content/40 hover:text-base-content/60">
+                  <a href="#" className="text-base-content/70 hover:text-base-content/60">
                     <svg className="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                   </a>
                 </MockTooltip>
@@ -724,7 +741,7 @@ const MockMorphoView = () => (
                 <span className="text-base-content/50 cursor-help">APY: <span className="text-success font-mono font-semibold">+44.79%</span></span>
               </MockTooltip>
               <MockTooltip tip="Loan-to-Value: 89.7% used of 92% max">
-                <span className="text-base-content/50 cursor-help">LTV: <span className="text-warning font-mono font-semibold">89.7%</span><span className="text-base-content/40">/92%</span></span>
+                <span className="text-base-content/50 cursor-help">LTV: <span className="text-warning font-mono font-semibold">89.7%</span><span className="text-base-content/70">/92%</span></span>
               </MockTooltip>
               <MockTooltip tip="Projected 30-day earnings">
                 <span className="text-base-content/50 cursor-help">30D: <span className="text-success font-mono font-semibold">$241.28</span></span>
@@ -741,16 +758,16 @@ const MockMorphoView = () => (
                   <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={28} height={28} className="rounded-full" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-base-content/40 text-[9px] uppercase tracking-wider">Collateral</div>
+                  <div className="text-base-content/70 text-[9px] uppercase tracking-wider">Collateral</div>
                   <div className="truncate text-xs font-medium">PT-USDai-1...</div>
                 </div>
                 <div className="flex items-center gap-3 text-right">
                   <div>
-                    <div className="text-base-content/40 text-[8px] uppercase">Bal</div>
+                    <div className="text-base-content/70 text-[8px] uppercase">Bal</div>
                     <div className="text-success font-mono text-xs font-semibold">$63.8K</div>
                   </div>
                   <div>
-                    <div className="text-base-content/40 text-[8px] uppercase">APY</div>
+                    <div className="text-base-content/70 text-[8px] uppercase">APY</div>
                     <div className="font-mono text-xs font-semibold">7.46%</div>
                   </div>
                 </div>
@@ -767,16 +784,16 @@ const MockMorphoView = () => (
               <div className="flex items-center gap-2">
                 <Image src="/logos/usdc.svg" alt="USDC" width={28} height={28} className="flex-shrink-0 rounded-full" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-base-content/40 text-[9px] uppercase tracking-wider">Debt</div>
+                  <div className="text-base-content/70 text-[9px] uppercase tracking-wider">Debt</div>
                   <div className="text-xs font-medium">USDC</div>
                 </div>
                 <div className="flex items-center gap-3 text-right">
                   <div>
-                    <div className="text-base-content/40 text-[8px] uppercase">Bal</div>
+                    <div className="text-base-content/70 text-[8px] uppercase">Bal</div>
                     <div className="text-error font-mono text-xs font-semibold">-$57.3K</div>
                   </div>
                   <div>
-                    <div className="text-base-content/40 text-[8px] uppercase">APR</div>
+                    <div className="text-base-content/70 text-[8px] uppercase">APR</div>
                     <div className="font-mono text-xs font-semibold">3.19%</div>
                   </div>
                 </div>
@@ -811,31 +828,22 @@ const MockMorphoView = () => (
                   </div>
                 </div>
                 {/* Stats - col-span-9, evenly distributed */}
-                <div className="col-span-9 grid grid-cols-4 gap-0">
+                <div className="col-span-9 grid grid-cols-3 gap-0">
                   <MockTooltip tip="Total collateral value">
                     <div className="border-base-300/30 cursor-help border-r px-2 text-center">
-                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Balance</div>
+                      <div className="text-base-content/70 text-[10px] uppercase tracking-wider">Balance</div>
                       <div className="text-success font-mono text-sm font-semibold">$63.83K</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Current yield rate">
                     <div className="border-base-300/30 cursor-help border-r px-2 text-center">
-                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">APY</div>
+                      <div className="text-base-content/70 text-[10px] uppercase tracking-wider">APY</div>
                       <div className="font-mono text-sm font-semibold">7.46%</div>
-                    </div>
-                  </MockTooltip>
-                  <MockTooltip tip="Best available rate across protocols">
-                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
-                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Best APY</div>
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="text-success font-mono text-sm font-semibold">7.46%</span>
-                        <Image src="/logos/morpho.svg" alt="Morpho" width={12} height={12} />
-                      </div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Loan-to-Value ratio">
                     <div className="cursor-help px-2 text-center">
-                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">LTV</div>
+                      <div className="text-base-content/70 text-[10px] uppercase tracking-wider">LTV</div>
                       <div className="text-warning font-mono text-sm font-semibold">89.7%</div>
                     </div>
                   </MockTooltip>
@@ -862,26 +870,17 @@ const MockMorphoView = () => (
                   </div>
                 </div>
                 {/* Stats - col-span-8, evenly distributed */}
-                <div className="col-span-8 grid grid-cols-3 gap-0">
+                <div className="col-span-8 grid grid-cols-2 gap-0">
                   <MockTooltip tip="Total debt owed">
                     <div className="border-base-300/30 cursor-help border-r px-2 text-center">
-                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Balance</div>
+                      <div className="text-base-content/70 text-[10px] uppercase tracking-wider">Balance</div>
                       <div className="text-error font-mono text-sm font-semibold">-$57.28K</div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Current borrow rate">
-                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
-                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">APR</div>
-                      <div className="font-mono text-sm font-semibold">3.19%</div>
-                    </div>
-                  </MockTooltip>
-                  <MockTooltip tip="Best available borrow rate">
                     <div className="cursor-help px-2 text-center">
-                      <div className="text-base-content/40 text-[10px] uppercase tracking-wider">Best APR</div>
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="text-success font-mono text-sm font-semibold">3.72%</span>
-                        <Image src="/logos/aave.svg" alt="Aave" width={12} height={12} />
-                      </div>
+                      <div className="text-base-content/70 text-[10px] uppercase tracking-wider">APR</div>
+                      <div className="font-mono text-sm font-semibold">3.19%</div>
                     </div>
                   </MockTooltip>
                 </div>
@@ -934,26 +933,26 @@ const MockAaveHeader = () => (
               <Image src="/logos/aave.svg" alt="Aave V3" width={24} height={24} className="object-contain drop-shadow-sm" />
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Protocol</span>
+              <span className="text-base-content/60 text-[10px] font-semibold uppercase tracking-widest">Protocol</span>
               <span className="text-base font-bold tracking-tight">Aave V3</span>
             </div>
           </div>
           <div className="via-base-300 h-10 w-px bg-gradient-to-b from-transparent to-transparent" />
           <div className="flex flex-1 flex-wrap items-center justify-around gap-y-3">
             <div className="flex flex-col items-center gap-1 px-3 py-1">
-              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Balance</span>
+              <span className="text-base-content/60 text-[10px] font-semibold uppercase tracking-widest">Balance</span>
               <span className="text-success font-mono text-sm font-bold tabular-nums">$2,356.66</span>
             </div>
             <div className="flex flex-col items-center gap-1 px-3 py-1">
-              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">30D Yield</span>
+              <span className="text-base-content/60 text-[10px] font-semibold uppercase tracking-widest">30D Yield</span>
               <span className="text-error font-mono text-sm font-bold tabular-nums">-$7.45</span>
             </div>
             <div className="flex flex-col items-center gap-1 px-3 py-1">
-              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Net APY</span>
+              <span className="text-base-content/60 text-[10px] font-semibold uppercase tracking-widest">Net APY</span>
               <span className="text-error font-mono text-sm font-bold tabular-nums">-3.85%</span>
             </div>
             <div className="flex flex-col items-center gap-1 px-3 py-1">
-              <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-widest">Utilization</span>
+              <span className="text-base-content/60 text-[10px] font-semibold uppercase tracking-widest">Utilization</span>
               <div className="flex items-center gap-2.5">
                 <div className="bg-base-300/60 h-1.5 w-24 overflow-hidden rounded-full">
                   <div className="bg-warning h-full w-[81%] rounded-full" />
@@ -1067,7 +1066,7 @@ const TokenDisplay = ({
     <div className="flex items-center gap-3">
       <Image src={logo} alt={symbol} width={s.img} height={s.img} className="rounded-full" />
       <div>
-        {label && <div className="text-base-content/30 text-[10px] uppercase tracking-wider">{label}</div>}
+        {label && <div className="text-base-content/60 text-[10px] uppercase tracking-wider">{label}</div>}
         <div className="flex items-baseline gap-2">
           <span className={`font-mono ${s.amount} ${
             variant === "success" ? "text-success" :
@@ -1112,9 +1111,9 @@ const RateDisplay = ({
   size?: "md" | "lg";
 }) => (
   <div className={`flex items-baseline gap-3 ${size === "md" ? "" : ""}`}>
-    <span className="text-base-content/30 text-xs uppercase tracking-wider">{label}</span>
+    <span className="text-base-content/60 text-xs uppercase tracking-wider">{label}</span>
     {oldRate && (
-      <span className="text-base-content/30 font-mono line-through">{oldRate}</span>
+      <span className="text-base-content/60 font-mono line-through">{oldRate}</span>
     )}
     <span className={`text-success font-mono font-bold ${size === "lg" ? "text-2xl sm:text-3xl" : "text-xl"}`}>{newRate}</span>
   </div>
@@ -1139,7 +1138,7 @@ const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?:
         animate={arrowAnimate}
         transition={FLOW_ARROW_TRANSITION}
       >
-        <ArrowRightIcon className={`text-base-content/20 size-5${vertical ? "rotate-90" : ""}`} />
+        <ArrowRightIcon className={`text-base-content/60 size-5${vertical ? "rotate-90" : ""}`} />
       </motion.div>
     </motion.div>
   );
@@ -1151,7 +1150,7 @@ const ActionContent = ({ children, description }: { children: React.ReactNode; d
     <motion.p
       initial={ACTION_CONTENT_INITIAL}
       animate={ACTION_CONTENT_ANIMATE}
-      className="text-base-content/40 mb-8 text-center text-sm sm:mb-10 sm:text-base"
+      className="text-base-content/70 mb-8 text-center text-sm sm:mb-10 sm:text-base"
     >
       {description}
     </motion.p>
@@ -1160,7 +1159,7 @@ const ActionContent = ({ children, description }: { children: React.ReactNode; d
 );
 
 const LendCard = () => (
-  <ActionContent description="Deposit assets to earn yield. Compare rates across all protocols.">
+  <ActionContent description="Put assets to work. See which protocol pays more before you commit.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-6 md:hidden">
       <FlowStep delay={0}>
@@ -1177,7 +1176,7 @@ const LendCard = () => (
         </div>
       </FlowStep>
       <FlowStep delay={0.5}>
-        <div className="text-base-content/25 flex items-center gap-4 text-xs">
+        <div className="text-base-content/60 flex items-center gap-4 text-xs">
           <span className="flex items-center gap-1"><Image src="/logos/morpho.svg" alt="" width={12} height={12} className="opacity-50" />3.21%</span>
           <span className="flex items-center gap-1"><Image src="/logos/compound.svg" alt="" width={12} height={12} className="opacity-50" />2.89%</span>
         </div>
@@ -1200,7 +1199,7 @@ const LendCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.4}>
-        <div className="text-base-content/25 border-base-content/10 flex flex-col gap-2 border-l pl-8 text-xs">
+        <div className="text-base-content/60 border-base-content/10 flex flex-col gap-2 border-l pl-8 text-xs">
           <span className="flex items-center gap-1.5"><Image src="/logos/morpho.svg" alt="" width={14} height={14} className="opacity-50" />Morpho 3.21%</span>
           <span className="flex items-center gap-1.5"><Image src="/logos/compound.svg" alt="" width={14} height={14} className="opacity-50" />Compound 2.89%</span>
         </div>
@@ -1210,7 +1209,7 @@ const LendCard = () => (
 );
 
 const BorrowCard = () => (
-  <ActionContent description="Borrow against your collateral. Compare rates across protocols.">
+  <ActionContent description="Borrow against what you hold. See who charges least, then go there.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-6 md:hidden">
       <FlowStep delay={0}>
@@ -1251,7 +1250,7 @@ const BorrowCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.55}>
-        <div className="text-base-content/25 border-base-content/10 flex flex-col gap-2 border-l pl-8 text-xs">
+        <div className="text-base-content/60 border-base-content/10 flex flex-col gap-2 border-l pl-8 text-xs">
           <span className="flex items-center gap-1.5"><Image src="/logos/aave.svg" alt="" width={14} height={14} className="opacity-50" />Aave 4.80%</span>
           <span className="flex items-center gap-1.5"><Image src="/logos/compound.svg" alt="" width={14} height={14} className="opacity-50" />Compound 5.12%</span>
         </div>
@@ -1261,7 +1260,7 @@ const BorrowCard = () => (
 );
 
 const SwapCard = () => (
-  <ActionContent description="Switch collateral or debt assets atomically. Position stays open.">
+  <ActionContent description="Swap your collateral or debt without closing the position. Nothing to unwind.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-6 md:hidden">
       <FlowStep delay={0}>
@@ -1273,7 +1272,7 @@ const SwapCard = () => (
       </FlowStep>
       <FlowStep delay={0.4}>
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-base-content/30">APY improvement</span>
+          <span className="text-base-content/60">APY improvement</span>
           <span className="text-success font-mono text-xl font-bold">+0.8%</span>
         </div>
       </FlowStep>
@@ -1289,7 +1288,7 @@ const SwapCard = () => (
           <motion.div animate={SWAP_ARROW_ANIMATE} transition={SWAP_ARROW_TRANSITION}>
             <ArrowRightIcon className="text-primary size-6" />
           </motion.div>
-          <span className="text-base-content/20 mt-1 text-[9px] uppercase tracking-widest">swap</span>
+          <span className="text-base-content/60 mt-1 text-[9px] uppercase tracking-widest">swap</span>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.3}>
@@ -1297,7 +1296,7 @@ const SwapCard = () => (
       </HFlowStep>
       <HFlowStep delay={0.45}>
         <div className="border-base-content/10 ml-6 flex flex-col items-center border-l pl-10">
-          <span className="text-base-content/30 text-[10px] uppercase tracking-wider">APY improvement</span>
+          <span className="text-base-content/60 text-[10px] uppercase tracking-wider">APY improvement</span>
           <span className="text-success font-mono text-2xl font-bold">+0.8%</span>
         </div>
       </HFlowStep>
@@ -1306,14 +1305,14 @@ const SwapCard = () => (
 );
 
 const LoopCard = () => (
-  <ActionContent description="Create leveraged positions in one transaction. Zap from any token.">
+  <ActionContent description="Open a leveraged position in one move. Start from any token you hold.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-6 md:hidden">
       <FlowStep delay={0}>
         <div className="flex items-center gap-3">
           <Image src="/logos/wsteth.svg" alt="wstETH" width={36} height={36} className="rounded-full" />
           <div>
-            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Deposit</div>
+            <div className="text-base-content/60 text-[10px] uppercase tracking-wider">Deposit</div>
             <span className="font-mono text-lg">5.0 wstETH</span>
           </div>
         </div>
@@ -1327,12 +1326,12 @@ const LoopCard = () => (
         <div className="flex flex-col gap-2 text-sm">
           <div className="flex items-center gap-2">
             <Image src="/logos/wsteth.svg" alt="" width={20} height={20} />
-            <span className="text-base-content/40">Position:</span>
+            <span className="text-base-content/70">Position:</span>
             <span className="text-success font-mono">15.0 wstETH</span>
           </div>
           <div className="flex items-center gap-2">
             <Image src="/logos/weth.svg" alt="" width={20} height={20} />
-            <span className="text-base-content/40">Debt:</span>
+            <span className="text-base-content/70">Debt:</span>
             <span className="text-error font-mono">-10.0 WETH</span>
           </div>
         </div>
@@ -1348,7 +1347,7 @@ const LoopCard = () => (
         <div className="flex items-center gap-3">
           <Image src="/logos/wsteth.svg" alt="wstETH" width={40} height={40} className="rounded-full" />
           <div>
-            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">You deposit</div>
+            <div className="text-base-content/60 text-[10px] uppercase tracking-wider">You deposit</div>
             <span className="font-mono text-xl">5.0 wstETH</span>
           </div>
         </div>
@@ -1357,7 +1356,7 @@ const LoopCard = () => (
       <HFlowStep delay={0.25}>
         <div className="flex flex-col items-center px-6">
           <span className="bg-primary/10 text-primary rounded px-4 py-1.5 text-sm font-bold">3x Leverage</span>
-          <span className="text-base-content/20 mt-1 text-[9px] uppercase tracking-widest">wstETH / WETH</span>
+          <span className="text-base-content/60 mt-1 text-[9px] uppercase tracking-widest">wstETH / WETH</span>
         </div>
       </HFlowStep>
       <FlowArrow delay={0.35} />
@@ -1365,12 +1364,12 @@ const LoopCard = () => (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sm">
             <Image src="/logos/wsteth.svg" alt="" width={20} height={20} />
-            <span className="text-base-content/40">Position:</span>
+            <span className="text-base-content/70">Position:</span>
             <span className="text-success font-mono">15.0 wstETH</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Image src="/logos/weth.svg" alt="" width={20} height={20} />
-            <span className="text-base-content/40">Debt:</span>
+            <span className="text-base-content/70">Debt:</span>
             <span className="text-error font-mono">-10.0 WETH</span>
           </div>
         </div>
@@ -1385,7 +1384,7 @@ const LoopCard = () => (
 );
 
 const PendleCard = () => (
-  <ActionContent description="Leverage Pendle PT tokens. Fixed yield until maturity.">
+  <ActionContent description="Put Pendle PT tokens to work. Fixed-rate until maturity, looped in one move.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-6 md:hidden">
       <FlowStep delay={0}>
@@ -1397,7 +1396,7 @@ const PendleCard = () => (
             </div>
           </div>
           <div>
-            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Pendle PT</div>
+            <div className="text-base-content/60 text-[10px] uppercase tracking-wider">Pendle PT</div>
             <div className="font-semibold">PT-USDai-19FEB2026</div>
           </div>
         </div>
@@ -1406,7 +1405,7 @@ const PendleCard = () => (
         <RateDisplay newRate="8.42%" label="Fixed APY" />
       </FlowStep>
       <FlowStep delay={0.4}>
-        <div className="text-base-content/30 flex items-center gap-4 text-xs">
+        <div className="text-base-content/60 flex items-center gap-4 text-xs">
           <span className="uppercase tracking-wider">Leverage</span>
           <span className="text-base-content/10">|</span>
           <span className="uppercase tracking-wider">Swap</span>
@@ -1427,7 +1426,7 @@ const PendleCard = () => (
             </div>
           </div>
           <div>
-            <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Pendle PT Token</div>
+            <div className="text-base-content/60 text-[10px] uppercase tracking-wider">Pendle PT Token</div>
             <div className="text-lg font-semibold">PT-USDai-19FEB2026</div>
           </div>
         </div>
@@ -1439,7 +1438,7 @@ const PendleCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.4}>
-        <div className="border-base-content/10 text-base-content/30 flex flex-col gap-2 border-l pl-8 text-xs">
+        <div className="border-base-content/10 text-base-content/60 flex flex-col gap-2 border-l pl-8 text-xs">
           <span className="hover:text-base-content/60 cursor-default uppercase tracking-wider transition-colors">Leverage</span>
           <span className="hover:text-base-content/60 cursor-default uppercase tracking-wider transition-colors">Swap</span>
           <span className="hover:text-base-content/60 cursor-default uppercase tracking-wider transition-colors">Refinance</span>
@@ -1450,7 +1449,7 @@ const PendleCard = () => (
 );
 
 const RefinanceCard = () => (
-  <ActionContent description="Move entire positions between protocols in one atomic transaction.">
+  <ActionContent description="Move a whole position to a cheaper protocol in one move.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-5 md:hidden">
       <FlowStep delay={0}>
@@ -1482,12 +1481,12 @@ const RefinanceCard = () => (
       <HFlowStep delay={0}>
         <div className="flex flex-col items-center gap-2">
           <ProtocolBadge logo="/logos/aave.svg" name="Aave V3" size="lg" />
-          <span className="text-base-content/25 text-[10px] uppercase tracking-wider">Current</span>
+          <span className="text-base-content/60 text-[10px] uppercase tracking-wider">Current</span>
         </div>
       </HFlowStep>
       <HFlowStep delay={0.1}>
         <div className="border-base-content/5 mx-4 flex flex-col items-center gap-3 border-x px-8 py-2">
-          <div className="text-base-content/30 text-[10px] uppercase tracking-wider">Position</div>
+          <div className="text-base-content/60 text-[10px] uppercase tracking-wider">Position</div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <Image src="/logos/wsteth.svg" alt="wstETH" width={24} height={24} />
@@ -1612,7 +1611,7 @@ const TabButton = ({
         relative p-3 text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors sm:px-5 sm:text-xs
         ${isActive
           ? "text-base-content"
-          : "text-base-content/30 hover:text-base-content/60"}
+          : "text-base-content/60 hover:text-base-content/60"}
       `}
     >
       {tab.label}
@@ -1645,43 +1644,50 @@ export const StickyLanding = () => {
   const sections: SectionData[] = useMemo(() => [
     {
       tag: "00 / KAPAN",
-      title: "ONE DASHBOARD.",
-      titlePhrases: ["ONE DASHBOARD.", "EVERY PROTOCOL.", "ALL NETWORKS."],
-      description: "View all your lending positions in one place. Refinance debt, swap collateral, and migrate between protocols—all in a single atomic transaction.",
+      // The scramble decodes once on load (the "cool effect") then SETTLES on the last phrase —
+      // so a cold visitor still lands on a readable headline instead of an endless cycle. The H1
+      // also SSRs real text now (TextScramble seeds from phrases[0]), so it's not empty for crawlers.
+      title: "SEE EVERYTHING.",
+      titlePhrases: ["SEE EVERYTHING.", "THEN ACT ON IT.", "ALL ON ONE SCREEN."],
+      loopTitle: false,
+      description:
+        "Every lending position across Aave, Compound, Morpho and Venus on one screen — then move a whole position to a cheaper protocol in one transaction, without unwinding it.",
       content: <HeroContent />,
+      headingLevel: "h1",
     },
     {
       tag: "01 / PORTFOLIO",
-      title: "SEE EVERYTHING.",
-      description: "All your DeFi lending positions across protocols, unified in a single view. Compare rates, track health, and spot opportunities instantly.",
+      title: "STOP COUNTING TABS.",
+      description:
+        "Every position, every chain, one view. See your rates and how close you are to liquidation — before the market tells you.",
       content: <DashboardPreview />,
       compactHeader: true,
     },
     {
       tag: "02 / ACTIONS",
-      title: "DO MORE.",
-      description: "Lend, borrow, swap collateral, and refinance between protocols. All operations are atomic—no extra capital needed.",
+      title: "MOVE IT IN ONE STEP.",
+      description: "Lend, borrow, loop, swap collateral, refinance. Each one is a single signature, no extra capital to bring.",
       content: <ActionTabs />,
       compactHeader: true,
     },
     {
       tag: "03 / HOW",
       title: "HOW IT WORKS.",
-      description: "Composable lending instructions powered by flash loans.",
+      description: "Move a whole position in one transaction, no capital up front. Flash loans do the heavy lifting.",
       content: <HowItWorks />,
       compactHeader: true,
     },
     {
       tag: "04 / WHY",
       title: "BUILT FOR YOU.",
-      description: "Everything you need for efficient DeFi lending, without the usual friction.",
+      description: "Your keys, your call. No custody, no Kapan fee.",
       content: <FeatureList />,
       compactHeader: true,
     },
     {
       tag: "05 / START",
       title: "GET STARTED.",
-      description: "Start optimizing your DeFi lending today.",
+      description: "Connect your wallet. See everything. Move what you want.",
       content: <FinalCTA />,
     },
   ], []);
@@ -1765,7 +1771,7 @@ export const StickyLanding = () => {
             {/* Scroll hint on first section */}
             <motion.div
               style={scrollHintStyle}
-              className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
+              className="text-base-content/60 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="landing-tag">Scroll to explore</span>
               <ChevronDownIcon className="size-5 animate-bounce" />

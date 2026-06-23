@@ -62,11 +62,11 @@ export const SwapExchangeDisplay: FC<SwapExchangeDisplayProps> = ({
           {formatTokenAmount(sellAmount.toString(), sellToken.decimals)} {sellToken.name}
         </div>
         {sellAmountUsd !== undefined && (
-          <div className="text-[11px] text-gray-500">{formatUsd(sellAmountUsd)}</div>
+          <div className="text-base-content/60 text-[11px]">{formatUsd(sellAmountUsd)}</div>
         )}
       </div>
     </div>
-    <div className="text-gray-400">&rarr;</div>
+    <div className="text-base-content/70">&rarr;</div>
     <div className="flex items-center gap-2">
       <Image src={buyToken.icon} alt={buyToken.name} width={24} height={24} className="size-6" />
       <div className="text-right">
@@ -74,7 +74,7 @@ export const SwapExchangeDisplay: FC<SwapExchangeDisplayProps> = ({
           {formatTokenAmount(buyAmount.toString(), buyToken.decimals)} {buyToken.name}
         </div>
         {buyAmountUsd !== undefined && (
-          <div className="text-[11px] text-gray-500">{formatUsd(buyAmountUsd)}</div>
+          <div className="text-base-content/60 text-[11px]">{formatUsd(buyAmountUsd)}</div>
         )}
       </div>
     </div>
@@ -100,41 +100,41 @@ export const FeeBreakdownDisplay: FC<FeeBreakdownDisplayProps> = ({ fees, showFe
   return (
     <div className="space-y-1 border-t border-gray-100 pt-2">
       <div className="flex justify-between text-[12px]">
-        <span className="text-gray-600">Aggregator fee</span>
+        <span className="text-base-content/55">Aggregator fee</span>
         <span>
           {showFeesInToken && (
             <>
               {formatTokenAmount(fees.aggregatorFee.toString(), fees.feeToken.decimals)} {fees.feeToken.name}
-              <span className="text-gray-500"> &middot; </span>
+              <span className="text-base-content/60"> &middot; </span>
             </>
           )}
-          <span className="text-gray-500">{fees.aggregatorFeeUsd !== undefined ? formatUsd(fees.aggregatorFeeUsd) : "-"}</span>
+          <span className="text-base-content/60">{fees.aggregatorFeeUsd !== undefined ? formatUsd(fees.aggregatorFeeUsd) : "-"}</span>
         </span>
       </div>
 
       {fees.integratorFee !== undefined && fees.integratorFee > 0n && (
         <div className="flex justify-between text-[12px]">
-          <span className="text-gray-600">Integrator fee</span>
+          <span className="text-base-content/55">Integrator fee</span>
           <span>
             {showFeesInToken && (
               <>
                 {formatTokenAmount(fees.integratorFee.toString(), fees.feeToken.decimals)} {fees.feeToken.name}
-                <span className="text-gray-500"> &middot; </span>
+                <span className="text-base-content/60"> &middot; </span>
               </>
             )}
-            <span className="text-gray-500">{fees.integratorFeeUsd !== undefined ? formatUsd(fees.integratorFeeUsd) : "-"}</span>
+            <span className="text-base-content/60">{fees.integratorFeeUsd !== undefined ? formatUsd(fees.integratorFeeUsd) : "-"}</span>
           </span>
         </div>
       )}
 
       <div className="flex justify-between text-[12px]">
-        <span className="text-gray-600">Network fee</span>
-        <span className="text-gray-700">{fees.gasFeeUsd !== undefined ? formatUsd(fees.gasFeeUsd) : "-"}</span>
+        <span className="text-base-content/55">Network fee</span>
+        <span className="text-base-content/60">{fees.gasFeeUsd !== undefined ? formatUsd(fees.gasFeeUsd) : "-"}</span>
       </div>
 
       <div className="flex justify-between text-[12px]">
-        <span className="text-gray-600">Total fees (USD)</span>
-        <span className="text-gray-700">{formatUsd(totalFeesUsd)}</span>
+        <span className="text-base-content/55">Total fees (USD)</span>
+        <span className="text-base-content font-medium">{formatUsd(totalFeesUsd)}</span>
       </div>
     </div>
   );
@@ -161,7 +161,7 @@ export const WithdrawRemainderDisplay: FC<WithdrawRemainderDisplayProps> = ({
   action,
 }) => (
   <div className="border-t border-gray-100 pt-2">
-    <div className="mb-1 text-[12px] text-gray-600">Withdraw</div>
+    <div className="text-base-content/55 mb-1 text-[12px]">Withdraw</div>
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2">
         <Image src={token.icon} alt={token.name} width={20} height={20} className="size-5" />
@@ -170,7 +170,7 @@ export const WithdrawRemainderDisplay: FC<WithdrawRemainderDisplayProps> = ({
             {remainderInfo.remainderFormatted} {token.name}
           </div>
           {remainderInfo.remainderUsd !== undefined && (
-            <div className="text-[11px] text-gray-500">{formatUsd(remainderInfo.remainderUsd)}</div>
+            <div className="text-base-content/60 text-[11px]">{formatUsd(remainderInfo.remainderUsd)}</div>
           )}
         </div>
       </div>

@@ -58,15 +58,23 @@ const cartridgeConnector = new ControllerConnector({
 
 const ScaffoldEthApp = ({
   children,
-  initialHost,
 }: {
   children: React.ReactNode;
-  initialHost?: string | null;
 }) => {
   useInitializeNativeCurrencyPrice();
   useBridgeTracking();
   const pathname = usePathname();
-  const [hostname, setHostname] = useState<string | null>(initialHost ?? null);
+  // Host is read on the client only (after mount). We intentionally do NOT seed this from the
+  // server (it used to come from headers() in the root layout) — reading headers() there forced
+  // every route into dynamic rendering, blocking SSG/ISR for the programmatic /rates pages.
+  // Starting null keeps the server and first client render identical (no hydration mismatch).
+  //
+  // KNOWN TRADE-OFF: on the `app.` subdomain, next.config rewrites `/` -> `/app` transparently, but
+  // usePathname() still sees `/`, so until this effect runs the chrome falls back to LandingHeader
+  // for one tick before swapping to AppHeader (and PendingOrdersDrawer mounts). Cosmetic, app-side,
+  // self-correcting. The proper fix (host-aware chrome without tainting the static pages) is to give
+  // the SEO route group its own minimal layout with no wallet providers — tracked as a follow-up.
+  const [hostname, setHostname] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -107,10 +115,8 @@ const ScaffoldEthApp = ({
 
 export const ScaffoldEthAppWithProviders = ({
   children,
-  initialHost,
 }: {
   children: React.ReactNode;
-  initialHost?: string | null;
 }) => {
   // Always dark mode with kapan theme
 
@@ -164,7 +170,7 @@ export const ScaffoldEthAppWithProviders = ({
                     <StarknetSessionRecovery />
                     <StarknetWalletAnalytics />
                     <WalletAnalytics />
-                    <ScaffoldEthApp initialHost={initialHost}>{children}</ScaffoldEthApp>
+                    <ScaffoldEthApp>{children}</ScaffoldEthApp>
                   </ReferralProvider>
                 </RainbowKitProvider>
               </StarkBlockNumberProvider>

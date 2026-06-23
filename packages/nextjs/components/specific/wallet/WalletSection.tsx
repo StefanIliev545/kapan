@@ -75,7 +75,7 @@ const WalletTokenCard: FC<WalletTokenCardProps> = ({ token, canSwap, canBridge, 
   const truncatedBalance = useMemo(() => truncateBalance(token.balanceFormatted), [token.balanceFormatted]);
 
   return (
-    <div className="group/token flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-base-200/60">
+    <div className="group/token hover:bg-base-200/60 flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors">
       {/* Token icon */}
       <TokenIcon icon={token.icon} symbol={token.symbol} customSize={24} />
 
@@ -86,10 +86,10 @@ const WalletTokenCard: FC<WalletTokenCardProps> = ({ token, canSwap, canBridge, 
             <TokenSymbolDisplay symbol={token.symbol} size="xs" variant="inline" />
           </span>
           {token.usdValue > 0 ? (
-            <UsdDisplay value={token.usdValue} className="flex-shrink-0 text-[11px] font-semibold text-base-content/60" />
+            <UsdDisplay value={token.usdValue} className="text-base-content/60 flex-shrink-0 text-[11px] font-semibold" />
           ) : null}
         </div>
-        <span className="text-base-content/25 font-mono text-[9px] tabular-nums leading-tight">
+        <span className="text-base-content/60 font-mono text-[9px] tabular-nums leading-tight">
           {token.balanceFormatted > 0 ? truncatedBalance : "—"}
         </span>
       </div>
@@ -111,7 +111,7 @@ const WalletTokenCard: FC<WalletTokenCardProps> = ({ token, canSwap, canBridge, 
           {showSwap && (
             <button
               onClick={handleSwap}
-              className="group/btn flex h-6 items-center gap-0 overflow-hidden rounded text-base-content/25 transition-all duration-200 ease-out hover:gap-1 hover:bg-primary/15 hover:px-1.5 hover:text-primary"
+              className="group/btn text-base-content/60 hover:bg-primary/15 hover:text-primary flex h-6 items-center gap-0 overflow-hidden rounded transition-all duration-200 ease-out hover:gap-1 hover:px-1.5"
               style={{ maxWidth: "24px", transitionProperty: "max-width, background-color, color, gap, padding" }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.maxWidth = "80px"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.maxWidth = "24px"; }}
@@ -124,7 +124,7 @@ const WalletTokenCard: FC<WalletTokenCardProps> = ({ token, canSwap, canBridge, 
           {showBridge && (
             <button
               onClick={handleBridge}
-              className="group/btn flex h-6 items-center gap-0 overflow-hidden rounded text-base-content/25 transition-all duration-200 ease-out hover:gap-1 hover:bg-info/15 hover:px-1.5 hover:text-info"
+              className="group/btn text-base-content/60 hover:bg-info/15 hover:text-info flex h-6 items-center gap-0 overflow-hidden rounded transition-all duration-200 ease-out hover:gap-1 hover:px-1.5"
               style={{ maxWidth: "24px", transitionProperty: "max-width, background-color, color, gap, padding" }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.maxWidth = "80px"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.maxWidth = "24px"; }}
@@ -243,7 +243,7 @@ export const WalletSection: FC<WalletSectionProps> = ({
 
             {/* Expand icon */}
             <ChevronDownIcon
-              className={`text-base-content/30 size-5 transition-transform duration-300 ${isExpanded ? "" : "-rotate-90"}`}
+              className={`text-base-content/60 size-5 transition-transform duration-300 ${isExpanded ? "" : "-rotate-90"}`}
             />
           </div>
         </div>

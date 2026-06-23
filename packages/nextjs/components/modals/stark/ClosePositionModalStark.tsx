@@ -324,8 +324,8 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
     }
     return (
       <div className="flex justify-between text-[12px]">
-        <span className="text-gray-600">Fees in {debt.name}</span>
-        <span className="text-gray-700">{feesInDebtToken} {debt.name}</span>
+        <span className="text-base-content/55">Fees in {debt.name}</span>
+        <span className="text-base-content/60">{feesInDebtToken} {debt.name}</span>
       </div>
     );
   }, [feesInDebtToken, debt.name]);
@@ -348,7 +348,7 @@ export const ClosePositionModalStark: FC<ClosePositionModalProps> = ({
             additionalContent={additionalContentElement}
           />
         ) : (
-          <div className="mt-2 text-xs text-gray-500">Fetching quote...</div>
+          <div className="text-base-content/60 mt-2 text-xs">Fetching quote...</div>
         )}
       </div>
     </BaseModal>

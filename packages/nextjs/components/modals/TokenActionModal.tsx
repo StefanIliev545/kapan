@@ -424,7 +424,7 @@ export const LeftMetrics: FC<{
   token: TokenInfo;
 }> = ({ hf, ltv, metricLabel, metricValue, token }) => (
   <div className="bg-base-200/50 border-base-300/50 w-full space-y-4 border-b p-5 text-sm md:w-52 md:border-b-0 md:border-r">
-    <div className="text-base-content/40 text-xs font-medium uppercase tracking-wider">Before</div>
+    <div className="text-base-content/70 text-xs font-medium uppercase tracking-wider">Before</div>
     <div className="space-y-4">
       <HealthFactor value={hf} />
       <LoanToValueBar value={ltv} />
@@ -600,7 +600,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
   // Memoize the actions array for SegmentedActionBar
   const actionBarActions = useMemo(() => {
     const pendingIcon = <span className="loading loading-spinner loading-xs" />;
-    const starkIcon = <Fuel className="size-4 text-gray-400" />;
+    const starkIcon = <Fuel className="text-base-content/70 size-4" />;
     return [
       {
         key: txState === "success" ? "close" : "confirm",
@@ -634,7 +634,7 @@ export const TokenActionModal: FC<TokenActionModalProps> = ({
                   {action} {token.name}
                 </h3>
               </div>
-              {protocolName && <div className="text-base-content/40 text-xs uppercase tracking-wider">{protocolName}</div>}
+              {protocolName && <div className="text-base-content/70 text-xs uppercase tracking-wider">{protocolName}</div>}
             </div>
             <div className="text-base-content/70 flex items-center justify-between text-xs">
               <span>

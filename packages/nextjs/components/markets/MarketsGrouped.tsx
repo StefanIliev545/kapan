@@ -26,20 +26,12 @@ import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates
 import formatPercentage from "~~/utils/formatPercentage";
 import { useExternalYields } from "~~/hooks/useExternalYields";
 import { aaveRateToAPY, venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
+import { canonicalizeTokenName } from "~~/utils/tokenSymbols";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
 import { useMorphoMarketsQuery } from "~~/utils/morpho/marketApi";
 import { useEulerVaultsQuery } from "~~/utils/euler/vaultApi";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
-
-const TOKEN_ALIASES: Record<string, string> = {
-  usdt: "USDT",
-  "usd₮0": "USDT",
-  weth: "ETH",
-  eth: "ETH",
-};
-
-const canonicalizeTokenName = (name: string) => TOKEN_ALIASES[name.toLowerCase()] || name;
 
 const AAVE_CHAIN_IDS = [arbitrum.id, base.id, optimism.id, linea.id];
 
@@ -616,7 +608,7 @@ const GroupMarketsTable: FC<{ markets: MarketData[] }> = ({ markets }) => {
   }, []);
 
   return (
-    <div className="border-x border-b border-base-content/[0.05] overflow-hidden">
+    <div className="border-base-content/[0.05] overflow-hidden border-x border-b">
       <ScrollArea scrollbars="horizontal" type="auto">
         {/* Header */}
         <div className="flex items-center">
@@ -651,15 +643,15 @@ const GroupMarketsTable: FC<{ markets: MarketData[] }> = ({ markets }) => {
                 <div className="flex items-center gap-2">
                   <div className="relative size-4"><Image src={protocolIcons[item.market.protocol]} alt={item.market.protocol} fill className="object-contain" /></div>
                   {item.market.marketUrl ? (
-                    <a href={item.market.marketUrl} target="_blank" rel="noopener noreferrer" className="group/link flex items-center gap-1 text-sm hover:text-primary transition-colors">
+                    <a href={item.market.marketUrl} target="_blank" rel="noopener noreferrer" className="group/link hover:text-primary flex items-center gap-1 text-sm transition-colors">
                       {protocolNames[item.market.protocol]}
-                      {item.market.poolName && <span className="text-base-content/40"> · {item.market.poolName}</span>}
+                      {item.market.poolName && <span className="text-base-content/70"> · {item.market.poolName}</span>}
                       <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-50" />
                     </a>
                   ) : (
                     <span className="text-sm">
                       {protocolNames[item.market.protocol]}
-                      {item.market.poolName && <span className="text-base-content/40"> · {item.market.poolName}</span>}
+                      {item.market.poolName && <span className="text-base-content/70"> · {item.market.poolName}</span>}
                     </span>
                   )}
                 </div>
@@ -726,7 +718,7 @@ const CollapsibleProtocolGroup: FC<{
   return (
     <details className="group/coll market-row">
       {/* Summary row — same flex layout as regular rows */}
-      <summary className="cursor-pointer list-none flex items-center hover:bg-base-content/[0.02]">
+      <summary className="hover:bg-base-content/[0.02] flex cursor-pointer list-none items-center">
         <div className="market-td flex-1 px-4">
           <div className="flex items-center gap-2">
             <div className="relative size-4"><Image src={networkIcons[network]} alt={network} fill className="object-contain" /></div>
@@ -738,9 +730,9 @@ const CollapsibleProtocolGroup: FC<{
             <div className="relative size-4"><Image src={protocolIcons[protocol]} alt={protocol} fill className="object-contain" /></div>
             <span className="text-sm">
               {protocolNames[protocol]}
-              <span className="text-base-content/40"> · {markets.length} mkts</span>
+              <span className="text-base-content/70"> · {markets.length} mkts</span>
             </span>
-            <svg className="text-base-content/30 group-open/coll:text-base-content/50 size-3 transition-transform duration-200 group-open/coll:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="text-base-content/60 group-open/coll:text-base-content/50 size-3 transition-transform duration-200 group-open/coll:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
@@ -752,22 +744,22 @@ const CollapsibleProtocolGroup: FC<{
       </summary>
 
       {/* Expanded: sortable sub-table of individual markets */}
-      <div className="bg-base-content/[0.015] border-t border-base-content/[0.04]">
+      <div className="bg-base-content/[0.015] border-base-content/[0.04] border-t">
         {/* Sub-table column headers */}
-        <div className="flex items-center px-4 py-1.5 border-b border-base-content/[0.03]">
+        <div className="border-base-content/[0.03] flex items-center border-b px-4 py-1.5">
           <div className="min-w-[320px]">
-            <span className="text-[9px] tracking-[0.12em] text-base-content/25 font-normal uppercase">
+            <span className="text-base-content/60 text-[9px] font-normal uppercase tracking-[0.12em]">
               {COLLAPSIBLE_LABELS[protocol] || "Markets"}
             </span>
           </div>
           {INNER_COLUMNS.filter(c => c.sortKey).map(col => (
             <div
               key={col.id}
-              className="min-w-[80px] text-center cursor-pointer select-none hover:text-base-content/50"
+              className="hover:text-base-content/50 min-w-[80px] cursor-pointer select-none text-center"
               onClick={() => toggleInnerSort(col.sortKey!)}
             >
-              <span className={`inline-flex items-center gap-0.5 text-[9px] tracking-[0.12em] uppercase font-normal ${
-                innerSortCol === col.sortKey ? "text-base-content/50" : "text-base-content/25"
+              <span className={`inline-flex items-center gap-0.5 text-[9px] font-normal uppercase tracking-[0.12em] ${
+                innerSortCol === col.sortKey ? "text-base-content/50" : "text-base-content/60"
               }`}>
                 {col.label}
                 {innerSortCol === col.sortKey && innerSortDir === "desc" && <ChevronDown className="size-2.5" />}
@@ -779,26 +771,26 @@ const CollapsibleProtocolGroup: FC<{
 
         {/* Individual market rows */}
         {sorted.map(m => (
-          <div key={`${m.address}-${m.poolName ?? ""}`} className="flex items-center px-4 py-2 border-t border-base-content/[0.03] hover:bg-base-content/[0.02] transition-colors">
+          <div key={`${m.address}-${m.poolName ?? ""}`} className="border-base-content/[0.03] hover:bg-base-content/[0.02] flex items-center border-t px-4 py-2 transition-colors">
             <div className="min-w-[320px]">
               {m.marketUrl ? (
-                <a href={m.marketUrl} target="_blank" rel="noopener noreferrer" className="group/link inline-flex items-center gap-1.5 text-sm hover:text-primary transition-colors">
+                <a href={m.marketUrl} target="_blank" rel="noopener noreferrer" className="group/link hover:text-primary inline-flex items-center gap-1.5 text-sm transition-colors">
                   {m.poolName && <span className="text-base-content/60">{m.poolName}</span>}
-                  {m.poolName && <span className="text-base-content/25">/</span>}
+                  {m.poolName && <span className="text-base-content/60">/</span>}
                   <span className="font-medium">{m.name}</span>
                   <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-50" />
                 </a>
               ) : (
                 <span className="text-sm">
-                  {m.poolName && <><span className="text-base-content/60">{m.poolName}</span><span className="text-base-content/25"> / </span></>}
+                  {m.poolName && <><span className="text-base-content/60">{m.poolName}</span><span className="text-base-content/60"> / </span></>}
                   <span className="font-medium">{m.name}</span>
                 </span>
               )}
             </div>
-            <span className="text-base-content/50 text-sm tabular-nums text-center min-w-[80px]">{formatTvl(m.tvlUsd)}</span>
-            <span className="text-base-content/40 text-sm tabular-nums text-center min-w-[80px]">{m.utilization}%</span>
-            <span className="text-success/80 text-sm tabular-nums text-center min-w-[90px]">{m.supplyRate}</span>
-            <span className="text-base-content/80 text-sm tabular-nums text-center min-w-[90px]">{m.borrowRate}</span>
+            <span className="text-base-content/50 min-w-[80px] text-center text-sm tabular-nums">{formatTvl(m.tvlUsd)}</span>
+            <span className="text-base-content/70 min-w-[80px] text-center text-sm tabular-nums">{m.utilization}%</span>
+            <span className="text-success/80 min-w-[90px] text-center text-sm tabular-nums">{m.supplyRate}</span>
+            <span className="text-base-content/80 min-w-[90px] text-center text-sm tabular-nums">{m.borrowRate}</span>
           </div>
         ))}
       </div>
@@ -883,13 +875,13 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
       {/* Sort Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-[9px] tracking-[0.12em] text-base-content/30 font-normal uppercase">Sort by best</span>
-          <div className="bg-base-content/[0.03] flex p-0.5 border border-base-content/[0.05]">
+          <span className="text-base-content/60 text-[9px] font-normal uppercase tracking-[0.12em]">Sort by best</span>
+          <div className="bg-base-content/[0.03] border-base-content/[0.05] flex border p-0.5">
             <button
               className={`px-3 py-1 text-[10px] font-medium uppercase tracking-wider transition-all duration-200 ${
                 sortBy === "supply"
                   ? "bg-success/15 text-success"
-                  : "text-base-content/40 hover:text-base-content/70"
+                  : "text-base-content/70 hover:text-base-content/70"
               }`}
               onClick={handleSortBySupply}
             >
@@ -899,7 +891,7 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
               className={`px-3 py-1 text-[10px] font-medium uppercase tracking-wider transition-all duration-200 ${
                 sortBy === "borrow"
                   ? "bg-error/15 text-error"
-                  : "text-base-content/40 hover:text-base-content/70"
+                  : "text-base-content/70 hover:text-base-content/70"
               }`}
               onClick={handleSortByBorrow}
             >
@@ -907,7 +899,7 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
             </button>
           </div>
         </div>
-        <span className="text-base-content/25 text-[10px] tabular-nums">{filtered.length} tokens</span>
+        <span className="text-base-content/60 text-[10px] tabular-nums">{filtered.length} tokens</span>
       </div>
 
       {/* Market Groups */}
@@ -915,7 +907,7 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
         {filtered.map(group => (
           <details key={group.name} className="group overflow-hidden">
             <summary className="cursor-pointer list-none">
-              <div className="flex items-center gap-4 border border-base-content/[0.05] bg-base-content/[0.02] px-4 py-3.5 transition-all duration-200 hover:bg-base-content/[0.04] hover:border-base-content/[0.08]">
+              <div className="border-base-content/[0.05] bg-base-content/[0.02] hover:bg-base-content/[0.04] hover:border-base-content/[0.08] flex items-center gap-4 border px-4 py-3.5 transition-all duration-200">
                 {/* Token Icon & Name */}
                 <div className="flex min-w-[120px] items-center gap-3">
                   <div className="token-icon-wrapper-lg">
@@ -950,11 +942,11 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
 
                 {/* Markets count & expand indicator */}
                 <div className="flex items-center gap-3">
-                  <span className="text-base-content/30 text-[10px] font-normal tracking-[0.12em]">
+                  <span className="text-base-content/60 text-[10px] font-normal tracking-[0.12em]">
                     {group.markets.length} {group.markets.length === 1 ? "market" : "markets"}
                   </span>
                   <svg
-                    className="text-base-content/30 group-open:text-base-content/50 size-4 transition-all duration-300 group-open:rotate-180"
+                    className="text-base-content/60 group-open:text-base-content/50 size-4 transition-all duration-300 group-open:rotate-180"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -974,10 +966,10 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
       {/* Empty State */}
       {filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="bg-base-content/[0.03] border border-base-content/[0.05] mb-4 flex size-14 items-center justify-center">
-            <MagnifyingGlassIcon className="text-base-content/20 size-6" />
+          <div className="bg-base-content/[0.03] border-base-content/[0.05] mb-4 flex size-14 items-center justify-center border">
+            <MagnifyingGlassIcon className="text-base-content/60 size-6" />
           </div>
-          <p className="text-base-content/30 text-sm">No markets found</p>
+          <p className="text-base-content/60 text-sm">No markets found</p>
         </div>
       )}
     </div>

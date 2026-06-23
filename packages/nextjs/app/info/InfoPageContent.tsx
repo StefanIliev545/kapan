@@ -241,7 +241,7 @@ const StickySection = ({
         {/* Tag + Title */}
         <div className="mb-8 flex flex-col items-center gap-3 md:mb-12">
           <div className="bg-base-content/20 h-px w-10" />
-          <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-[0.2em]">
+          <span className="text-base-content/70 text-[10px] font-medium uppercase tracking-[0.2em]">
             {section.tag}
           </span>
           <h2 className="text-4xl font-black uppercase tracking-tight md:text-5xl lg:text-6xl">
@@ -310,7 +310,7 @@ const FeaturesContent = ({ isActive }: { isActive: boolean }) => {
           <h3 className="mb-2 text-lg font-bold tracking-tight md:text-xl">
             <ScrambleText text={f.title} isActive={featureStates[i]} duration={500} />
           </h3>
-          <p className="text-base-content/40 text-sm">
+          <p className="text-base-content/70 text-sm">
             <ScrambleText text={f.desc} isActive={featureStates[i]} duration={600} />
           </p>
         </div>
@@ -323,7 +323,7 @@ const FeaturesContent = ({ isActive }: { isActive: boolean }) => {
 const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
   <div className="mx-auto max-w-2xl space-y-6">
     <div>
-      <h3 className="text-base-content/30 mb-3 text-[10px] uppercase tracking-[0.15em]">
+      <h3 className="text-base-content/60 mb-3 text-[10px] uppercase tracking-[0.15em]">
         <ScrambleText text="Networks" isActive={isActive} duration={400} />
       </h3>
       <div className="flex flex-wrap items-center justify-center gap-1">
@@ -331,7 +331,7 @@ const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
       </div>
     </div>
     <div>
-      <h3 className="text-base-content/30 mb-3 text-[10px] uppercase tracking-[0.15em]">
+      <h3 className="text-base-content/60 mb-3 text-[10px] uppercase tracking-[0.15em]">
         <ScrambleText text="Protocols" isActive={isActive} duration={400} />
       </h3>
       <div className="flex flex-wrap items-center justify-center gap-1">
@@ -339,7 +339,7 @@ const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
       </div>
     </div>
     <div>
-      <h3 className="text-base-content/30 mb-3 text-[10px] uppercase tracking-[0.15em]">
+      <h3 className="text-base-content/60 mb-3 text-[10px] uppercase tracking-[0.15em]">
         <ScrambleText text="Routers" isActive={isActive} duration={400} />
       </h3>
       <div className="flex flex-wrap items-center justify-center gap-1">
@@ -412,7 +412,7 @@ const FAQAccordionScramble = ({
           <ScrambleText text={item.question} isActive={itemActive} duration={500} />
         </span>
         <ChevronDownIcon
-          className={`text-base-content/40 size-4 flex-shrink-0 transition-transform duration-300${isOpen ? "rotate-180" : ""}`}
+          className={`text-base-content/70 size-4 flex-shrink-0 transition-transform duration-300${isOpen ? "rotate-180" : ""}`}
         />
       </button>
       <motion.div
@@ -421,7 +421,7 @@ const FAQAccordionScramble = ({
         transition={ACCORDION_TRANSITION}
         className="overflow-hidden"
       >
-        <p className="text-base-content/40 pb-5 text-sm leading-relaxed">
+        <p className="text-base-content/70 pb-5 text-sm leading-relaxed">
           {item.answer}
         </p>
       </motion.div>
@@ -432,7 +432,7 @@ const FAQAccordionScramble = ({
 // Security content
 const SecurityContent = ({ isActive }: { isActive: boolean }) => (
   <div className="flex flex-col items-center gap-6">
-    <p className="text-base-content/40 max-w-md text-sm">
+    <p className="text-base-content/70 max-w-md text-sm">
       <ScrambleText text="Audited. Verified. Open source." isActive={isActive} duration={500} />
     </p>
     <a
@@ -446,11 +446,11 @@ const SecurityContent = ({ isActive }: { isActive: boolean }) => (
         <div className="text-base-content/80 group-hover:text-success text-sm font-medium transition-colors">
           <ScrambleText text="Starknet Audit" isActive={isActive} duration={500} />
         </div>
-        <div className="text-base-content/40 text-[10px]">
+        <div className="text-base-content/70 text-[10px]">
           <ScrambleText text="Codespect" isActive={isActive} duration={400} />
         </div>
       </div>
-      <DocumentTextIcon className="text-base-content/30 size-4" />
+      <DocumentTextIcon className="text-base-content/60 size-4" />
     </a>
   </div>
 );
@@ -459,7 +459,7 @@ const SecurityContent = ({ isActive }: { isActive: boolean }) => (
 const CTAContent = ({ isActive }: { isActive: boolean }) => (
   <div className="flex flex-col items-center gap-8">
     <LaunchAppButton />
-    <div className="text-base-content/30 flex items-center gap-6 text-xs">
+    <div className="text-base-content/60 flex items-center gap-6 text-xs">
       <a href="https://discord.gg/Vjk6NhkxGv" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">
         <ScrambleText text="Discord" isActive={isActive} duration={300} />
       </a>
@@ -601,7 +601,7 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
             {/* Scroll hint */}
             <motion.div
               style={scrollHintStyle}
-              className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
+              className="text-base-content/60 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>
               <ChevronDownIcon className="size-4 animate-bounce" />

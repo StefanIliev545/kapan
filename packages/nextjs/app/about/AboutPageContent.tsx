@@ -257,7 +257,7 @@ const MissionContent = ({ isActive }: { isActive: boolean }) => {
           duration={700} 
         />
       </p>
-      <p className="text-base-content/40 text-base leading-relaxed md:text-lg">
+      <p className="text-base-content/70 text-base leading-relaxed md:text-lg">
         <ScrambleText 
           text="One interface. Every protocol. Every action. If we have to leave to run a strat, something's broken. We fix it." 
           isActive={line4Active} 
@@ -310,13 +310,13 @@ const FounderContent = ({ isActive }: { isActive: boolean }) => {
       </div>
       
       {/* Background details */}
-      <div className="text-base-content/40 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs uppercase tracking-wider">
+      <div className="text-base-content/70 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs uppercase tracking-wider">
         <span><ScrambleText text="Ex-R3" isActive={detailsActive} duration={400} /></span>
-        <span className="text-base-content/20">|</span>
+        <span className="text-base-content/60">|</span>
         <span><ScrambleText text="Ex-Finance" isActive={detailsActive} duration={400} /></span>
-        <span className="text-base-content/20">|</span>
+        <span className="text-base-content/60">|</span>
         <span><ScrambleText text="L2 Infrastructure" isActive={detailsActive} duration={400} /></span>
-        <span className="text-base-content/20">|</span>
+        <span className="text-base-content/60">|</span>
         <span><ScrambleText text="6 Years Building" isActive={detailsActive} duration={400} /></span>
       </div>
       
@@ -442,7 +442,7 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => {
             href={social.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-base-content/30 hover:text-base-content/80 transition-colors duration-300"
+            className="text-base-content/60 hover:text-base-content/80 transition-colors duration-300"
             title={social.name}
           >
             <social.icon />
@@ -458,7 +458,7 @@ const CTAContent = ({ isActive }: { isActive: boolean }) => {
       >
         <Link
           href="/"
-          className="text-base-content/30 hover:text-base-content/60 text-xs uppercase tracking-wider transition-colors"
+          className="text-base-content/60 hover:text-base-content/60 text-xs uppercase tracking-wider transition-colors"
         >
           ← Back to Home
         </Link>
@@ -520,7 +520,7 @@ const StickySection = ({
         {/* Tag + Title */}
         <div className="mb-8 flex flex-col items-center gap-3 md:mb-12">
           <div className="bg-base-content/20 h-px w-10" />
-          <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-[0.2em]">
+          <span className="text-base-content/70 text-[10px] font-medium uppercase tracking-[0.2em]">
             {section.tag}
           </span>
           <h2 className="text-4xl font-black uppercase tracking-tight md:text-5xl lg:text-6xl">
@@ -625,7 +625,7 @@ const AboutPageContent = () => {
             {/* Scroll hint */}
             <motion.div
               style={scrollHintStyle}
-              className="text-base-content/30 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
+              className="text-base-content/60 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>
               <ChevronDownIcon className="size-4 animate-bounce" />

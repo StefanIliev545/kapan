@@ -75,7 +75,7 @@ const VARIANT_CLASSES: Record<Exclude<RateVariant, "auto">, string> = {
   default: "text-base-content",
   success: "text-success",
   error: "text-error",
-  muted: "text-base-content/40",
+  muted: "text-base-content/70",
 };
 
 /**
@@ -156,7 +156,7 @@ export const RateDisplay: FC<RateDisplayProps> = ({
   const labelElement = showLabel && (
     <span
       className={clsx(
-        "text-base-content/40 font-medium uppercase tracking-widest",
+        "text-base-content/70 font-medium uppercase tracking-widest",
         sizeClasses.label,
         labelClassName
       )}
@@ -168,7 +168,7 @@ export const RateDisplay: FC<RateDisplayProps> = ({
   const oldRateElement = formattedOldRate && (
     <span
       className={clsx(
-        "text-base-content/30 font-mono tabular-nums line-through",
+        "text-base-content/60 font-mono tabular-nums line-through",
         sizeClasses.oldRate
       )}
     >

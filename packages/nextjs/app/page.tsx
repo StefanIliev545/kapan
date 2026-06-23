@@ -4,20 +4,38 @@ import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 export async function generateMetadata(): Promise<Metadata> {
   return getMetadata({
-    title: "Kapan Finance – DeFi Lending Aggregator",
-    description: "Optimize DeFi borrowing costs with Kapan Finance by refinancing across protocols for the best rates.",
+    title: "Kapan Finance — Manage Your DeFi Positions",
+    description:
+      "See all your DeFi lending and borrowing positions across Aave, Compound, Morpho, and Venus in one place — compare rates across protocols and chains, and act on them without leaving the page.",
   });
 }
 
-// Static organization schema and HTML - extracted outside component to avoid recreating on each render
-const organizationSchema = {
+// Static structured data - extracted outside component to avoid recreating on each render.
+// Organization + WebApplication so search/answer engines understand what Kapan is and does.
+const structuredData = {
   "@context": "https://schema.org",
-  "@type": "Organization",
-  name: "Kapan Finance",
-  url: "https://kapan.finance",
-  logo: "https://kapan.finance/thumbnail.png",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://kapan.finance/#organization",
+      name: "Kapan Finance",
+      url: "https://kapan.finance",
+      logo: "https://kapan.finance/thumbnail.png",
+    },
+    {
+      "@type": "WebApplication",
+      name: "Kapan Finance",
+      url: "https://kapan.finance",
+      applicationCategory: "FinanceApplication",
+      operatingSystem: "Web",
+      description:
+        "View, compare, and manage DeFi lending and borrowing positions across Aave, Compound, Morpho, and Venus on Arbitrum, Base, Ethereum and more.",
+      publisher: { "@id": "https://kapan.finance/#organization" },
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  ],
 };
-const organizationSchemaHtml = { __html: JSON.stringify(organizationSchema).replace(/</g, "\\u003c") };
+const organizationSchemaHtml = { __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") };
 
 /**
  * Home Page Component - Sticky scroll landing
