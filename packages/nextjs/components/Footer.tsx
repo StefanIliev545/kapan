@@ -5,14 +5,17 @@ import Link from "next/link";
  */
 export const Footer = () => (
   <footer className="w-full py-6 text-center">
-    <div className="text-base-content/30 flex justify-center gap-6 text-[10px] uppercase tracking-wider">
-      <Link href="/blog" className="hover:text-base-content/50 transition-colors">
+    <div className="text-base-content/60 flex justify-center gap-6 text-[10px] uppercase tracking-wider">
+      <Link href="/rates" className="hover:text-base-content/90 transition-colors">
+        Rates
+      </Link>
+      <Link href="/blog" className="hover:text-base-content/90 transition-colors">
         Blog
       </Link>
-      <Link href="/license" className="hover:text-base-content/50 transition-colors">
+      <Link href="/license" className="hover:text-base-content/90 transition-colors">
         License
       </Link>
-      <Link href="/privacy" className="hover:text-base-content/50 transition-colors">
+      <Link href="/privacy" className="hover:text-base-content/90 transition-colors">
         Privacy
       </Link>
     </div>

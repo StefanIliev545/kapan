@@ -24,11 +24,14 @@ interface MdxImageProps {
   height?: number;
 }
 
-// Custom MDX components
+// Custom MDX components.
+// Headings are demoted one level: the post title is the page's single <h1> (BlogPostContent),
+// so body markdown `#`/`##`/`###` render as <h2>/<h3>/<h4> to keep one h1 per page (SEO/a11y)
+// while preserving the visual sizes.
 const mdxComponents = {
-  h1: (props: HeadingProps) => <h1 className="mb-4 mt-8 text-3xl font-bold" {...props} />,
-  h2: (props: HeadingProps) => <h2 className="mb-4 mt-8 text-2xl font-bold" {...props} />,
-  h3: (props: HeadingProps) => <h3 className="mb-3 mt-6 text-xl font-bold" {...props} />,
+  h1: (props: HeadingProps) => <h2 className="mb-4 mt-8 text-3xl font-bold" {...props} />,
+  h2: (props: HeadingProps) => <h3 className="mb-4 mt-8 text-2xl font-bold" {...props} />,
+  h3: (props: HeadingProps) => <h4 className="mb-3 mt-6 text-xl font-bold" {...props} />,
   p: (props: ParagraphProps) => <p className="my-4" {...props} />,
   ul: (props: ListProps) => <ul className="my-4 ml-6 list-disc" {...props} />,
   ol: (props: ListProps) => <ol className="my-4 ml-6 list-decimal" {...props} />,

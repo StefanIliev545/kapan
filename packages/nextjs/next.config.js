@@ -17,9 +17,8 @@ const commonConfig = {
   typescript: {
     ignoreBuildErrors: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
   },
-  eslint: {
-    ignoreDuringBuilds: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
-  },
+  // NOTE: the `eslint` config key was removed — Next 16 no longer supports it (it logged an
+  // "Unrecognized key" warning). Lint runs via `yarn lint`, not the build.
 
   experimental: {
     // Reduce webpack memory usage during builds (v15+)
