@@ -10,6 +10,8 @@ interface TextScrambleProps {
   revealDuration?: number;
   /** CSS class for the text */
   className?: string;
+  /** Loop through phrases forever (default). false = decode once, then settle on the last phrase. */
+  loop?: boolean;
 }
 
 // Mixed character set: crypto/hacker symbols + some alphanumeric
@@ -22,15 +24,18 @@ export const TextScramble = ({
   displayDuration = 3000,
   revealDuration = 750,
   className = "",
+  loop = true,
 }: TextScrambleProps) => {
-  const [displayText, setDisplayText] = useState("");
+  // Initialize to the first phrase so the SERVER renders real text (the <h1> isn't empty for
+  // crawlers / no-JS). The client then decode-animates from this on mount via the effect below.
+  const [displayText, setDisplayText] = useState(phrases[0] ?? "");
   const [currentIndex, setCurrentIndex] = useState(0);
   const frameRef = useRef<number | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isAnimatingRef = useRef(false);
 
   const scrambleText = useCallback(
-    (targetText: string) => {
+    (targetText: string, index: number) => {
       const length = targetText.length;
       const startTime = performance.now();
       isAnimatingRef.current = true;
@@ -84,17 +89,20 @@ export const TextScramble = ({
           // Ensure final text is exactly correct
           setDisplayText(targetText);
           isAnimatingRef.current = false;
-          
-          // Schedule next phrase
-          timeoutRef.current = setTimeout(() => {
-            setCurrentIndex((prev) => (prev + 1) % phrases.length);
-          }, displayDuration);
+
+          // Schedule next phrase — but when not looping, stop after the last phrase so the
+          // headline settles on a readable line instead of cycling forever.
+          if (loop || index < phrases.length - 1) {
+            timeoutRef.current = setTimeout(() => {
+              setCurrentIndex((prev) => (prev + 1) % phrases.length);
+            }, displayDuration);
+          }
         }
       };
 
       frameRef.current = requestAnimationFrame(animate);
     },
-    [revealDuration, displayDuration, phrases.length]
+    [revealDuration, displayDuration, phrases.length, loop]
   );
 
   // Trigger animation when currentIndex changes
@@ -102,7 +110,7 @@ export const TextScramble = ({
     if (phrases.length === 0) return;
     
     const currentPhrase = phrases[currentIndex];
-    scrambleText(currentPhrase);
+    scrambleText(currentPhrase, currentIndex);
 
     return () => {
       if (frameRef.current) {

@@ -13,6 +13,8 @@ export interface SectionData {
   compactHeader?: boolean;
   /** If provided, cycles through these titles with scramble effect */
   titlePhrases?: string[];
+  /** When false, the title scramble decodes once and settles on the last phrase (default loops). */
+  loopTitle?: boolean;
   /** Heading tag for the title. Defaults to "h2"; the hero section uses "h1" for SEO/a11y. */
   headingLevel?: "h1" | "h2";
 }
@@ -131,6 +133,7 @@ export const StickySection = ({
                 phrases={section.titlePhrases}
                 displayDuration={3000}
                 revealDuration={750}
+                loop={section.loopTitle ?? true}
               />
             ) : (
               section.title

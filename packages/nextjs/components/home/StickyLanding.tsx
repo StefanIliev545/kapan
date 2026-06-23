@@ -1643,9 +1643,12 @@ export const StickyLanding = () => {
   const sections: SectionData[] = useMemo(() => [
     {
       tag: "00 / KAPAN",
-      // Static H1 (no scramble): a cold visitor's first paint must show a complete, readable
-      // outcome headline + the action — the cycling scramble left no static headline for ~7s.
-      title: "SEE EVERYTHING. THEN MOVE IT.",
+      // The scramble decodes once on load (the "cool effect") then SETTLES on the last phrase —
+      // so a cold visitor still lands on a readable headline instead of an endless cycle. The H1
+      // also SSRs real text now (TextScramble seeds from phrases[0]), so it's not empty for crawlers.
+      title: "SEE EVERYTHING.",
+      titlePhrases: ["SEE EVERYTHING.", "THEN ACT ON IT.", "ALL ON ONE SCREEN."],
+      loopTitle: false,
       description:
         "Every lending position you hold — across Aave, Compound, Morpho and Venus — on one screen. Move debt to a cheaper rate, swap collateral, refinance, without unwinding anything. You decide; Kapan does the legwork.",
       content: <HeroContent />,
