@@ -126,47 +126,33 @@ const SWAP_ARROW_TRANSITION = { duration: 1.2, repeat: Infinity };
 // Protocol and Network Data
 // ================================
 
-const protocols = [
-  { name: "Aave", logo: "/logos/aave.svg" },
-  { name: "Compound", logo: "/logos/compound.svg" },
-  { name: "Vesu", logo: "/logos/vesu.svg" },
-  { name: "Nostra", logo: "/logos/nostra.svg" },
-  { name: "Venus", logo: "/logos/venus.svg" },
-];
-
-// Duplicate for seamless loop
-const duplicatedProtocols = [...protocols, ...protocols];
-
-const ProtocolMarquee = () => {
+// Brighter, generic marquee row used in the hero (protocols / networks).
+const HeroMarquee = ({
+  items,
+  reverse = false,
+}: {
+  items: { name: string; logo: string }[];
+  reverse?: boolean;
+}) => {
+  const animate = useMemo(
+    () => (reverse ? { x: ["-50%", "0%"] as [string, string] } : MARQUEE_ANIMATE),
+    [reverse],
+  );
   return (
-    <div className="relative w-full max-w-md overflow-hidden">
-      <motion.div
-        className="flex gap-6"
-        animate={MARQUEE_ANIMATE}
-        transition={MARQUEE_TRANSITION}
-      >
-        {duplicatedProtocols.map((protocol, index) => (
-          <div
-            key={`${protocol.name}-${index}`}
-            className="flex flex-shrink-0 items-center gap-2"
-          >
+    <div className="relative w-full overflow-hidden">
+      <motion.div className="flex gap-8" animate={animate} transition={MARQUEE_TRANSITION}>
+        {items.map((item, index) => (
+          <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
             <div className="relative size-5">
-              <Image
-                src={protocol.logo}
-                alt={protocol.name}
-                fill
-                className="object-contain"
-              />
+              <Image src={item.logo} alt={item.name} fill className="object-contain" />
             </div>
-            <span className="text-base-content/50 text-sm font-medium">
-              {protocol.name}
-            </span>
+            <span className="text-base-content/70 text-sm font-medium">{item.name}</span>
           </div>
         ))}
       </motion.div>
       {/* Fade edges */}
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r to-transparent" />
+      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l to-transparent" />
     </div>
   );
 };
@@ -202,12 +188,45 @@ const LaunchAppButton = () => {
   );
 };
 
-const HeroContent = () => (
-  <div className="flex flex-col items-center gap-8">
-    <ProtocolMarquee />
-    <LaunchAppButton />
-  </div>
-);
+const HeroContent = () => {
+  // Breadth, derived from the data (not a financial claim) — gives the hero substance.
+  const stats = [
+    { value: supportedProtocols.length, label: "Protocols" },
+    { value: networks.length, label: "Networks" },
+    { value: 1, label: "Screen" },
+  ];
+  return (
+    <div className="relative flex w-full flex-col items-center gap-7">
+      {/* Accent glow — drama within the palette (accent #3b82f6), no new hue */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-[42rem] -translate-x-1/2 translate-y-[-65%] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.12),transparent_65%)] blur-2xl" />
+
+      {/* Live breadth strip — terminal-styled, monospace */}
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-xs uppercase tracking-[0.22em] sm:text-sm">
+        <span className="relative flex size-2">
+          <span className="bg-accent absolute inline-flex size-2 animate-ping rounded-full opacity-75" />
+          <span className="bg-accent relative inline-flex size-2 rounded-full" />
+        </span>
+        {stats.map((s, i) => (
+          <span key={s.label} className="flex items-center gap-4">
+            {i > 0 && <span className="text-accent/50">/</span>}
+            <span>
+              <span className="text-base-content font-bold">{s.value}</span>{" "}
+              <span className="text-base-content/55">{s.label}</span>
+            </span>
+          </span>
+        ))}
+      </div>
+
+      {/* Protocol + network marquees — brighter and more present than a single faint row */}
+      <div className="w-full max-w-xl space-y-2.5">
+        <HeroMarquee items={duplicatedSupportedProtocols} />
+        <HeroMarquee items={duplicatedNetworks} reverse />
+      </div>
+
+      <LaunchAppButton />
+    </div>
+  );
+};
 
 // Supported networks
 const networks = [
@@ -809,7 +828,7 @@ const MockMorphoView = () => (
                   </div>
                 </div>
                 {/* Stats - col-span-9, evenly distributed */}
-                <div className="col-span-9 grid grid-cols-4 gap-0">
+                <div className="col-span-9 grid grid-cols-3 gap-0">
                   <MockTooltip tip="Total collateral value">
                     <div className="border-base-300/30 cursor-help border-r px-2 text-center">
                       <div className="text-base-content/70 text-[10px] uppercase tracking-wider">Balance</div>
@@ -820,15 +839,6 @@ const MockMorphoView = () => (
                     <div className="border-base-300/30 cursor-help border-r px-2 text-center">
                       <div className="text-base-content/70 text-[10px] uppercase tracking-wider">APY</div>
                       <div className="font-mono text-sm font-semibold">7.46%</div>
-                    </div>
-                  </MockTooltip>
-                  <MockTooltip tip="Best available rate across protocols">
-                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
-                      <div className="text-base-content/70 text-[10px] uppercase tracking-wider">Best APY</div>
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="text-success font-mono text-sm font-semibold">7.46%</span>
-                        <Image src="/logos/morpho.svg" alt="Morpho" width={12} height={12} />
-                      </div>
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Loan-to-Value ratio">
@@ -860,7 +870,7 @@ const MockMorphoView = () => (
                   </div>
                 </div>
                 {/* Stats - col-span-8, evenly distributed */}
-                <div className="col-span-8 grid grid-cols-3 gap-0">
+                <div className="col-span-8 grid grid-cols-2 gap-0">
                   <MockTooltip tip="Total debt owed">
                     <div className="border-base-300/30 cursor-help border-r px-2 text-center">
                       <div className="text-base-content/70 text-[10px] uppercase tracking-wider">Balance</div>
@@ -868,18 +878,9 @@ const MockMorphoView = () => (
                     </div>
                   </MockTooltip>
                   <MockTooltip tip="Current borrow rate">
-                    <div className="border-base-300/30 cursor-help border-r px-2 text-center">
+                    <div className="cursor-help px-2 text-center">
                       <div className="text-base-content/70 text-[10px] uppercase tracking-wider">APR</div>
                       <div className="font-mono text-sm font-semibold">3.19%</div>
-                    </div>
-                  </MockTooltip>
-                  <MockTooltip tip="Best available borrow rate">
-                    <div className="cursor-help px-2 text-center">
-                      <div className="text-base-content/70 text-[10px] uppercase tracking-wider">Best APR</div>
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="text-success font-mono text-sm font-semibold">3.72%</span>
-                        <Image src="/logos/aave.svg" alt="Aave" width={12} height={12} />
-                      </div>
                     </div>
                   </MockTooltip>
                 </div>
@@ -1650,7 +1651,7 @@ export const StickyLanding = () => {
       titlePhrases: ["SEE EVERYTHING.", "THEN ACT ON IT.", "ALL ON ONE SCREEN."],
       loopTitle: false,
       description:
-        "Every lending position you hold — across Aave, Compound, Morpho and Venus — on one screen. Move debt to a cheaper rate, swap collateral, refinance, without unwinding anything. You decide; Kapan does the legwork.",
+        "Every lending position across Aave, Compound, Morpho and Venus on one screen — then move a whole position to a cheaper protocol in one transaction, without unwinding it.",
       content: <HeroContent />,
       headingLevel: "h1",
     },
