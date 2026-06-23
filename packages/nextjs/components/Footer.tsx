@@ -12,6 +12,9 @@ export const Footer = () => (
       <Link href="/blog" className="hover:text-base-content/90 transition-colors">
         Blog
       </Link>
+      <Link href="/contracts" className="hover:text-base-content/90 transition-colors">
+        Contracts
+      </Link>
       <Link href="/license" className="hover:text-base-content/90 transition-colors">
         License
       </Link>
