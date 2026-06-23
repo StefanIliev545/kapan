@@ -26,20 +26,12 @@ import { feltToString, formatPrice, formatRate, formatUtilization, toAnnualRates
 import formatPercentage from "~~/utils/formatPercentage";
 import { useExternalYields } from "~~/hooks/useExternalYields";
 import { aaveRateToAPY, venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
+import { canonicalizeTokenName } from "~~/utils/tokenSymbols";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
 import { useMorphoMarketsQuery } from "~~/utils/morpho/marketApi";
 import { useEulerVaultsQuery } from "~~/utils/euler/vaultApi";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
-
-const TOKEN_ALIASES: Record<string, string> = {
-  usdt: "USDT",
-  "usd₮0": "USDT",
-  weth: "ETH",
-  eth: "ETH",
-};
-
-const canonicalizeTokenName = (name: string) => TOKEN_ALIASES[name.toLowerCase()] || name;
 
 const AAVE_CHAIN_IDS = [arbitrum.id, base.id, optimism.id, linea.id];
 

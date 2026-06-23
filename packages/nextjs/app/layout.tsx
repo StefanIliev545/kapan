@@ -1,7 +1,6 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithProviders";
 import { ThemeProvider } from "~~/components/ThemeProvider";
@@ -43,10 +42,10 @@ const themeScript = {
   `,
 };
 
-const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
-  const headersList = await headers();
-  const initialHost = headersList.get("host");
-
+// NOTE: this layout must stay free of dynamic functions (headers()/cookies()) — using them here
+// opts EVERY route into per-request dynamic rendering, which blocks SSG/ISR for the programmatic
+// /rates pages. Host detection now happens client-side in ScaffoldEthAppWithProviders.
+const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
   return (
     <html lang="en" suppressHydrationWarning data-theme="kapan" className="dark">
       <head>
@@ -66,7 +65,7 @@ const ScaffoldEthApp = async ({ children }: { children: React.ReactNode }) => {
       <body className={`${inter.className}`}>
         <ThemeProvider>
           <QueryProvider>
-            <ScaffoldEthAppWithProviders initialHost={initialHost}>
+            <ScaffoldEthAppWithProviders>
               {children}
             </ScaffoldEthAppWithProviders>
           </QueryProvider>

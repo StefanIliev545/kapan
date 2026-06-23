@@ -18,6 +18,24 @@ export const sanitizeSymbol = (name: string): string => {
 };
 
 /**
+ * Canonical token aliases — collapse equivalent symbols so the same underlying asset
+ * groups together across protocols (e.g. WETH↔ETH, USD₮0↔USDT). Shared by the markets
+ * grid (components/markets/MarketsGrouped.tsx) and the /rates pages.
+ */
+export const TOKEN_ALIASES: Record<string, string> = {
+  usdt: "USDT",
+  "usd₮0": "USDT",
+  weth: "ETH",
+  eth: "ETH",
+};
+
+/**
+ * Returns the canonical display symbol for a token name. Unknown names pass through unchanged.
+ * @example canonicalizeTokenName("WETH") // "ETH"
+ */
+export const canonicalizeTokenName = (name: string): string => TOKEN_ALIASES[name.toLowerCase()] || name;
+
+/**
  * Default token filter for displaying positions when wallet is not connected.
  * Shows only the most common/important tokens.
  */

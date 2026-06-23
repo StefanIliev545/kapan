@@ -9,15 +9,19 @@ export const getMetadata = ({
   title,
   description,
   imageRelativePath = "/thumbnail.png",
+  canonicalPath,
 }: {
   title: string;
   description: string;
   imageRelativePath?: string;
+  /** Relative self-canonical path (e.g. "/rates/arbitrum/usdc"). metadataBase prefixes it. */
+  canonicalPath?: string;
 }): Metadata => {
   const imageUrl = `${baseUrl}${imageRelativePath}`;
 
   return {
     metadataBase: new URL(baseUrl),
+    alternates: canonicalPath ? { canonical: canonicalPath } : undefined,
     title: {
       default: title,
       template: titleTemplate,
