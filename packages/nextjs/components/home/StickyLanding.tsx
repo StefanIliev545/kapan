@@ -194,11 +194,9 @@ const LaunchAppButton = () => {
       onClick={handleClick}
       className="bg-primary text-primary-content group relative flex h-16 items-center justify-center overflow-hidden px-10 text-[11px] font-black uppercase tracking-[0.3em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] md:h-20 md:px-14 md:text-xs"
     >
-      <div className="relative z-10 flex items-center gap-4">
-        <span className="translate-x-2 transition-transform duration-500 group-hover:translate-x-0">
-          Launch App
-        </span>
-        <ArrowRightIcon className="size-4 opacity-0 transition-all duration-500 group-hover:translate-x-1 group-hover:opacity-100" />
+      <div className="relative z-10 flex items-center gap-3">
+        <span>See my positions</span>
+        <ArrowRightIcon className="size-4 transition-transform duration-500 group-hover:translate-x-1" />
       </div>
     </a>
   );
@@ -1645,8 +1643,9 @@ export const StickyLanding = () => {
   const sections: SectionData[] = useMemo(() => [
     {
       tag: "00 / KAPAN",
-      title: "SEE EVERYTHING.",
-      titlePhrases: ["SEE EVERYTHING.", "THEN ACT ON IT.", "ALL ON ONE SCREEN."],
+      // Static H1 (no scramble): a cold visitor's first paint must show a complete, readable
+      // outcome headline + the action — the cycling scramble left no static headline for ~7s.
+      title: "SEE EVERYTHING. THEN MOVE IT.",
       description:
         "Every lending position you hold — across Aave, Compound, Morpho and Venus — on one screen. Move debt to a cheaper rate, swap collateral, refinance, without unwinding anything. You decide; Kapan does the legwork.",
       content: <HeroContent />,
@@ -1662,7 +1661,7 @@ export const StickyLanding = () => {
     },
     {
       tag: "02 / ACTIONS",
-      title: "DO MORE.",
+      title: "MOVE IT IN ONE STEP.",
       description: "Lend, borrow, loop, swap collateral, refinance. Each one is a single signature, no extra capital to bring.",
       content: <ActionTabs />,
       compactHeader: true,
@@ -1670,7 +1669,7 @@ export const StickyLanding = () => {
     {
       tag: "03 / HOW",
       title: "HOW IT WORKS.",
-      description: "Flash loans do the heavy lifting. You bring the decision, not the capital.",
+      description: "Move a whole position in one transaction, no capital up front. Flash loans do the heavy lifting.",
       content: <HowItWorks />,
       compactHeader: true,
     },

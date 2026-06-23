@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
+import { TrustStrip } from "~~/components/common/TrustStrip";
 import {
   CHAIN_LABELS,
   PROTOCOL_LABELS,
@@ -82,6 +83,14 @@ export default async function RatesPage({
   const sorted = [...rows].sort((a, b) => b.supplyApy - a.supplyApy);
   const icon = tokenNameToLogo(sym);
 
+  // Carry the chain into the app so the CTA doesn't dump the visitor on the app's default chain.
+  const appHref = `/app?network=${chain}`;
+  // Rate spread = the actual product value. Only surfaced when there's a genuine, >0 gap.
+  const borrowable = rows.filter(r => r.borrowApy > 0);
+  const maxBorrow = borrowable.length ? Math.max(...borrowable.map(r => r.borrowApy)) : undefined;
+  const borrowSpread = bestBorrow && maxBorrow !== undefined ? maxBorrow - bestBorrow.borrowApy : 0;
+  const showSpread = borrowable.length >= 2 && borrowSpread > 0.01;
+
   const siblingTokens = RATES_TOKENS.filter(t => t.slug !== token);
   const siblingChains = RATES_CHAINS.filter(c => c.slug !== chain);
 
@@ -150,7 +159,7 @@ export default async function RatesPage({
       </div>
 
       {/* Answer block — concise, machine-extractable for answer engines */}
-      <p className="text-base-content/80 mb-6 leading-relaxed">
+      <p className="text-base-content/80 mb-3 leading-relaxed">
         {bestBorrow ? (
           <>
             The cheapest place to borrow <strong>{sym}</strong> on {chainLabel} right now is{" "}
@@ -168,30 +177,42 @@ export default async function RatesPage({
         )}
       </p>
 
+      {/* Rate-spread hook — the actual product value (only when there's a real gap) */}
+      {showSpread && (
+        <p className="text-base-content/70 mb-6 text-sm leading-relaxed">
+          That&apos;s a <strong className="text-base-content">{fmtPct(borrowSpread)}</strong> gap between the cheapest
+          and priciest {sym} market here — Kapan moves a whole position to the cheaper one in a single transaction, no
+          unwinding. <span className="text-base-content/50">Rates shown are current and variable.</span>
+        </p>
+      )}
+
       {/* Single, outcome-led CTA — one obvious next step, framed as the benefit */}
-      <div className="mb-10">
+      <div className="mb-6">
         {bestBorrow ? (
           <Link
-            href="/app"
+            href={appHref}
             className="bg-primary text-primary-content inline-flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
           >
-            Borrow {sym} at {fmtPct(bestBorrow.borrowApy)} on Kapan →
+            See if you can borrow {sym} cheaper →
           </Link>
         ) : bestSupply ? (
           <Link
-            href="/app"
+            href={appHref}
             className="bg-primary text-primary-content inline-flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
           >
-            Earn {fmtPct(bestSupply.supplyApy)} on {sym} with Kapan →
+            Supply {sym} on Kapan →
           </Link>
         ) : null}
         {bestBorrow && bestSupply && (
           <p className="text-base-content/60 mt-3 text-sm">
-            Or supply {sym} to earn {fmtPct(bestSupply.supplyApy)} APY —{" "}
-            <Link href="/app" className="text-primary hover:underline">open Kapan</Link>.
+            Or compare {sym} supply rates —{" "}
+            <Link href={appHref} className="text-primary hover:underline">open Kapan</Link>.
           </p>
         )}
       </div>
+
+      {/* Trust signals at the decision point */}
+      <TrustStrip className="mb-10 justify-start" />
 
       {/* Rate table (evidence — no per-row actions) */}
       <div className="card-surface overflow-hidden">
