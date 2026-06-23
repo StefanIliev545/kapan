@@ -163,6 +163,14 @@ export function getBlockExplorerAddressLink(network: Chain, address: string) {
 }
 
 /**
+ * Resolve a known EVM Chain (viem chains + scaffold target networks) by id, or undefined.
+ * Used by the /contracts page to label networks and build explorer links.
+ */
+export function getChainById(chainId: number): Chain | undefined {
+  return KNOWN_CHAINS.get(chainId);
+}
+
+/**
  * @returns targetNetworks array containing networks configured in scaffold.config including extra network metadata
  */
 export function getTargetNetworks(): ChainWithAttributes[] {
