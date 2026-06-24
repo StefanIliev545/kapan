@@ -809,7 +809,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       id: "implied",
       header: () => (
         <Tooltip content="Implied APY for PT collateral tokens (Pendle fixed yield)">
-          <span className="cursor-help border-b border-dashed border-current">Implied</span>
+          <span className="cursor-help">Implied</span>
         </Tooltip>
       ),
       cell: info => {
@@ -839,7 +839,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       id: "maxLoop",
       header: () => (
         <Tooltip content="Estimated net APY at max safe leverage (~99% of LLTV). Includes external yield for PT tokens.">
-          <span className="cursor-help border-b border-dashed border-current">Max Loop</span>
+          <span className="cursor-help">Max Loop</span>
         </Tooltip>
       ),
       cell: info => {
@@ -1228,11 +1228,10 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                         <th
                           key={header.id}
                           className={`market-th ${
-                            header.id === "market" ? "text-left" :
-                            header.id === "util" ? "text-center" :
-                            header.id === "actions" ? "border-0" :
+                            header.id === "market" ? "w-full text-left" :
+                            header.id === "actions" ? "border-0 text-right" :
                             "text-right"
-                          } ${header.column.getCanSort() ? "hover:text-base-content/50 cursor-pointer" : ""}`}
+                          } ${header.column.getCanSort() ? "hover:text-base-content/80 cursor-pointer" : ""}`}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <span className={`inline-flex items-center gap-1 ${header.column.getIsSorted() ? "text-primary" : ""}`}>
@@ -1256,9 +1255,8 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                           <td
                             key={cell.id}
                             className={`market-td ${
-                              cell.column.id === "market" ? "pl-3" :
-                              cell.column.id === "util" ? "text-center" :
-                              cell.column.id === "actions" ? "pr-3" :
+                              cell.column.id === "market" ? "w-full pl-3" :
+                              cell.column.id === "actions" ? "pr-3 text-right" :
                               "text-right tabular-nums"
                             }`}
                           >
