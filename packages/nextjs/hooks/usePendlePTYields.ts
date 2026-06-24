@@ -45,6 +45,8 @@ export interface PTYield {
   symbol: string;
   name: string;
   fixedApy: number; // Implied APY as percentage (e.g., 15.5 for 15.5%)
+  /** Underlying asset's native/organic APY as percentage (e.g., 4.1 for 4.1%) */
+  underlyingApy: number;
   expiry: Date;
   daysToExpiry: number;
   underlyingSymbol: string;
@@ -483,6 +485,7 @@ export function usePendlePTYields(
             symbol: m.pt.symbol,
             name: m.pt.name,
             fixedApy,
+            underlyingApy: Number.isFinite(m.underlyingApy) ? m.underlyingApy * 100 : 0,
             expiry,
             daysToExpiry,
             underlyingSymbol: m.underlyingAsset?.symbol || "",

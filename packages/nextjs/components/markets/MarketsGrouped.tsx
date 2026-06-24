@@ -424,6 +424,7 @@ const useEulerData = (): MarketData[] => {
   const baseQuery = useEulerVaultsQuery(base.id);
   const optimismQuery = useEulerVaultsQuery(optimism.id);
   const lineaQuery = useEulerVaultsQuery(linea.id);
+  const { findYield, getEffectiveSupplyRate } = useExternalYields();
 
   return useMemo(() => {
     const results: MarketData[] = [];
@@ -439,7 +440,12 @@ const useEulerData = (): MarketData[] => {
       const network = CHAIN_ID_TO_NETWORK[chainId] || "arbitrum";
       const eulerNetwork = EULER_NETWORK_NAMES[chainId] || "ethereum";
       data.forEach(vault => {
-        const supplyApy = (vault.supplyApy ?? 0) * 100;
+        const baseSupplyApy = (vault.supplyApy ?? 0) * 100;
+        // Fold external yield into the supply rate so PT vaults show their implied
+        // (Pendle fixed) yield instead of the ~0% raw vault rate, and LST vaults add
+        // their staking yield. Falls back to the raw rate for plain assets.
+        const ext = findYield(vault.asset.address, vault.asset.symbol);
+        const supplyApy = getEffectiveSupplyRate(vault.asset.address, vault.asset.symbol, baseSupplyApy);
         const borrowApy = (vault.borrowApy ?? 0) * 100;
         const utilization = (vault.utilization ?? 0) * 100;
         results.push({
@@ -455,12 +461,15 @@ const useEulerData = (): MarketData[] => {
           protocol: "euler",
           poolName: vault.name,
           marketUrl: `https://app.euler.finance/vault/${vault.address}?network=${eulerNetwork}`,
+          impliedApy: ext?.source === "pendle" ? ext.apy : undefined,
+          nativeApy: ext?.metadata?.underlyingApy ?? (ext?.source === "lst" ? ext.apy : undefined),
+          baseSupplyApy,
         });
       });
     });
 
     return results;
-  }, [arbitrumQuery.data, baseQuery.data, optimismQuery.data, lineaQuery.data]);
+  }, [arbitrumQuery.data, baseQuery.data, optimismQuery.data, lineaQuery.data, findYield, getEffectiveSupplyRate]);
 };
 
 // ── TanStack Table for inner group markets ──────────────────────────
@@ -905,7 +914,7 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
       {/* Market Groups */}
       <div className="space-y-2">
         {filtered.map(group => (
-          <details key={group.name} className="group overflow-hidden">
+          <details key={group.name} className="group">
             <summary className="cursor-pointer list-none">
               <div className="border-base-content/[0.05] bg-base-content/[0.02] hover:bg-base-content/[0.04] hover:border-base-content/[0.08] flex items-center gap-4 border px-4 py-3.5 transition-all duration-200">
                 {/* Token Icon & Name */}
@@ -929,6 +938,9 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
                     networkType={group.bestSupply.networkType}
                     protocol={group.bestSupply.protocol}
                     poolName={group.bestSupply.poolName}
+                    impliedApy={group.bestSupply.impliedApy}
+                    nativeApy={group.bestSupply.nativeApy}
+                    baseSupplyApy={group.bestSupply.baseSupplyApy}
                   />
                   <RatePill
                     variant="borrow"

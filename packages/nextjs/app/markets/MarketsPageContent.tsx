@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import Image from "next/image";
 import type { NextPage } from "next";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
 import StableArea from "~~/components/common/StableArea";
 import { createTextChangeHandler } from "~~/utils/handlers";
@@ -22,6 +22,7 @@ const MarketsPageContent: NextPage = () => {
   const [search, setSearch] = useState("");
   const [network, setNetwork] = useState("all");
   const handleNetwork = useCallback((id: string) => setNetwork(id), []);
+  const handleClearSearch = useCallback(() => setSearch(""), []);
 
   return (
     <div className="container mx-auto min-h-[calc(100vh-6rem)] px-5 py-6">
@@ -38,15 +39,25 @@ const MarketsPageContent: NextPage = () => {
           {/* Controls: Search + Network Filter */}
           <div className="flex flex-wrap items-center gap-4">
             {/* Search */}
-            <div className="relative max-w-xs flex-1">
-              <MagnifyingGlassIcon className="text-base-content/40 pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+            <div className="group/search relative max-w-xs flex-1">
+              <MagnifyingGlassIcon className="text-base-content/40 group-focus-within/search:text-base-content/70 pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 transition-colors" />
               <input
                 type="text"
-                placeholder="Search tokens..."
-                className="bg-base-content/[0.03] border border-base-content/[0.06] focus:border-base-content/15 placeholder:text-base-content/25 w-full py-2 pl-10 pr-4 text-sm transition-all focus:outline-none"
+                placeholder="Search tokens…"
+                className="bg-base-content/[0.04] border-base-content/[0.08] focus:border-base-content/20 focus:bg-base-content/[0.06] placeholder:text-base-content/30 w-full border py-2.5 pl-10 pr-9 text-sm transition-all focus:outline-none"
                 value={search}
                 onChange={createTextChangeHandler(setSearch)}
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  aria-label="Clear search"
+                  className="text-base-content/40 hover:text-base-content/80 absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                >
+                  <XMarkIcon className="size-4" />
+                </button>
+              )}
             </div>
 
             {/* Network Filter */}
