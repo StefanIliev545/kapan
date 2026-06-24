@@ -24,15 +24,6 @@ const HeroScene = dynamic(() => import("./HeroScene").then(m => m.HeroScene), {
 // Static Animation Constants
 // ================================
 
-// MarqueeRow animations
-const MARQUEE_ROW_TRANSITION = {
-  x: {
-    duration: 25,
-    repeat: Infinity,
-    ease: "linear" as const,
-  },
-};
-
 // NeonLetter animations
 const NEON_LETTER_INITIAL = { opacity: 0 };
 const NEON_LETTER_ANIMATE = {
@@ -179,51 +170,6 @@ const supportedProtocols = [
   { name: "Venus", logo: "/logos/venus.svg" },
 ];
 
-// Aggregators & integrations
-const integrations = [
-  { name: "1inch", logo: "/logos/1inch.png" },
-  { name: "AVNU", logo: "/logos/avnu.png" },
-  { name: "Pendle", logo: "/logos/pendle.png" },
-];
-
-// Duplicate arrays for seamless loop
-const duplicatedNetworks = [...networks, ...networks];
-const duplicatedSupportedProtocols = [...supportedProtocols, ...supportedProtocols];
-const duplicatedIntegrations = [...integrations, ...integrations];
-
-// Marquee row component
-const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; logo: string }[]; label: string; reverse?: boolean }) => {
-  const animate = useMemo(() =>
-    ({ x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] as [string, string] }),
-    [reverse]
-  );
-
-  return (
-    <div className="flex w-full items-center gap-4">
-      <span className="text-base-content/60 w-20 flex-shrink-0 text-right text-[10px] uppercase tracking-wider">{label}</span>
-      <div className="relative flex-1 overflow-hidden">
-        <motion.div
-          className="flex gap-6"
-          animate={animate}
-          transition={MARQUEE_ROW_TRANSITION}
-        >
-          {items.map((item, index) => (
-            <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
-              <div className="relative size-5">
-                <Image src={item.logo} alt={item.name} fill className="object-contain" />
-              </div>
-              <span className="text-base-content/70 text-xs">{item.name}</span>
-            </div>
-          ))}
-        </motion.div>
-        {/* Fade edges */}
-        <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
-        <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
-      </div>
-    </div>
-  );
-};
-
 const FeatureList = () => {
   const features = useMemo(() => [
     { icon: ShieldCheckIcon, title: "Non-Custodial", desc: "Your assets never leave your wallet. Verify every move on the protocol's own frontend." },
@@ -232,28 +178,38 @@ const FeatureList = () => {
     { icon: SparklesIcon, title: "Any Gas Token", desc: "Pay gas in any token you hold — no native-token scramble (via AVNU Paymaster)." },
   ], []);
 
+  const supported = useMemo(() => [...supportedProtocols, ...networks], []);
+
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-10 px-4">
-      {/* Features grid - centered with consistent spacing */}
-      <div className="grid w-full max-w-2xl grid-cols-1 gap-x-12 gap-y-8 md:grid-cols-2">
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8 px-4">
+      {/* Feature cards — anchored with surface + depth, left-aligned */}
+      <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
         {features.map((f, i) => (
-          <div key={i} className="flex gap-4 text-left">
-            <div className="bg-base-content/5 border-base-content/5 flex size-11 flex-shrink-0 items-center justify-center rounded-xl border">
-              <f.icon className="text-base-content/60 size-5" />
+          <div key={i} className="card-surface flex flex-col items-start gap-3 p-5 text-left">
+            <div className="bg-base-content/5 border-base-content/10 flex size-10 flex-shrink-0 items-center justify-center rounded-xl border">
+              <f.icon className="text-base-content/70 size-5" />
             </div>
-            <div className="pt-0.5">
-              <div className="text-base-content mb-1 text-sm font-semibold">{f.title}</div>
+            <div>
+              <div className="text-base-content mb-1 font-semibold">{f.title}</div>
               <div className="text-base-content/70 text-sm leading-relaxed">{f.desc}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Supported networks/protocols/integrations marquees */}
-      <div className="border-base-content/5 w-full space-y-3 border-t pt-6">
-        <MarqueeRow items={duplicatedNetworks} label="Networks" />
-        <MarqueeRow items={duplicatedSupportedProtocols} label="Protocols" reverse />
-        <MarqueeRow items={duplicatedIntegrations} label="Routers" />
+      {/* Works across — one tidy static logo row, not three scrolling marquees */}
+      <div className="border-base-content/10 flex w-full flex-col items-center gap-4 border-t pt-7">
+        <span className="text-base-content/50 text-[10px] uppercase tracking-[0.25em]">Works across</span>
+        <div className="flex max-w-2xl flex-wrap items-center justify-center gap-x-6 gap-y-3">
+          {supported.map(item => (
+            <div key={item.name} className="flex items-center gap-1.5">
+              <div className="relative size-5 shrink-0">
+                <Image src={item.logo} alt={item.name} fill className="object-contain" />
+              </div>
+              <span className="text-base-content/65 text-sm font-medium">{item.name}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
