@@ -1040,17 +1040,19 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                         const columnId = header.column.id;
                         const isMarket = columnId === "market";
                         const isCollaterals = columnId === "collaterals";
-                                        const isActions = columnId === "actions";
+                        const isUtil = columnId === "util";
+                        const isActions = columnId === "actions";
 
                         return (
                           <th
                             key={header.id}
                             className={`market-th ${
-                              isMarket ? "w-full text-left" :
+                              isMarket ? "text-left" :
                               isCollaterals ? "px-3 text-left" :
-                              isActions ? "pl-6 border-0 text-right" :
+                              isUtil ? "text-center" :
+                              isActions ? "pl-6 border-0" :
                               "text-right"
-                            } ${canSort ? "hover:text-base-content/80 cursor-pointer" : ""}`}
+                            } ${canSort ? "hover:text-base-content/50 cursor-pointer" : ""}`}
                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                           >
                             {!header.isPlaceholder && (
@@ -1075,14 +1077,16 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                         const columnId = cell.column.id;
                         const isMarket = columnId === "market";
                         const isCollaterals = columnId === "collaterals";
-                                        const isActions = columnId === "actions";
+                        const isUtil = columnId === "util";
+                        const isActions = columnId === "actions";
 
                         return (
                           <td
                             key={cell.id}
                             className={`market-td ${
-                              isMarket ? "w-full pl-3" :
+                              isMarket ? "pl-3" :
                               isCollaterals ? "px-3" :
+                              isUtil ? "text-center" :
                               isActions ? "pl-6 pr-3 text-right" :
                               "text-right tabular-nums"
                             }`}
