@@ -130,6 +130,8 @@ export interface BasePositionProps {
   // UI customization
   containerClassName?: string;
   hideBalanceColumn?: boolean;
+  /** Skip the APY/APR + 30D-yield columns (e.g. Uniswap LP — yield is fees, shown via extraStats). */
+  hideRateColumns?: boolean;
   subtitle?: ReactNode;
   infoButton?: ReactNode;
   afterInfoContent?: ReactNode;
@@ -262,6 +264,9 @@ function buildStatColumns(opts: {
   tokenName: string;
   /** Whether this is a borrow/cost position (yield is negative) */
   isNegative: boolean;
+  /** Skip the rate (APY/APR) + 30D-yield columns — for positions where they don't apply
+   *  (e.g. Uniswap LP, whose yield is fees, surfaced via extraStats instead). */
+  hideRateColumns: boolean;
   extraStats: Array<{ label: string; value: ReactNode }>;
 }): Array<{ key: string; content: ReactNode; hasBorder?: boolean }> {
   const columns: Array<{ key: string; content: ReactNode; hasBorder?: boolean }> = [];
@@ -281,44 +286,46 @@ function buildStatColumns(opts: {
     });
   }
 
-  columns.push({
-    key: "rate",
-    hasBorder: true,
-    content: (
-      <>
-        <div className="text-base-content/70 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{opts.rateLabel}</div>
-        <div className="text-base-content font-mono text-xs font-semibold tabular-nums">
-          {formatPercentage(opts.currentRate)}%
-        </div>
-      </>
-    ),
-  });
-
-  // 30-day projected yield with raw token tooltip on hover
-  const yieldColorClass = opts.yield30dUsd === 0
-    ? "text-base-content/70"
-    : opts.isNegative ? "text-error" : "text-success";
-  const signPrefix = opts.isNegative && opts.yield30dUsd !== 0 ? "-" : "";
-  const rawYieldFormatted = Math.abs(opts.yield30dRaw).toLocaleString(undefined, { maximumFractionDigits: 4 });
-
-  columns.push({
-    key: "30d-yield",
-    content: (
-      <>
-        <div className="text-base-content/70 mb-0.5 text-[10px] font-medium uppercase tracking-widest">30D Yield</div>
-        <div className="group/yield relative cursor-help">
-          <div className={`font-mono text-xs font-semibold tabular-nums ${yieldColorClass}`}>
-            {opts.yield30dUsd === 0 ? "—" : `${signPrefix}${formatCurrencyCompact(Math.abs(opts.yield30dUsd))}`}
+  if (!opts.hideRateColumns) {
+    columns.push({
+      key: "rate",
+      hasBorder: true,
+      content: (
+        <>
+          <div className="text-base-content/70 mb-0.5 text-[10px] font-medium uppercase tracking-widest">{opts.rateLabel}</div>
+          <div className="text-base-content font-mono text-xs font-semibold tabular-nums">
+            {formatPercentage(opts.currentRate)}%
           </div>
-          {opts.yield30dUsd !== 0 && (
-            <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover/yield:opacity-100">
-              {signPrefix}{rawYieldFormatted} {opts.tokenName}
-            </span>
-          )}
-        </div>
-      </>
-    ),
-  });
+        </>
+      ),
+    });
+
+    // 30-day projected yield with raw token tooltip on hover
+    const yieldColorClass = opts.yield30dUsd === 0
+      ? "text-base-content/70"
+      : opts.isNegative ? "text-error" : "text-success";
+    const signPrefix = opts.isNegative && opts.yield30dUsd !== 0 ? "-" : "";
+    const rawYieldFormatted = Math.abs(opts.yield30dRaw).toLocaleString(undefined, { maximumFractionDigits: 4 });
+
+    columns.push({
+      key: "30d-yield",
+      content: (
+        <>
+          <div className="text-base-content/70 mb-0.5 text-[10px] font-medium uppercase tracking-widest">30D Yield</div>
+          <div className="group/yield relative cursor-help">
+            <div className={`font-mono text-xs font-semibold tabular-nums ${yieldColorClass}`}>
+              {opts.yield30dUsd === 0 ? "—" : `${signPrefix}${formatCurrencyCompact(Math.abs(opts.yield30dUsd))}`}
+            </div>
+            {opts.yield30dUsd !== 0 && (
+              <span className="bg-base-300 text-base-content pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-[10px] opacity-0 shadow-lg transition-opacity group-hover/yield:opacity-100">
+                {signPrefix}{rawYieldFormatted} {opts.tokenName}
+              </span>
+            )}
+          </div>
+        </>
+      ),
+    });
+  }
 
   opts.extraStats.forEach((stat, index) => {
     const isLast = index === opts.extraStats.length - 1;
@@ -351,6 +358,7 @@ export const BasePosition: FC<BasePositionProps> = ({
   rateLabel = positionType === "supply" ? "APY" : "APR",
   containerClassName,
   hideBalanceColumn = false,
+  hideRateColumns = false,
   subtitle,
   infoButton,
   afterInfoContent,
@@ -445,10 +453,11 @@ export const BasePosition: FC<BasePositionProps> = ({
     yield30dRaw,
     tokenName: name,
     isNegative: isNegativeBalance,
+    hideRateColumns,
     extraStats,
   });
 
-  const baseStatColumns = hideBalanceColumn ? 2 : 3;
+  const baseStatColumns = (hideBalanceColumn ? 0 : 1) + (hideRateColumns ? 0 : 2);
   const totalStatColumns = baseStatColumns + extraStats.length;
   const statColumnClassMap: Record<number, string> = {
     1: "grid-cols-1",
@@ -503,19 +512,30 @@ export const BasePosition: FC<BasePositionProps> = ({
                 </div>
               </div>
             )}
-            <div className="flex flex-col items-center text-center">
-              <div className="text-base-content/70 text-[8px] font-medium uppercase tracking-widest">{rateLabel}</div>
-              <div className="text-base-content font-mono text-[11px] font-semibold tabular-nums">
-                {formatPercentage(currentRate)}%
+            {!hideRateColumns && (
+              <div className="flex flex-col items-center text-center">
+                <div className="text-base-content/70 text-[8px] font-medium uppercase tracking-widest">{rateLabel}</div>
+                <div className="text-base-content font-mono text-[11px] font-semibold tabular-nums">
+                  {formatPercentage(currentRate)}%
+                </div>
               </div>
-            </div>
+            )}
             {/* 30D yield - hidden on very narrow screens */}
-            <div className="hidden flex-col items-center text-center min-[400px]:flex">
-              <div className="text-base-content/70 text-[8px] font-medium uppercase tracking-widest">30D</div>
-              <div className={`font-mono text-[11px] font-semibold tabular-nums ${yield30dUsd === 0 ? "text-base-content/70" : isNegativeBalance ? "text-error" : "text-success"}`}>
-                {yield30dUsd === 0 ? "—" : `${isNegativeBalance ? "-" : ""}${formatCurrencyCompact(Math.abs(yield30dUsd))}`}
+            {!hideRateColumns && (
+              <div className="hidden flex-col items-center text-center min-[400px]:flex">
+                <div className="text-base-content/70 text-[8px] font-medium uppercase tracking-widest">30D</div>
+                <div className={`font-mono text-[11px] font-semibold tabular-nums ${yield30dUsd === 0 ? "text-base-content/70" : isNegativeBalance ? "text-error" : "text-success"}`}>
+                  {yield30dUsd === 0 ? "—" : `${isNegativeBalance ? "-" : ""}${formatCurrencyCompact(Math.abs(yield30dUsd))}`}
+                </div>
               </div>
-            </div>
+            )}
+            {/* Extra stats (e.g. LP Amount / Fees) — surfaced on mobile too */}
+            {extraStats.map((stat, i) => (
+              <div key={`m-extra-${i}`} className="flex flex-col items-center text-center">
+                <div className="text-base-content/70 text-[8px] font-medium uppercase tracking-widest">{stat.label}</div>
+                <div className="font-mono text-[11px] font-semibold tabular-nums">{stat.value}</div>
+              </div>
+            ))}
           </div>
 
           {/* Quick action + expand indicator */}
