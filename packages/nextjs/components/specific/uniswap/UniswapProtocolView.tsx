@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
+import { Avatar } from "@radix-ui/themes";
 import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import { useAccount } from "wagmi";
 import { BaseProtocolHeader, type HeaderMetric } from "../common";
@@ -39,14 +39,13 @@ const formatPrice = (n: number): string => {
   return n.toLocaleString(undefined, { maximumSignificantDigits: 3 });
 };
 
-/** Small overlapping token icon for the pair header. */
-function TokenGlyph({ symbol, size = 20 }: { symbol: string; size?: number }) {
+/** Overlapping pair avatars — Radix Avatar shows image OR fallback (no text bleed). */
+function PairAvatars({ a, b }: { a: string; b: string }) {
   return (
-    <span className="bg-base-300 ring-base-100 relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-2" style={{ width: size, height: size }}>
-      <span className="text-base-content/60 absolute inset-0 flex items-center justify-center text-[9px] font-medium">{symbol.slice(0, 3).toUpperCase()}</span>
-      <Image src={tokenNameToLogo(symbol.toLowerCase())} alt={symbol} width={size} height={size} className="relative z-10 object-contain"
-        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-    </span>
+    <div className="flex items-center -space-x-1.5">
+      <Avatar size="1" radius="full" src={tokenNameToLogo(a.toLowerCase())} fallback={a.slice(0, 2).toUpperCase()} className="ring-base-100 ring-2" />
+      <Avatar size="1" radius="full" src={tokenNameToLogo(b.toLowerCase())} fallback={b.slice(0, 2).toUpperCase()} className="ring-base-100 ring-2" />
+    </div>
   );
 }
 
@@ -165,54 +164,41 @@ const UniswapPositionRow: FC<RowProps> = ({ position: p, chainId, value, fees, p
   const slug = UNI_SLUG[chainId];
   const url = slug ? `https://app.uniswap.org/positions/${p.version === 4 ? "v4" : "v3"}/${slug}/${p.tokenId}` : undefined;
 
-  // Range bar: where the current price sits between bounds.
+  // Compact range: marker = where current sits between the bounds.
   const span = p.priceUpper - p.priceLower;
   const pct = Math.max(0, Math.min(100, span > 0 ? ((p.priceCurrent - p.priceLower) / span) * 100 : 50));
-  const labelPct = Math.max(8, Math.min(92, pct)); // keep the floating label off the edges
   const rangeColor = p.inRange ? "bg-success" : "bg-warning";
+  const priceTitle = `Range ${formatPrice(p.priceLower)} – ${formatPrice(p.priceUpper)} · now ${formatPrice(p.priceCurrent)} ${p.token1.symbol}/${p.token0.symbol}`;
 
   return (
-    <div className="space-y-2 py-3 first:pt-0 last:pb-0">
-      {/* Header: pair + fee tier + version + status + value/fees (LP extension) */}
-      <div className="flex flex-wrap items-center justify-between gap-y-1 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center -space-x-1.5">
-            <TokenGlyph symbol={p.token0.symbol} />
-            <TokenGlyph symbol={p.token1.symbol} />
-          </div>
-          <span className="font-semibold">{p.token0.symbol} / {p.token1.symbol}</span>
-          <span className="badge-tag-muted">{p.feePercent}%</span>
-          <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-wider">v{p.version}</span>
+    <div className="space-y-2.5 py-3.5 first:pt-0 last:pb-0">
+      {/* Premium single-line header: identity · inline range · value/fees */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+        <div className="flex min-w-0 items-center gap-2">
+          <PairAvatars a={p.token0.symbol} b={p.token1.symbol} />
+          <span className="text-sm font-semibold tracking-tight">{p.token0.symbol} / {p.token1.symbol}</span>
+          <span className="bg-base-content/[0.06] text-base-content/70 px-1.5 py-0.5 text-[10px] font-medium tabular-nums">{p.feePercent}%</span>
+          <span className="text-base-content/35 text-[10px] font-semibold uppercase tracking-wider">v{p.version}</span>
           {url && (
-            <a href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-base-content/40 hover:text-primary transition-colors">
+            <a href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-base-content/30 hover:text-primary transition-colors">
               <ArrowTopRightOnSquareIcon className="size-3.5" />
             </a>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 font-mono tabular-nums">
-          <span className={`badge-tag ${p.inRange ? "text-success border-success/30" : "text-warning border-warning/30"}`}>
-            {p.closed ? "Closed" : p.inRange ? "In range" : "Out of range"}
-          </span>
-          <span className="text-base-content/60">Value: <span className="text-base-content font-semibold">{formatCurrencyCompact(value)}</span></span>
-          <span className="text-base-content/60">Fees: <span className="text-success font-semibold">{formatCurrencyCompact(fees)}</span></span>
-        </div>
-      </div>
 
-      {/* Price range (LP extension) — on top, current price floats above its marker */}
-      <div className="relative px-1 pt-4">
-        <div
-          className={`absolute top-0 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums ${p.inRange ? "text-success" : "text-warning"}`}
-          style={{ left: `${labelPct}%` }}
-        >
-          {formatPrice(p.priceCurrent)}
+        {/* Inline range bar (min ─●─ max) + current price, colored by in/out */}
+        <div className="flex items-center gap-2" title={priceTitle}>
+          <span className="text-base-content/40 text-[10px] tabular-nums">{formatPrice(p.priceLower)}</span>
+          <div className="relative h-1 w-16 bg-base-content/15">
+            <div className={`absolute top-1/2 h-2.5 w-1 -translate-x-1/2 -translate-y-1/2 ${rangeColor}`} style={{ left: `${pct}%` }} />
+          </div>
+          <span className="text-base-content/40 text-[10px] tabular-nums">{formatPrice(p.priceUpper)}</span>
+          <span className={`text-xs font-semibold tabular-nums ${p.inRange ? "text-success" : "text-warning"}`}>{formatPrice(p.priceCurrent)}</span>
         </div>
-        <div className="relative h-1.5 w-full bg-base-content/10">
-          <div className={`absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 ${rangeColor}`} style={{ left: `${pct}%` }} />
-        </div>
-        <div className="text-base-content/40 mt-1 flex justify-between text-[10px] tabular-nums">
-          <span>{formatPrice(p.priceLower)}</span>
-          <span className="text-base-content/30">{p.token1.symbol} / {p.token0.symbol}</span>
-          <span>{formatPrice(p.priceUpper)}</span>
+
+        <div className="ml-auto flex items-center gap-4 font-mono tabular-nums">
+          <span className="text-base-content/45">Value <span className="text-base-content font-semibold">{formatCurrencyCompact(value)}</span></span>
+          <span className="text-base-content/45">Fees <span className="text-success font-semibold">{fees < 0.01 && fees > 0 ? "<$0.01" : formatCurrencyCompact(fees)}</span></span>
         </div>
       </div>
 

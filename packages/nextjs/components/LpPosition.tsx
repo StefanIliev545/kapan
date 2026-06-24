@@ -47,11 +47,11 @@ export const LpPosition: FC<LpPositionProps> = ({
 }) => {
   const rawBalance = amount > 0 ? BigInt(Math.round(amount * 10 ** tokenDecimals)) : 0n;
 
+  // Balance (USD) reveals the token amount on hover, so no separate Amount column.
   const extraStats = [
-    { label: "Amount", value: formatAmount(amount) },
     {
       label: "Fees",
-      // Fees shown in USD (token amounts have absurd decimals); tiny → "<$0.01", raw on hover.
+      // Fees in USD (token amounts have absurd decimals); tiny → "<$0.01", raw on hover.
       value: feesUsd > 0 ? (
         <span className="text-success" title={`${formatAmount(fees)} ${symbol}`}>
           {feesUsd < 0.01 ? "<$0.01" : `$${feesUsd.toFixed(2)}`}
