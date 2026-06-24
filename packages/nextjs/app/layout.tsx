@@ -1,7 +1,7 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { ScaffoldEthAppWithProviders } from "~~/components/ScaffoldEthAppWithProviders";
 import { ThemeProvider } from "~~/components/ThemeProvider";
 import "~~/styles/globals.css";
@@ -26,11 +26,8 @@ export const viewport = {
   maximumScale: 1,
 };
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "900"],
-  display: "swap",
-});
+const geist = Geist({ subsets: ["latin"], display: "swap" });
+const geistMono = Geist_Mono({ subsets: ["latin"], display: "swap", variable: "--font-geist-mono" });
 
 // Static object for dangerouslySetInnerHTML to avoid creating new object on each render
 const themeScript = {
@@ -62,7 +59,7 @@ const ScaffoldEthApp = ({ children }: { children: React.ReactNode }) => {
         {/* Inline script to ensure kapan theme is always applied */}
         <script dangerouslySetInnerHTML={themeScript} />
       </head>
-      <body className={`${inter.className}`}>
+      <body className={`${geist.className} ${geistMono.variable}`}>
         <ThemeProvider>
           <QueryProvider>
             <ScaffoldEthAppWithProviders>

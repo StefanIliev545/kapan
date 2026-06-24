@@ -19,6 +19,11 @@ export interface MarketData {
   tvlUsd?: number;
   /** External link to market on protocol's app */
   marketUrl?: string;
+  /** Yield breakdown (percentages) for tokens with external yield (PT / LST).
+   *  `supplyRate` is the effective total; these explain where it comes from. */
+  impliedApy?: number;
+  nativeApy?: number;
+  baseSupplyApy?: number;
 }
 
 interface MarketsSectionProps {

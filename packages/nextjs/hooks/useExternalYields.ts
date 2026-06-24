@@ -38,6 +38,8 @@ export interface ExternalYield {
     daysToExpiry?: number;
     underlyingSymbol?: string;
     underlyingAddress?: string;
+    /** Underlying asset's native/organic APY as percentage (Pendle). */
+    underlyingApy?: number;
     /** PT price in USD from Pendle (use for consistent APY calculation) */
     ptPriceUsd?: number;
     /** Underlying price in USD from Pendle (use for consistent APY calculation) */
@@ -93,6 +95,7 @@ function ptYieldToExternal(
       daysToExpiry: pt.daysToExpiry,
       underlyingSymbol: pt.underlyingSymbol,
       underlyingAddress: pt.underlyingAddress,
+      underlyingApy: pt.underlyingApy,
       ptPriceUsd: pt.ptPriceUsd,
       underlyingPriceUsd: pt.underlyingPriceUsd,
       ...(position?.entryApyPercent != null ? { entryApyPercent: position.entryApyPercent } : {}),

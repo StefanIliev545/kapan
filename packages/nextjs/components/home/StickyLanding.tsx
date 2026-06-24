@@ -19,33 +19,10 @@ const HeroScene = dynamic(() => import("./HeroScene").then(m => m.HeroScene), {
   loading: () => null,
 });
 
-const HowItWorksScene = dynamic(() => import("./HowItWorksScene").then(m => m.HowItWorksScene), {
-  ssr: false,
-  loading: () => null,
-});
 
 // ================================
 // Static Animation Constants
 // ================================
-
-// ProtocolMarquee animations
-const MARQUEE_ANIMATE = { x: ["0%", "-50%"] as [string, string] };
-const MARQUEE_TRANSITION = {
-  x: {
-    duration: 20,
-    repeat: Infinity,
-    ease: "linear" as const,
-  },
-};
-
-// MarqueeRow animations
-const MARQUEE_ROW_TRANSITION = {
-  x: {
-    duration: 25,
-    repeat: Infinity,
-    ease: "linear" as const,
-  },
-};
 
 // NeonLetter animations
 const NEON_LETTER_INITIAL = { opacity: 0 };
@@ -74,22 +51,6 @@ const LINKS_INITIAL = { opacity: 0, y: 20 };
 const LINKS_ANIMATE_ACTIVE = { opacity: 1, y: 0 };
 const LINKS_ANIMATE_INACTIVE = { opacity: 0, y: 20 };
 const LINKS_TRANSITION = { delay: 4.2, duration: 0.6, ease: "easeOut" as const };
-
-// HowItWorks animations
-const SPRING_SCALE_INITIAL = { scale: 0 };
-const SPRING_SCALE_ANIMATE = { scale: 1 };
-const SPRING_SCALE_TRANSITION = { type: "spring" as const, bounce: 0.4, duration: 0.8 };
-
-
-const FADE_UP_INITIAL = { opacity: 0, scale: 0 };
-const FADE_UP_ANIMATE = { opacity: 1, scale: 1 };
-
-const STEP_01_INITIAL = { opacity: 0, y: 10 };
-const STEP_01_ANIMATE = { opacity: 1, y: 0 };
-const STEP_01_TRANSITION = { delay: 0.8 };
-
-const STEP_02_TRANSITION = { delay: 0.95 };
-const STEP_03_TRANSITION = { delay: 1.1 };
 
 // FlowStep animations
 const FLOW_STEP_INITIAL = { opacity: 0, y: 10 };
@@ -126,36 +87,6 @@ const SWAP_ARROW_TRANSITION = { duration: 1.2, repeat: Infinity };
 // Protocol and Network Data
 // ================================
 
-// Brighter, generic marquee row used in the hero (protocols / networks).
-const HeroMarquee = ({
-  items,
-  reverse = false,
-}: {
-  items: { name: string; logo: string }[];
-  reverse?: boolean;
-}) => {
-  const animate = useMemo(
-    () => (reverse ? { x: ["-50%", "0%"] as [string, string] } : MARQUEE_ANIMATE),
-    [reverse],
-  );
-  return (
-    <div className="relative w-full overflow-hidden">
-      <motion.div className="flex gap-8" animate={animate} transition={MARQUEE_TRANSITION}>
-        {items.map((item, index) => (
-          <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
-            <div className="relative size-5">
-              <Image src={item.logo} alt={item.name} fill className="object-contain" />
-            </div>
-            <span className="text-base-content/70 text-sm font-medium">{item.name}</span>
-          </div>
-        ))}
-      </motion.div>
-      {/* Fade edges */}
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r to-transparent" />
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l to-transparent" />
-    </div>
-  );
-};
 
 const LaunchAppButton = () => {
   const appUrl = useMemo(() => {
@@ -178,7 +109,7 @@ const LaunchAppButton = () => {
     <a
       href="/app"
       onClick={handleClick}
-      className="bg-primary text-primary-content group relative flex h-16 items-center justify-center overflow-hidden px-10 text-[11px] font-black uppercase tracking-[0.3em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] md:h-20 md:px-14 md:text-xs"
+      className="bg-primary text-primary-content group relative flex h-14 items-center justify-center overflow-hidden rounded-full px-9 text-[11px] font-bold uppercase tracking-[0.18em] shadow-lg shadow-black/30 transition-all duration-300 hover:shadow-[0_0_50px_rgba(59,130,246,0.25)] md:h-16 md:px-12"
     >
       <div className="relative z-10 flex items-center gap-3">
         <span>See my positions</span>
@@ -197,9 +128,6 @@ const HeroContent = () => {
   ];
   return (
     <div className="relative flex w-full flex-col items-center gap-7">
-      {/* Accent glow — drama within the palette (accent #3b82f6), no new hue */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-[42rem] -translate-x-1/2 translate-y-[-65%] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.12),transparent_65%)] blur-2xl" />
-
       {/* Live breadth strip — terminal-styled, monospace */}
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-xs uppercase tracking-[0.22em] sm:text-sm">
         <span className="relative flex size-2">
@@ -215,12 +143,6 @@ const HeroContent = () => {
             </span>
           </span>
         ))}
-      </div>
-
-      {/* Protocol + network marquees — brighter and more present than a single faint row */}
-      <div className="w-full max-w-xl space-y-2.5">
-        <HeroMarquee items={duplicatedSupportedProtocols} />
-        <HeroMarquee items={duplicatedNetworks} reverse />
       </div>
 
       <LaunchAppButton />
@@ -248,51 +170,6 @@ const supportedProtocols = [
   { name: "Venus", logo: "/logos/venus.svg" },
 ];
 
-// Aggregators & integrations
-const integrations = [
-  { name: "1inch", logo: "/logos/1inch.png" },
-  { name: "AVNU", logo: "/logos/avnu.png" },
-  { name: "Pendle", logo: "/logos/pendle.png" },
-];
-
-// Duplicate arrays for seamless loop
-const duplicatedNetworks = [...networks, ...networks];
-const duplicatedSupportedProtocols = [...supportedProtocols, ...supportedProtocols];
-const duplicatedIntegrations = [...integrations, ...integrations];
-
-// Marquee row component
-const MarqueeRow = ({ items, label, reverse = false }: { items: { name: string; logo: string }[]; label: string; reverse?: boolean }) => {
-  const animate = useMemo(() =>
-    ({ x: reverse ? ["-50%", "0%"] : ["0%", "-50%"] as [string, string] }),
-    [reverse]
-  );
-
-  return (
-    <div className="flex w-full items-center gap-4">
-      <span className="text-base-content/60 w-20 flex-shrink-0 text-right text-[10px] uppercase tracking-wider">{label}</span>
-      <div className="relative flex-1 overflow-hidden">
-        <motion.div
-          className="flex gap-6"
-          animate={animate}
-          transition={MARQUEE_ROW_TRANSITION}
-        >
-          {items.map((item, index) => (
-            <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
-              <div className="relative size-5">
-                <Image src={item.logo} alt={item.name} fill className="object-contain" />
-              </div>
-              <span className="text-base-content/70 text-xs">{item.name}</span>
-            </div>
-          ))}
-        </motion.div>
-        {/* Fade edges */}
-        <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent" />
-        <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent" />
-      </div>
-    </div>
-  );
-};
-
 const FeatureList = () => {
   const features = useMemo(() => [
     { icon: ShieldCheckIcon, title: "Non-Custodial", desc: "Your assets never leave your wallet. Verify every move on the protocol's own frontend." },
@@ -301,28 +178,38 @@ const FeatureList = () => {
     { icon: SparklesIcon, title: "Any Gas Token", desc: "Pay gas in any token you hold — no native-token scramble (via AVNU Paymaster)." },
   ], []);
 
+  const supported = useMemo(() => [...supportedProtocols, ...networks], []);
+
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-10 px-4">
-      {/* Features grid - centered with consistent spacing */}
-      <div className="grid w-full max-w-2xl grid-cols-1 gap-x-12 gap-y-8 md:grid-cols-2">
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8 px-4">
+      {/* Feature cards — anchored with surface + depth, left-aligned */}
+      <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
         {features.map((f, i) => (
-          <div key={i} className="flex gap-4 text-left">
-            <div className="bg-base-content/5 border-base-content/5 flex size-11 flex-shrink-0 items-center justify-center rounded-xl border">
-              <f.icon className="text-base-content/60 size-5" />
+          <div key={i} className="card-surface flex flex-col items-start gap-3 p-5 text-left">
+            <div className="bg-base-content/5 border-base-content/10 flex size-10 flex-shrink-0 items-center justify-center rounded-xl border">
+              <f.icon className="text-base-content/70 size-5" />
             </div>
-            <div className="pt-0.5">
-              <div className="text-base-content mb-1 text-sm font-semibold">{f.title}</div>
+            <div>
+              <div className="text-base-content mb-1 font-semibold">{f.title}</div>
               <div className="text-base-content/70 text-sm leading-relaxed">{f.desc}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Supported networks/protocols/integrations marquees */}
-      <div className="border-base-content/5 w-full space-y-3 border-t pt-6">
-        <MarqueeRow items={duplicatedNetworks} label="Networks" />
-        <MarqueeRow items={duplicatedSupportedProtocols} label="Protocols" reverse />
-        <MarqueeRow items={duplicatedIntegrations} label="Routers" />
+      {/* Works across — one tidy static logo row, not three scrolling marquees */}
+      <div className="border-base-content/10 flex w-full flex-col items-center gap-4 border-t pt-7">
+        <span className="text-base-content/50 text-[10px] uppercase tracking-[0.25em]">Works across</span>
+        <div className="flex max-w-2xl flex-wrap items-center justify-center gap-x-6 gap-y-3">
+          {supported.map(item => (
+            <div key={item.name} className="flex items-center gap-1.5">
+              <div className="relative size-5 shrink-0">
+                <Image src={item.logo} alt={item.name} fill className="object-contain" />
+              </div>
+              <span className="text-base-content/65 text-sm font-medium">{item.name}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -445,122 +332,6 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
 };
 
 // How it Works section - Kapan as orchestrator visualization
-const HowItWorks = () => {
-  // Shared radius values - X is larger since container is wider than tall
-  const radiusX = 42; // percentage from center horizontally
-  const radiusY = 38; // percentage from center vertically
-
-  // Helper to calculate position from angle
-  const getPosition = useCallback((angle: number, radius = 1) => {
-    const radians = ((angle - 90) * Math.PI) / 180;
-    return {
-      x: 50 + Math.cos(radians) * radiusX * radius,
-      y: 50 + Math.sin(radians) * radiusY * radius,
-    };
-  }, []);
-
-  // Pre-compute all protocol data with positions, styles, and transitions
-  const protocolData = useMemo(() => {
-    const protocols = [
-      { name: "Aave", logo: "/logos/aave.svg", angle: 0 },
-      { name: "Morpho", logo: "/logos/morpho.svg", angle: 45 },
-      { name: "Compound", logo: "/logos/compound.svg", angle: 90 },
-      { name: "1inch", logo: "/logos/1inch.png", angle: 135 },
-      { name: "Pendle", logo: "/logos/pendle.png", angle: 180 },
-      { name: "Venus", logo: "/logos/venus.svg", angle: 225 },
-      { name: "Nostra", logo: "/logos/nostra.svg", angle: 270 },
-      { name: "Euler", logo: "/logos/euler.svg", angle: 315 },
-    ];
-
-    return protocols.map((protocol, i) => {
-      const pos = getPosition(protocol.angle);
-      return {
-        ...protocol,
-        pos,
-        style: { left: `${pos.x}%`, top: `${pos.y}%` },
-        mobileTransition: { delay: 0.2 + i * 0.05 },
-        lineTransition: { delay: i * 0.1, duration: 0.5 },
-        desktopTransition: { delay: 0.3 + i * 0.08, duration: 0.4 },
-      };
-    });
-  }, [getPosition]);
-
-  return (
-    <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 px-4">
-      {/* Mobile: Just Kapan logo centered */}
-      <div className="flex flex-col items-center gap-6 md:hidden">
-        <motion.div
-          initial={SPRING_SCALE_INITIAL}
-          animate={SPRING_SCALE_ANIMATE}
-          transition={SPRING_SCALE_TRANSITION}
-        >
-          <div className="bg-base-200/80 border-base-content/20 flex size-20 items-center justify-center rounded-2xl border shadow-lg">
-            <Image src="/seal-logo.png" alt="Kapan" width={48} height={48} />
-          </div>
-        </motion.div>
-
-        {/* Protocol logos in a row */}
-        <div className="flex max-w-xs flex-wrap items-center justify-center gap-3">
-          {protocolData.map((protocol) => (
-            <motion.div
-              key={protocol.name}
-              initial={FADE_UP_INITIAL}
-              animate={FADE_UP_ANIMATE}
-              transition={protocol.mobileTransition}
-            >
-              <div className="bg-base-200/60 border-base-content/10 flex size-8 items-center justify-center rounded-lg border">
-                <Image src={protocol.logo} alt={protocol.name} width={18} height={18} />
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* Desktop: 3D orchestrator visualization — Kapan in the center,
-          protocol logos on a ring, tracer beams shuttling back and forth
-          along each spoke. Same visual language as the hero background. */}
-      <div className="hidden w-full items-center justify-center md:flex">
-        <div className="relative h-[350px] w-full max-w-2xl">
-          <HowItWorksScene />
-        </div>
-      </div>
-
-      {/* Explanation text */}
-      <div className="flex flex-col items-center justify-center gap-8 text-center md:flex-row md:gap-16">
-        <motion.div
-          className="max-w-[200px]"
-          initial={STEP_01_INITIAL}
-          animate={STEP_01_ANIMATE}
-          transition={STEP_01_TRANSITION}
-        >
-          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">01</div>
-          <div className="mb-1 text-sm font-medium">Bundle the steps</div>
-          <div className="text-base-content/70 text-xs">Deposit, borrow, swap, repay — stacked into one transaction.</div>
-        </motion.div>
-        <motion.div
-          className="max-w-[200px]"
-          initial={STEP_01_INITIAL}
-          animate={STEP_01_ANIMATE}
-          transition={STEP_02_TRANSITION}
-        >
-          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">02</div>
-          <div className="mb-1 text-sm font-medium">No capital up front</div>
-          <div className="text-base-content/70 text-xs">A flash loan fronts the funds — borrowed and repaid inside the same transaction.</div>
-        </motion.div>
-        <motion.div
-          className="max-w-[200px]"
-          initial={STEP_01_INITIAL}
-          animate={STEP_01_ANIMATE}
-          transition={STEP_03_TRANSITION}
-        >
-          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">03</div>
-          <div className="mb-1 text-sm font-medium">All or nothing</div>
-          <div className="text-base-content/70 text-xs">It all goes through, or none of it does. No half-finished position to clean up.</div>
-        </motion.div>
-      </div>
-    </div>
-  );
-};
 
 // Tooltip wrapper using Radix UI for professional look
 const MockTooltip = ({ children, tip }: { children: React.ReactNode; tip: string }) => (
@@ -972,15 +743,35 @@ const MockAaveHeader = () => (
 );
 
 // Dashboard preview - Morpho with positions, Aave header fading out
-const DashboardPreview = () => (
+// Browser-window chrome around the product mock — the "real screenshot" premium treatment
+// (mac traffic lights + URL bar + depth + glow), à la Aave Pro / Linear / Phantom.
+const BrowserFrame = ({ children, url = "app.kapan.finance" }: { children: React.ReactNode; url?: string }) => (
   <div className="relative mx-auto w-full max-w-5xl">
+    {/* soft accent glow behind the frame */}
+    <div className="pointer-events-none absolute -inset-x-12 -top-12 bottom-0 -z-10 rounded-[2rem] bg-[radial-gradient(60%_60%_at_50%_0%,rgba(59,130,246,0.16),transparent_70%)] blur-2xl" />
+    <div className="border-base-content/10 bg-base-200/50 overflow-hidden rounded-2xl border shadow-2xl shadow-black/60 backdrop-blur-sm">
+      {/* title bar */}
+      <div className="border-base-content/10 bg-base-300/40 flex items-center gap-2 border-b px-4 py-2.5">
+        <span className="size-3 rounded-full bg-[#ff5f57]" />
+        <span className="size-3 rounded-full bg-[#febc2e]" />
+        <span className="size-3 rounded-full bg-[#28c840]" />
+        <div className="flex-1">
+          <div className="bg-base-100/60 text-base-content/50 mx-auto w-fit rounded-md px-3 py-1 text-[11px]">{url}</div>
+        </div>
+        <span className="w-12 shrink-0" />
+      </div>
+      <div className="relative">{children}</div>
+    </div>
+  </div>
+);
+
+const DashboardPreview = () => (
+  <BrowserFrame url="app.kapan.finance">
     <MockMorphoView />
     <div className="pointer-events-none">
       <MockAaveHeader />
     </div>
-    {/* Fade overlay on bottom */}
-    <div className="from-base-100 via-base-100/90 pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t to-transparent" />
-  </div>
+  </BrowserFrame>
 );
 
 // Animated flow component - shows the transaction being built
@@ -1557,9 +1348,9 @@ const ActionTabs = () => {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4">
-      {/* Tight tab bar */}
-      <div className="mb-8 flex items-center justify-center">
-        <div className="border-base-content/10 inline-flex items-center gap-0 border-b">
+      {/* Tight tab bar — scrolls horizontally on mobile instead of clipping */}
+      <div className="hide-scrollbar -mx-4 mb-8 flex items-center overflow-x-auto px-4 md:mx-0 md:justify-center">
+        <div className="border-base-content/10 inline-flex shrink-0 items-center gap-0 border-b">
           {actionTabs.map((tab) => (
             <TabButton
               key={tab.id}
@@ -1671,21 +1462,14 @@ export const StickyLanding = () => {
       compactHeader: true,
     },
     {
-      tag: "03 / HOW",
-      title: "HOW IT WORKS.",
-      description: "Move a whole position in one transaction, no capital up front. Flash loans do the heavy lifting.",
-      content: <HowItWorks />,
-      compactHeader: true,
-    },
-    {
-      tag: "04 / WHY",
+      tag: "03 / WHY",
       title: "BUILT FOR YOU.",
       description: "Your keys, your call. No custody, no Kapan fee.",
       content: <FeatureList />,
       compactHeader: true,
     },
     {
-      tag: "05 / START",
+      tag: "04 / START",
       title: "GET STARTED.",
       description: "Connect your wallet. See everything. Move what you want.",
       content: <FinalCTA />,
@@ -1718,20 +1502,29 @@ export const StickyLanding = () => {
 
   return (
     <div className="bg-base-100 text-base-content fixed inset-0 overflow-hidden">
-      {/* Radial glow - fixed position, no parallax */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
+      {/* Layered premium backdrop — depth instead of a flat black + busy wireframe.
+         Soft accent glow (top), vignette (focus), dimmed 3D texture, film grain. */}
+      <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_20%,rgba(59,130,246,0.10),transparent_72%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.6)_100%)]" />
 
-      {/* 3D hero scene. Fades out as the user scrolls past the first sections
-         so it doesn't fight with the later content. `pointer-events-none` on
-         the wrapper AND inside HeroScene's Canvas style so clicks/scroll pass
-         straight through to the CTA underneath — r3f's Canvas otherwise
-         re-enables pointer-events inline and swallows the hero button click. */}
+      {/* 3D hero scene — dimmed to a faint texture so it adds depth without the busy "node graph"
+         look. Fades further as you scroll past the first sections. pointer-events-none so clicks
+         pass through to the CTA (r3f's Canvas otherwise re-enables pointer-events and swallows them). */}
       <motion.div
         className="pointer-events-none absolute inset-0"
-        style={{ opacity: useTransform(smoothProgress, [0, 0.25, 0.5], [0.45, 0.25, 0.06]) }}
+        style={{ opacity: useTransform(smoothProgress, [0, 0.25, 0.5], [0.16, 0.09, 0.03]) }}
       >
         <HeroScene />
       </motion.div>
+
+      {/* Film grain — subtle premium texture over the dark. */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-soft-light"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        }}
+      />
 
       {/* Scroll container */}
       <div
