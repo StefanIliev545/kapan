@@ -168,6 +168,7 @@ const UniswapPositionRow: FC<RowProps> = ({ position: p, chainId, value, fees, p
   // Range bar: where the current price sits between bounds.
   const span = p.priceUpper - p.priceLower;
   const pct = Math.max(0, Math.min(100, span > 0 ? ((p.priceCurrent - p.priceLower) / span) * 100 : 50));
+  const labelPct = Math.max(8, Math.min(92, pct)); // keep the floating label off the edges
   const rangeColor = p.inRange ? "bg-success" : "bg-warning";
 
   return (
@@ -197,6 +198,24 @@ const UniswapPositionRow: FC<RowProps> = ({ position: p, chainId, value, fees, p
         </div>
       </div>
 
+      {/* Price range (LP extension) — on top, current price floats above its marker */}
+      <div className="relative px-1 pt-4">
+        <div
+          className={`absolute top-0 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums ${p.inRange ? "text-success" : "text-warning"}`}
+          style={{ left: `${labelPct}%` }}
+        >
+          {formatPrice(p.priceCurrent)}
+        </div>
+        <div className="relative h-1.5 w-full bg-base-content/10">
+          <div className={`absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 ${rangeColor}`} style={{ left: `${pct}%` }} />
+        </div>
+        <div className="text-base-content/40 mt-1 flex justify-between text-[10px] tabular-nums">
+          <span>{formatPrice(p.priceLower)}</span>
+          <span className="text-base-content/30">{p.token1.symbol} / {p.token0.symbol}</span>
+          <span>{formatPrice(p.priceUpper)}</span>
+        </div>
+      </div>
+
       {/* Two tokens side by side — real position chrome via LpPosition */}
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {[p.token0, p.token1].map((t, i) => (
@@ -212,18 +231,6 @@ const UniswapPositionRow: FC<RowProps> = ({ position: p, chainId, value, fees, p
             feesUsd={usdOf(t, t.fees)}
           />
         ))}
-      </div>
-
-      {/* Price range bar — replaces the LTV/health bar from lending positions (LP extension) */}
-      <div className="px-0.5 pt-1">
-        <div className="relative h-1.5 w-full bg-base-content/10">
-          <div className={`absolute top-1/2 h-3 w-0.5 -translate-x-1/2 -translate-y-1/2 ${rangeColor}`} style={{ left: `${pct}%` }} />
-        </div>
-        <div className="text-base-content/45 mt-1 flex justify-between text-[10px] tabular-nums">
-          <span>{formatPrice(p.priceLower)}</span>
-          <span className={p.inRange ? "text-success" : "text-warning"}>{formatPrice(p.priceCurrent)} {p.token1.symbol}/{p.token0.symbol}</span>
-          <span>{formatPrice(p.priceUpper)}</span>
-        </div>
       </div>
     </div>
   );

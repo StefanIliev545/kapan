@@ -51,12 +51,10 @@ export const LpPosition: FC<LpPositionProps> = ({
     { label: "Amount", value: formatAmount(amount) },
     {
       label: "Fees",
-      value: fees > 0 ? (
-        <span className="text-success flex flex-col leading-tight">
-          <span>+{formatAmount(fees)}</span>
-          {feesUsd > 0 && (
-            <span className="text-base-content/40 text-[9px]">${feesUsd < 0.01 ? "0.00" : feesUsd.toFixed(2)}</span>
-          )}
+      // Fees shown in USD (token amounts have absurd decimals); tiny → "<$0.01", raw on hover.
+      value: feesUsd > 0 ? (
+        <span className="text-success" title={`${formatAmount(fees)} ${symbol}`}>
+          {feesUsd < 0.01 ? "<$0.01" : `$${feesUsd.toFixed(2)}`}
         </span>
       ) : (
         <span className="text-base-content/40">—</span>
