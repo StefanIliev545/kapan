@@ -35,7 +35,7 @@ body {
 }
 
 .landing-tag {
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace;
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.5em;
@@ -176,7 +176,7 @@ img[src$="/logos/ethereum.svg"] {
 /* Card surfaces - consistent card styling */
 /* No rounding on mobile (edge-to-edge), rounded on sm+ */
 .card-surface {
-  @apply card bg-base-200/40 shadow-md border border-base-300/50;
+  @apply card bg-base-200/40 border border-base-content/10 shadow-lg shadow-black/20;
 }
 
 .card-surface-hover {

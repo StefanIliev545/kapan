@@ -25,9 +25,9 @@ module.exports = {
           success: "#4ade80",
           warning: "#fbbf24",
           error: "#f87171",
-          "--rounded-btn": "0px",
-          "--rounded-box": "0px",
-          "--rounded-badge": "0px",
+          "--rounded-btn": "0.625rem",
+          "--rounded-box": "1rem",
+          "--rounded-badge": "0.5rem",
           ".tooltip": { "--tooltip-tail": "6px" },
           ".link": { textUnderlineOffset: "2px" },
           ".link:hover": { opacity: "0.8" },
@@ -48,6 +48,9 @@ module.exports = {
       },
     },
     extend: {
+      fontFamily: {
+        mono: ["var(--font-geist-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
+      },
       boxShadow: { center: "0 0 12px -2px rgb(0 0 0 / 0.05)" },
       animation: {
         "pulse-fast": "pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite",

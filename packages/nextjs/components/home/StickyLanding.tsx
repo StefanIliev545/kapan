@@ -178,7 +178,7 @@ const LaunchAppButton = () => {
     <a
       href="/app"
       onClick={handleClick}
-      className="bg-primary text-primary-content group relative flex h-16 items-center justify-center overflow-hidden px-10 text-[11px] font-black uppercase tracking-[0.3em] transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] md:h-20 md:px-14 md:text-xs"
+      className="bg-primary text-primary-content group relative flex h-14 items-center justify-center overflow-hidden rounded-full px-9 text-[11px] font-bold uppercase tracking-[0.18em] shadow-lg shadow-black/30 transition-all duration-300 hover:shadow-[0_0_50px_rgba(59,130,246,0.25)] md:h-16 md:px-12"
     >
       <div className="relative z-10 flex items-center gap-3">
         <span>See my positions</span>
