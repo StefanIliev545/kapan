@@ -969,15 +969,35 @@ const MockAaveHeader = () => (
 );
 
 // Dashboard preview - Morpho with positions, Aave header fading out
-const DashboardPreview = () => (
+// Browser-window chrome around the product mock — the "real screenshot" premium treatment
+// (mac traffic lights + URL bar + depth + glow), à la Aave Pro / Linear / Phantom.
+const BrowserFrame = ({ children, url = "app.kapan.finance" }: { children: React.ReactNode; url?: string }) => (
   <div className="relative mx-auto w-full max-w-5xl">
+    {/* soft accent glow behind the frame */}
+    <div className="pointer-events-none absolute -inset-x-12 -top-12 bottom-0 -z-10 rounded-[2rem] bg-[radial-gradient(60%_60%_at_50%_0%,rgba(59,130,246,0.16),transparent_70%)] blur-2xl" />
+    <div className="border-base-content/10 bg-base-200/50 overflow-hidden rounded-2xl border shadow-2xl shadow-black/60 backdrop-blur-sm">
+      {/* title bar */}
+      <div className="border-base-content/10 bg-base-300/40 flex items-center gap-2 border-b px-4 py-2.5">
+        <span className="size-3 rounded-full bg-[#ff5f57]" />
+        <span className="size-3 rounded-full bg-[#febc2e]" />
+        <span className="size-3 rounded-full bg-[#28c840]" />
+        <div className="flex-1">
+          <div className="bg-base-100/60 text-base-content/50 mx-auto w-fit rounded-md px-3 py-1 text-[11px]">{url}</div>
+        </div>
+        <span className="w-12 shrink-0" />
+      </div>
+      <div className="relative">{children}</div>
+    </div>
+  </div>
+);
+
+const DashboardPreview = () => (
+  <BrowserFrame url="app.kapan.finance">
     <MockMorphoView />
     <div className="pointer-events-none">
       <MockAaveHeader />
     </div>
-    {/* Fade overlay on bottom */}
-    <div className="from-base-100 via-base-100/90 pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t to-transparent" />
-  </div>
+  </BrowserFrame>
 );
 
 // Animated flow component - shows the transaction being built
