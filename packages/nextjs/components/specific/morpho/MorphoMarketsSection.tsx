@@ -119,6 +119,22 @@ interface MarketRow {
 
 const columnHelper = createColumnHelper<MarketRow>();
 
+// Per-column desktop layout. `table-fixed` + these fractional widths keep the row evenly
+// distributed (no giant empty Market gap) and make the table fill its container exactly
+// instead of spilling off-screen. Lower-priority columns drop out on narrower viewports
+// (util < xl; implied/maxLoop < lg) so the table never needs horizontal scroll on a laptop.
+// Keep ids in sync with the column defs below; EulerMarketsSection mirrors this pattern.
+const COL_LAYOUT: Record<string, { width: string; align: string; show: string }> = {
+  market:      { width: "w-[25%]", align: "text-left",  show: "" },
+  supplyUsd:   { width: "w-[11%]", align: "text-right", show: "" },
+  util:        { width: "w-[7%]",  align: "text-right", show: "hidden xl:table-cell" },
+  implied:     { width: "w-[10%]", align: "text-right", show: "hidden lg:table-cell" },
+  supplyApy01: { width: "w-[10%]", align: "text-right", show: "" },
+  borrowApy01: { width: "w-[10%]", align: "text-right", show: "" },
+  maxLoop:     { width: "w-[11%]", align: "text-right", show: "hidden lg:table-cell" },
+  actions:     { width: "w-[16%]", align: "text-right", show: "" },
+};
+
 
 function TokenPairAvatars(props: { collateralSymbol?: string; loanSymbol: string }) {
   const collateralSymbol = (props.collateralSymbol ?? "").toLowerCase();
@@ -566,8 +582,8 @@ function MobileMarketRow({ row, usd, chainId, onSupply, onLoop }: MobileMarketRo
       <div className="flex items-center gap-2.5 px-3.5 py-2.5">
         {/* Token pair icons + name */}
         <TokenPairAvatars collateralSymbol={row.collateralSymbol} loanSymbol={row.loanSymbol} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="flex min-w-0 items-center gap-1">
             <TokenSymbolDisplay symbol={row.collateralSymbol} size="xs" variant="inline" />
             <span className="text-base-content/50 text-xs">/</span>
             <span className="text-xs font-medium">{row.loanSymbol}</span>
@@ -586,7 +602,7 @@ function MobileMarketRow({ row, usd, chainId, onSupply, onLoop }: MobileMarketRo
         </div>
 
         {/* Stats - always visible */}
-        <div className="flex items-center gap-3 text-[11px]">
+        <div className="flex shrink-0 items-center gap-3 text-[11px]">
           <span className="text-base-content/70 font-mono tabular-nums">{usd.format(row.supplyUsd)}</span>
           <span className="text-success font-mono tabular-nums">{formatPercent(row.supplyApy01, 2)}</span>
           <span className="font-mono tabular-nums">{formatPercent(row.borrowApy01, 2)}</span>
@@ -809,7 +825,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       id: "implied",
       header: () => (
         <Tooltip content="Implied APY for PT collateral tokens (Pendle fixed yield)">
-          <span className="cursor-help border-b border-dashed border-current">Implied</span>
+          <span className="cursor-help">Implied</span>
         </Tooltip>
       ),
       cell: info => {
@@ -839,7 +855,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       id: "maxLoop",
       header: () => (
         <Tooltip content="Estimated net APY at max safe leverage (~99% of LLTV). Includes external yield for PT tokens.">
-          <span className="cursor-help border-b border-dashed border-current">Max Loop</span>
+          <span className="cursor-help">Max Loop</span>
         </Tooltip>
       ),
       cell: info => {
@@ -862,7 +878,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
       id: "actions",
       header: "",
       cell: info => (
-        <Flex gap="5" align="center" justify="end" className="ml-4">
+        <Flex gap="4" align="center" justify="end" className="whitespace-nowrap">
           <button
             onClick={() => handleSupplyClick(info.row.original.market)}
             className="market-action-primary"
@@ -1220,19 +1236,18 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           {/* Desktop: Table layout */}
           <div className="hidden md:block">
             <ScrollArea scrollbars="horizontal" type="auto">
-              <table className="w-full text-sm">
+              <table className="w-full table-fixed text-sm">
                 <thead>
                   {table.getHeaderGroups().map(headerGroup => (
                     <tr key={headerGroup.id}>
                       {headerGroup.headers.map(header => (
                         <th
                           key={header.id}
-                          className={`market-th ${
-                            header.id === "market" ? "text-left" :
-                            header.id === "util" ? "text-center" :
-                            header.id === "actions" ? "border-0" :
-                            "text-right"
-                          } ${header.column.getCanSort() ? "hover:text-base-content/50 cursor-pointer" : ""}`}
+                          className={`market-th ${COL_LAYOUT[header.id]?.width ?? ""} ${
+                            COL_LAYOUT[header.id]?.align ?? "text-right"
+                          } ${COL_LAYOUT[header.id]?.show ?? ""} ${
+                            header.id === "actions" ? "border-0" : ""
+                          } ${header.column.getCanSort() ? "hover:text-base-content/80 cursor-pointer" : ""}`}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <span className={`inline-flex items-center gap-1 ${header.column.getIsSorted() ? "text-primary" : ""}`}>
@@ -1255,12 +1270,11 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
                         return (
                           <td
                             key={cell.id}
-                            className={`market-td ${
-                              cell.column.id === "market" ? "pl-3" :
-                              cell.column.id === "util" ? "text-center" :
-                              cell.column.id === "actions" ? "pr-3" :
-                              "text-right tabular-nums"
-                            }`}
+                            className={`market-td ${COL_LAYOUT[cell.column.id]?.align ?? "text-right"} ${
+                              COL_LAYOUT[cell.column.id]?.show ?? ""
+                            } ${cell.column.id === "market" ? "pl-3" : ""} ${
+                              cell.column.id === "actions" ? "pr-3" : ""
+                            } ${cell.column.id !== "market" && cell.column.id !== "actions" ? "tabular-nums" : ""}`}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>

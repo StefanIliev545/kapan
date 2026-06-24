@@ -76,6 +76,19 @@ interface VaultRow {
 
 const columnHelper = createColumnHelper<VaultRow>();
 
+// Per-column desktop layout — mirrors MorphoMarketsSection. `table-fixed` + these fractional
+// widths keep the row evenly distributed and make the table fill its container exactly instead
+// of spilling off-screen. `util` drops out below lg so the table never needs horizontal scroll.
+const COL_LAYOUT: Record<string, { width: string; align: string; show: string }> = {
+  market:      { width: "w-[23%]", align: "text-left",  show: "" },
+  collaterals: { width: "w-[20%]", align: "text-left",  show: "" },
+  tvlUsd:      { width: "w-[13%]", align: "text-right", show: "" },
+  util:        { width: "w-[9%]",  align: "text-right", show: "hidden lg:table-cell" },
+  supplyApy01: { width: "w-[11%]", align: "text-right", show: "" },
+  borrowApy01: { width: "w-[11%]", align: "text-right", show: "" },
+  actions:     { width: "w-[13%]", align: "text-right", show: "" },
+};
+
 // Token Icon component
 function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {
   const src = tokenNameToLogo(symbol.toLowerCase());
@@ -505,7 +518,7 @@ function MobileVaultRow({ row, usd, chainId, onSupply, onBorrow }: MobileVaultRo
       {/* Main row */}
       <div className="flex items-center gap-2.5 px-3.5 py-2.5">
         <TokenIcon symbol={row.assetSymbol} size={24} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex items-center gap-1">
             <a
               href={eulerUrl}
@@ -530,7 +543,7 @@ function MobileVaultRow({ row, usd, chainId, onSupply, onBorrow }: MobileVaultRo
         </div>
 
         {/* Stats */}
-        <div className="flex items-center gap-3 text-[11px]">
+        <div className="flex shrink-0 items-center gap-3 text-[11px]">
           <span className="text-base-content/70 font-mono tabular-nums">{usd.format(row.tvlUsd)}</span>
           {row.impliedApy !== null ? (
             <span className="text-info font-mono tabular-nums">{formatPercent(row.impliedApy / 100, 2)}</span>
@@ -1031,28 +1044,26 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
           {/* Desktop: Table layout */}
           <div className="hidden md:block">
             <ScrollArea scrollbars="horizontal" type="auto">
-              <table className="w-full text-sm">
+              <table className="w-full table-fixed text-sm">
                 <thead>
                   {table.getHeaderGroups().map(headerGroup => (
                     <tr key={headerGroup.id}>
                       {headerGroup.headers.map(header => {
                         const canSort = header.column.getCanSort();
                         const columnId = header.column.id;
-                        const isMarket = columnId === "market";
                         const isCollaterals = columnId === "collaterals";
-                        const isUtil = columnId === "util";
                         const isActions = columnId === "actions";
 
                         return (
                           <th
                             key={header.id}
-                            className={`market-th ${
-                              isMarket ? "text-left" :
-                              isCollaterals ? "px-3 text-left" :
-                              isUtil ? "text-center" :
-                              isActions ? "pl-6 border-0" :
-                              "text-right"
-                            } ${canSort ? "hover:text-base-content/50 cursor-pointer" : ""}`}
+                            className={`market-th ${COL_LAYOUT[columnId]?.width ?? ""} ${
+                              COL_LAYOUT[columnId]?.align ?? "text-right"
+                            } ${COL_LAYOUT[columnId]?.show ?? ""} ${
+                              isCollaterals ? "px-3" : ""
+                            } ${isActions ? "pl-6 border-0" : ""} ${
+                              canSort ? "hover:text-base-content/80 cursor-pointer" : ""
+                            }`}
                             onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                           >
                             {!header.isPlaceholder && (
@@ -1077,19 +1088,16 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
                         const columnId = cell.column.id;
                         const isMarket = columnId === "market";
                         const isCollaterals = columnId === "collaterals";
-                        const isUtil = columnId === "util";
                         const isActions = columnId === "actions";
 
                         return (
                           <td
                             key={cell.id}
-                            className={`market-td ${
-                              isMarket ? "pl-3" :
-                              isCollaterals ? "px-3" :
-                              isUtil ? "text-center" :
-                              isActions ? "pl-6 pr-3 text-right" :
-                              "text-right tabular-nums"
-                            }`}
+                            className={`market-td ${COL_LAYOUT[columnId]?.align ?? "text-right"} ${
+                              COL_LAYOUT[columnId]?.show ?? ""
+                            } ${isMarket ? "pl-3" : ""} ${isCollaterals ? "px-3" : ""} ${
+                              isActions ? "pl-6 pr-3" : ""
+                            } ${!isMarket && !isCollaterals && !isActions ? "tabular-nums" : ""}`}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
