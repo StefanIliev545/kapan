@@ -19,24 +19,10 @@ const HeroScene = dynamic(() => import("./HeroScene").then(m => m.HeroScene), {
   loading: () => null,
 });
 
-const HowItWorksScene = dynamic(() => import("./HowItWorksScene").then(m => m.HowItWorksScene), {
-  ssr: false,
-  loading: () => null,
-});
 
 // ================================
 // Static Animation Constants
 // ================================
-
-// ProtocolMarquee animations
-const MARQUEE_ANIMATE = { x: ["0%", "-50%"] as [string, string] };
-const MARQUEE_TRANSITION = {
-  x: {
-    duration: 20,
-    repeat: Infinity,
-    ease: "linear" as const,
-  },
-};
 
 // MarqueeRow animations
 const MARQUEE_ROW_TRANSITION = {
@@ -75,22 +61,6 @@ const LINKS_ANIMATE_ACTIVE = { opacity: 1, y: 0 };
 const LINKS_ANIMATE_INACTIVE = { opacity: 0, y: 20 };
 const LINKS_TRANSITION = { delay: 4.2, duration: 0.6, ease: "easeOut" as const };
 
-// HowItWorks animations
-const SPRING_SCALE_INITIAL = { scale: 0 };
-const SPRING_SCALE_ANIMATE = { scale: 1 };
-const SPRING_SCALE_TRANSITION = { type: "spring" as const, bounce: 0.4, duration: 0.8 };
-
-
-const FADE_UP_INITIAL = { opacity: 0, scale: 0 };
-const FADE_UP_ANIMATE = { opacity: 1, scale: 1 };
-
-const STEP_01_INITIAL = { opacity: 0, y: 10 };
-const STEP_01_ANIMATE = { opacity: 1, y: 0 };
-const STEP_01_TRANSITION = { delay: 0.8 };
-
-const STEP_02_TRANSITION = { delay: 0.95 };
-const STEP_03_TRANSITION = { delay: 1.1 };
-
 // FlowStep animations
 const FLOW_STEP_INITIAL = { opacity: 0, y: 10 };
 const FLOW_STEP_ANIMATE_ACTIVE = { opacity: 1, y: 0 };
@@ -126,36 +96,6 @@ const SWAP_ARROW_TRANSITION = { duration: 1.2, repeat: Infinity };
 // Protocol and Network Data
 // ================================
 
-// Brighter, generic marquee row used in the hero (protocols / networks).
-const HeroMarquee = ({
-  items,
-  reverse = false,
-}: {
-  items: { name: string; logo: string }[];
-  reverse?: boolean;
-}) => {
-  const animate = useMemo(
-    () => (reverse ? { x: ["-50%", "0%"] as [string, string] } : MARQUEE_ANIMATE),
-    [reverse],
-  );
-  return (
-    <div className="relative w-full overflow-hidden">
-      <motion.div className="flex gap-8" animate={animate} transition={MARQUEE_TRANSITION}>
-        {items.map((item, index) => (
-          <div key={`${item.name}-${index}`} className="flex flex-shrink-0 items-center gap-2">
-            <div className="relative size-5">
-              <Image src={item.logo} alt={item.name} fill className="object-contain" />
-            </div>
-            <span className="text-base-content/70 text-sm font-medium">{item.name}</span>
-          </div>
-        ))}
-      </motion.div>
-      {/* Fade edges */}
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r to-transparent" />
-      <div className="from-base-100 pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l to-transparent" />
-    </div>
-  );
-};
 
 const LaunchAppButton = () => {
   const appUrl = useMemo(() => {
@@ -212,12 +152,6 @@ const HeroContent = () => {
             </span>
           </span>
         ))}
-      </div>
-
-      {/* Protocol + network marquees — brighter and more present than a single faint row */}
-      <div className="w-full max-w-xl space-y-2.5">
-        <HeroMarquee items={duplicatedSupportedProtocols} />
-        <HeroMarquee items={duplicatedNetworks} reverse />
       </div>
 
       <LaunchAppButton />
@@ -442,122 +376,6 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
 };
 
 // How it Works section - Kapan as orchestrator visualization
-const HowItWorks = () => {
-  // Shared radius values - X is larger since container is wider than tall
-  const radiusX = 42; // percentage from center horizontally
-  const radiusY = 38; // percentage from center vertically
-
-  // Helper to calculate position from angle
-  const getPosition = useCallback((angle: number, radius = 1) => {
-    const radians = ((angle - 90) * Math.PI) / 180;
-    return {
-      x: 50 + Math.cos(radians) * radiusX * radius,
-      y: 50 + Math.sin(radians) * radiusY * radius,
-    };
-  }, []);
-
-  // Pre-compute all protocol data with positions, styles, and transitions
-  const protocolData = useMemo(() => {
-    const protocols = [
-      { name: "Aave", logo: "/logos/aave.svg", angle: 0 },
-      { name: "Morpho", logo: "/logos/morpho.svg", angle: 45 },
-      { name: "Compound", logo: "/logos/compound.svg", angle: 90 },
-      { name: "1inch", logo: "/logos/1inch.png", angle: 135 },
-      { name: "Pendle", logo: "/logos/pendle.png", angle: 180 },
-      { name: "Venus", logo: "/logos/venus.svg", angle: 225 },
-      { name: "Nostra", logo: "/logos/nostra.svg", angle: 270 },
-      { name: "Euler", logo: "/logos/euler.svg", angle: 315 },
-    ];
-
-    return protocols.map((protocol, i) => {
-      const pos = getPosition(protocol.angle);
-      return {
-        ...protocol,
-        pos,
-        style: { left: `${pos.x}%`, top: `${pos.y}%` },
-        mobileTransition: { delay: 0.2 + i * 0.05 },
-        lineTransition: { delay: i * 0.1, duration: 0.5 },
-        desktopTransition: { delay: 0.3 + i * 0.08, duration: 0.4 },
-      };
-    });
-  }, [getPosition]);
-
-  return (
-    <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 px-4">
-      {/* Mobile: Just Kapan logo centered */}
-      <div className="flex flex-col items-center gap-6 md:hidden">
-        <motion.div
-          initial={SPRING_SCALE_INITIAL}
-          animate={SPRING_SCALE_ANIMATE}
-          transition={SPRING_SCALE_TRANSITION}
-        >
-          <div className="bg-base-200/80 border-base-content/20 flex size-20 items-center justify-center rounded-2xl border shadow-lg">
-            <Image src="/seal-logo.png" alt="Kapan" width={48} height={48} />
-          </div>
-        </motion.div>
-
-        {/* Protocol logos in a row */}
-        <div className="flex max-w-xs flex-wrap items-center justify-center gap-3">
-          {protocolData.map((protocol) => (
-            <motion.div
-              key={protocol.name}
-              initial={FADE_UP_INITIAL}
-              animate={FADE_UP_ANIMATE}
-              transition={protocol.mobileTransition}
-            >
-              <div className="bg-base-200/60 border-base-content/10 flex size-8 items-center justify-center rounded-lg border">
-                <Image src={protocol.logo} alt={protocol.name} width={18} height={18} />
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* Desktop: 3D orchestrator visualization — Kapan in the center,
-          protocol logos on a ring, tracer beams shuttling back and forth
-          along each spoke. Same visual language as the hero background. */}
-      <div className="hidden w-full items-center justify-center md:flex">
-        <div className="relative h-[350px] w-full max-w-2xl">
-          <HowItWorksScene />
-        </div>
-      </div>
-
-      {/* Explanation text */}
-      <div className="flex flex-col items-center justify-center gap-8 text-center md:flex-row md:gap-16">
-        <motion.div
-          className="max-w-[200px]"
-          initial={STEP_01_INITIAL}
-          animate={STEP_01_ANIMATE}
-          transition={STEP_01_TRANSITION}
-        >
-          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">01</div>
-          <div className="mb-1 text-sm font-medium">Bundle the steps</div>
-          <div className="text-base-content/70 text-xs">Deposit, borrow, swap, repay — stacked into one transaction.</div>
-        </motion.div>
-        <motion.div
-          className="max-w-[200px]"
-          initial={STEP_01_INITIAL}
-          animate={STEP_01_ANIMATE}
-          transition={STEP_02_TRANSITION}
-        >
-          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">02</div>
-          <div className="mb-1 text-sm font-medium">No capital up front</div>
-          <div className="text-base-content/70 text-xs">A flash loan fronts the funds — borrowed and repaid inside the same transaction.</div>
-        </motion.div>
-        <motion.div
-          className="max-w-[200px]"
-          initial={STEP_01_INITIAL}
-          animate={STEP_01_ANIMATE}
-          transition={STEP_03_TRANSITION}
-        >
-          <div className="text-primary mb-1 text-[10px] uppercase tracking-widest">03</div>
-          <div className="mb-1 text-sm font-medium">All or nothing</div>
-          <div className="text-base-content/70 text-xs">It all goes through, or none of it does. No half-finished position to clean up.</div>
-        </motion.div>
-      </div>
-    </div>
-  );
-};
 
 // Tooltip wrapper using Radix UI for professional look
 const MockTooltip = ({ children, tip }: { children: React.ReactNode; tip: string }) => (
@@ -1574,9 +1392,9 @@ const ActionTabs = () => {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4">
-      {/* Tight tab bar */}
-      <div className="mb-8 flex items-center justify-center">
-        <div className="border-base-content/10 inline-flex items-center gap-0 border-b">
+      {/* Tight tab bar — scrolls horizontally on mobile instead of clipping */}
+      <div className="hide-scrollbar -mx-4 mb-8 flex items-center overflow-x-auto px-4 md:mx-0 md:justify-center">
+        <div className="border-base-content/10 inline-flex shrink-0 items-center gap-0 border-b">
           {actionTabs.map((tab) => (
             <TabButton
               key={tab.id}
@@ -1688,21 +1506,14 @@ export const StickyLanding = () => {
       compactHeader: true,
     },
     {
-      tag: "03 / HOW",
-      title: "HOW IT WORKS.",
-      description: "Move a whole position in one transaction, no capital up front. Flash loans do the heavy lifting.",
-      content: <HowItWorks />,
-      compactHeader: true,
-    },
-    {
-      tag: "04 / WHY",
+      tag: "03 / WHY",
       title: "BUILT FOR YOU.",
       description: "Your keys, your call. No custody, no Kapan fee.",
       content: <FeatureList />,
       compactHeader: true,
     },
     {
-      tag: "05 / START",
+      tag: "04 / START",
       title: "GET STARTED.",
       description: "Connect your wallet. See everything. Move what you want.",
       content: <FinalCTA />,
