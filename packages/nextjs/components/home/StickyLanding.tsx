@@ -197,9 +197,6 @@ const HeroContent = () => {
   ];
   return (
     <div className="relative flex w-full flex-col items-center gap-7">
-      {/* Accent glow — drama within the palette (accent #3b82f6), no new hue */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-[42rem] -translate-x-1/2 translate-y-[-65%] rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.12),transparent_65%)] blur-2xl" />
-
       {/* Live breadth strip — terminal-styled, monospace */}
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-xs uppercase tracking-[0.22em] sm:text-sm">
         <span className="relative flex size-2">
@@ -1718,20 +1715,29 @@ export const StickyLanding = () => {
 
   return (
     <div className="bg-base-100 text-base-content fixed inset-0 overflow-hidden">
-      {/* Radial glow - fixed position, no parallax */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
+      {/* Layered premium backdrop — depth instead of a flat black + busy wireframe.
+         Soft accent glow (top), vignette (focus), dimmed 3D texture, film grain. */}
+      <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_20%,rgba(59,130,246,0.10),transparent_72%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.6)_100%)]" />
 
-      {/* 3D hero scene. Fades out as the user scrolls past the first sections
-         so it doesn't fight with the later content. `pointer-events-none` on
-         the wrapper AND inside HeroScene's Canvas style so clicks/scroll pass
-         straight through to the CTA underneath — r3f's Canvas otherwise
-         re-enables pointer-events inline and swallows the hero button click. */}
+      {/* 3D hero scene — dimmed to a faint texture so it adds depth without the busy "node graph"
+         look. Fades further as you scroll past the first sections. pointer-events-none so clicks
+         pass through to the CTA (r3f's Canvas otherwise re-enables pointer-events and swallows them). */}
       <motion.div
         className="pointer-events-none absolute inset-0"
-        style={{ opacity: useTransform(smoothProgress, [0, 0.25, 0.5], [0.45, 0.25, 0.06]) }}
+        style={{ opacity: useTransform(smoothProgress, [0, 0.25, 0.5], [0.16, 0.09, 0.03]) }}
       >
         <HeroScene />
       </motion.div>
+
+      {/* Film grain — subtle premium texture over the dark. */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-soft-light"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        }}
+      />
 
       {/* Scroll container */}
       <div
