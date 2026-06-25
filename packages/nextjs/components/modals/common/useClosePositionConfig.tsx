@@ -85,6 +85,7 @@ import {
 } from "../closeWithCollateralEvmHelpers";
 
 import type { SwapAsset, SwapRouter } from "../SwapModalShell";
+import { resolveSwapRouter } from "./swapRouterUtils";
 import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
 import type { SwapOperationConfig, UseClosePositionConfigProps, ExecutionType, SwapQuoteResult } from "./swapConfigTypes";
 import type { FlashLoanProviderOption } from "~~/utils/flashLoan";
@@ -123,30 +124,7 @@ function calculateInterestBufferBps(borrowRateApy: number, minutes: number): big
   return BigInt(Math.max(1, bufferBps)); // Minimum 1 bp
 }
 
-/**
- * Resolve the best available swap router when the current one is unavailable.
- * Returns the fallback router name, or the current one if it is available.
- */
-function resolveSwapRouterFallback(
-  current: SwapRouter,
-  kyber: boolean,
-  oneInch: boolean,
-  pendle: boolean
-): SwapRouter {
-  const fallbackOrder: Record<SwapRouter, SwapRouter[]> = {
-    kyber: ["1inch", "pendle", "kyber"],
-    "1inch": ["kyber", "pendle", "1inch"],
-    pendle: ["kyber", "1inch", "pendle"],
-  };
-  const available: Record<SwapRouter, boolean> = { kyber, "1inch": oneInch, pendle };
-
-  if (available[current]) {
-    return current;
-  }
-
-  const candidates = fallbackOrder[current];
-  return candidates.find(r => available[r]) ?? current;
-}
+// resolveSwapRouter (the fallback resolver) now lives in ./swapRouterUtils (shared).
 
 /** Map UI swap router name to internal protocol name used in instruction encoding. */
 function resolveSwapProtocolName(router: SwapRouter): "oneinch" | "kyber" | "pendle" {
@@ -531,7 +509,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   // ============ Effects ============
   // Update swap router when chain changes
   useEffect(() => {
-    const resolved = resolveSwapRouterFallback(swapRouter, kyberAvailable, oneInchAvailable, pendleAvailable);
+    const resolved = resolveSwapRouter(swapRouter, kyberAvailable, oneInchAvailable, pendleAvailable);
     if (resolved !== swapRouter) {
       setSwapRouter(resolved);
     }

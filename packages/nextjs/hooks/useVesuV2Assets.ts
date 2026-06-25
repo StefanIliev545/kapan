@@ -265,7 +265,7 @@ export const useVesuV2Assets = (poolAddress: string) => {
   });
 
   const assetsWithRates = useMemo<AssetWithRates[]>(() => {
-    return normalizedAssets.map((asset: any) => {
+    return normalizedAssets.map(asset => {
       const hexAddress = `0x${asset.address.toString(16).padStart(64, "0")}`;
       const normalizedAddress = hexAddress.toLowerCase();
       const rates = poolRates[normalizedAddress];
