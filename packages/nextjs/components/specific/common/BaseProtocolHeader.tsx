@@ -53,6 +53,9 @@ export interface BaseProtocolHeaderProps {
   onToggleCollapsed: () => void;
   /** Callback when markets button is clicked */
   onToggleMarkets: (e: React.MouseEvent) => void;
+  /** Whether to show the Markets toggle button (default true). Set false for view-only
+   *  protocols that have no markets/pools browser (e.g. Uniswap LP positions). */
+  showMarkets?: boolean;
 
   /** Whether user has positions (affects metric display) */
   hasPositions: boolean;
@@ -174,6 +177,7 @@ export const BaseProtocolHeader: FC<BaseProtocolHeaderProps> = ({
   isMarketsOpen,
   onToggleCollapsed,
   onToggleMarkets,
+  showMarkets = true,
   hasPositions,
   metrics,
   headerExtra,
@@ -205,14 +209,16 @@ export const BaseProtocolHeader: FC<BaseProtocolHeaderProps> = ({
           </div>
           <div className="flex items-center gap-1.5">
             {headerExtra}
-            <button
-              className="btn btn-xs btn-ghost gap-0.5 opacity-60 hover:opacity-100"
-              type="button"
-              onClick={onToggleMarkets}
-            >
-              <span className="text-[9px] font-medium tracking-wider">Markets</span>
-              {isMarketsOpen ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />}
-            </button>
+            {showMarkets && (
+              <button
+                className="btn btn-xs btn-ghost gap-0.5 opacity-60 hover:opacity-100"
+                type="button"
+                onClick={onToggleMarkets}
+              >
+                <span className="text-[9px] font-medium tracking-wider">Markets</span>
+                {isMarketsOpen ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />}
+              </button>
+            )}
             <ChevronDownIcon
               className={`text-base-content/30 size-4 transition-transform duration-300 ${isCollapsed ? "-rotate-90" : ""}`}
             />
@@ -263,14 +269,16 @@ export const BaseProtocolHeader: FC<BaseProtocolHeaderProps> = ({
         {/* Actions: Markets + collapse chevron */}
         <div className="flex items-center gap-2 pr-5 pl-3">
           {headerExtra}
-          <button
-            className="btn btn-sm btn-ghost gap-1 opacity-50 hover:opacity-100"
-            type="button"
-            onClick={onToggleMarkets}
-          >
-            <span className="text-[10px] font-medium tracking-wider">Markets</span>
-            {isMarketsOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}
-          </button>
+          {showMarkets && (
+            <button
+              className="btn btn-sm btn-ghost gap-1 opacity-50 hover:opacity-100"
+              type="button"
+              onClick={onToggleMarkets}
+            >
+              <span className="text-[10px] font-medium tracking-wider">Markets</span>
+              {isMarketsOpen ? <ChevronUpIcon className="size-3.5" /> : <ChevronDownIcon className="size-3.5" />}
+            </button>
+          )}
           <ChevronDownIcon
             className={`text-base-content/30 size-5 transition-transform duration-300 ${isCollapsed ? "-rotate-90" : ""}`}
           />

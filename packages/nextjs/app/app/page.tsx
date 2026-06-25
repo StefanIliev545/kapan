@@ -62,6 +62,11 @@ const AlchemixProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Alchemix" /> }
 );
 
+const UniswapProtocolView = dynamic(
+  () => import("~~/components/specific/uniswap/UniswapProtocolView").then(m => m.UniswapProtocolView),
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Uniswap" /> }
+);
+
 const WalletSection = dynamic(
   () => import("~~/components/specific/wallet/WalletSection").then(m => m.WalletSection),
   { ssr: false }
@@ -244,6 +249,9 @@ const App: NextPage = () => {
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={mainnet.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <UniswapProtocolView chainId={mainnet.id} />
+              </StableArea>
             </div>
           )}
 
@@ -269,6 +277,9 @@ const App: NextPage = () => {
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <VenusProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <UniswapProtocolView chainId={arbitrum.id} />
+              </StableArea>
             </div>
           )}
 
@@ -290,6 +301,9 @@ const App: NextPage = () => {
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <VenusProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <UniswapProtocolView chainId={base.id} />
               </StableArea>
             </div>
           )}
@@ -344,6 +358,9 @@ const App: NextPage = () => {
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <CompoundProtocolView chainId={optimism.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
               </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <UniswapProtocolView chainId={optimism.id} />
+              </StableArea>
             </div>
           )}
 
@@ -391,6 +408,9 @@ const App: NextPage = () => {
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <VenusProtocolView chainId={unichain.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <UniswapProtocolView chainId={unichain.id} />
               </StableArea>
             </div>
           )}
