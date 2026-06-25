@@ -43,8 +43,11 @@ const GOVERNED_PERSPECTIVE_ADDRESSES: Record<number, string> = {
 };
 
 // `verifiedArray()` selector — returns address[]. Same ABI shape as the LTVList call below
-// so we can reuse `decodeAddressArray`.
-const VERIFIED_ARRAY_SELECTOR = "0x9caa49bd";
+// so we can reuse `decodeAddressArray`. NOTE: the previous value (0x9caa49bd) was the WRONG
+// selector and reverted, so the curation filter silently no-op'd and unofficial vaults showed.
+// keccak256("verifiedArray()")[:4] = 0x8d5e21d3 (verified: returns 137/20/21 vaults on
+// mainnet/Base/Arbitrum GovernedPerspectives).
+const VERIFIED_ARRAY_SELECTOR = "0x8d5e21d3";
 
 // Euler subgraph endpoints by chain
 const EULER_SUBGRAPH_URLS: Record<number, string> = {
