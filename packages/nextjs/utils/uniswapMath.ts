@@ -75,9 +75,16 @@ export interface UniToken {
   fees: number;
 }
 
-/** A unified Uniswap LP position (V3 or V4), resolved for display. */
+/** A unified concentrated-liquidity LP position (Uniswap V3/V4, Aerodrome/Velodrome Slipstream),
+ *  resolved for display. Same math across all of them — only the on-chain plumbing differs. */
 export interface UniswapPosition {
-  version: 3 | 4;
+  /** Which DEX this came from — drives the card label + deep-link. Defaults to uniswap. */
+  protocol?: "uniswap" | "aerodrome" | "velodrome";
+  /** Header badge text, e.g. "v3" / "v4" / "CL". Defaults to `v{version}`. */
+  versionLabel?: string;
+  /** Deep-link to the position on the protocol's own app. */
+  url?: string;
+  version: number;
   chainId: number;
   tokenId: string;
   fee: number; // 500 / 3000 / 10000 …
