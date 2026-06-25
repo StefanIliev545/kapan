@@ -9,7 +9,7 @@ import { getEffectiveChainId } from "~~/utils/forkChain";
 // Slipstream lives on two chains under two brands — pick identity per chain.
 const META: Record<number, { name: string; icon: string; url: string }> = {
   8453: { name: "Aerodrome", icon: "/logos/aero.svg", url: "https://aerodrome.finance/positions" },
-  10: { name: "Velodrome", icon: "/logos/velo.svg", url: "https://velodrome.finance/positions" },
+  10: { name: "Velodrome", icon: "/logos/velo.png", url: "https://velodrome.finance/positions" },
 };
 
 /**
