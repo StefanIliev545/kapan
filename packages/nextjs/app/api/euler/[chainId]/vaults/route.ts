@@ -123,6 +123,9 @@ export interface CollateralInfo {
   vaultSymbol: string;
   tokenSymbol: string; // Extracted from vault symbol (e.g., "eWETH-1" -> "WETH")
   tokenAddress: string; // Underlying asset address of the collateral vault
+  decimals: number; // Underlying asset decimals — lets consumers (e.g. collateral-swap targets)
+  // resolve a vault WITHOUT looking it up in the (curated) top-level vault list, which omits
+  // un-verified-but-accepted collaterals like PT vaults. See useEulerCollateralSwapVaults.
 }
 
 export interface EulerVaultResponse {
@@ -332,11 +335,13 @@ function resolveCollaterals(
       const addr = collateralAddr.toLowerCase();
       const vaultInfo = vaultInfoLookup.get(addr);
       const vaultSymbol = vaultInfo?.symbol || "???";
+      const { decimals } = resolveAssetSymbol(vaultInfo?.asset || "", vaultSymbol);
       return {
         vaultAddress: addr,
         vaultSymbol,
         tokenSymbol: extractTokenFromVaultSymbol(vaultSymbol),
         tokenAddress: vaultInfo?.asset || "",
+        decimals,
       };
     });
 }

@@ -326,6 +326,9 @@ export interface SwapAsset {
     price?: bigint;
     /** Euler-specific: the collateral vault address for this asset */
     eulerCollateralVault?: string;
+    /** Optional secondary label shown in the token picker to disambiguate multiple vaults that
+     *  share the same underlying token (e.g. Euler "eUSD₮0-1" vs "eUSD₮0-2", or PT maturities). */
+    vaultLabel?: string;
 }
 
 // Swap router options
@@ -474,10 +477,16 @@ export const SwapModalShell: FC<SwapModalShellProps> = ({
 
     // Initialize "To" selection
     useEffect(() => {
+        // Identity that distinguishes multiple vaults sharing the same underlying token (Euler).
+        const keyOf = (a: SwapAsset) => a.eulerCollateralVault ?? a.address;
         if (isOpen && !selectedTo && toAssets.length > 0) {
             setSelectedTo(toAssets[0]);
         } else if (selectedTo && selectedFrom && selectedTo.address === selectedFrom.address) {
             setSelectedTo(toAssets[0] || null);
+        } else if (isOpen && selectedTo && toAssets.length > 0 && !toAssets.some(t => keyOf(t) === keyOf(selectedTo))) {
+            // Target list changed (e.g. different From token re-filtered targets) and the current
+            // selection is no longer offered — reset so we never encode a stale/invalid vault.
+            setSelectedTo(toAssets[0]);
         }
     }, [isOpen, toAssets, selectedTo, selectedFrom, setSelectedTo]);
 

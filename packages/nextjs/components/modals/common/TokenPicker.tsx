@@ -42,8 +42,16 @@ export const TokenPicker: FC<TokenPickerProps> = ({
   const filtered = useMemo(() => {
     if (!query.trim()) return assets;
     const q = query.trim().toLowerCase();
-    return assets.filter(a => a.symbol.toLowerCase().includes(q) || a.address.toLowerCase().includes(q));
+    return assets.filter(
+      a =>
+        a.symbol.toLowerCase().includes(q) ||
+        a.address.toLowerCase().includes(q) ||
+        (a.vaultLabel?.toLowerCase().includes(q) ?? false),
+    );
   }, [assets, query]);
+
+  // Identity that distinguishes multiple vaults sharing the same underlying token (Euler).
+  const keyOf = (a: SwapAsset) => a.eulerCollateralVault ?? a.address;
 
   const showSearch = assets.length >= searchAfter;
 
@@ -104,14 +112,14 @@ export const TokenPicker: FC<TokenPickerProps> = ({
               <li className="text-base-content/50 px-3 py-4 text-center text-xs">No tokens match</li>
             ) : (
               filtered.map(t => {
-                const isSelected = asset?.address === t.address;
+                const isSelected = asset != null && keyOf(asset) === keyOf(t);
                 const balance = Number.parseFloat(formatUnits(t.rawBalance, t.decimals));
                 const usd =
                   t.price && balance > 0
                     ? balance * Number(formatUnits(t.price, 8))
                     : null;
                 return (
-                  <li key={t.address}>
+                  <li key={keyOf(t)}>
                     <button
                       type="button"
                       onClick={() => {
@@ -128,11 +136,15 @@ export const TokenPicker: FC<TokenPickerProps> = ({
                       </div>
                       <div className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate text-sm font-medium">{t.symbol}</span>
-                        {balance > 0 && (
-                          <span className="text-base-content/50 truncate text-[10px]">
-                            {balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                            {usd !== null ? ` · $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ""}
-                          </span>
+                        {t.vaultLabel ? (
+                          <span className="text-base-content/50 truncate text-[10px]">{t.vaultLabel}</span>
+                        ) : (
+                          balance > 0 && (
+                            <span className="text-base-content/50 truncate text-[10px]">
+                              {balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                              {usd !== null ? ` · $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ""}
+                            </span>
+                          )
                         )}
                       </div>
                       {isSelected && <span className="text-success ml-auto text-xs">✓</span>}

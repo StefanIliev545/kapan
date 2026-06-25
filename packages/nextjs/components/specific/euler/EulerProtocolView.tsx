@@ -244,16 +244,26 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
 
   // Build available collaterals for swap modal (all collaterals in group)
   const allCollateralsForSwap: BasicCollateral[] = useMemo(() =>
-    collaterals.map((col) => ({
-      address: col.vault.asset.address,
-      symbol: col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol,
-      decimals: col.vault.asset.decimals,
-      rawBalance: col.balance,
-      balance: Number(col.balance) / (10 ** col.vault.asset.decimals),
-      icon: getIcon(col.vault.asset.symbol),
-      price: pricesRaw[col.vault.asset.symbol?.toLowerCase()] ?? 0n,
-    })),
-    [collaterals, pricesRaw, getIcon]
+    collaterals.map((col) => {
+      const sym = col.vault.asset.symbol;
+      // PT tokens lack standard oracle prices — fall back to Pendle's ptPriceUsd so the swap
+      // modal can show input USD value + cost breakdown (mirrors subAccountYieldMetrics below).
+      let price = pricesRaw[sym?.toLowerCase()] ?? 0n;
+      if (price === 0n && isPTToken(sym)) {
+        const ptUsd = findYield(col.vault.asset.address, sym)?.metadata?.ptPriceUsd;
+        if (ptUsd && ptUsd > 0) price = BigInt(Math.round(ptUsd * 1e8));
+      }
+      return {
+        address: col.vault.asset.address,
+        symbol: sym === "???" ? "unknown" : sym,
+        decimals: col.vault.asset.decimals,
+        rawBalance: col.balance,
+        balance: Number(col.balance) / (10 ** col.vault.asset.decimals),
+        icon: getIcon(sym),
+        price,
+      };
+    }),
+    [collaterals, pricesRaw, getIcon, findYield]
   );
 
   // Calculate total collateral and debt USD values for ADL modal (scaled to 8 decimals)
