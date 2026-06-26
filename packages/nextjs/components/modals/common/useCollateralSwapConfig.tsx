@@ -37,7 +37,9 @@ import { useSwapCostBreakdown } from "./useSwapCostBreakdown";
 import { CostBreakdownRows } from "./CostBreakdownRows";
 import { useAutoSlippage } from "~~/hooks/useAutoSlippage";
 import { useMorphoCollateralSwapMarkets, marketToContext } from "~~/hooks/useMorphoCollateralSwapMarkets";
-import { useEulerCollateralSwapVaults } from "~~/hooks/useEulerCollateralSwapVaults";
+import { useEulerCollateralSwapVaults, type EulerCollateralSwapTarget } from "~~/hooks/useEulerCollateralSwapVaults";
+import { useTokenPricesByAddress } from "~~/hooks/useTokenPrice";
+import { useExternalYields } from "~~/hooks/useExternalYields";
 import { useSaveOrder } from "~~/hooks/useOrderHistory";
 
 // Utils
@@ -88,6 +90,7 @@ import { ExecutionTypeToggle } from "./ExecutionTypeToggle";
 
 // Types
 import type { SwapAsset, SwapRouter } from "../SwapModalShell";
+import { resolveSwapRouter } from "./swapRouterUtils";
 import type { SwapOperationConfig, UseCollateralSwapConfigProps, ExecutionType, FlashLoanInfo, LimitOrderConfig, FlashLoanConfig } from "./swapConfigTypes";
 import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import type { TransactionReceipt } from "~~/utils/transactionSimulation";
@@ -229,35 +232,7 @@ function getDepositOperation(protocolName: string): LendingOp {
     return useCollateralOp ? LendingOp.DepositCollateral : LendingOp.Deposit;
 }
 
-/**
- * Resolves the swap router when the currently selected one is unavailable.
- * Uses a lookup table instead of nested ternaries to keep complexity low.
- */
-function resolveSwapRouter(
-    current: SwapRouter,
-    kyber: boolean,
-    oneInch: boolean,
-    pendle: boolean,
-): SwapRouter {
-    const fallbackOrder: Record<SwapRouter, SwapRouter[]> = {
-        kyber: ["1inch", "pendle", "kyber"],
-        "1inch": ["kyber", "pendle", "1inch"],
-        pendle: ["kyber", "1inch", "pendle"],
-    };
-
-    const isAvailable: Record<SwapRouter, boolean> = {
-        kyber,
-        "1inch": oneInch,
-        pendle,
-    };
-
-    if (isAvailable[current]) {
-        return current;
-    }
-
-    const candidates = fallbackOrder[current];
-    return candidates.find(r => isAvailable[r]) ?? current;
-}
+// resolveSwapRouter now lives in ./swapRouterUtils (shared with useClosePositionConfig).
 
 // ============================================================================
 // Conditional Order Instruction Builders (extracted for complexity reduction)
@@ -631,7 +606,8 @@ function buildTargetAssets(
     isMorpho: boolean,
     morphoTargetMarkets: MorphoMarket[],
     isEuler: boolean,
-    eulerTargetVaults: Record<string, { tokenSymbol: string; tokenAddress: string; decimals: number; vaultAddress: string }>,
+    eulerTargets: EulerCollateralSwapTarget[],
+    eulerTargetPrices: Record<string, bigint>,
     availableAssets: SwapAsset[],
     selectedFromAddress: string | undefined,
 ): SwapAsset[] {
@@ -659,20 +635,31 @@ function buildTargetAssets(
             } as SwapAsset));
     }
 
-    if (isEuler && Object.keys(eulerTargetVaults).length > 0) {
+    if (isEuler) {
+        // Euler ALWAYS sources targets from the borrow vault's accepted collaterals — never fall
+        // through to the generic `availableAssets` branch below, whose assets lack the
+        // `eulerCollateralVault` needed to encode the swap (would silently break the operation).
+        if (eulerTargets.length === 0) return [];
         const lcFrom = selectedFromAddress?.toLowerCase();
-        return Object.values(eulerTargetVaults)
+        // One entry PER VAULT (not collapsed by token) so multiple vaults for the same asset
+        // (e.g. eUSD₮0-1 vs eUSD₮0-2, or different PT maturities) are all selectable. The
+        // vault symbol is surfaced as `vaultLabel` so the picker can disambiguate same-asset rows.
+        return eulerTargets
             .filter(vault => vault.tokenAddress.toLowerCase() !== lcFrom)
-            .map(vault => ({
-                symbol: vault.tokenSymbol,
-                address: vault.tokenAddress as Address,
-                decimals: vault.decimals,
-                rawBalance: 0n,
-                balance: 0,
-                icon: tokenNameToLogo(vault.tokenSymbol.toLowerCase()),
-                price: undefined,
-                eulerCollateralVault: vault.vaultAddress,
-            } as SwapAsset));
+            .map(vault => {
+                const price = eulerTargetPrices[vault.tokenAddress.toLowerCase()];
+                return {
+                    symbol: vault.tokenSymbol,
+                    address: vault.tokenAddress as Address,
+                    decimals: vault.decimals,
+                    rawBalance: 0n,
+                    balance: 0,
+                    icon: tokenNameToLogo(vault.tokenSymbol.toLowerCase()),
+                    price: price && price > 0n ? price : undefined,
+                    eulerCollateralVault: vault.vaultAddress,
+                    vaultLabel: vault.vaultSymbol,
+                } as SwapAsset;
+            });
     }
 
     const lcFrom = selectedFromAddress?.toLowerCase();
@@ -686,12 +673,14 @@ function computeNewEulerContext(
     isEuler: boolean,
     eulerBorrowVault: string | undefined,
     selectedTo: SwapAsset | null,
-    eulerTargetVaults: Record<string, { vaultAddress: string }>,
+    eulerTargets: EulerCollateralSwapTarget[],
     eulerSubAccountIndex: number | undefined,
 ): string | undefined {
     if (!isEuler || !eulerBorrowVault || !selectedTo) {
         return undefined;
     }
+    // Prefer the exact vault carried on the selected asset — this is what makes per-vault
+    // selection (multiple vaults for the same token) encode correctly.
     const eulerVaultFromAsset = (selectedTo as SwapAsset & { eulerCollateralVault?: string }).eulerCollateralVault;
     if (eulerVaultFromAsset) {
         return encodeEulerContext({
@@ -701,7 +690,7 @@ function computeNewEulerContext(
         });
     }
     const tokenAddr = selectedTo.address.toLowerCase();
-    const targetVault = eulerTargetVaults[tokenAddr];
+    const targetVault = eulerTargets.find(t => t.tokenAddress.toLowerCase() === tokenAddr);
     if (!targetVault) {
         return undefined;
     }
@@ -1067,12 +1056,38 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
     );
 
     // ============ Euler Vaults ============
-    const { targetVaultsByAddress: eulerTargetVaults, isLoading: isEulerVaultsLoading } = useEulerCollateralSwapVaults({
+    const { targets: eulerTargets, isLoading: isEulerVaultsLoading } = useEulerCollateralSwapVaults({
         chainId,
         borrowVaultAddress: eulerBorrowVault || "",
         currentCollateralAddress: initialFromTokenAddress || "",
         enabled: isEuler && isOpen && !!eulerBorrowVault,
     });
+
+    // Target USD prices (8-decimal bigint). The swap modal needs selectedTo.price to show the
+    // output USD value, "Min Output $" and the cost breakdown. Standard tokens come from the
+    // price-by-address API; PT vaults aren't oracle-priced, so fall back to Pendle's ptPriceUsd.
+    const eulerTargetAddresses = useMemo(
+        () => (isEuler ? eulerTargets.map(t => t.tokenAddress) : []),
+        [isEuler, eulerTargets],
+    );
+    const { pricesRaw: eulerPricesByAddr } = useTokenPricesByAddress(chainId, eulerTargetAddresses, {
+        enabled: isEuler && isOpen && eulerTargetAddresses.length > 0,
+    });
+    const { findYield: findEulerYield } = useExternalYields(chainId);
+    const eulerTargetPrices = useMemo<Record<string, bigint>>(() => {
+        if (!isEuler) return {};
+        const map: Record<string, bigint> = {};
+        for (const t of eulerTargets) {
+            const addr = t.tokenAddress.toLowerCase();
+            let price = eulerPricesByAddr[addr] ?? 0n;
+            if (price === 0n && isPendleToken(t.tokenSymbol)) {
+                const ptUsd = findEulerYield(t.tokenAddress, t.tokenSymbol)?.metadata?.ptPriceUsd;
+                if (ptUsd && ptUsd > 0) price = BigInt(Math.round(ptUsd * 1e8));
+            }
+            if (price > 0n) map[addr] = price;
+        }
+        return map;
+    }, [isEuler, eulerTargets, eulerPricesByAddr, findEulerYield]);
 
     const oldEulerContextEncoded = useMemo(
         () => computeOldEulerContextEncoded(isEuler, eulerBorrowVault, eulerCollateralVault, eulerSubAccountIndex),
@@ -1155,8 +1170,8 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // ============ Target Assets ============
     const targetAssets = useMemo(
-        () => buildTargetAssets(isMorpho, morphoTargetMarkets, isEuler, eulerTargetVaults, availableAssets as SwapAsset[], selectedFrom?.address),
-        [isMorpho, morphoTargetMarkets, availableAssets, selectedFrom, isEuler, eulerTargetVaults],
+        () => buildTargetAssets(isMorpho, morphoTargetMarkets, isEuler, eulerTargets, eulerTargetPrices, availableAssets as SwapAsset[], selectedFrom?.address),
+        [isMorpho, morphoTargetMarkets, availableAssets, selectedFrom, isEuler, eulerTargets, eulerTargetPrices],
     );
 
     // Sync selectedMorphoMarket when user selects a "to" asset
@@ -1174,8 +1189,8 @@ export function useCollateralSwapConfig(props: UseCollateralSwapConfigProps): Sw
 
     // Euler: new context
     const newEulerContextEncoded = useMemo(
-        () => computeNewEulerContext(isEuler, eulerBorrowVault, selectedTo, eulerTargetVaults, eulerSubAccountIndex),
-        [isEuler, eulerBorrowVault, selectedTo, eulerTargetVaults, eulerSubAccountIndex],
+        () => computeNewEulerContext(isEuler, eulerBorrowVault, selectedTo, eulerTargets, eulerSubAccountIndex),
+        [isEuler, eulerBorrowVault, selectedTo, eulerTargets, eulerSubAccountIndex],
     );
 
     // Auto-switch to Pendle for PT tokens

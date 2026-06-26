@@ -7,6 +7,7 @@ import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { MarketsGrouped } from "~~/components/markets/MarketsGrouped";
 import StableArea from "~~/components/common/StableArea";
 import { createTextChangeHandler } from "~~/utils/handlers";
+import { type TokenCategory, TOKEN_CATEGORIES, TOKEN_CATEGORY_ORDER } from "~~/utils/tokenCategories";
 
 const MARKET_NETWORKS = [
   { id: "all", name: "All" },
@@ -21,7 +22,9 @@ const MARKET_NETWORKS = [
 const MarketsPageContent: NextPage = () => {
   const [search, setSearch] = useState("");
   const [network, setNetwork] = useState("all");
+  const [category, setCategory] = useState<TokenCategory>("all");
   const handleNetwork = useCallback((id: string) => setNetwork(id), []);
+  const handleCategory = useCallback((c: TokenCategory) => setCategory(c), []);
   const handleClearSearch = useCallback(() => setSearch(""), []);
 
   return (
@@ -60,6 +63,24 @@ const MarketsPageContent: NextPage = () => {
               )}
             </div>
 
+            {/* Token-type Filter */}
+            <div className="bg-base-content/[0.03] flex items-center gap-0.5 border border-base-content/[0.05] p-0.5">
+              {TOKEN_CATEGORY_ORDER.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => handleCategory(c)}
+                  className={`px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wider transition-all duration-200 ${
+                    category === c
+                      ? "bg-base-content/10 text-base-content"
+                      : "text-base-content/35 hover:text-base-content/60"
+                  }`}
+                >
+                  {TOKEN_CATEGORIES[c].label}
+                </button>
+              ))}
+            </div>
+
             {/* Network Filter */}
             <div className="bg-base-content/[0.03] flex items-center gap-0.5 border border-base-content/[0.05] p-0.5">
               {MARKET_NETWORKS.map(n => (
@@ -86,7 +107,7 @@ const MarketsPageContent: NextPage = () => {
         </div>
 
         <StableArea as="section" minHeight="32rem" innerClassName="h-full">
-          <MarketsGrouped search={search} network={network} />
+          <MarketsGrouped search={search} network={network} category={category} />
         </StableArea>
       </div>
     </div>

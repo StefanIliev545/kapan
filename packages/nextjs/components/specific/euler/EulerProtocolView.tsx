@@ -220,6 +220,18 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
     return pricesRaw[symbol.toLowerCase()] ?? 0n;
   };
 
+  // Collateral price (8-decimal bigint) with a Pendle ptPriceUsd fallback for PT tokens, which
+  // lack standard oracle prices. Used wherever we hand collaterals to a modal that shows USD /
+  // LTV (collateral swap, close-with-collateral) — keeps those figures correct for PT positions.
+  const resolveCollateralPrice = (symbol: string, address: string): bigint => {
+    let price = pricesRaw[symbol?.toLowerCase()] ?? 0n;
+    if (price === 0n && isPTToken(symbol)) {
+      const ptUsd = findYield(address, symbol)?.metadata?.ptPriceUsd;
+      if (ptUsd && ptUsd > 0) price = BigInt(Math.round(ptUsd * 1e8));
+    }
+    return price;
+  };
+
   // Get the borrow vault address (needed for context)
   // Use zero address if no debt - empty string causes ABI encoding errors
   const borrowVaultAddress = debt?.vault.address || "0x0000000000000000000000000000000000000000";
@@ -244,16 +256,20 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
 
   // Build available collaterals for swap modal (all collaterals in group)
   const allCollateralsForSwap: BasicCollateral[] = useMemo(() =>
-    collaterals.map((col) => ({
-      address: col.vault.asset.address,
-      symbol: col.vault.asset.symbol === "???" ? "unknown" : col.vault.asset.symbol,
-      decimals: col.vault.asset.decimals,
-      rawBalance: col.balance,
-      balance: Number(col.balance) / (10 ** col.vault.asset.decimals),
-      icon: getIcon(col.vault.asset.symbol),
-      price: pricesRaw[col.vault.asset.symbol?.toLowerCase()] ?? 0n,
-    })),
-    [collaterals, pricesRaw, getIcon]
+    collaterals.map((col) => {
+      const sym = col.vault.asset.symbol;
+      return {
+        address: col.vault.asset.address,
+        symbol: sym === "???" ? "unknown" : sym,
+        decimals: col.vault.asset.decimals,
+        rawBalance: col.balance,
+        balance: Number(col.balance) / (10 ** col.vault.asset.decimals),
+        icon: getIcon(sym),
+        price: resolveCollateralPrice(sym, col.vault.asset.address),
+      };
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [collaterals, pricesRaw, getIcon, findYield]
   );
 
   // Calculate total collateral and debt USD values for ADL modal (scaled to 8 decimals)
@@ -716,7 +732,7 @@ const EulerPositionGroupRow: FC<EulerPositionGroupRowProps> = ({ group, position
           rawBalance: col.balance,
           balance: Number(col.balance) / (10 ** col.vault.asset.decimals),
           icon: getIcon(col.vault.asset.symbol),
-          price: pricesRaw[col.vault.asset.symbol?.toLowerCase()] ?? 0n,
+          price: resolveCollateralPrice(col.vault.asset.symbol, col.vault.asset.address),
           eulerCollateralVault: col.vault.address,
         }))}
         context={closeState.context}

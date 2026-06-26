@@ -268,7 +268,10 @@ function resolveEulerVaultLogo(lower: string): string | null {
 function resolvePtTokenLogo(lower: string): string {
   let w = lower.startsWith("pt ") ? lower.slice(3) : lower.slice(3);
   if (lower.startsWith("pt ") && w.startsWith("ept-")) w = w.slice(4);
-  return morphoOrLocalLogo(`pt${stripPtSuffixes(w)}`);
+  const base = `pt${stripPtSuffixes(w)}`;
+  // Allow PNG logos for PTs (some underlyings only have a raster logo, e.g. PT-USN -> usn.png).
+  if (PNG_LOGO_MAP[base]) return PNG_LOGO_MAP[base];
+  return morphoOrLocalLogo(base);
 }
 
 const TOKEN_FALLBACKS: Record<string, string> = {
@@ -293,6 +296,19 @@ const TOKEN_FALLBACKS: Record<string, string> = {
 };
 
 const PNG_LOGO_MAP: Record<string, string> = {
+  // Niche tokens not on Morpho's CDN — logos sourced by contract address (GeckoTerminal/CoinGecko).
+  dejaaa: "/logos/dejaaa.png", // DeFi Janus Henderson Anemoy AAA CLO Fund (Base)
+  rex33: "/logos/rex33.png", // Etherex Liquid Staking Token (Linea)
+  w: "/logos/w.png", // Wormhole Token
+  ethx: "/logos/ethx.png",
+  fdusd: "/logos/fdusd.png",
+  "liusd-1w": "/logos/liusd-1w.png",
+  meth: "/logos/meth.png",
+  srusde: "/logos/srusde.png",
+  tbill: "/logos/tbill.png",
+  usn: "/logos/usn.png",
+  sbuidl: "/logos/sbuidl.png", // staked BlackRock BUIDL (parent BUIDL logo)
+  ptusn: "/logos/ptusn.png", // PT-USN -> USN underlying (resolved via resolvePtTokenLogo)
   ekubo: "/logos/ekubo.png",
   xstrk: "/logos/xstrk.png",
   lbtc: "/logos/lbtc.png",
@@ -379,9 +395,11 @@ const MORPHO_CDN_LOGOS: Record<string, string> = {
  * Used as the final step before returning a logo URL so PT/Euler paths can also benefit.
  */
 function morphoOrLocalLogo(basename: string): string {
-  const morphoFile = MORPHO_CDN_LOGOS[basename];
-  if (morphoFile) return `https://cdn.morpho.org/assets/logos/${morphoFile}.svg`;
-  return `/logos/${basename}.svg`;
+  // Logos are served locally from /public/logos. MORPHO_CDN_LOGOS remaps a symbol to its local
+  // file name when they differ; otherwise the file is named after the symbol. Missing files are
+  // downloaded from Morpho's CDN into /public/logos (see scripts), not hot-linked.
+  const file = MORPHO_CDN_LOGOS[basename] ?? basename;
+  return `/logos/${file}.svg`;
 }
 
 function isEulerPrefixed(lower: string): boolean {

@@ -85,6 +85,8 @@ import {
 } from "../closeWithCollateralEvmHelpers";
 
 import type { SwapAsset, SwapRouter } from "../SwapModalShell";
+import { resolveSwapRouter } from "./swapRouterUtils";
+import { PositionManager } from "~~/utils/position";
 import type { LimitOrderResult } from "~~/components/LimitOrderConfig";
 import type { SwapOperationConfig, UseClosePositionConfigProps, ExecutionType, SwapQuoteResult } from "./swapConfigTypes";
 import type { FlashLoanProviderOption } from "~~/utils/flashLoan";
@@ -123,30 +125,7 @@ function calculateInterestBufferBps(borrowRateApy: number, minutes: number): big
   return BigInt(Math.max(1, bufferBps)); // Minimum 1 bp
 }
 
-/**
- * Resolve the best available swap router when the current one is unavailable.
- * Returns the fallback router name, or the current one if it is available.
- */
-function resolveSwapRouterFallback(
-  current: SwapRouter,
-  kyber: boolean,
-  oneInch: boolean,
-  pendle: boolean
-): SwapRouter {
-  const fallbackOrder: Record<SwapRouter, SwapRouter[]> = {
-    kyber: ["1inch", "pendle", "kyber"],
-    "1inch": ["kyber", "pendle", "1inch"],
-    pendle: ["kyber", "1inch", "pendle"],
-  };
-  const available: Record<SwapRouter, boolean> = { kyber, "1inch": oneInch, pendle };
-
-  if (available[current]) {
-    return current;
-  }
-
-  const candidates = fallbackOrder[current];
-  return candidates.find(r => available[r]) ?? current;
-}
+// resolveSwapRouter (the fallback resolver) now lives in ./swapRouterUtils (shared).
 
 /** Map UI swap router name to internal protocol name used in instruction encoding. */
 function resolveSwapProtocolName(router: SwapRouter): "oneinch" | "kyber" | "pendle" {
@@ -531,7 +510,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   // ============ Effects ============
   // Update swap router when chain changes
   useEffect(() => {
-    const resolved = resolveSwapRouterFallback(swapRouter, kyberAvailable, oneInchAvailable, pendleAvailable);
+    const resolved = resolveSwapRouter(swapRouter, kyberAvailable, oneInchAvailable, pendleAvailable);
     if (resolved !== swapRouter) {
       setSwapRouter(resolved);
     }
@@ -704,6 +683,31 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
   const hasEnoughCollateral = selectedTo
     ? checkCollateralSufficiency(requiredCollateral, selectedTo.rawBalance)
     : false;
+
+  // Projected loan-to-value after this close. Closing with collateral always deleverages
+  // (sells ~repay-worth of collateral to repay debt), so projected LTV <= current. Plain
+  // debt/collateral LTV (no liquidation threshold needed); liquidation-threshold-aware HF would
+  // require per-collateral thresholds, which aren't passed into this modal (future enhancement).
+  const ltvProjection = useMemo(() => {
+    const toUsd = (raw: bigint, decimals: number, price8: bigint | undefined) =>
+      price8 && price8 > 0n ? (Number(raw) / 10 ** decimals) * (Number(price8) / 1e8) : 0;
+
+    const currentCollateralUsd = toAssets.reduce((sum, a) => sum + toUsd(a.rawBalance, a.decimals, a.price), 0);
+    const currentDebtUsd = toUsd(debtBalance, debtDecimals, debtPrice);
+    const repaidDebtUsd = toUsd(repayAmountRaw, debtDecimals, debtPrice);
+    const soldCollateralUsd = selectedTo ? toUsd(requiredCollateral, selectedTo.decimals, selectedTo.price) : 0;
+
+    const projectedCollateralUsd = Math.max(0, currentCollateralUsd - soldCollateralUsd);
+    const projectedDebtUsd = Math.max(0, currentDebtUsd - repaidDebtUsd);
+
+    return {
+      current: new PositionManager(currentCollateralUsd, currentDebtUsd).utilization(),
+      projected: new PositionManager(projectedCollateralUsd, projectedDebtUsd).utilization(),
+      // Only meaningful when we actually have priced collateral to divide by.
+      hasData: currentCollateralUsd > 0,
+      changed: repayAmountRaw > 0n,
+    };
+  }, [toAssets, debtBalance, debtDecimals, debtPrice, repayAmountRaw, requiredCollateral, selectedTo]);
 
   // Swap quote
   const minSwapAmount = selectedTo ? parseUnits("0.0001", selectedTo.decimals) : 0n;
@@ -1385,6 +1389,23 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
           limitReady={conditionalOrderReady}
         />
 
+        {ltvProjection.hasData && (
+          <div className="bg-base-200/50 flex items-center justify-between rounded p-3 text-xs">
+            <span className="text-base-content/70">Loan to value</span>
+            <span className="font-medium">
+              {ltvProjection.changed ? (
+                <>
+                  <span className="text-base-content/60">{ltvProjection.current.toFixed(1)}%</span>
+                  <span className="text-base-content/40 mx-1.5">→</span>
+                  <span className="text-success">{ltvProjection.projected.toFixed(1)}%</span>
+                </>
+              ) : (
+                <span>{ltvProjection.current.toFixed(1)}%</span>
+              )}
+            </span>
+          </div>
+        )}
+
         {executionType === "market" && (
           <MarketOrderRightPanel
             slippage={slippage}
@@ -1439,6 +1460,7 @@ export function useClosePositionConfig(props: UseClosePositionConfigProps): Swap
       repayAmountRaw,
       debtDecimals,
       costBreakdown,
+      ltvProjection,
     ]
   );
 

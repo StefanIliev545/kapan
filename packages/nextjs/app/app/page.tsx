@@ -67,6 +67,11 @@ const UniswapProtocolView = dynamic(
   { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Uniswap" /> }
 );
 
+const AerodromeProtocolView = dynamic(
+  () => import("~~/components/specific/aerodrome/AerodromeProtocolView").then(m => m.AerodromeProtocolView),
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Aerodrome" /> }
+);
+
 const WalletSection = dynamic(
   () => import("~~/components/specific/wallet/WalletSection").then(m => m.WalletSection),
   { ssr: false }
@@ -305,6 +310,9 @@ const App: NextPage = () => {
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <UniswapProtocolView chainId={base.id} />
               </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <AerodromeProtocolView chainId={base.id} />
+              </StableArea>
             </div>
           )}
 
@@ -360,6 +368,9 @@ const App: NextPage = () => {
               </StableArea>
               <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
                 <UniswapProtocolView chainId={optimism.id} />
+              </StableArea>
+              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+                <AerodromeProtocolView chainId={optimism.id} />
               </StableArea>
             </div>
           )}

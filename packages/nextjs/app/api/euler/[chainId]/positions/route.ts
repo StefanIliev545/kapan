@@ -1,452 +1,248 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createPublicClient, http, getAddress, type Address, type PublicClient } from "viem";
+import { mainnet, base, arbitrum, optimism, unichain, linea } from "viem/chains";
 
 /**
- * Euler V2 Positions API
+ * Euler V2 Positions API — on-chain discovery via the EVC.
  *
- * Fetches user positions from the Euler V2 subgraph.
- * Uses the trackingActiveAccount query to get deposits and borrows.
+ * Previously this read positions from the Euler subgraph (`trackingActiveAccount`). That source
+ * lags and omits positions (e.g. a freshly-refinanced PT borrow showed `borrows: []` even though
+ * the borrow existed on-chain), so positions silently went missing. We now enumerate positions
+ * the same way Euler's own app does: directly from the Ethereum Vault Connector (EVC).
  *
- * Euler V2 Architecture:
- * - Each address has 256 sub-accounts (via EVC)
- * - Each sub-account can have 1 controller (debt vault) + N collaterals
- * - Positions are grouped by sub-account for display
+ * EVC model: an owner address has 256 sub-accounts (first 19 bytes shared, last byte = id ^ ...).
+ * For each sub-account, `getControllers` returns its debt vault (≤1) and `getCollaterals` returns
+ * its enabled collateral vaults. We derive all 256 sub-accounts and batch every read through
+ * multicall3 (≈ a handful of RPC round-trips). Vault metadata (asset/symbol/decimals) is read
+ * on-chain so an un-indexed vault is never dropped; APYs are best-effort enriched from the
+ * subgraph (0 when unavailable — the position still shows correctly).
  */
 
-// Euler subgraph endpoints by chain
+const RPC_ENDPOINTS: Record<number, { url: string; chain: any }> = (() => {
+  const A = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  const mk = (slug: string, pub: string) => (A ? `https://${slug}.g.alchemy.com/v2/${A}` : pub);
+  return {
+    1: { url: mk("eth-mainnet", "https://ethereum-rpc.publicnode.com"), chain: mainnet },
+    10: { url: mk("opt-mainnet", "https://optimism-rpc.publicnode.com"), chain: optimism },
+    130: { url: mk("unichain-mainnet", "https://unichain-rpc.publicnode.com"), chain: unichain },
+    8453: { url: mk("base-mainnet", "https://base-rpc.publicnode.com"), chain: base },
+    42161: { url: mk("arb-mainnet", "https://arbitrum-one-rpc.publicnode.com"), chain: arbitrum },
+    59144: { url: mk("linea-mainnet", "https://linea-rpc.publicnode.com"), chain: linea },
+  };
+})();
+
+// Euler EVC (Ethereum Vault Connector) per chain — verified on-chain via vault.EVC().
+const EVC_ADDRESSES: Record<number, Address> = {
+  1: "0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383",
+  10: "0xbfB28650Cd13CE879E7D56569Ed4715c299823E4",
+  130: "0x2A1176964F5D7caE5406B627Bf6166664FE83c60",
+  8453: "0x5301c7dD20bD945D2013b48ed0DEE3A284ca8989",
+  42161: "0x6302ef0F34100CDDFb5489fbcB6eE1AA95CD1066",
+  59144: "0xd8CeCEe9A04eA3d941a959F68fb4486f23271d09",
+};
+
+// Subgraph (best-effort APY enrichment only — never used for discovery).
 const EULER_SUBGRAPH_URLS: Record<number, string> = {
-  // Ethereum Mainnet
   1: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-mainnet/latest/gn",
-  // Optimism
   10: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-optimism/latest/gn",
-  // Unichain
   130: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-unichain/latest/gn",
-  // Base
   8453: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-base/latest/gn",
-  // Plasma
-  9745: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-plasma/latest/gn",
-  // Arbitrum
   42161: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-arbitrum/latest/gn",
-  // Linea
   59144: "https://api.goldsky.com/api/public/project_cm4iagnemt1wp01xn4gh1agft/subgraphs/euler-v2-linea/latest/gn",
 };
 
-// Query for user positions via trackingActiveAccount
-const POSITIONS_QUERY = `
-  query Positions($user: ID!) {
-    trackingActiveAccount(id: $user) {
-      mainAddress
-      deposits
-      borrows
-    }
-  }
-`;
+const EVC_ABI = [
+  { name: "getCollaterals", type: "function", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "address[]" }] },
+  { name: "getControllers", type: "function", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "address[]" }] },
+] as const;
 
-// Query for vault details (used to enrich position data)
-// Note: `asset` is returned as an address string, not an object
-const VAULT_DETAILS_QUERY = `
-  query VaultDetails($vaultIds: [ID!]!) {
-    eulerVaults(where: { id_in: $vaultIds }) {
-      id
-      name
-      symbol
-      asset
-      state {
-        totalShares
-        totalBorrows
-        supplyApy
-        borrowApy
-        cash
-      }
-    }
-  }
-`;
+const VAULT_ABI = [
+  { name: "asset", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  { name: "symbol", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  { name: "name", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+] as const;
 
-// Common token metadata for known assets on Arbitrum
-const KNOWN_TOKENS: Record<string, { symbol: string; decimals: number }> = {
-  "0xaf88d065e77c8cc2239327c5edb3a432268e5831": { symbol: "USDC", decimals: 6 },
-  "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": { symbol: "WETH", decimals: 18 },
-  "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": { symbol: "WBTC", decimals: 8 },
-  "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": { symbol: "USDT", decimals: 6 },
-  "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1": { symbol: "DAI", decimals: 18 },
-  "0x912ce59144191c1204e64559fe8253a0e49e6548": { symbol: "ARB", decimals: 18 },
-  "0x5979d7b546e38e414f7e9822514be443a4800529": { symbol: "wstETH", decimals: 18 },
-  "0x35751007a407ca6feffe80b3cb397736d2cf4dbe": { symbol: "weETH", decimals: 18 },
-  "0xec70dcb4a1efa46b8f2d97c310c9c4790ba5ffa8": { symbol: "rETH", decimals: 18 },
-};
+const ERC20_ABI = [
+  { name: "symbol", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  { name: "decimals", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] },
+] as const;
 
-// Extract token symbol from vault symbol (e.g., "eWETH-1" -> "WETH", "esUSDS-1" -> "sUSDS")
-function extractTokenFromVaultSymbol(vaultSymbol: string): string {
-  const match = vaultSymbol.match(/^e(.+?)-\d+$/);
-  if (match) {
-    return match[1];
-  }
-  return vaultSymbol.startsWith('e') ? vaultSymbol.slice(1) : vaultSymbol;
-}
-
-// Vault info for both collateral and debt positions
+// ---- exported types (unchanged — consumed by useEulerLendingPositions) ----
 export interface EulerVaultInfo {
   address: string;
   name: string;
   symbol: string;
-  asset: {
-    address: string;
-    symbol: string;
-    decimals: number;
-  };
+  asset: { address: string; symbol: string; decimals: number };
   supplyApy: number;
   borrowApy: number;
 }
-
-// A collateral position within a sub-account
-export interface EulerCollateralPosition {
-  vault: EulerVaultInfo;
-  // Note: shares/balance would need separate on-chain query for accuracy
-}
-
-// A grouped position representing one sub-account
-// Each sub-account has at most 1 debt + N collaterals
+export interface EulerCollateralPosition { vault: EulerVaultInfo }
 export interface EulerPositionGroup {
-  subAccount: string; // The sub-account address
-  isMainAccount: boolean; // True if this is sub-account 0
-  debt: {
-    vault: EulerVaultInfo;
-  } | null;
+  subAccount: string;
+  isMainAccount: boolean;
+  debt: { vault: EulerVaultInfo } | null;
   collaterals: EulerCollateralPosition[];
 }
-
-// Legacy format for backwards compatibility
 export interface EulerPositionResponse {
-  vault: {
-    address: string;
-    name: string;
-    symbol: string;
-    asset: {
-      address: string;
-      symbol: string;
-      decimals: number;
-    };
-    supplyApy: number;
-    borrowApy: number;
-  };
+  vault: EulerVaultInfo;
   supplyShares: string;
   borrowShares: string;
 }
 
-/**
- * Parse position entries from subgraph response.
- * Entries are formatted as `${subAccountAddress}${vaultAddress}` (42 + 40 hex chars)
- */
-function parsePositionEntries(entries: string[]): { subAccount: string; vault: string }[] {
-  return entries
-    .filter(entry => entry && entry.length >= 82) // 0x + 40 + 40
-    .map(entry => ({
-      subAccount: entry.slice(0, 42), // First 42 chars (0x + 40)
-      vault: "0x" + entry.slice(42),  // Last 40 chars with 0x prefix
-    }));
+/** EVC sub-accounts: 256 addresses sharing the owner's first 19 bytes, last byte 0x00..0xff. */
+function deriveSubAccounts(owner: Address): Address[] {
+  const base = (BigInt(owner) >> 8n) << 8n;
+  return Array.from({ length: 256 }, (_, i) => getAddress("0x" + (base | BigInt(i)).toString(16).padStart(40, "0")));
 }
 
-/**
- * Check if a sub-account is the main account (sub-account 0)
- * In EVC, sub-accounts have the same first 19 bytes, with last byte being the index
- */
-function isMainAccount(subAccount: string, mainAddress: string): boolean {
-  // Main account has last byte = 0x00
-  return subAccount.toLowerCase() === mainAddress.toLowerCase();
-}
-
-/**
- * Create vault info from subgraph vault data
- */
-function createVaultInfo(vault: any): EulerVaultInfo {
-  // Asset is returned as an address string, not an object
-  const assetAddr = (vault.asset || "").toLowerCase();
-  const knownToken = KNOWN_TOKENS[assetAddr];
-
-  // Try to get symbol from known tokens, then from vault symbol extraction
-  let assetSymbol = knownToken?.symbol;
-  if (!assetSymbol && vault.symbol) {
-    assetSymbol = extractTokenFromVaultSymbol(vault.symbol);
-  }
-  assetSymbol = assetSymbol || "???";
-
-  const decimals = knownToken?.decimals ?? 18;
-
-  return {
-    address: vault.id,
-    name: vault.name || "Unknown",
-    symbol: vault.symbol || "???",
-    asset: {
-      address: assetAddr,
-      symbol: assetSymbol,
-      decimals,
-    },
-    supplyApy: parseFloat(vault.state?.supplyApy || "0") / 1e27, // RAY to decimal
-    borrowApy: parseFloat(vault.state?.borrowApy || "0") / 1e27,
-  };
-}
-
-/**
- * Create a position response object from vault data (legacy format)
- */
-function createPositionFromVault(vault: any, hasSupply: boolean, hasDebt: boolean): EulerPositionResponse {
-  // Asset is returned as an address string, not an object
-  const assetAddr = (vault.asset || "").toLowerCase();
-  const knownToken = KNOWN_TOKENS[assetAddr];
-
-  // Try to get symbol from known tokens, then from vault symbol extraction
-  let assetSymbol = knownToken?.symbol;
-  if (!assetSymbol && vault.symbol) {
-    assetSymbol = extractTokenFromVaultSymbol(vault.symbol);
-  }
-  assetSymbol = assetSymbol || "???";
-
-  const decimals = knownToken?.decimals ?? 18;
-
-  return {
-    vault: {
-      address: vault.id,
-      name: vault.name || "Unknown",
-      symbol: vault.symbol || "???",
-      asset: {
-        address: assetAddr,
-        symbol: assetSymbol,
-        decimals,
-      },
-      supplyApy: parseFloat(vault.state?.supplyApy || "0") / 1e27, // RAY to decimal
-      borrowApy: parseFloat(vault.state?.borrowApy || "0") / 1e27,
-    },
-    supplyShares: hasSupply ? "1" : "0", // Placeholder - actual shares would need separate query
-    borrowShares: hasDebt ? "1" : "0",
-  };
-}
-
-/**
- * Build grouped positions from deposit and borrow entries
- * Groups by sub-account: each group has 1 debt + N collaterals
- */
-function buildPositionGroups(
-  depositEntries: { subAccount: string; vault: string }[],
-  borrowEntries: { subAccount: string; vault: string }[],
-  vaultMap: Map<string, any>,
-  mainAddress: string
-): EulerPositionGroup[] {
-  // Group by sub-account
-  const subAccountMap = new Map<string, { deposits: string[]; borrows: string[] }>();
-
-  for (const entry of depositEntries) {
-    const key = entry.subAccount.toLowerCase();
-    if (!subAccountMap.has(key)) {
-      subAccountMap.set(key, { deposits: [], borrows: [] });
-    }
-    subAccountMap.get(key)?.deposits.push(entry.vault.toLowerCase());
-  }
-
-  for (const entry of borrowEntries) {
-    const key = entry.subAccount.toLowerCase();
-    if (!subAccountMap.has(key)) {
-      subAccountMap.set(key, { deposits: [], borrows: [] });
-    }
-    subAccountMap.get(key)?.borrows.push(entry.vault.toLowerCase());
-  }
-
-  // Build position groups
-  const groups: EulerPositionGroup[] = [];
-
-  for (const [subAccount, { deposits, borrows }] of subAccountMap) {
-    // Each sub-account can only have 1 borrow (controller)
-    const borrowVaultAddr = borrows[0]; // Should only be one
-    const borrowVault = borrowVaultAddr ? vaultMap.get(borrowVaultAddr) : null;
-
-    // All deposits in this sub-account are collaterals
-    const collaterals: EulerCollateralPosition[] = deposits
-      .map(addr => vaultMap.get(addr))
-      .filter(Boolean)
-      .map(vault => ({ vault: createVaultInfo(vault) }));
-
-    // Only include groups that have either debt or collateral
-    if (borrowVault || collaterals.length > 0) {
-      groups.push({
-        subAccount,
-        isMainAccount: isMainAccount(subAccount, mainAddress),
-        debt: borrowVault ? { vault: createVaultInfo(borrowVault) } : null,
-        collaterals,
+/** Best-effort APY map (RAY → decimal) keyed by vault address. Empty on any subgraph hiccup. */
+async function fetchApyMap(chainId: number, vaultIds: string[]): Promise<Map<string, { supplyApy: number; borrowApy: number }>> {
+  const map = new Map<string, { supplyApy: number; borrowApy: number }>();
+  const url = EULER_SUBGRAPH_URLS[chainId];
+  if (!url || vaultIds.length === 0) return map;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: `query($ids:[ID!]!){ eulerVaults(where:{id_in:$ids}){ id state{ supplyApy borrowApy } } }`, variables: { ids: vaultIds } }),
+      next: { revalidate: 60 },
+    });
+    const json = await res.json();
+    for (const v of json.data?.eulerVaults ?? []) {
+      map.set((v.id as string).toLowerCase(), {
+        supplyApy: parseFloat(v.state?.supplyApy || "0") / 1e27,
+        borrowApy: parseFloat(v.state?.borrowApy || "0") / 1e27,
       });
     }
+  } catch {
+    /* APY is best-effort */
   }
-
-  // Sort: main account first, then by sub-account address
-  groups.sort((a, b) => {
-    if (a.isMainAccount && !b.isMainAccount) return -1;
-    if (!a.isMainAccount && b.isMainAccount) return 1;
-    return a.subAccount.localeCompare(b.subAccount);
-  });
-
-  return groups;
+  return map;
 }
 
-/**
- * Build positions from deposit and borrow entries with vault data (legacy format)
- */
-function buildPositions(
-  depositEntries: { subAccount: string; vault: string }[],
-  borrowEntries: { subAccount: string; vault: string }[],
-  vaultMap: Map<string, any>
-): EulerPositionResponse[] {
-  const positions: EulerPositionResponse[] = [];
-  const processedVaults = new Set<string>();
-
-  // Process deposits
-  for (const entry of depositEntries) {
-    const vault = vaultMap.get(entry.vault.toLowerCase());
-    if (!vault) continue;
-
-    const vaultKey = entry.vault.toLowerCase();
-    if (!processedVaults.has(vaultKey)) {
-      processedVaults.add(vaultKey);
-      positions.push(createPositionFromVault(vault, true, false));
-    }
-  }
-
-  // Process borrows (update existing or create new)
-  for (const entry of borrowEntries) {
-    const vault = vaultMap.get(entry.vault.toLowerCase());
-    if (!vault) continue;
-
-    const vaultKey = entry.vault.toLowerCase();
-    const existingIdx = positions.findIndex(p => p.vault.address.toLowerCase() === vaultKey);
-
-    if (existingIdx >= 0) {
-      positions[existingIdx].borrowShares = "1";
-    } else {
-      positions.push(createPositionFromVault(vault, false, true));
-    }
-  }
-
-  return positions;
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ chainId: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ chainId: string }> }) {
   const { chainId: chainIdStr } = await params;
   const chainId = parseInt(chainIdStr, 10);
-
   const searchParams = request.nextUrl.searchParams;
+  const forkChainId = chainId === 31337 ? parseInt(searchParams.get("forkChainId") || "42161", 10) : chainId;
+  const userParam = searchParams.get("user");
 
-  // For hardhat (31337), use forkChainId param to determine which chain's subgraph to query
-  const forkChainId = chainId === 31337
-    ? parseInt(searchParams.get("forkChainId") || "42161", 10) // Default to Arbitrum
-    : chainId;
+  const cfg = RPC_ENDPOINTS[forkChainId];
+  const evc = EVC_ADDRESSES[forkChainId];
+  if (!cfg || !evc) return NextResponse.json({ error: `Chain ${forkChainId} not supported for Euler V2` }, { status: 400 });
+  if (!userParam) return NextResponse.json({ error: "Missing user address parameter" }, { status: 400 });
 
-  const subgraphUrl = EULER_SUBGRAPH_URLS[forkChainId];
-  if (!subgraphUrl) {
-    return NextResponse.json(
-      { error: `Chain ${forkChainId} not supported for Euler V2` },
-      { status: 400 }
-    );
-  }
-
-  const userAddress = searchParams.get("user")?.toLowerCase();
-
-  if (!userAddress) {
-    return NextResponse.json(
-      { error: "Missing user address parameter" },
-      { status: 400 }
-    );
-  }
+  let user: Address;
+  try { user = getAddress(userParam); } catch { return NextResponse.json({ error: "Invalid user address" }, { status: 400 }); }
 
   try {
-    // Fetch user's active account data
-    const positionsResponse = await fetch(subgraphUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: POSITIONS_QUERY,
-        variables: { user: userAddress },
-      }),
-      next: { revalidate: 30 }, // Cache for 30 seconds
+    const client = createPublicClient({ chain: cfg.chain, transport: http(cfg.url) }) as PublicClient;
+    const subs = deriveSubAccounts(user);
+
+    // 1) EVC discovery — collaterals + controllers per sub-account (multicall).
+    const [collRes, ctrlRes] = await Promise.all([
+      client.multicall({ contracts: subs.map(s => ({ address: evc, abi: EVC_ABI, functionName: "getCollaterals" as const, args: [s] as const })), allowFailure: true }),
+      client.multicall({ contracts: subs.map(s => ({ address: evc, abi: EVC_ABI, functionName: "getControllers" as const, args: [s] as const })), allowFailure: true }),
+    ]);
+
+    interface SubPos { subAccount: Address; collaterals: Address[]; controller: Address | null }
+    const subPositions: SubPos[] = [];
+    const vaultSet = new Set<string>();
+    subs.forEach((s, i) => {
+      const collaterals = (collRes[i].status === "success" ? (collRes[i].result as Address[]) : []);
+      const controllers = (ctrlRes[i].status === "success" ? (ctrlRes[i].result as Address[]) : []);
+      if (collaterals.length === 0 && controllers.length === 0) return;
+      collaterals.forEach(v => vaultSet.add(v.toLowerCase()));
+      if (controllers[0]) vaultSet.add(controllers[0].toLowerCase());
+      subPositions.push({ subAccount: s, collaterals, controller: controllers[0] ?? null });
     });
 
-    if (!positionsResponse.ok) {
-      console.error(`[euler/positions] Subgraph error: ${positionsResponse.status}`);
-      return NextResponse.json(
-        { error: "Failed to fetch positions from subgraph" },
-        { status: 502 }
-      );
-    }
+    if (subPositions.length === 0) return NextResponse.json({ positions: [], positionGroups: [] });
 
-    const positionsData = await positionsResponse.json();
-
-    if (positionsData.errors) {
-      console.error("[euler/positions] Positions query GraphQL errors:", JSON.stringify(positionsData.errors));
-      return NextResponse.json(
-        { error: "GraphQL query failed", details: positionsData.errors },
-        { status: 500 }
-      );
-    }
-
-    console.log("[euler/positions] Positions query response:", JSON.stringify(positionsData.data));
-
-    const account = positionsData.data?.trackingActiveAccount;
-
-    // If no account found, return empty positions
-    if (!account) {
-      return NextResponse.json({ positions: [], positionGroups: [] });
-    }
-
-    const mainAddress = account.mainAddress || userAddress;
-
-    // Parse deposit and borrow entries
-    const depositEntries = parsePositionEntries(account.deposits || []);
-    const borrowEntries = parsePositionEntries(account.borrows || []);
-
-    // Collect unique vault addresses (keep original case for query, subgraph may require it)
-    const vaultAddresses = new Set<string>();
-    depositEntries.forEach(e => vaultAddresses.add(e.vault));
-    borrowEntries.forEach(e => vaultAddresses.add(e.vault));
-
-    if (vaultAddresses.size === 0) {
-      return NextResponse.json({ positions: [], positionGroups: [] });
-    }
-
-    console.log("[euler/positions] Querying vault details for:", Array.from(vaultAddresses));
-
-    // Fetch vault details
-    const vaultDetailsResponse = await fetch(subgraphUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: VAULT_DETAILS_QUERY,
-        variables: { vaultIds: Array.from(vaultAddresses) },
-      }),
+    // 2) On-chain vault metadata (asset/symbol/name) — never depends on the subgraph.
+    const vaults = Array.from(vaultSet).map(v => getAddress(v));
+    const metaRes = await client.multicall({
+      contracts: vaults.flatMap(v => [
+        { address: v, abi: VAULT_ABI, functionName: "asset" as const },
+        { address: v, abi: VAULT_ABI, functionName: "symbol" as const },
+        { address: v, abi: VAULT_ABI, functionName: "name" as const },
+      ]),
+      allowFailure: true,
+    });
+    const vaultAsset = new Map<string, Address>();
+    const vaultSymbol = new Map<string, string>();
+    const vaultName = new Map<string, string>();
+    vaults.forEach((v, i) => {
+      const a = metaRes[i * 3], s = metaRes[i * 3 + 1], n = metaRes[i * 3 + 2];
+      if (a.status === "success") vaultAsset.set(v.toLowerCase(), getAddress(a.result as Address));
+      vaultSymbol.set(v.toLowerCase(), s.status === "success" ? (s.result as string) : "?");
+      vaultName.set(v.toLowerCase(), n.status === "success" ? (n.result as string) : "Euler Vault");
     });
 
-    const vaultDetailsData = await vaultDetailsResponse.json();
+    // 3) Underlying asset symbol + decimals (multicall).
+    const assets = Array.from(new Set(Array.from(vaultAsset.values()).map(a => a.toLowerCase()))).map(a => getAddress(a));
+    const assetRes = await client.multicall({
+      contracts: assets.flatMap(a => [
+        { address: a, abi: ERC20_ABI, functionName: "symbol" as const },
+        { address: a, abi: ERC20_ABI, functionName: "decimals" as const },
+      ]),
+      allowFailure: true,
+    });
+    const assetSymbol = new Map<string, string>();
+    const assetDecimals = new Map<string, number>();
+    assets.forEach((a, i) => {
+      const s = assetRes[i * 2], d = assetRes[i * 2 + 1];
+      assetSymbol.set(a.toLowerCase(), s.status === "success" ? (s.result as string) : "?");
+      assetDecimals.set(a.toLowerCase(), d.status === "success" ? Number(d.result) : 18);
+    });
 
-    if (vaultDetailsData.errors) {
-      console.error("[euler/positions] Vault details GraphQL errors:", vaultDetailsData.errors);
+    // 4) Best-effort APY enrichment from the subgraph.
+    const apy = await fetchApyMap(forkChainId, vaults.map(v => v.toLowerCase()));
+
+    const buildVaultInfo = (vaultAddr: Address): EulerVaultInfo => {
+      const key = vaultAddr.toLowerCase();
+      const assetAddr = vaultAsset.get(key) ?? ("0x0000000000000000000000000000000000000000" as Address);
+      const akey = assetAddr.toLowerCase();
+      const rates = apy.get(key) ?? { supplyApy: 0, borrowApy: 0 };
+      return {
+        address: vaultAddr,
+        name: vaultName.get(key) ?? "Euler Vault",
+        symbol: vaultSymbol.get(key) ?? "?",
+        asset: { address: assetAddr, symbol: assetSymbol.get(akey) ?? "?", decimals: assetDecimals.get(akey) ?? 18 },
+        supplyApy: rates.supplyApy,
+        borrowApy: rates.borrowApy,
+      };
+    };
+
+    // 5) Build position groups (1 debt + N collaterals per sub-account) + legacy positions.
+    const positionGroups: EulerPositionGroup[] = subPositions
+      .map(sp => ({
+        subAccount: sp.subAccount,
+        isMainAccount: sp.subAccount.toLowerCase() === user.toLowerCase(),
+        debt: sp.controller ? { vault: buildVaultInfo(sp.controller) } : null,
+        collaterals: sp.collaterals.map(v => ({ vault: buildVaultInfo(v) })),
+      }))
+      .sort((a, b) => (a.isMainAccount === b.isMainAccount ? a.subAccount.localeCompare(b.subAccount) : a.isMainAccount ? -1 : 1));
+
+    const seen = new Set<string>();
+    const positions: EulerPositionResponse[] = [];
+    for (const g of positionGroups) {
+      for (const c of g.collaterals) {
+        if (seen.has(c.vault.address.toLowerCase())) continue;
+        seen.add(c.vault.address.toLowerCase());
+        positions.push({ vault: c.vault, supplyShares: "1", borrowShares: "0" });
+      }
+      if (g.debt) {
+        const k = g.debt.vault.address.toLowerCase();
+        const existing = positions.find(p => p.vault.address.toLowerCase() === k);
+        if (existing) existing.borrowShares = "1";
+        else { seen.add(k); positions.push({ vault: g.debt.vault, supplyShares: "0", borrowShares: "1" }); }
+      }
     }
-
-    const vaults = vaultDetailsData.data?.eulerVaults || [];
-    console.log("[euler/positions] Found", vaults.length, "vaults from query");
-
-    // Create vault lookup map
-    const vaultMap = new Map<string, any>();
-    vaults.forEach((v: any) => vaultMap.set(v.id.toLowerCase(), v));
-
-    // Build legacy positions format (for backwards compatibility)
-    const positions = buildPositions(depositEntries, borrowEntries, vaultMap);
-
-    // Build grouped positions (new format: 1 debt + N collaterals per sub-account)
-    const positionGroups = buildPositionGroups(depositEntries, borrowEntries, vaultMap, mainAddress);
 
     return NextResponse.json({ positions, positionGroups });
   } catch (error) {
     console.error("[euler/positions] Error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch positions" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch positions" }, { status: 500 });
   }
 }

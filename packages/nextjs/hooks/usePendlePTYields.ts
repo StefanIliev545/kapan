@@ -403,18 +403,40 @@ function findYieldByParsedComponents(
 
 /**
  * Fallback: fuzzy match on underlying symbol or yield symbol using the base token substring.
+ *
+ * Maturity-aware: if the queried PT has an explicit maturity, we only accept a candidate with the
+ * SAME maturity (±2 days). This prevents an expired/delisted maturity (which is filtered out of the
+ * yields list once past expiry) from silently borrowing a *live* maturity's APY — e.g. a matured
+ * PT-USDai-18JUN2026 must not display the 15OCT2026 market's fixed APY. Different maturities of the
+ * same asset genuinely have different fixed yields, so a cross-maturity fuzzy match is always wrong.
  */
 function findYieldByFuzzyMatch(
   symbol: string,
   allYields: PTYield[] | undefined,
 ): PTYield | undefined {
-  const baseToken = extractPTBaseToken(symbol);
+  const parsed = parsePTToken(symbol);
+  const baseToken = (parsed.isPT ? parsed.baseToken : extractPTBaseToken(symbol)).toLowerCase();
   if (!baseToken) return undefined;
 
-  return allYields?.find(y =>
-    y.underlyingSymbol.toLowerCase().includes(baseToken) ||
-    y.symbol.toLowerCase().includes(baseToken)
+  const candidates = (allYields || []).filter(
+    y =>
+      y.underlyingSymbol.toLowerCase().includes(baseToken) ||
+      y.symbol.toLowerCase().includes(baseToken),
   );
+
+  // Explicit maturity → require a same-maturity candidate; never fall back to another maturity.
+  const wantedMaturity = parsed.isPT ? parsed.maturityDate : null;
+  if (wantedMaturity) {
+    const wanted = wantedMaturity.getTime();
+    return candidates.find(y => {
+      const yp = parsePTToken(y.symbol);
+      const ym = yp.isPT ? yp.maturityDate : null;
+      if (!ym) return false;
+      return Math.abs(wanted - ym.getTime()) / (1000 * 60 * 60 * 24) <= 2;
+    });
+  }
+
+  return candidates[0];
 }
 
 // All chains where Pendle is deployed - we fetch from all to support bridged tokens

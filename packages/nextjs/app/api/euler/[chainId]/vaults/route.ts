@@ -10,15 +10,20 @@ import { NextRequest, NextResponse } from "next/server";
  * Only collaterals with LTVBorrow > 0 are included.
  */
 
-// RPC endpoints for on-chain LTV checks
+// RPC endpoints for on-chain LTV checks. Prefer Alchemy (same key used by other server routes,
+// e.g. api/orders/sync + utils/server/protocolRates.server) and fall back to public RPCs.
+// The public mainnet RPC (eth.llamarpc.com) was returning HTTP 521, which made the LTVList()
+// collateral check fail → every collateral got filtered out → mainnet showed no collaterals
+// while Arbitrum (working RPC) did. Alchemy fixes that and is more reliable under batched calls.
+const ALCHEMY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
 const RPC_ENDPOINTS: Record<number, string> = {
-  1: "https://eth.llamarpc.com",
-  10: "https://mainnet.optimism.io",
+  1: ALCHEMY ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY}` : "https://eth.llamarpc.com",
+  10: ALCHEMY ? `https://opt-mainnet.g.alchemy.com/v2/${ALCHEMY}` : "https://mainnet.optimism.io",
   130: "https://mainnet.unichain.org",
-  8453: "https://mainnet.base.org",
+  8453: ALCHEMY ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY}` : "https://mainnet.base.org",
   9745: "https://rpc.plasma.io/l2",
-  42161: "https://arb1.arbitrum.io/rpc",
-  59144: "https://rpc.linea.build",
+  42161: ALCHEMY ? `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY}` : "https://arb1.arbitrum.io/rpc",
+  59144: ALCHEMY ? `https://linea-mainnet.g.alchemy.com/v2/${ALCHEMY}` : "https://rpc.linea.build",
   31337: "http://127.0.0.1:8545", // Hardhat local node
 };
 
@@ -38,8 +43,11 @@ const GOVERNED_PERSPECTIVE_ADDRESSES: Record<number, string> = {
 };
 
 // `verifiedArray()` selector — returns address[]. Same ABI shape as the LTVList call below
-// so we can reuse `decodeAddressArray`.
-const VERIFIED_ARRAY_SELECTOR = "0x9caa49bd";
+// so we can reuse `decodeAddressArray`. NOTE: the previous value (0x9caa49bd) was the WRONG
+// selector and reverted, so the curation filter silently no-op'd and unofficial vaults showed.
+// keccak256("verifiedArray()")[:4] = 0x8d5e21d3 (verified: returns 137/20/21 vaults on
+// mainnet/Base/Arbitrum GovernedPerspectives).
+const VERIFIED_ARRAY_SELECTOR = "0x8d5e21d3";
 
 // Euler subgraph endpoints by chain
 const EULER_SUBGRAPH_URLS: Record<number, string> = {
@@ -115,6 +123,9 @@ export interface CollateralInfo {
   vaultSymbol: string;
   tokenSymbol: string; // Extracted from vault symbol (e.g., "eWETH-1" -> "WETH")
   tokenAddress: string; // Underlying asset address of the collateral vault
+  decimals: number; // Underlying asset decimals — lets consumers (e.g. collateral-swap targets)
+  // resolve a vault WITHOUT looking it up in the (curated) top-level vault list, which omits
+  // un-verified-but-accepted collaterals like PT vaults. See useEulerCollateralSwapVaults.
 }
 
 export interface EulerVaultResponse {
@@ -324,11 +335,13 @@ function resolveCollaterals(
       const addr = collateralAddr.toLowerCase();
       const vaultInfo = vaultInfoLookup.get(addr);
       const vaultSymbol = vaultInfo?.symbol || "???";
+      const { decimals } = resolveAssetSymbol(vaultInfo?.asset || "", vaultSymbol);
       return {
         vaultAddress: addr,
         vaultSymbol,
         tokenSymbol: extractTokenFromVaultSymbol(vaultSymbol),
         tokenAddress: vaultInfo?.asset || "",
+        decimals,
       };
     });
 }
