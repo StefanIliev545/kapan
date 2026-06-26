@@ -20,8 +20,10 @@ export interface MarketData {
    *  headlined by the collateral, normal markets by the loan. */
   collateralSymbol?: string;
   loanSymbol?: string;
-  /** Max LTV (0-1, e.g. 0.915) for this market — used to show the max loop multiplier 1/(1-ltv). */
-  maxLtv?: number;
+  /** Net APY (percent) from max-looping this market: L·collateralYield − (L−1)·borrow, where
+   *  L = 1/(1-LLTV). Only set when the collateral natively yields (PT / LST) — looping a
+   *  non-yielding collateral is just a borrow cost. */
+  maxLoopApy?: number;
   /** Total value locked in USD (for display and sorting) */
   tvlUsd?: number;
   /** External link to market on protocol's app */
