@@ -29,6 +29,7 @@ import { aaveRateToAPY, venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/pro
 import { canonicalizeTokenName } from "~~/utils/tokenSymbols";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
+import { type TokenCategory, matchesCategory } from "~~/utils/tokenCategories";
 import { useMorphoMarketsQuery } from "~~/utils/morpho/marketApi";
 import { useEulerVaultsQuery } from "~~/utils/euler/vaultApi";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
@@ -379,6 +380,7 @@ const useMorphoData = (): MarketData[] => {
   const mainnetQuery = useMorphoMarketsQuery(mainnet.id);
   const arbitrumQuery = useMorphoMarketsQuery(arbitrum.id);
   const baseQuery = useMorphoMarketsQuery(base.id);
+  const { findYield } = useExternalYields();
 
   return useMemo(() => {
     const results: MarketData[] = [];
@@ -396,7 +398,37 @@ const useMorphoData = (): MarketData[] => {
         const borrowApy = (market.state?.borrowApy ?? 0) * 100;
         const utilization = (market.state?.utilization ?? 0) * 100;
         const collateralSymbol = market.collateralAsset?.symbol ?? "";
+        const collateralAddress = market.collateralAsset?.address;
         const loanSymbol = market.loanAsset.symbol;
+
+        // A Morpho PT market is "borrow <loan> against <PT collateral>". Headline it by the PT so
+        // PT users find it, framed correctly: SUPPLY = the PT's Pendle fixed yield (intrinsic to
+        // holding the PT, not the loan's lending rate), BORROW = the cost to borrow against it.
+        // Non-PT markets keep the loan-asset headline (the lender's supply view).
+        if (isPTToken(collateralSymbol)) {
+          const ext = findYield(collateralAddress, collateralSymbol);
+          const ptYield = ext?.source === "pendle" ? ext.apy : 0;
+          results.push({
+            icon: tokenNameToLogo(collateralSymbol.toLowerCase()),
+            name: collateralSymbol,
+            supplyRate: `${formatPercentage(ptYield, 2, false)}%`,
+            borrowRate: `${formatPercentage(borrowApy, 2, false)}%`,
+            price: market.collateralAsset?.priceUsd?.toFixed(2) ?? "0.00",
+            utilization: utilization.toFixed(2),
+            address: market.uniqueKey,
+            networkType: "evm",
+            network,
+            protocol: "morpho",
+            poolName: loanSymbol, // what you borrow against the PT
+            collateralSymbol, // the PT
+            loanSymbol,
+            tvlUsd: market.state?.supplyAssetsUsd ?? undefined,
+            marketUrl: getMorphoMarketUrl(chainId, market.uniqueKey, collateralSymbol, loanSymbol) ?? undefined,
+            impliedApy: ptYield > 0 ? ptYield : undefined,
+          });
+          return;
+        }
+
         results.push({
           icon: tokenNameToLogo(loanSymbol.toLowerCase()),
           name: loanSymbol,
@@ -409,6 +441,8 @@ const useMorphoData = (): MarketData[] => {
           network,
           protocol: "morpho",
           poolName: collateralSymbol || undefined,
+          collateralSymbol: collateralSymbol || undefined,
+          loanSymbol,
           tvlUsd: market.state?.supplyAssetsUsd ?? undefined,
           marketUrl: getMorphoMarketUrl(chainId, market.uniqueKey, collateralSymbol, loanSymbol) ?? undefined,
         });
@@ -416,10 +450,11 @@ const useMorphoData = (): MarketData[] => {
     });
 
     return results;
-  }, [mainnetQuery.data, arbitrumQuery.data, baseQuery.data]);
+  }, [mainnetQuery.data, arbitrumQuery.data, baseQuery.data, findYield]);
 };
 
 const useEulerData = (): MarketData[] => {
+  const mainnetQuery = useEulerVaultsQuery(mainnet.id);
   const arbitrumQuery = useEulerVaultsQuery(arbitrum.id);
   const baseQuery = useEulerVaultsQuery(base.id);
   const optimismQuery = useEulerVaultsQuery(optimism.id);
@@ -429,6 +464,7 @@ const useEulerData = (): MarketData[] => {
   return useMemo(() => {
     const results: MarketData[] = [];
     const queries = [
+      { data: mainnetQuery.data, chainId: mainnet.id },
       { data: arbitrumQuery.data, chainId: arbitrum.id },
       { data: baseQuery.data, chainId: base.id },
       { data: optimismQuery.data, chainId: optimism.id },
@@ -469,7 +505,7 @@ const useEulerData = (): MarketData[] => {
     });
 
     return results;
-  }, [arbitrumQuery.data, baseQuery.data, optimismQuery.data, lineaQuery.data, findYield, getEffectiveSupplyRate]);
+  }, [mainnetQuery.data, arbitrumQuery.data, baseQuery.data, optimismQuery.data, lineaQuery.data, findYield, getEffectiveSupplyRate]);
 };
 
 // ── TanStack Table for inner group markets ──────────────────────────
@@ -779,20 +815,26 @@ const CollapsibleProtocolGroup: FC<{
         </div>
 
         {/* Individual market rows */}
-        {sorted.map(m => (
+        {sorted.map(m => {
+          // Pair is "<collateral> / <loan>" to match the header. Morpho carries explicit
+          // collateral/loan symbols (PT markets are headlined by the collateral, so name/poolName
+          // alone would invert the pair); other protocols fall back to poolName / name.
+          const leftLabel = m.collateralSymbol ?? m.poolName;
+          const rightLabel = m.loanSymbol ?? m.name;
+          return (
           <div key={`${m.address}-${m.poolName ?? ""}`} className="border-base-content/[0.03] hover:bg-base-content/[0.02] flex items-center border-t px-4 py-2 transition-colors">
             <div className="min-w-[320px]">
               {m.marketUrl ? (
                 <a href={m.marketUrl} target="_blank" rel="noopener noreferrer" className="group/link hover:text-primary inline-flex items-center gap-1.5 text-sm transition-colors">
-                  {m.poolName && <span className="text-base-content/60">{m.poolName}</span>}
-                  {m.poolName && <span className="text-base-content/60">/</span>}
-                  <span className="font-medium">{m.name}</span>
+                  {leftLabel && <span className="text-base-content/60">{leftLabel}</span>}
+                  {leftLabel && <span className="text-base-content/60">/</span>}
+                  <span className="font-medium">{rightLabel}</span>
                   <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-50" />
                 </a>
               ) : (
                 <span className="text-sm">
-                  {m.poolName && <><span className="text-base-content/60">{m.poolName}</span><span className="text-base-content/60"> / </span></>}
-                  <span className="font-medium">{m.name}</span>
+                  {leftLabel && <><span className="text-base-content/60">{leftLabel}</span><span className="text-base-content/60"> / </span></>}
+                  <span className="font-medium">{rightLabel}</span>
                 </span>
               )}
             </div>
@@ -801,7 +843,8 @@ const CollapsibleProtocolGroup: FC<{
             <span className="text-success/80 min-w-[90px] text-center text-sm tabular-nums">{m.supplyRate}</span>
             <span className="text-base-content/80 min-w-[90px] text-center text-sm tabular-nums">{m.borrowRate}</span>
           </div>
-        ))}
+          );
+        })}
       </div>
     </details>
   );
@@ -809,7 +852,7 @@ const CollapsibleProtocolGroup: FC<{
 
 // ── Main component ──────────────────────────────────────────────────
 
-export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ search, network }) => {
+export const MarketsGrouped: FC<{ search: string; network?: string; category?: TokenCategory }> = ({ search, network, category = "all" }) => {
   const aave = useAaveLikeData("AaveGatewayView", "aave", AAVE_CHAIN_IDS);
   const compoundArbitrum = useCompoundMarketData({ chainId: arbitrum.id });
   const compoundBase = useCompoundMarketData({ chainId: base.id });
@@ -832,6 +875,16 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
     return combined.filter(m => m.network === network);
   }, [aave, compound, nostra, venus, vesu, morpho, euler, network]);
 
+  // Category filter matches the HEADLINE (suppliable) token only — not the collateral. A market is
+  // headlined by what you supply/earn on it; Morpho PT *collateral* markets are really stablecoin/
+  // ETH lending markets (e.g. lend USDC against PT collateral), so matching their PT collateral
+  // would wrongly list "USDC 22.93%" under the PT filter. Genuine PT tokens (Euler EVK PT vaults)
+  // are headlined by the PT itself and match correctly. Collateral is still searchable (see below).
+  const categoryFiltered = useMemo(() => {
+    if (category === "all") return all;
+    return all.filter(m => matchesCategory(m.name, category));
+  }, [all, category]);
+
   const groups = useMemo(() => {
     const map = new Map<
       string,
@@ -842,7 +895,7 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
         bestBorrow: MarketData;
       }
     >();
-    all.forEach(m => {
+    categoryFiltered.forEach(m => {
       const key = canonicalizeTokenName(m.name);
       const entry = map.get(key);
       if (entry) {
@@ -859,7 +912,7 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
       }
     });
     return Array.from(map.entries()).map(([name, value]) => ({ name, ...value }));
-  }, [all]);
+  }, [categoryFiltered]);
 
   const sorted = useMemo(() => {
     return [...groups].sort((a, b) => {
@@ -870,9 +923,17 @@ export const MarketsGrouped: FC<{ search: string; network?: string }> = ({ searc
   }, [groups, sortBy]);
 
   const filtered = useMemo(() => {
+    if (!search) return sorted;
     const lower = search.toLowerCase();
     const canon = canonicalizeTokenName(search).toLowerCase();
-    return sorted.filter(g => g.name.toLowerCase().includes(lower) || g.name.toLowerCase().includes(canon));
+    // Match the group's loan token AND each market's collateral (poolName) so e.g. searching a PT
+    // surfaces markets that take it as collateral (Morpho), not just suppliable-PT vaults (Euler).
+    return sorted.filter(
+      g =>
+        g.name.toLowerCase().includes(lower) ||
+        g.name.toLowerCase().includes(canon) ||
+        g.markets.some(m => (m.poolName ?? "").toLowerCase().includes(lower)),
+    );
   }, [sorted, search]);
 
   // Memoized handlers for sort buttons

@@ -34,6 +34,7 @@ import type { MorphoMarket } from "~~/hooks/useMorphoLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { encodeMorphoContext } from "~~/utils/v2/instructionHelpers";
 import { getMorphoMarketUrl } from "~~/utils/morpho";
+import { type TokenCategory, TOKEN_CATEGORIES, matchesCategory } from "~~/utils/tokenCategories";
 import { useModal } from "~~/hooks/useModal";
 import { DepositModal } from "~~/components/modals/DepositModal";
 import { MultiplyEvmModal } from "~~/components/modals/MultiplyEvmModal";
@@ -163,24 +164,8 @@ function TokenPairAvatars(props: { collateralSymbol?: string; loanSymbol: string
   );
 }
 
-// Token category definitions for filter tabs
-type TokenCategory = "all" | "eth" | "btc" | "stables" | "pt";
-
-const TOKEN_CATEGORIES: Record<TokenCategory, { label: string; patterns: string[] }> = {
-  all: { label: "All", patterns: [] },
-  eth: { label: "Eth", patterns: ["eth", "weth", "steth", "wsteth", "cbeth", "reth", "weeth", "ezeth", "rseth", "meth", "oeth", "sweth", "sfrxeth", "frxeth", "eeth", "lseth", "bsdeth"] },
-  btc: { label: "Btc", patterns: ["btc", "wbtc", "cbbtc", "lbtc", "tbtc", "sbtc", "renbtc", "hbtc"] },
-  stables: { label: "Stables", patterns: ["usdc", "usdt", "dai", "usde", "frax", "lusd", "gusd", "tusd", "usdp", "susd", "mim", "eurc", "eur", "cusd", "pyusd", "gho", "dola", "usd", "aprusr", "cusdo"] },
-  pt: { label: "PT", patterns: ["pt-"] },
-};
-
-function matchesCategory(symbol: string, category: TokenCategory): boolean {
-  if (category === "all") {
-    return true;
-  }
-  const lowerSymbol = symbol.toLowerCase();
-  return TOKEN_CATEGORIES[category].patterns.some(pattern => lowerSymbol.includes(pattern));
-}
+// TokenCategory / TOKEN_CATEGORIES / matchesCategory now live in ~~/utils/tokenCategories
+// (shared with the markets page).
 
 // Token Icon component with fixed sizing
 function TokenIcon({ symbol, size = 20 }: { symbol: string; size?: number }) {

@@ -15,6 +15,11 @@ export interface MarketData {
   protocol: "aave" | "nostra" | "venus" | "vesu" | "compound" | "morpho" | "euler";
   allowDeposit?: boolean;
   poolName?: string;
+  /** Explicit collateral/loan symbols for the "Collateral / Loan" pair display (Morpho), so the
+   *  order is correct regardless of which side `name`/`poolName` represent — PT markets are
+   *  headlined by the collateral, normal markets by the loan. */
+  collateralSymbol?: string;
+  loanSymbol?: string;
   /** Total value locked in USD (for display and sorting) */
   tvlUsd?: number;
   /** External link to market on protocol's app */
