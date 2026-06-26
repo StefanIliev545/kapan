@@ -400,6 +400,8 @@ const useMorphoData = (): MarketData[] => {
         const collateralSymbol = market.collateralAsset?.symbol ?? "";
         const collateralAddress = market.collateralAsset?.address;
         const loanSymbol = market.loanAsset.symbol;
+        // Morpho LLTV is 1e18-scaled (e.g. 915000000000000000 = 0.915). Drives the max loop = 1/(1-ltv).
+        const maxLtv = market.lltv ? Number(market.lltv) / 1e18 : undefined;
 
         // A Morpho PT market is "borrow <loan> against <PT collateral>". Headline it by the PT so
         // PT users find it, framed correctly: SUPPLY = the PT's Pendle fixed yield (intrinsic to
@@ -422,6 +424,7 @@ const useMorphoData = (): MarketData[] => {
             poolName: loanSymbol, // what you borrow against the PT
             collateralSymbol, // the PT
             loanSymbol,
+            maxLtv,
             tvlUsd: market.state?.supplyAssetsUsd ?? undefined,
             marketUrl: getMorphoMarketUrl(chainId, market.uniqueKey, collateralSymbol, loanSymbol) ?? undefined,
             impliedApy: ptYield > 0 ? ptYield : undefined,
@@ -443,6 +446,7 @@ const useMorphoData = (): MarketData[] => {
           poolName: collateralSymbol || undefined,
           collateralSymbol: collateralSymbol || undefined,
           loanSymbol,
+          maxLtv,
           tvlUsd: market.state?.supplyAssetsUsd ?? undefined,
           marketUrl: getMorphoMarketUrl(chainId, market.uniqueKey, collateralSymbol, loanSymbol) ?? undefined,
         });
@@ -561,7 +565,13 @@ const formatTvl = (usd: number | undefined): string => {
 const COLLAPSIBLE_PROTOCOLS = new Set<MarketData["protocol"]>(["morpho", "euler"]);
 const COLLAPSIBLE_LABELS: Record<string, string> = { morpho: "Collateral / Loan pairs", euler: "Vaults" };
 
-type SortColumn = "borrowRate" | "supplyRate" | "utilization" | "tvlUsd";
+type SortColumn = "borrowRate" | "supplyRate" | "utilization" | "tvlUsd" | "maxLtv";
+
+/** Max loop multiplier from a market's max LTV: 1/(1-ltv). e.g. 0.915 -> "11.8×". */
+function formatLoop(maxLtv?: number): string {
+  if (!maxLtv || maxLtv <= 0 || maxLtv >= 1) return "—";
+  return `${(1 / (1 - maxLtv)).toFixed(1)}×`;
+}
 type SortDir = "asc" | "desc";
 
 /** A single row or a collapsible group, unified for sorting */
@@ -720,6 +730,7 @@ const INNER_COLUMNS: { id: string; label: string; sortKey?: SortColumn }[] = [
   { id: "market", label: "" },
   { id: "tvlUsd", label: "TVL", sortKey: "tvlUsd" },
   { id: "utilization", label: "Util", sortKey: "utilization" },
+  { id: "maxLtv", label: "Max Loop", sortKey: "maxLtv" },
   { id: "supplyRate", label: "Supply", sortKey: "supplyRate" },
   { id: "borrowRate", label: "Borrow", sortKey: "borrowRate" },
 ];
@@ -840,6 +851,9 @@ const CollapsibleProtocolGroup: FC<{
             </div>
             <span className="text-base-content/50 min-w-[80px] text-center text-sm tabular-nums">{formatTvl(m.tvlUsd)}</span>
             <span className="text-base-content/70 min-w-[80px] text-center text-sm tabular-nums">{m.utilization}%</span>
+            <span className="min-w-[80px] text-center text-sm tabular-nums">
+              {m.maxLtv ? <span className="text-info font-medium">{formatLoop(m.maxLtv)}</span> : <span className="text-base-content/25">—</span>}
+            </span>
             <span className="text-success/80 min-w-[90px] text-center text-sm tabular-nums">{m.supplyRate}</span>
             <span className="text-base-content/80 min-w-[90px] text-center text-sm tabular-nums">{m.borrowRate}</span>
           </div>
@@ -911,7 +925,11 @@ export const MarketsGrouped: FC<{ search: string; network?: string; category?: T
         });
       }
     });
-    return Array.from(map.entries()).map(([name, value]) => ({ name, ...value }));
+    return Array.from(map.entries()).map(([name, value]) => {
+      // Best (highest) max-loop across the group's markets, for the at-a-glance header stat.
+      const maxLtv = Math.max(0, ...value.markets.map(m => m.maxLtv ?? 0));
+      return { name, ...value, maxLtv: maxLtv > 0 ? maxLtv : undefined };
+    });
   }, [categoryFiltered]);
 
   const sorted = useMemo(() => {
@@ -1015,6 +1033,12 @@ export const MarketsGrouped: FC<{ search: string; network?: string; category?: T
 
                 {/* Markets count & expand indicator */}
                 <div className="flex items-center gap-3">
+                  {group.maxLtv && (
+                    <div className="hidden flex-col items-end leading-tight sm:flex">
+                      <span className="text-base-content/40 text-[9px] uppercase tracking-[0.12em]">Max loop</span>
+                      <span className="text-info text-sm font-semibold tabular-nums">{formatLoop(group.maxLtv)}</span>
+                    </div>
+                  )}
                   <span className="text-base-content/60 text-[10px] font-normal tracking-[0.12em]">
                     {group.markets.length} {group.markets.length === 1 ? "market" : "markets"}
                   </span>
