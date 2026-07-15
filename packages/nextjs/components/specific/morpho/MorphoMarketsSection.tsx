@@ -42,6 +42,7 @@ import { useAccount } from "wagmi";
 import { notification } from "~~/utils/scaffold-eth/notification";
 import { parseUnits } from "viem";
 import { useExternalYields, hasExternalYield } from "~~/hooks/useExternalYields";
+import { PharosGradeBadge } from "~~/components/common/PharosGradeBadge";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { createTextChangeHandler } from "~~/utils/handlers";
 import {
@@ -116,6 +117,7 @@ interface MarketRow {
   impliedApy: number | null; // PT implied yield for collateral (as percentage, e.g., 15.5)
   maxLoopApy: number | null; // Max leveraged APY at ~99% of LLTV (as percentage)
   collateralAddress: string;
+  loanAddress: string;
 }
 
 const columnHelper = createColumnHelper<MarketRow>();
@@ -570,8 +572,10 @@ function MobileMarketRow({ row, usd, chainId, onSupply, onLoop }: MobileMarketRo
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex min-w-0 items-center gap-1">
             <TokenSymbolDisplay symbol={row.collateralSymbol} size="xs" variant="inline" />
+            <PharosGradeBadge symbol={row.collateralSymbol} address={row.market.collateralAsset?.address} />
             <span className="text-base-content/50 text-xs">/</span>
             <span className="text-xs font-medium">{row.loanSymbol}</span>
+            <PharosGradeBadge symbol={row.loanSymbol} address={row.market.loanAsset?.address} />
             {morphoUrl && (
               <a
                 href={morphoUrl}
@@ -726,6 +730,7 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           collateralSymbol,
           loanSymbol: m.loanAsset?.symbol ?? "",
           collateralAddress,
+          loanAddress: (m.loanAsset?.address ?? "").toLowerCase(),
           liquidityUsd,
           supplyUsd,
           borrowUsd,
@@ -770,25 +775,25 @@ export const MorphoMarketsSection: FC<MorphoMarketsSectionProps> = ({
           <div className="flex items-center gap-2">
             <TokenPairAvatars collateralSymbol={row.collateralSymbol} loanSymbol={row.loanSymbol} />
             <div className="flex flex-col">
-              {morphoUrl ? (
-                <a
-                  href={morphoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-primary group/link flex items-center gap-1 transition-colors"
-                >
-                  <TokenSymbolDisplay symbol={row.collateralSymbol} size="sm" variant="inline" />
-                  <span className="text-base-content/50">/</span>
-                  <span className="font-medium">{row.loanSymbol}</span>
-                  <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
-                </a>
-              ) : (
-                <span className="flex items-center gap-1">
-                  <TokenSymbolDisplay symbol={row.collateralSymbol} size="sm" variant="inline" />
-                  <span className="text-base-content/50">/</span>
-                  <span className="font-medium">{row.loanSymbol}</span>
-                </span>
-              )}
+              {/* Grade badges are anchors themselves, so the Morpho link is icon-only here
+                  (same idiom as the compact row) instead of wrapping the pair text. */}
+              <span className="flex items-center gap-1">
+                <TokenSymbolDisplay symbol={row.collateralSymbol} size="sm" variant="inline" />
+                <PharosGradeBadge symbol={row.collateralSymbol} address={row.collateralAddress} />
+                <span className="text-base-content/50">/</span>
+                <span className="font-medium">{row.loanSymbol}</span>
+                <PharosGradeBadge symbol={row.loanSymbol} address={row.loanAddress} />
+                {morphoUrl && (
+                  <a
+                    href={morphoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="opacity-40 transition-opacity hover:opacity-80"
+                  >
+                    <ExternalLink className="size-3" />
+                  </a>
+                )}
+              </span>
               <span className="text-base-content/50 text-[10px]">LLTV {formatPercent(row.lltv01, 0)}</span>
             </div>
           </div>

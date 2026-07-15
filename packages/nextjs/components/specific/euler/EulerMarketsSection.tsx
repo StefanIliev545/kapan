@@ -33,6 +33,7 @@ import {
 import type { EulerVault, EulerCollateralInfo } from "~~/hooks/useEulerLendingPositions";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { usePendlePTYields, isPTToken } from "~~/hooks/usePendlePTYields";
+import { PharosGradeBadge } from "~~/components/common/PharosGradeBadge";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { useModal } from "~~/hooks/useModal";
 import { DepositModal } from "~~/components/modals/DepositModal";
@@ -529,6 +530,7 @@ function MobileVaultRow({ row, usd, chainId, onSupply, onBorrow }: MobileVaultRo
             >
               <TokenSymbolDisplay symbol={row.assetSymbol} size="sm" variant="inline" />
             </a>
+            <PharosGradeBadge symbol={row.assetSymbol} address={row.assetAddress} />
             <a
               href={eulerUrl}
               target="_blank"
@@ -709,15 +711,18 @@ export const EulerMarketsSection: FC<EulerMarketsSectionProps> = ({
           <div className="flex items-center gap-2">
             <TokenIcon symbol={row.assetSymbol} size={24} />
             <div className="flex flex-col">
-              <a
-                href={eulerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-primary group/link flex items-center gap-1 transition-colors"
-              >
-                <TokenSymbolDisplay symbol={row.assetSymbol} size="sm" variant="inline" />
-                <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
-              </a>
+              <span className="flex items-center gap-1">
+                <a
+                  href={eulerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary group/link flex items-center gap-1 transition-colors"
+                >
+                  <TokenSymbolDisplay symbol={row.assetSymbol} size="sm" variant="inline" />
+                  <ExternalLink className="size-3 opacity-0 transition-opacity group-hover/link:opacity-60" />
+                </a>
+                <PharosGradeBadge symbol={row.assetSymbol} address={row.assetAddress} />
+              </span>
               <span className="text-base-content/50 max-w-[180px] truncate text-[10px]" title={row.vault.name}>
                 {row.vault.symbol}
               </span>

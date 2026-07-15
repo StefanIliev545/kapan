@@ -51,6 +51,11 @@ export const qk = {
     debtSwapMarkets: (chainId: number) => ["morpho", chainId, "debt-swap-markets"] as const,
   },
 
+  // Pharos stablecoin safety grades (chain-agnostic, one global map)
+  pharos: {
+    grades: () => ["pharos", "grades"] as const,
+  },
+
   // Bridges
   bridges: {
     history: (wallet?: string) => ["bridges", "history", wallet?.toLowerCase() ?? ""] as const,

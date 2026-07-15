@@ -4,6 +4,7 @@ import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark"
 import { InterestPillRow } from "./InterestPillRow";
 import { MarketProps } from "./types";
 import { useMarketDeposit } from "./useMarketDeposit";
+import { PharosGradeBadge } from "~~/components/common/PharosGradeBadge";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
 
@@ -36,6 +37,7 @@ export const MarketRow: FC<MarketProps> = ({
           <div className="flex w-1/5 items-center gap-3">
             <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
             {isPTToken(name) ? <TokenSymbolDisplay symbol={name} size="sm" variant="inline" /> : <span className="font-medium">{name}</span>}
+            <PharosGradeBadge symbol={name} address={address} />
           </div>
           <div className="flex flex-1 items-center">
             <div className="flex w-1/5 flex-col items-center">
@@ -70,6 +72,7 @@ export const MarketRow: FC<MarketProps> = ({
             <div className="flex items-center gap-2">
               <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
               {isPTToken(name) ? <TokenSymbolDisplay symbol={name} size="sm" variant="inline" /> : <span className="font-medium">{name}</span>}
+            <PharosGradeBadge symbol={name} address={address} />
             </div>
             {showDepositButton && (
               <button className="btn btn-sm btn-primary" onClick={openModal}>
@@ -104,6 +107,7 @@ export const MarketRow: FC<MarketProps> = ({
             <div className="flex items-center gap-2">
               <Image src={icon} alt={name} width={24} height={24} className="rounded-full" />
               {isPTToken(name) ? <TokenSymbolDisplay symbol={name} size="sm" variant="inline" /> : <span className="font-medium">{name}</span>}
+            <PharosGradeBadge symbol={name} address={address} />
             </div>
             {showDepositButton && (
               <button className="btn btn-xs btn-primary" onClick={openModal}>

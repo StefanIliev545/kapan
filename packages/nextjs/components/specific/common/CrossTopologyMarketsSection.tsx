@@ -18,6 +18,7 @@ import {
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { TokenIcon } from "~~/components/common/TokenDisplay";
+import { PharosGradeBadge } from "~~/components/common/PharosGradeBadge";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
 import { formatPercent } from "../utils";
@@ -83,6 +84,7 @@ const baseColumns = [
           ) : (
             <span className="font-medium">{symbol}</span>
           )}
+          <PharosGradeBadge symbol={symbol} address={info.row.original.tokenAddress} />
         </div>
       );
     },
@@ -316,11 +318,14 @@ export const CrossTopologyMarketsSection: FC<CrossTopologyMarketsSectionProps> =
             <div className="flex items-center gap-2">
               <TokenIcon symbol={row.symbol} customSize={24} />
               <div className="min-w-0 flex-1">
-                {isPTToken(row.symbol) ? (
-                  <TokenSymbolDisplay symbol={row.symbol} size="sm" variant="inline" />
-                ) : (
-                  <span className="font-medium">{row.symbol}</span>
-                )}
+                <span className="flex items-center gap-1.5">
+                  {isPTToken(row.symbol) ? (
+                    <TokenSymbolDisplay symbol={row.symbol} size="sm" variant="inline" />
+                  ) : (
+                    <span className="font-medium">{row.symbol}</span>
+                  )}
+                  <PharosGradeBadge symbol={row.symbol} address={row.tokenAddress} />
+                </span>
               </div>
               <div className="flex items-center gap-3 text-[11px]">
                 <span className={`font-mono tabular-nums ${row.supplyApy > 0 ? "text-success" : "text-base-content/60"}`}>

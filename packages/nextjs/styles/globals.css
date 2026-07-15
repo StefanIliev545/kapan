@@ -335,3 +335,14 @@ img[src$="/logos/ethereum.svg"] {
 .landing-canvas-wrapper * {
   pointer-events: none !important;
 }
+
+/* Pharos grade badge tooltip (components/common/PharosGradeBadge.tsx).
+   Radix Themes tooltips use an inverted (light-on-dark-theme) bubble by
+   default, which clashes with our dark UI — repaint content + arrow with
+   surface tokens. */
+.pharos-tooltip.rt-TooltipContent {
+  @apply bg-base-200 text-base-content border border-base-content/10 shadow-lg shadow-black/40;
+}
+.pharos-tooltip .rt-TooltipArrow {
+  fill: theme("colors.base-200");
+}
