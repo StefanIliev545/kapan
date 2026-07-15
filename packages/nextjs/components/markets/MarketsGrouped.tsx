@@ -27,6 +27,7 @@ import formatPercentage from "~~/utils/formatPercentage";
 import { useExternalYields } from "~~/hooks/useExternalYields";
 import { aaveRateToAPY, venusRateToAPY, CHAIN_ID_TO_NETWORK } from "~~/utils/protocolRates";
 import { canonicalizeTokenName } from "~~/utils/tokenSymbols";
+import { PharosGradeBadge } from "~~/components/common/PharosGradeBadge";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
 import { type TokenCategory, matchesCategory } from "~~/utils/tokenCategories";
@@ -988,6 +989,7 @@ export const MarketsGrouped: FC<{ search: string; network?: string; category?: T
                   ) : (
                     <span className="text-base font-semibold tracking-tight">{group.name}</span>
                   )}
+                  <PharosGradeBadge symbol={group.name} size="sm" />
                 </div>
 
                 {/* Rates */}

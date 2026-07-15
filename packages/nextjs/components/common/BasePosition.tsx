@@ -12,6 +12,7 @@ import { useWalletConnection } from "~~/hooks/useWalletConnection";
 import formatPercentage from "~~/utils/formatPercentage";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
+import { PharosGradeBadge } from "./PharosGradeBadge";
 import { TokenSymbolDisplay } from "./TokenSymbolDisplay";
 
 // Static handler for stopPropagation - extracted to module level to avoid recreation
@@ -199,6 +200,8 @@ function formatPriceForSubtitle(priceUsd: number): string | null {
 /** Token name display - handles renderName, PT tokens, and fallback. Shared by mobile/desktop. */
 const TokenNameContent: FC<{
   name: string;
+  /** Contract address — lets the Pharos grade badge match exactly (duplicate tickers) */
+  tokenAddress?: string;
   renderName?: (name: string) => ReactNode;
   subtitle?: ReactNode;
   /** USD price (already converted from raw 1e8). When set and no `subtitle` is provided,
@@ -206,14 +209,24 @@ const TokenNameContent: FC<{
    *  row. PT tokens skip this — their second row is the maturity date. */
   priceUsd?: number;
   variant: "mobile" | "desktop";
-}> = ({ name, renderName: renderNameFn, subtitle, priceUsd, variant }) => {
+}> = ({ name, tokenAddress, renderName: renderNameFn, subtitle, priceUsd, variant }) => {
   if (renderNameFn) {
     return variant === "desktop" ? <>{renderNameFn(name)}</> : <>{renderNameFn(name)}</>;
   }
   if (isPTToken(name)) {
-    return variant === "desktop"
-      ? <TokenSymbolDisplay symbol={name} size="sm" variant="stacked" />
-      : <TokenSymbolDisplay symbol={name} size="xs" />;
+    // Desktop uses the stacked (two-line) PT display — pin the badge to the
+    // symbol line instead of centering it across both lines.
+    return variant === "desktop" ? (
+      <span className="inline-flex items-start gap-1.5">
+        <TokenSymbolDisplay symbol={name} size="sm" variant="stacked" />
+        <PharosGradeBadge symbol={name} className="mt-[3px]" />
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-1.5">
+        <TokenSymbolDisplay symbol={name} size="xs" />
+        <PharosGradeBadge symbol={name} />
+      </span>
+    );
   }
   // Price subtitle takes priority over an explicit subtitle prop only when one isn't passed.
   // Callers that already pass a subtitle (rare today) still win — we don't clobber them.
@@ -221,7 +234,10 @@ const TokenNameContent: FC<{
   if (variant === "desktop") {
     return (
       <>
-        <span className="truncate text-base font-bold leading-tight tracking-tight" title={name}>{name}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-base font-bold leading-tight tracking-tight" title={name}>{name}</span>
+          <PharosGradeBadge symbol={name} address={tokenAddress} />
+        </span>
         {subtitle ? (
           <span className="text-base-content/70 truncate text-[10px] uppercase leading-tight tracking-wider">{subtitle}</span>
         ) : priceLabel ? (
@@ -233,10 +249,18 @@ const TokenNameContent: FC<{
   // Mobile: stacked name + tiny price. Skip when no price (preserves the existing behavior).
   return priceLabel ? (
     <span className="flex flex-col leading-tight">
-      <span className="truncate">{name}</span>
+      <span className="flex min-w-0 items-center gap-1">
+        <span className="truncate">{name}</span>
+        <PharosGradeBadge symbol={name} address={tokenAddress} />
+      </span>
       <span className="text-base-content/50 font-mono text-[9px] tabular-nums">{priceLabel}</span>
     </span>
-  ) : <>{name}</>;
+  ) : (
+    <span className="inline-flex items-center gap-1">
+      {name}
+      <PharosGradeBadge symbol={name} address={tokenAddress} />
+    </span>
+  );
 };
 
 
@@ -492,7 +516,7 @@ export const BasePosition: FC<BasePositionProps> = ({
               <Image src={icon} alt={`${name} icon`} fill className="rounded object-contain" />
             </div>
             <span className="max-w-[100px] truncate text-sm font-bold leading-none tracking-tight" title={name}>
-              <TokenNameContent name={name} renderName={renderName} priceUsd={tokenPriceUsd} variant="mobile" />
+              <TokenNameContent name={name} tokenAddress={tokenAddress} renderName={renderName} priceUsd={tokenPriceUsd} variant="mobile" />
             </span>
             {infoButtonNode && (
               <div className="hidden flex-shrink-0 sm:block" onClick={stopPropagation}>
@@ -556,7 +580,7 @@ export const BasePosition: FC<BasePositionProps> = ({
             </div>
             <div className="ml-3 flex min-w-0 items-center gap-1.5">
               <div className="flex min-w-0 flex-col">
-                <TokenNameContent name={name} renderName={renderName} subtitle={subtitle} priceUsd={tokenPriceUsd} variant="desktop" />
+                <TokenNameContent name={name} tokenAddress={tokenAddress} renderName={renderName} subtitle={subtitle} priceUsd={tokenPriceUsd} variant="desktop" />
               </div>
             </div>
             {infoButtonNode && (

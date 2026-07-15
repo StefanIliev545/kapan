@@ -4,6 +4,7 @@ import { DepositModalStark } from "~~/components/modals/stark/DepositModalStark"
 import { InterestPillRow } from "./InterestPillRow";
 import { MarketProps } from "./types";
 import { useMarketDeposit } from "./useMarketDeposit";
+import { PharosGradeBadge } from "~~/components/common/PharosGradeBadge";
 import { TokenSymbolDisplay } from "~~/components/common/TokenSymbolDisplay";
 import { isPTToken } from "~~/hooks/usePendlePTYields";
 
@@ -35,11 +36,14 @@ export const MarketCard: FC<MarketProps> = ({
           <div className="flex items-center gap-3">
             <Image src={icon} alt={name} width={32} height={32} className="rounded-full" />
             <div className="flex flex-1 flex-col">
-              {isPTToken(name) ? (
-                <TokenSymbolDisplay symbol={name} size="base" variant="inline" />
-              ) : (
-                <h3 className="text-lg font-semibold">{name}</h3>
-              )}
+              <div className="flex items-center gap-1.5">
+                {isPTToken(name) ? (
+                  <TokenSymbolDisplay symbol={name} size="base" variant="inline" />
+                ) : (
+                  <h3 className="text-lg font-semibold">{name}</h3>
+                )}
+                <PharosGradeBadge symbol={name} address={address} size="sm" />
+              </div>
               <span className="text-base-content/70 text-sm">${price}</span>
             </div>
             {showDepositButton && (
