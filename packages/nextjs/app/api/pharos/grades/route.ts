@@ -23,6 +23,13 @@ import { NextResponse } from "next/server";
  */
 
 export const dynamic = "force-dynamic";
+// Edge runtime: Pharos's Cloudflare WAF 403s requests from cloud-datacenter
+// egress (Vercel's serverless AWS IPs included — verified July 2026: even
+// keyless /api/health 403s from datacenter IPs while residential gets 200).
+// The edge runtime uses a different egress path that Cloudflare typically
+// scores differently. If Pharos still 403s this, the durable fix is asking
+// them to exempt key-authenticated API-lane traffic from the WAF rule.
+export const runtime = "edge";
 
 const PHAROS_API = "https://api.pharos.watch";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
