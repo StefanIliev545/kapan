@@ -2,13 +2,13 @@
 
 import { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { BaseProtocolHeader, type HeaderMetric } from "../specific/common";
+import { LpPositionCard } from "./LpPositionCard";
 import { CollapsibleSection } from "~~/components/common/CollapsibleSection";
 import { LoadingSpinner } from "~~/components/common/Loading";
-import { LpPositionCard } from "./LpPositionCard";
 import { useTokenPricesByAddress } from "~~/hooks/useTokenPrice";
-import type { UniswapPosition, UniToken } from "~~/utils/uniswapMath";
 import { useGlobalState } from "~~/services/store/store";
 import { MetricColors } from "~~/utils/protocolMetrics";
+import type { UniToken, UniswapPosition } from "~~/utils/uniswapMath";
 
 const NATIVE = "0x0000000000000000000000000000000000000000";
 /** Wrapped-native per chain — native ETH (0x0, e.g. Uniswap V4) is priced via WETH. */
@@ -52,24 +52,39 @@ export const LpProtocolView: FC<LpProtocolViewProps> = ({
   const priceAddr = useCallback((a: string) => (a.toLowerCase() === NATIVE ? (WETH[chainId] ?? a) : a), [chainId]);
   const tokenAddresses = useMemo(() => {
     const set = new Set<string>();
-    positions.forEach(p => { set.add(priceAddr(p.token0.address).toLowerCase()); set.add(priceAddr(p.token1.address).toLowerCase()); });
+    positions.forEach(p => {
+      set.add(priceAddr(p.token0.address).toLowerCase());
+      set.add(priceAddr(p.token1.address).toLowerCase());
+    });
     return Array.from(set);
   }, [positions, priceAddr]);
   const { pricesRaw } = useTokenPricesByAddress(chainId, tokenAddresses, { enabled: tokenAddresses.length > 0 });
-  const priceRawOf = useCallback((t: UniToken) => pricesRaw[priceAddr(t.address).toLowerCase()] ?? 0n, [pricesRaw, priceAddr]);
+  const priceRawOf = useCallback(
+    (t: UniToken) => pricesRaw[priceAddr(t.address).toLowerCase()] ?? 0n,
+    [pricesRaw, priceAddr],
+  );
   const usdOf = useCallback((t: UniToken, amount: number) => amount * (Number(priceRawOf(t)) / 1e8), [priceRawOf]);
 
-  const rows = useMemo(() => positions.map(p => {
-    const value = usdOf(p.token0, p.token0.amount) + usdOf(p.token1, p.token1.amount);
-    const fees = usdOf(p.token0, p.token0.fees) + usdOf(p.token1, p.token1.fees);
-    return { p, value, fees };
-  }).filter(r => !r.p.closed || r.value > 0.01 || r.fees > 0.01), [positions, usdOf]);
+  const rows = useMemo(
+    () =>
+      positions
+        .map(p => {
+          const value = usdOf(p.token0, p.token0.amount) + usdOf(p.token1, p.token1.amount);
+          const fees = usdOf(p.token0, p.token0.fees) + usdOf(p.token1, p.token1.fees);
+          return { p, value, fees };
+        })
+        .filter(row => !row.p.closed || row.value > 0.01 || row.fees > 0.01)
+        // An LP position outside its range needs attention before a large but healthy one.
+        .sort((left, right) => Number(left.p.inRange) - Number(right.p.inRange) || right.value - left.value),
+    [positions, usdOf],
+  );
 
   const totals = useMemo(() => {
     const value = rows.reduce((s, r) => s + r.value, 0);
     const fees = rows.reduce((s, r) => s + r.fees, 0);
     const inRange = rows.filter(r => r.p.inRange && !r.p.closed).length;
-    return { value, fees, inRange, count: rows.length };
+    const outOfRange = rows.filter(r => !r.p.inRange && !r.p.closed).length;
+    return { value, fees, inRange, outOfRange, count: rows.length };
   }, [rows]);
 
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
@@ -79,29 +94,34 @@ export const LpProtocolView: FC<LpProtocolViewProps> = ({
   }, [hasLoadedOnce, totals.value, setProtocolTotals, protocolName, chainId]);
 
   const hasPositions = rows.length > 0;
-  useEffect(() => { if (hasLoadedOnce) setIsCollapsed(!hasPositions); }, [hasLoadedOnce, hasPositions]);
+  useEffect(() => {
+    if (hasLoadedOnce) setIsCollapsed(!hasPositions);
+  }, [hasLoadedOnce, hasPositions]);
   const toggleCollapsed = useCallback(() => setIsCollapsed(prev => !prev), []);
 
-  const headerMetrics: HeaderMetric[] = useMemo(() => [
-    { label: "Balance", value: totals.value, type: "currency" },
-    { label: "Uncollected Fees", mobileLabel: "Fees", value: totals.fees, type: "currency" },
-    {
-      label: "In Range", value: totals.inRange, type: "custom",
-      customRender: (hasData: boolean) => (
-        <span className={`font-mono text-xs font-bold tabular-nums ${hasData ? "text-base-content" : MetricColors.MUTED}`}>
-          {hasData ? `${totals.inRange}/${totals.count}` : "—"}
-        </span>
-      ),
-    },
-    {
-      label: "Positions", value: totals.count, type: "custom",
-      customRender: (hasData: boolean) => (
-        <span className={`font-mono text-xs font-bold tabular-nums ${hasData ? "text-base-content" : MetricColors.MUTED}`}>
-          {hasData ? totals.count : "—"}
-        </span>
-      ),
-    },
-  ], [totals]);
+  const headerMetrics: HeaderMetric[] = useMemo(
+    () => [
+      { label: "Balance", value: totals.value, type: "currency" },
+      { label: "Uncollected Fees", mobileLabel: "Fees", value: totals.fees, type: "currency" },
+      {
+        label: totals.outOfRange > 0 ? "Needs attention" : "Active range",
+        value: totals.outOfRange || totals.inRange,
+        type: "custom",
+        customRender: (hasData: boolean) => (
+          <span
+            className={`font-mono text-xs font-bold tabular-nums ${hasData ? (totals.outOfRange > 0 ? "text-warning" : "text-success") : MetricColors.MUTED}`}
+          >
+            {hasData
+              ? totals.outOfRange > 0
+                ? `${totals.outOfRange} outside`
+                : `${totals.inRange}/${totals.count}`
+              : "—"}
+          </span>
+        ),
+      },
+    ],
+    [totals],
+  );
 
   return (
     <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? "p-1" : "space-y-2 py-2 sm:p-3"}`}>
@@ -120,15 +140,30 @@ export const LpProtocolView: FC<LpProtocolViewProps> = ({
 
       <CollapsibleSection isOpen={!isCollapsed}>
         {isLoading && !hasLoadedOnce ? (
-          <div className="flex justify-center py-6"><LoadingSpinner /></div>
+          <div className="flex justify-center py-6">
+            <LoadingSpinner />
+          </div>
         ) : !hasPositions ? (
-          <div className="text-base-content/50 px-3 py-6 text-center text-xs">No {protocolName} LP positions on this network.</div>
+          <div className="text-base-content/50 px-3 py-6 text-center text-xs">
+            No {protocolName} LP positions on this network.
+          </div>
         ) : (
           <div className="card bg-base-200/40 border-base-300/50 border shadow-md">
             <div className="card-body p-4">
+              <div className="text-base-content/45 mb-3 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest">
+                <span>Liquidity positions</span>
+                <span>{totals.count} total</span>
+              </div>
               <div className="divide-base-content/10 divide-y">
                 {rows.map(({ p, value, fees }) => (
-                  <LpPositionCard key={`${p.protocol ?? "uni"}-${p.version}-${p.tokenId}`} position={p} value={value} fees={fees} priceRawOf={priceRawOf} usdOf={usdOf} />
+                  <LpPositionCard
+                    key={`${p.protocol ?? "uni"}-${p.version}-${p.tokenId}`}
+                    position={p}
+                    value={value}
+                    fees={fees}
+                    priceRawOf={priceRawOf}
+                    usdOf={usdOf}
+                  />
                 ))}
               </div>
             </div>
