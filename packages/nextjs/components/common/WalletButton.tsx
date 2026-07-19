@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { GasTokenSelector } from "~~/components/GasTokenSelector";
 import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { CustomConnectButton } from "~~/components/scaffold-stark/CustomConnectButton";
-import { GasTokenSelector } from "~~/components/GasTokenSelector";
+import { NETWORK_CHANGE_EVENT } from "~~/utils/networkSelection";
 
 const NETWORK_STORAGE_KEY = "kapan-network-filter-selection";
 
@@ -103,11 +104,7 @@ export interface WalletButtonProps {
  * - "evm": Always shows the EVM wallet connection
  * - "starknet": Always shows the Starknet wallet connection
  */
-export const WalletButton = ({
-  variant = "auto",
-  showGasSelector = true,
-  className = "",
-}: WalletButtonProps) => {
+export const WalletButton = ({ variant = "auto", showGasSelector = true, className = "" }: WalletButtonProps) => {
   const searchParams = useSearchParams();
   const [selectedNetwork, setSelectedNetwork] = useState("base");
 
@@ -158,25 +155,29 @@ export const WalletButton = ({
     return () => globalThis.removeEventListener("popstate", handlePopState);
   }, [getCurrentNetwork, variant]);
 
-  // Poll for URL changes (since NetworkFilter uses shallow updates that don't trigger React)
+  // NetworkFilter emits an event after its shallow History API updates. This
+  // avoids polling the URL five times a second for the lifetime of the header.
   useEffect(() => {
     if (variant !== "auto") {
       return;
     }
 
-    let lastNetwork = selectedNetwork;
-
-    const checkNetwork = () => {
-      const current = getCurrentNetwork();
-      if (current !== lastNetwork) {
-        lastNetwork = current;
-        setSelectedNetwork(current);
-      }
+    const handleNetworkChange = (event: Event) => {
+      const networkId = (event as CustomEvent<{ networkId?: string }>).detail?.networkId;
+      setSelectedNetwork(networkId ?? getCurrentNetwork());
     };
 
-    const interval = setInterval(checkNetwork, 200);
-    return () => clearInterval(interval);
-  }, [selectedNetwork, getCurrentNetwork, variant]);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === NETWORK_STORAGE_KEY) setSelectedNetwork(getCurrentNetwork());
+    };
+
+    globalThis.addEventListener(NETWORK_CHANGE_EVENT, handleNetworkChange);
+    globalThis.addEventListener("storage", handleStorage);
+    return () => {
+      globalThis.removeEventListener(NETWORK_CHANGE_EVENT, handleNetworkChange);
+      globalThis.removeEventListener("storage", handleStorage);
+    };
+  }, [getCurrentNetwork, variant]);
 
   // Determine which wallet to show
   const showStarknet = useMemo(() => {
@@ -193,11 +194,7 @@ export const WalletButton = ({
     // Simple mode - no animation needed
     return (
       <div className={`flex items-center ${className}`}>
-        {showStarknet ? (
-          <StarknetWalletContent showGasSelector={showGasSelector} />
-        ) : (
-          <EvmWalletContent />
-        )}
+        {showStarknet ? <StarknetWalletContent showGasSelector={showGasSelector} /> : <EvmWalletContent />}
       </div>
     );
   }
