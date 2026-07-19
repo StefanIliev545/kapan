@@ -5,8 +5,8 @@ import Image from "next/image";
 import { ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import { LpPosition } from "~~/components/LpPosition";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
-import type { UniswapPosition, UniToken } from "~~/utils/uniswapMath";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
+import type { UniToken, UniswapPosition } from "~~/utils/uniswapMath";
 
 const formatPrice = (n: number): string => {
   if (!Number.isFinite(n) || n === 0) return "—";
@@ -36,7 +36,9 @@ function TokenGlyph({ symbol, size = 20 }: { symbol: string; size?: number }) {
         width={size}
         height={size}
         className="relative z-10 object-contain"
-        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+        onError={e => {
+          (e.target as HTMLImageElement).style.display = "none";
+        }}
       />
     </span>
   );
@@ -62,55 +64,99 @@ export const LpPositionCard: FC<LpPositionCardProps> = ({ position: p, value, fe
   const span = p.priceUpper - p.priceLower;
   const pct = Math.max(0, Math.min(100, span > 0 ? ((p.priceCurrent - p.priceLower) / span) * 100 : 50));
   const labelPct = Math.max(8, Math.min(92, pct)); // keep the floating label off the edges
-  const rangeColor = p.inRange ? "bg-success" : "bg-warning";
+  const isBelowRange = p.priceCurrent < p.priceLower;
+  const status = p.closed
+    ? {
+        label: "Closed",
+        detail: "Position is no longer earning fees",
+        color: "text-base-content/50 border-base-content/20",
+        marker: "bg-base-content/40",
+      }
+    : p.inRange
+      ? {
+          label: "In range",
+          detail: "Actively earning fees",
+          color: "text-success border-success/30",
+          marker: "bg-success",
+        }
+      : {
+          label: isBelowRange ? "Below range" : "Above range",
+          detail: "Rebalance to resume earning fees",
+          color: "text-warning border-warning/30",
+          marker: "bg-warning",
+        };
   const versionLabel = p.versionLabel ?? `v${p.version}`;
 
   return (
-    <div className="space-y-2 py-3 first:pt-0 last:pb-0">
-      {/* Header: pair + fee tier + version + status + value/fees */}
-      <div className="flex flex-wrap items-center justify-between gap-y-1 text-xs">
-        <div className="flex items-center gap-2">
+    <article className="space-y-3 py-4 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
           <div className="flex items-center -space-x-1.5">
             <TokenGlyph symbol={p.token0.symbol} />
             <TokenGlyph symbol={p.token1.symbol} />
           </div>
-          <span className="font-semibold">{p.token0.symbol} / {p.token1.symbol}</span>
+          <span className="font-semibold">
+            {p.token0.symbol} / {p.token1.symbol}
+          </span>
           <span className="badge-tag-muted">{formatFee(p.feePercent)}</span>
           <span className="text-base-content/40 text-[10px] font-medium uppercase tracking-wider">{versionLabel}</span>
           {p.url && (
-            <a href={p.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-base-content/40 hover:text-primary transition-colors">
+            <a
+              href={p.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              className="text-base-content/50 hover:text-primary inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider transition-colors"
+            >
+              <span className="hidden sm:inline">Manage</span>
               <ArrowTopRightOnSquareIcon className="size-3.5" />
             </a>
           )}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 font-mono tabular-nums">
-          <span className={`badge-tag ${p.inRange ? "text-success border-success/30" : "text-warning border-warning/30"}`}>
-            {p.closed ? "Closed" : p.inRange ? "In range" : "Out of range"}
+        <div className="flex flex-wrap items-center justify-end gap-2 font-mono tabular-nums">
+          <span className={`badge-tag ${status.color}`}>{status.label}</span>
+          <div className="text-right">
+            <div className="text-base-content text-sm font-semibold">{formatCurrencyCompact(value)}</div>
+            <div className="text-success text-[10px] font-semibold uppercase tracking-wider">
+              {formatCurrencyCompact(fees)} fees
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-base-content/[0.025] border-base-content/[0.08] space-y-2 border p-3">
+        <div className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-wider">
+          <span className="text-base-content/50">
+            Active range · {p.token1.symbol} / {p.token0.symbol}
           </span>
-          <span className="text-base-content/60">Value: <span className="text-base-content font-semibold">{formatCurrencyCompact(value)}</span></span>
-          <span className="text-base-content/60">Fees: <span className="text-success font-semibold">{formatCurrencyCompact(fees)}</span></span>
+          <span className={status.color.split(" ")[0]}>{status.detail}</span>
+        </div>
+        <div className="relative px-1 pt-4">
+          <div
+            className={`absolute top-0 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums ${status.color.split(" ")[0]}`}
+            style={{ left: `${labelPct}%` }}
+          >
+            {formatPrice(p.priceCurrent)} current
+          </div>
+          <div className="relative h-1.5 w-full bg-base-content/10">
+            <div
+              className={`absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 ${status.marker}`}
+              style={{ left: `${pct}%` }}
+            />
+          </div>
+          <div className="text-base-content/40 mt-1 flex justify-between text-[10px] tabular-nums">
+            <span>{formatPrice(p.priceLower)}</span>
+            <span className="text-base-content/30">
+              {p.token1.symbol} / {p.token0.symbol}
+            </span>
+            <span>{formatPrice(p.priceUpper)}</span>
+          </div>
         </div>
       </div>
 
-      {/* Price range — current price floats above its marker */}
-      <div className="relative px-1 pt-4">
-        <div
-          className={`absolute top-0 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums ${p.inRange ? "text-success" : "text-warning"}`}
-          style={{ left: `${labelPct}%` }}
-        >
-          {formatPrice(p.priceCurrent)}
-        </div>
-        <div className="relative h-1.5 w-full bg-base-content/10">
-          <div className={`absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 ${rangeColor}`} style={{ left: `${pct}%` }} />
-        </div>
-        <div className="text-base-content/40 mt-1 flex justify-between text-[10px] tabular-nums">
-          <span>{formatPrice(p.priceLower)}</span>
-          <span className="text-base-content/30">{p.token1.symbol} / {p.token0.symbol}</span>
-          <span>{formatPrice(p.priceUpper)}</span>
-        </div>
+      <div className="text-base-content/45 text-[10px] font-semibold uppercase tracking-widest">
+        Position composition
       </div>
-
-      {/* Two tokens via the shared position chrome */}
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {[p.token0, p.token1].map((t, i) => (
           <LpPosition
@@ -126,7 +172,7 @@ export const LpPositionCard: FC<LpPositionCardProps> = ({ position: p, value, fe
           />
         ))}
       </div>
-    </div>
+    </article>
   );
 };
 

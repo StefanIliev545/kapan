@@ -1,4 +1,4 @@
-import React, { PropsWithChildren, useEffect, useMemo, useRef, useState } from "react";
+import React, { PropsWithChildren, useMemo } from "react";
 
 type StableAreaProps = PropsWithChildren<{
   /**
@@ -21,8 +21,10 @@ type StableAreaProps = PropsWithChildren<{
  * Utility wrapper that reserves a predictable block of space so that client-only components can hydrate without
  * causing cumulative layout shift. This is particularly useful when using `next/dynamic` with `ssr: false`, where
  * the server initially renders nothing and the client later mounts a much taller component.
- * 
- * When content loads and is shorter than the reserved space, it smoothly animates to fit the actual content height.
+ *
+ * Keep the reservation stable after content loads. Measuring every protocol card with
+ * a ResizeObserver caused the dashboard to repeatedly animate its layout while live
+ * positions and prices updated, which made the page feel slower than the data was.
  */
 export const StableArea = ({
   minHeight = "20rem",
@@ -31,61 +33,17 @@ export const StableArea = ({
   as: Component = "div",
   children,
 }: StableAreaProps) => {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [isContentLoaded, setIsContentLoaded] = useState(false);
-  const [actualHeight, setActualHeight] = useState<number | null>(null);
-
-  useEffect(() => {
-    // Check if content has loaded (children are present)
-    if (children && contentRef.current) {
-      // Use ResizeObserver to detect when content size changes
-      const resizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const height = entry.contentRect.height;
-          if (height > 0) {
-            setActualHeight(height);
-            // Mark as loaded after a small delay to allow initial render
-            if (!isContentLoaded) {
-              setTimeout(() => setIsContentLoaded(true), 100);
-            }
-          }
-        }
-      });
-
-      resizeObserver.observe(contentRef.current);
-
-      return () => {
-        resizeObserver.disconnect();
-      };
-    }
-  }, [children, isContentLoaded]);
-
   const minHeightValue = typeof minHeight === "number" ? `${minHeight}px` : minHeight;
-  const combinedInnerClassName = ["w-full transition-all duration-500 ease-in-out", innerClassName]
-    .filter(Boolean)
-    .join(" ");
+  const combinedInnerClassName = ["w-full", innerClassName].filter(Boolean).join(" ");
 
-  // Convert minHeight to pixels for comparison (handle rem by assuming 16px base)
-  const minHeightPx = typeof minHeight === "number" 
-    ? minHeight 
-    : minHeight.endsWith("rem") 
-      ? parseFloat(minHeight) * 16 
-      : parseFloat(minHeight) || 0;
-
-  // Memoize style to avoid creating new object on each render
-  const style = useMemo<React.CSSProperties>(() => ({
-    minHeight: isContentLoaded && actualHeight && actualHeight < minHeightPx
-      ? `${actualHeight}px`
-      : minHeightValue,
-    transition: "min-height 0.5s ease-in-out",
-  }), [isContentLoaded, actualHeight, minHeightPx, minHeightValue]);
+  const style = useMemo<React.CSSProperties>(() => ({ minHeight: minHeightValue }), [minHeightValue]);
 
   // `React.createElement` avoids a React 19 / TS regression where JSX can't
   // infer the `children` prop type on a dynamic `ElementType` tag.
   return React.createElement(
     Component,
     { className },
-    <div ref={contentRef} className={combinedInnerClassName} style={style}>
+    <div className={combinedInnerClassName} style={style}>
       {children}
     </div>,
   );
