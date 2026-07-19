@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -160,6 +160,16 @@ function Network() {
     return { outerLineGeom, outerPointGeom };
   }, []);
 
+  // These geometries are created outside React Three Fiber's JSX primitives,
+  // so dispose them explicitly when the responsive/reduced-motion gate
+  // unmounts the decorative scene.
+  useEffect(() => {
+    return () => {
+      outerLineGeom.dispose();
+      outerPointGeom.dispose();
+    };
+  }, [outerLineGeom, outerPointGeom]);
+
   useFrame((_, delta) => {
     const outer = outerRef.current;
     if (outer) {
@@ -194,14 +204,7 @@ function Network() {
             depthWrite={false}
           />
         </points>
-        <EdgeTrails
-          lineGeom={outerLineGeom}
-          color={TRAIL_COLOR}
-          count={14}
-          speed={0.22}
-          trailLen={0.6}
-          opacity={0.9}
-        />
+        <EdgeTrails lineGeom={outerLineGeom} color={TRAIL_COLOR} count={14} speed={0.22} trailLen={0.6} opacity={0.9} />
       </group>
     </>
   );
@@ -216,13 +219,13 @@ export function HeroScene() {
     // `pointer-events: none` and eats the Launch App CTA click.
     <div className="landing-canvas-wrapper absolute inset-0">
       <Canvas
-        dpr={[1, 1.5]}
+        dpr={[1, 1.25]}
         // Camera is intentionally inside the outer shell (radius 2.7 after
         // the group's scale) — sitting at z=1.8 puts the viewer ~0.9 units
         // inside the cage. Wider FOV (60) makes the wireframe wrap around
         // more of the frame instead of reading as a contained object.
         camera={{ position: [0, 0, 1.8], fov: 60 }}
-        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+        gl={{ antialias: false, alpha: true, powerPreference: "high-performance" }}
       >
         <Network />
       </Canvas>

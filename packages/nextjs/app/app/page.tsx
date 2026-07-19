@@ -1,84 +1,135 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
-
-import type { NextPage } from "next";
+import { type ReactNode, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { NetworkFilter, NetworkOption } from "~~/components/NetworkFilter";
-import { SupportBanner } from "~~/components/common/SupportBanner";
-import StableArea from "~~/components/common/StableArea";
-import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
-import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
-import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
-import { arbitrum, base, optimism, linea, plasma, mainnet, unichain } from "wagmi/chains";
+import type { NextPage } from "next";
 import { hardhat } from "viem/chains";
 import { useAccount as useEvmAccount } from "wagmi";
+import { arbitrum, base, linea, mainnet, optimism, plasma, unichain } from "wagmi/chains";
+import { NetworkFilter, type NetworkOption } from "~~/components/NetworkFilter";
+import { ProtocolSkeleton } from "~~/components/common/ProtocolSkeleton";
+import StableArea from "~~/components/common/StableArea";
+import { SupportBanner } from "~~/components/common/SupportBanner";
+import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
+import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
 import { useAccount as useStarknetAccount } from "~~/hooks/useAccount";
 import { useGlobalState } from "~~/services/store/store";
 
-// ---- Lazy-load heavy protocol views (client-only) ----
+const withProtocolSkeleton = (name: string) => ({
+  ssr: false,
+  loading: () => <ProtocolSkeleton ariaLabel={`Loading ${name}`} />,
+});
+
 const AaveProtocolView = dynamic(
-  () => import("~~/components/specific/aave/AaveProtocolView").then(m => m.AaveProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Aave" /> }
+  () => import("~~/components/specific/aave/AaveProtocolView").then(module => module.AaveProtocolView),
+  withProtocolSkeleton("Aave"),
 );
-
 const CompoundProtocolView = dynamic(
-  () => import("~~/components/specific/compound/CompoundProtocolView").then(m => m.CompoundProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Compound" /> }
+  () => import("~~/components/specific/compound/CompoundProtocolView").then(module => module.CompoundProtocolView),
+  withProtocolSkeleton("Compound"),
 );
-
 const VenusProtocolView = dynamic(
-  () => import("~~/components/specific/venus/VenusProtocolView").then(m => m.VenusProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Venus" /> }
+  () => import("~~/components/specific/venus/VenusProtocolView").then(module => module.VenusProtocolView),
+  withProtocolSkeleton("Venus"),
 );
-
 const VesuProtocolView = dynamic(
-  () => import("~~/components/specific/vesu/VesuProtocolView").then(m => m.VesuProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Vesu" /> }
+  () => import("~~/components/specific/vesu/VesuProtocolView").then(module => module.VesuProtocolView),
+  withProtocolSkeleton("Vesu"),
 );
-
 const NostraProtocolView = dynamic(
-  () => import("~~/components/specific/nostra/NostraProtocolView").then(m => m.NostraProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Nostra" /> }
+  () => import("~~/components/specific/nostra/NostraProtocolView").then(module => module.NostraProtocolView),
+  withProtocolSkeleton("Nostra"),
 );
-
 const MorphoProtocolView = dynamic(
-  () => import("~~/components/specific/morpho/MorphoProtocolView").then(m => m.MorphoProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Morpho" /> }
+  () => import("~~/components/specific/morpho/MorphoProtocolView").then(module => module.MorphoProtocolView),
+  withProtocolSkeleton("Morpho"),
 );
-
 const SparkProtocolView = dynamic(
-  () => import("~~/components/specific/spark/SparkProtocolView").then(m => m.SparkProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Spark" /> }
+  () => import("~~/components/specific/spark/SparkProtocolView").then(module => module.SparkProtocolView),
+  withProtocolSkeleton("Spark"),
 );
-
 const EulerProtocolView = dynamic(
-  () => import("~~/components/specific/euler/EulerProtocolView").then(m => m.EulerProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Euler" /> }
+  () => import("~~/components/specific/euler/EulerProtocolView").then(module => module.EulerProtocolView),
+  withProtocolSkeleton("Euler"),
 );
-
 const AlchemixProtocolView = dynamic(
-  () => import("~~/components/specific/alchemix/AlchemixProtocolView").then(m => m.AlchemixProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Alchemix" /> }
+  () => import("~~/components/specific/alchemix/AlchemixProtocolView").then(module => module.AlchemixProtocolView),
+  withProtocolSkeleton("Alchemix"),
 );
-
 const UniswapProtocolView = dynamic(
-  () => import("~~/components/specific/uniswap/UniswapProtocolView").then(m => m.UniswapProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Uniswap" /> }
+  () => import("~~/components/specific/uniswap/UniswapProtocolView").then(module => module.UniswapProtocolView),
+  withProtocolSkeleton("Uniswap"),
 );
-
 const AerodromeProtocolView = dynamic(
-  () => import("~~/components/specific/aerodrome/AerodromeProtocolView").then(m => m.AerodromeProtocolView),
-  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading Aerodrome" /> }
+  () => import("~~/components/specific/aerodrome/AerodromeProtocolView").then(module => module.AerodromeProtocolView),
+  withProtocolSkeleton("Aerodrome"),
 );
-
 const WalletSection = dynamic(
-  () => import("~~/components/specific/wallet/WalletSection").then(m => m.WalletSection),
-  { ssr: false }
+  () => import("~~/components/specific/wallet/WalletSection").then(module => module.WalletSection),
+  { ssr: false, loading: () => <ProtocolSkeleton ariaLabel="Loading wallet" /> },
 );
 
+const ENABLED_FEATURES_SWAP_AND_MOVE = { swap: true, move: true } as const;
+const ENABLED_FEATURES_SWAP_ONLY = { swap: true, move: false } as const;
 
-// Network options (memo for referential stability)
+type ProtocolDefinition = { id: string; render: (chainId: number) => ReactNode };
+type EvmNetworkDefinition = { chainId: number; protocols: ProtocolDefinition[]; warning?: string };
+
+const protocolViews = {
+  aave: (chainId: number) => <AaveProtocolView chainId={chainId} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />,
+  aaveSwapOnly: (chainId: number) => (
+    <AaveProtocolView chainId={chainId} enabledFeatures={ENABLED_FEATURES_SWAP_ONLY} />
+  ),
+  alchemix: (chainId: number) => <AlchemixProtocolView chainId={chainId} />,
+  aerodrome: (chainId: number) => <AerodromeProtocolView chainId={chainId} />,
+  compound: (chainId: number) => (
+    <CompoundProtocolView chainId={chainId} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
+  ),
+  euler: (chainId: number) => <EulerProtocolView chainId={chainId} />,
+  morpho: (chainId: number) => <MorphoProtocolView chainId={chainId} />,
+  spark: (chainId: number) => <SparkProtocolView chainId={chainId} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />,
+  uniswap: (chainId: number) => <UniswapProtocolView chainId={chainId} />,
+  venus: (chainId: number) => <VenusProtocolView chainId={chainId} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />,
+};
+
+const protocols = (...ids: (keyof typeof protocolViews)[]): ProtocolDefinition[] =>
+  ids.map(id => ({ id, render: protocolViews[id] }));
+
+const evmNetworks: Record<string, EvmNetworkDefinition> = {
+  ethereum: {
+    chainId: mainnet.id,
+    warning: "Ethereum mainnet support is experimental and pre-audit.",
+    protocols: protocols("aave", "morpho", "spark", "euler", "compound", "uniswap"),
+  },
+  arbitrum: {
+    chainId: arbitrum.id,
+    warning: "Arbitrum support is experimental and pre-audit.",
+    protocols: protocols("aave", "morpho", "euler", "alchemix", "compound", "venus", "uniswap"),
+  },
+  base: {
+    chainId: base.id,
+    warning: "Base support is experimental and pre-audit.",
+    protocols: protocols("morpho", "aave", "euler", "compound", "venus", "uniswap", "aerodrome"),
+  },
+  hardhat: { chainId: hardhat.id, protocols: protocols("aave", "morpho", "euler", "compound") },
+  optimism: {
+    chainId: optimism.id,
+    warning: "Optimism support is experimental and pre-audit.",
+    protocols: protocols("aave", "morpho", "euler", "compound", "uniswap", "aerodrome"),
+  },
+  linea: {
+    chainId: linea.id,
+    warning: "Linea support is experimental and pre-audit.",
+    protocols: protocols("aave", "euler", "compound"),
+  },
+  plasma: { chainId: plasma.id, protocols: protocols("aaveSwapOnly", "euler") },
+  unichain: {
+    chainId: unichain.id,
+    warning: "Unichain support is experimental and pre-audit.",
+    protocols: protocols("morpho", "euler", "compound", "venus", "uniswap"),
+  },
+};
+
 const networkOptions: NetworkOption[] = [
   { id: "ethereum", name: "Ethereum", logo: "/logos/ethereum.svg" },
   { id: "base", name: "Base", logo: "/logos/base.svg" },
@@ -88,21 +139,42 @@ const networkOptions: NetworkOption[] = [
   { id: "optimism", name: "Optimism", logo: "/logos/optimism.svg" },
   { id: "linea", name: "Linea", logo: "/logos/linea.svg" },
   ...(process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true"
-    ? [{ id: "hardhat", name: "Hardhat", logo: "/logos/ethereum.svg" } as NetworkOption]
+    ? [{ id: "hardhat", name: "Hardhat", logo: "/logos/ethereum.svg" }]
     : []),
   { id: "starknet", name: "Starknet", logo: "/logos/starknet.svg" },
 ];
 
-// All protocol views now call setProtocolTotals() to report to the global portfolio balance.
-// Reporters: Wallet, Morpho, Euler, Compound, Nostra, Vesu, AaveFork (Aave/Spark), Venus.
+const ProtocolSlot = ({ children }: { children: ReactNode }) => (
+  <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
+    {children}
+  </StableArea>
+);
 
-// Static feature flags for protocol views (extracted for referential stability)
-const ENABLED_FEATURES_SWAP_AND_MOVE = { swap: true, move: true } as const;
-const ENABLED_FEATURES_SWAP_ONLY = { swap: true, move: false } as const;
+const EvmNetworkPane = ({ network }: { network: EvmNetworkDefinition }) => (
+  <div className="space-y-2 sm:space-y-3">
+    <ProtocolSlot>
+      <WalletSection chainId={network.chainId} />
+    </ProtocolSlot>
+    {network.protocols.map(protocol => (
+      <ProtocolSlot key={protocol.id}>{protocol.render(network.chainId)}</ProtocolSlot>
+    ))}
+  </div>
+);
+
+const StarknetNetworkPane = () => (
+  <div className="space-y-2 sm:space-y-3">
+    <ProtocolSlot>
+      <VesuProtocolView />
+    </ProtocolSlot>
+    <ProtocolSlot>
+      <NostraProtocolView />
+    </ProtocolSlot>
+  </div>
+);
 
 const App: NextPage = () => {
   const initialNetwork = process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base";
-  const [selectedNetwork, setSelectedNetwork] = useState<string>(initialNetwork);
+  const [selectedNetwork, setSelectedNetwork] = useState(initialNetwork);
   const totalSupplied = useGlobalState(state => state.totalSupplied);
   const totalBorrowed = useGlobalState(state => state.totalBorrowed);
   const totalNet = useGlobalState(state => state.totalNet);
@@ -111,88 +183,34 @@ const App: NextPage = () => {
   const { address: evmAddress } = useEvmAccount();
   const { viewingAddress: starknetAddress } = useStarknetAccount();
   const lastSeenAddresses = useRef<{ evm?: string; starknet?: string }>({});
+  const selectedEvmNetwork = evmNetworks[selectedNetwork];
+  const expectedProtocolCount = useMemo(
+    () => (selectedNetwork === "starknet" ? 2 : selectedEvmNetwork ? selectedEvmNetwork.protocols.length + 1 : 0),
+    [selectedEvmNetwork, selectedNetwork],
+  );
 
-  // Settling period: after a reset, show loading state for a minimum duration
-  // to prevent cascading partial totals from jumping around as protocols report one by one.
-  const [isSettling, setIsSettling] = useState(false);
-  const settlingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Tiny helper so the button click never feels blocked
   const handleNetworkChange = useCallback((id: string) => {
     startTransition(() => setSelectedNetwork(id));
   }, []);
 
-  // Optional: prefetch likely-next bundles when idle (micro-UX win)
   useEffect(() => {
-    const idle = (cb: () => void) =>
-      ("requestIdleCallback" in window ? (window as any).requestIdleCallback(cb) : setTimeout(cb, 200));
-
-    idle(async () => {
-      if (selectedNetwork === "starknet") {
-        import("~~/components/specific/aave/AaveProtocolView");
-        import("~~/components/specific/compound/CompoundProtocolView");
-        import("~~/components/specific/venus/VenusProtocolView");
-        import("~~/components/specific/morpho/MorphoProtocolView");
-        import("~~/components/specific/spark/SparkProtocolView");
-        import("~~/components/specific/euler/EulerProtocolView");
-        import("~~/components/specific/alchemix/AlchemixProtocolView");
-      } else {
-        import("~~/components/specific/vesu/VesuProtocolView");
-        import("~~/components/specific/nostra/NostraProtocolView");
-      }
-    });
-  }, [selectedNetwork]);
-
-  const warnings = useMemo(() => ({
-    ethereum: "Ethereum mainnet support is experimental and pre-audit.",
-    arbitrum: "Arbitrum support is experimental and pre-audit.",
-    base: "Base support is experimental and pre-audit.",
-    optimism: "Optimism support is experimental and pre-audit.",
-    linea: "Linea support is experimental and pre-audit.",
-    unichain: "Unichain support is experimental and pre-audit.",
-  }), []);
-
-
-
-  // Reset totals on network switch or wallet address change.
-  // Uses expectedCount=0 since we no longer gate on exact count — just track loadedProtocolCount > 0.
-  // The settling period prevents cascading partial totals from flashing while protocols report one by one.
-  const startSettlingPeriod = useCallback(() => {
-    resetTotals(0);
-    setIsSettling(true);
-    if (settlingTimerRef.current) clearTimeout(settlingTimerRef.current);
-    settlingTimerRef.current = setTimeout(() => setIsSettling(false), 800);
-  }, [resetTotals]);
-
-  // Cleanup settling timer on unmount
-  useEffect(() => () => {
-    if (settlingTimerRef.current) clearTimeout(settlingTimerRef.current);
-  }, []);
-
-  useEffect(() => {
-    startSettlingPeriod();
-  }, [startSettlingPeriod, selectedNetwork]);
+    resetTotals(expectedProtocolCount);
+  }, [expectedProtocolCount, resetTotals, selectedNetwork]);
 
   useEffect(() => {
     const nextEvm = evmAddress ?? "";
     const nextStarknet = starknetAddress ?? "";
-    const { evm: prevEvm, starknet: prevStarknet } = lastSeenAddresses.current;
-
-    if (prevEvm === nextEvm && prevStarknet === nextStarknet) return;
+    const previous = lastSeenAddresses.current;
+    if (previous.evm === nextEvm && previous.starknet === nextStarknet) return;
 
     lastSeenAddresses.current = { evm: nextEvm, starknet: nextStarknet };
-
-    if (!nextEvm && !nextStarknet) return;
-
-    startSettlingPeriod();
-  }, [evmAddress, starknetAddress, startSettlingPeriod]);
+    if (nextEvm || nextStarknet) resetTotals(expectedProtocolCount);
+  }, [evmAddress, expectedProtocolCount, resetTotals, starknetAddress]);
 
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-4">
-        {/* Compact header: title + metrics + network filter on one line (desktop) */}
-        <div className="flex flex-col gap-3 px-4 sm:px-0 lg:flex-row lg:items-center lg:justify-between">
-          {/* Left: Title + Metrics */}
+        <header className="flex flex-col gap-3 px-4 sm:px-0 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
             <h1 className="text-base-content text-lg font-bold uppercase tracking-tight">Positions</h1>
             <div className="bg-base-content/10 hidden h-6 w-px sm:block" />
@@ -201,232 +219,47 @@ const App: NextPage = () => {
                 netWorth={totalNet}
                 totalSupply={totalSupplied}
                 totalDebt={totalBorrowed}
-                isLoading={isSettling || loadedProtocolCount === 0}
+                isLoading={loadedProtocolCount === 0}
+                loadedSources={loadedProtocolCount}
+                expectedSources={expectedProtocolCount}
               />
             </div>
           </div>
-
-          {/* Right: Network Switcher */}
           <NetworkFilter
             networks={networkOptions}
+            value={selectedNetwork}
             defaultNetwork={initialNetwork}
             onNetworkChange={handleNetworkChange}
           />
-
-          {/* Mobile metrics (below network filter) */}
           <div className="sm:hidden">
             <DashboardMetrics
               netWorth={totalNet}
               totalSupply={totalSupplied}
               totalDebt={totalBorrowed}
-              isLoading={isSettling || loadedProtocolCount === 0}
+              isLoading={loadedProtocolCount === 0}
+              loadedSources={loadedProtocolCount}
+              expectedSources={expectedProtocolCount}
             />
           </div>
-        </div>
+        </header>
 
-        {/* Subtle warning */}
-        {warnings[selectedNetwork as keyof typeof warnings] && (
-          <p className="text-base-content/30 border-base-content/10 border-l pl-3 text-[10px] uppercase tracking-wider px-4 sm:px-0">
-            {warnings[selectedNetwork as keyof typeof warnings]}
+        {selectedEvmNetwork?.warning && (
+          <p className="text-base-content/30 border-base-content/10 border-l px-4 pl-3 text-[10px] uppercase tracking-wider sm:px-0">
+            {selectedEvmNetwork.warning}
           </p>
         )}
 
-        {/* Protocols */}
-        <div className="space-y-2 sm:space-y-3">
-          {/* ---- Network panes: only render the active selection ---- */}
-          {/* ETHEREUM MAINNET */}
-          {selectedNetwork === "ethereum" && (
-            <div className="space-y-2 sm:space-y-3">
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={mainnet.id} /></StableArea>
+        {selectedNetwork === "hardhat" && (
+          <div className="alert alert-warning text-sm">
+            Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
+          </div>
+        )}
 
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={mainnet.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <MorphoProtocolView chainId={mainnet.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <SparkProtocolView chainId={mainnet.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <EulerProtocolView chainId={mainnet.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={mainnet.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <UniswapProtocolView chainId={mainnet.id} />
-              </StableArea>
-            </div>
-          )}
-
-          {/* ARBITRUM */}
-          {selectedNetwork === "arbitrum" && (
-            <div className="space-y-2 sm:space-y-3">
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={arbitrum.id} /></StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <MorphoProtocolView chainId={arbitrum.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <EulerProtocolView chainId={arbitrum.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AlchemixProtocolView chainId={arbitrum.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <VenusProtocolView chainId={arbitrum.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <UniswapProtocolView chainId={arbitrum.id} />
-              </StableArea>
-            </div>
-          )}
-
-          {/* BASE */}
-          {selectedNetwork === "base" && (
-            <div className="space-y-2 sm:space-y-3">
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={base.id} /></StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <MorphoProtocolView chainId={base.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <EulerProtocolView chainId={base.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <VenusProtocolView chainId={base.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <UniswapProtocolView chainId={base.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AerodromeProtocolView chainId={base.id} />
-              </StableArea>
-            </div>
-          )}
-
-          {/* HARDHAT (conditionally enabled via NEXT_PUBLIC_ENABLE_HARDHAT_UI) */}
-          {process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" && selectedNetwork === "hardhat" && (
-            <div className="space-y-2 sm:space-y-3">
-              <div className="alert alert-warning text-sm">
-                Local Hardhat network is for development only. Ensure your node is running on 127.0.0.1:8545.
-              </div>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={hardhat.id} /></StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={hardhat.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <MorphoProtocolView chainId={hardhat.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <EulerProtocolView chainId={hardhat.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={hardhat.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-            </div>
-          )}
-
-          {/* STARKNET */}
-          {selectedNetwork === "starknet" && (
-            <div className="space-y-2 sm:space-y-3">
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <VesuProtocolView />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <NostraProtocolView />
-              </StableArea>
-            </div>
-          )}
-
-          {/* OPTIMISM */}
-          {selectedNetwork === "optimism" && (
-            <div className="space-y-2 sm:space-y-3">
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={optimism.id} /></StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={optimism.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <MorphoProtocolView chainId={optimism.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <EulerProtocolView chainId={optimism.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={optimism.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <UniswapProtocolView chainId={optimism.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AerodromeProtocolView chainId={optimism.id} />
-              </StableArea>
-            </div>
-          )}
-
-          {/* LINEA */}
-          {selectedNetwork === "linea" && (
-            <div className="space-y-2 sm:space-y-3">
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={linea.id} /></StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={linea.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <EulerProtocolView chainId={linea.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={linea.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-            </div>
-          )}
-
-          {/* PLASMA */}
-          {selectedNetwork === "plasma" && (
-            <div className="space-y-2 sm:space-y-3">
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={plasma.id} /></StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <AaveProtocolView chainId={plasma.id} enabledFeatures={ENABLED_FEATURES_SWAP_ONLY} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <EulerProtocolView chainId={plasma.id} />
-              </StableArea>
-            </div>
-          )}
-
-          {/* UNICHAIN */}
-          {selectedNetwork === "unichain" && (
-            <div className="space-y-2 sm:space-y-3">
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full"><WalletSection chainId={unichain.id} /></StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <MorphoProtocolView chainId={unichain.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <EulerProtocolView chainId={unichain.id} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <CompoundProtocolView chainId={unichain.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <VenusProtocolView chainId={unichain.id} enabledFeatures={ENABLED_FEATURES_SWAP_AND_MOVE} />
-              </StableArea>
-              <StableArea as="section" minHeight="4rem" className="block" innerClassName="h-full">
-                <UniswapProtocolView chainId={unichain.id} />
-              </StableArea>
-            </div>
-          )}
-        </div>
-
+        {selectedNetwork === "starknet" ? (
+          <StarknetNetworkPane />
+        ) : selectedEvmNetwork ? (
+          <EvmNetworkPane network={selectedEvmNetwork} />
+        ) : null}
         <div className="mt-12">
           <SupportBanner />
         </div>
