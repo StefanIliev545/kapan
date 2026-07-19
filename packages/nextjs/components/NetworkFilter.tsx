@@ -7,6 +7,7 @@ import { track } from "@vercel/analytics";
 import { useAccount, useSwitchChain } from "wagmi";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import { CHAIN_ID_TO_NETWORK_ID, NETWORK_ID_TO_CHAIN_ID, getNetworkOptionLogo } from "~~/utils/networkLogos";
+import { NETWORK_CHANGE_EVENT } from "~~/utils/networkSelection";
 
 export interface NetworkOption {
   id: string;
@@ -173,6 +174,9 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
     } else {
       window.history.replaceState({ network: networkId }, "", url.toString());
     }
+    // History API calls do not emit popstate. Notify components such as the
+    // wallet switcher directly instead of making them poll the URL.
+    window.dispatchEvent(new CustomEvent(NETWORK_CHANGE_EVENT, { detail: { networkId } }));
   }, []);
 
   // Listen to Back/Forward and keep our state in sync (because shallow updates won't notify Next)
@@ -241,6 +245,11 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
   useEffect(() => {
     if (isHardhatDevMode || !chain?.id) return;
 
+    // Starknet selection is intentionally independent of the connected EVM
+    // wallet chain. Without this guard, the still-connected EVM wallet would
+    // immediately map back to Base/Arbitrum and overwrite a Starknet choice.
+    if (selectedRef.current === "starknet") return;
+
     // If we initiated the chain switch, skip syncing back
     if (weInitiatedChainSwitchRef.current) {
       weInitiatedChainSwitchRef.current = false;
@@ -279,6 +288,9 @@ const NetworkFilterInner: React.FC<NetworkFilterProps> = ({
       }
 
       // Update UI immediately
+      // Keep the ref ahead of a concurrent controlled parent update so the
+      // EVM-chain synchronization effect cannot race a Starknet selection.
+      selectedRef.current = networkId;
       setSelectedNetwork(networkId);
       onNetworkChange(networkId);
 
