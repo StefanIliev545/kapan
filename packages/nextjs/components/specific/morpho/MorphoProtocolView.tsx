@@ -69,13 +69,14 @@ function buildSuppliedPositions(
   rows: MorphoPositionRow[],
   findYield: (address?: string, symbol?: string) => ExternalYield | undefined
 ): Array<{ balance: number; currentRate: number }> {
-  return rows.map((row) => {
-    const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
-    const currentRate = getExternalTokenYield(row.collateralSymbol, collateralAddr, findYield);
-    return {
-      balance: row.collateralBalanceUsd,
-      currentRate,
-    };
+  return rows.flatMap((row) => {
+    const positions: Array<{ balance: number; currentRate: number }> = [];
+    if (row.hasCollateral) {
+      const collateralAddr = row.market.collateralAsset?.address?.toLowerCase() || "";
+      positions.push({ balance: row.collateralBalanceUsd, currentRate: getExternalTokenYield(row.collateralSymbol, collateralAddr, findYield) });
+    }
+    if (row.hasSupply) positions.push({ balance: row.supplyBalanceUsd, currentRate: row.supplyApy });
+    return positions;
   });
 }
 

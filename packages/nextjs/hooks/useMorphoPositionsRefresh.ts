@@ -89,6 +89,7 @@ export function useMorphoPositionsRefresh(
         const loanDecimals = market.loanAsset.decimals;
 
         const collateralBalance = pos.collateralBalance;
+        const supplyBalance = pos.supplyBalance;
         const borrowBalance = pos.borrowBalance;
 
         const collateralPriceUsd = market.collateralAsset?.priceUsd || 0;
@@ -96,9 +97,11 @@ export function useMorphoPositionsRefresh(
 
         // Convert from contract format (already in underlying units)
         const collateralBalanceNum = Number(collateralBalance) / 10 ** collateralDecimals;
+        const supplyBalanceNum = Number(supplyBalance) / 10 ** loanDecimals;
         const borrowBalanceNum = Number(borrowBalance) / 10 ** loanDecimals;
 
         const collateralBalanceUsd = collateralBalanceNum * collateralPriceUsd;
+        const supplyBalanceUsd = supplyBalanceNum * loanPriceUsd;
         const borrowBalanceUsd = borrowBalanceNum * loanPriceUsd;
 
         // LTV calculation
@@ -121,6 +124,9 @@ export function useMorphoPositionsRefresh(
           collateralBalance,
           collateralBalanceUsd,
           collateralDecimals,
+          supplyBalance,
+          supplyBalanceUsd,
+          supplyDecimals: loanDecimals,
           borrowBalance,
           borrowBalanceUsd,
           borrowDecimals: loanDecimals,
@@ -131,6 +137,7 @@ export function useMorphoPositionsRefresh(
           healthFactor,
           isHealthy: pos.isHealthy,
           hasCollateral: pos.collateralBalance > 0n,
+          hasSupply: pos.supplyBalance > 0n,
           hasDebt: pos.borrowBalance > 0n,
         };
       })
@@ -144,4 +151,3 @@ export function useMorphoPositionsRefresh(
     isFetching,
   };
 }
-
