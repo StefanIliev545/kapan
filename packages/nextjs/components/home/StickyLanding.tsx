@@ -19,6 +19,27 @@ const HeroScene = dynamic(() => import("./HeroScene").then(m => m.HeroScene), {
   loading: () => null,
 });
 
+/**
+ * The WebGL background is decorative, so keep it off the critical rendering
+ * path on small screens and for people who have asked for less motion. The
+ * initial false value also prevents the R3F chunk from being requested until
+ * the browser has evaluated the user's display preferences.
+ */
+const useHeroSceneEnabled = () => {
+  const [isEnabled, setIsEnabled] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px) and (prefers-reduced-motion: no-preference)");
+    const updateEnabled = () => setIsEnabled(mediaQuery.matches);
+
+    updateEnabled();
+    mediaQuery.addEventListener("change", updateEnabled);
+    return () => mediaQuery.removeEventListener("change", updateEnabled);
+  }, []);
+
+  return isEnabled;
+};
+
 
 // ================================
 // Static Animation Constants
@@ -1425,6 +1446,7 @@ const useScrollHintOpacity = (smoothProgress: MotionValue<number>) => {
 export const StickyLanding = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { setCurrentSection, setTotalSections } = useLandingSection();
+  const isHeroSceneEnabled = useHeroSceneEnabled();
 
   // Force kapan dark theme on landing page
   useKapanTheme();
@@ -1514,7 +1536,7 @@ export const StickyLanding = () => {
         className="pointer-events-none absolute inset-0"
         style={{ opacity: useTransform(smoothProgress, [0, 0.25, 0.5], [0.16, 0.09, 0.03]) }}
       >
-        <HeroScene />
+        {isHeroSceneEnabled && <HeroScene />}
       </motion.div>
 
       {/* Film grain — subtle premium texture over the dark. */}

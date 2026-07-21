@@ -148,6 +148,36 @@ const SHADOW_RED = "shadow-[0_0_6px_rgba(239,68,68,0.25),0_0_12px_rgba(239,68,68
 const SHADOW_BLUE = "shadow-[0_0_6px_rgba(56,189,248,0.25),0_0_12px_rgba(56,189,248,0.15)]";
 const SHADOW_GREEN = "shadow-[0_0_6px_rgba(74,222,128,0.3),0_0_12px_rgba(74,222,128,0.18)]";
 
+/** A Morpho `supply` position lends the loan asset and has no collateral/debt leg. */
+const MorphoLenderRow: FC<{ row: MorphoPositionRow; chainId: number }> = memo(function MorphoLenderRow({ row, chainId }) {
+  return (
+    <div className="border-base-300 overflow-hidden rounded-md border">
+      <div className="bg-base-200/50 border-base-300 flex items-center justify-between border-b px-3 py-2">
+        <span className="text-base-content/65 text-[10px] font-semibold uppercase tracking-widest">Morpho Blue lending position</span>
+        <span className="text-success font-mono text-xs tabular-nums">{row.supplyApy.toFixed(2)}% APY</span>
+      </div>
+      <SupplyPosition
+        icon={tokenNameToLogo(row.loanSymbol.toLowerCase())}
+        name={row.loanSymbol}
+        balance={row.supplyBalanceUsd}
+        tokenBalance={row.supplyBalance}
+        currentRate={row.supplyApy}
+        tokenAddress={row.market.loanAsset.address}
+        tokenDecimals={row.supplyDecimals}
+        tokenPrice={priceToRaw(row.market.loanAsset.priceUsd ?? undefined)}
+        tokenSymbol={row.loanSymbol}
+        protocolName="morpho-blue"
+        networkType="evm"
+        chainId={chainId}
+        containerClassName="rounded-none"
+        availableActions={{ deposit: false, withdraw: false, move: false, swap: false }}
+        showExpandIndicator={false}
+        subtitle={<span className="text-base-content/45 text-xs">Lent in {row.collateralSymbol}/{row.loanSymbol}</span>}
+      />
+    </div>
+  );
+});
+
 /** Get shadow class based on automation status. Red = ADL trigger met, Blue = auto-lev trigger met, Green = protected */
 function getAutomationShadowClass(
   hasActiveADL: boolean | undefined,
@@ -757,6 +787,9 @@ export const MorphoPositionsSection: FC<MorphoPositionsSectionProps> = ({
     }
 
     return rows.map((row, idx) => {
+      if (row.hasSupply && !row.hasCollateral && !row.hasDebt) {
+        return <MorphoLenderRow key={row.key} row={row} chainId={chainId} />;
+      }
       const marketId = row.market.uniqueKey?.toLowerCase();
       const adlInfo = marketId ? adlInfoByMarketId.get(marketId) ?? EMPTY_ADL_INFO : EMPTY_ADL_INFO;
       return (

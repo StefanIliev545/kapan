@@ -88,6 +88,9 @@ export interface MorphoPositionRow {
   collateralBalance: bigint;
   collateralBalanceUsd: number;
   collateralDecimals: number;
+  supplyBalance: bigint;
+  supplyBalanceUsd: number;
+  supplyDecimals: number;
   // Borrow position  
   borrowBalance: bigint;
   borrowBalanceUsd: number;
@@ -102,6 +105,7 @@ export interface MorphoPositionRow {
   isHealthy: boolean;
   // Display
   hasCollateral: boolean;
+  hasSupply: boolean;
   hasDebt: boolean;
 }
 
@@ -252,7 +256,7 @@ export function useMorphoLendingPositions(
     if (!positions.length) return [];
 
     return positions
-      .filter((pos) => pos.collateral > 0 || pos.borrowAssets > 0)
+      .filter((pos) => pos.collateral > 0 || pos.borrowAssets > 0 || pos.supplyAssets > 0)
       .map((pos): MorphoPositionRow => {
         const market = pos.market;
         const context = createMorphoContext(market);
@@ -261,6 +265,7 @@ export function useMorphoLendingPositions(
         const loanDecimals = market.loanAsset.decimals;
 
         const collateralBalance = BigInt(Math.floor(pos.collateral));
+        const supplyBalance = BigInt(Math.floor(pos.supplyAssets));
         const borrowBalance = BigInt(Math.floor(pos.borrowAssets));
 
         const collateralPriceUsd = market.collateralAsset?.priceUsd || 0;
@@ -269,9 +274,11 @@ export function useMorphoLendingPositions(
         const collateralBalanceNum = Number(
           formatUnits(collateralBalance, collateralDecimals)
         );
+        const supplyBalanceNum = Number(formatUnits(supplyBalance, loanDecimals));
         const borrowBalanceNum = Number(formatUnits(borrowBalance, loanDecimals));
 
         const collateralBalanceUsd = collateralBalanceNum * collateralPriceUsd;
+        const supplyBalanceUsd = supplyBalanceNum * loanPriceUsd;
         const borrowBalanceUsd = borrowBalanceNum * loanPriceUsd;
 
         // LTV calculation
@@ -290,6 +297,9 @@ export function useMorphoLendingPositions(
           collateralBalance,
           collateralBalanceUsd,
           collateralDecimals,
+          supplyBalance,
+          supplyBalanceUsd,
+          supplyDecimals: loanDecimals,
           borrowBalance,
           borrowBalanceUsd,
           borrowDecimals: loanDecimals,
@@ -300,6 +310,7 @@ export function useMorphoLendingPositions(
           healthFactor: pos.healthFactor,
           isHealthy: pos.healthFactor === null || pos.healthFactor >= 1,
           hasCollateral: pos.collateral > 0,
+          hasSupply: pos.supplyAssets > 0,
           hasDebt: pos.borrowAssets > 0,
         };
       });
@@ -420,4 +431,3 @@ export function useMorphoMarkets(chainId: number, search?: string, showLowLiquid
     refetch,
   };
 }
-
