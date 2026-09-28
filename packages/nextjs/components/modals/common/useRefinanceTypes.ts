@@ -94,6 +94,8 @@ export type RefinanceModalEvmProps = RefinanceModalBaseProps & {
   chainId?: number;
   /** Pre-encoded context for the source protocol (e.g., Morpho MarketParams) */
   fromContext?: string;
+  /** Per-token source contexts for multi-collateral Midnight markets. */
+  fromContexts?: Record<string, `0x${string}`>;
 };
 
 /**

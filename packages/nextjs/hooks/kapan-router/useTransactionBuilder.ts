@@ -85,6 +85,8 @@ export type BuildUnlockDebtParams = {
   fromProtocol: string;
   debtToken: Address;
   expectedDebt: string;
+  /** false uses the entered partial debt amount; true reads the live full balance. */
+  repayMax?: boolean;
   debtDecimals?: number;
   fromContext?: `0x${string}`;
   flash: FlashConfig;
@@ -138,7 +140,7 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const amountBigInt = parseUnits(amount, decimals);
     const isCompound = normalizedProtocol === "compound";
-    const isMorpho = normalizedProtocol === "morpho-blue";
+    const isMorpho = normalizedProtocol === "morpho-blue" || normalizedProtocol === "morpho-midnight";
     const isEuler = normalizedProtocol === "euler";
     const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
     // Morpho, Compound, Euler and Alchemix use DepositCollateral for collateral deposits
@@ -204,7 +206,7 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
     const borrowAmountBigInt = parseUnits(borrowAmount, debtDecimals);
 
     const isCompound = normalizedProtocol === "compound";
-    const isMorpho = normalizedProtocol === "morpho-blue";
+    const isMorpho = normalizedProtocol === "morpho-blue" || normalizedProtocol === "morpho-midnight";
     const isEuler = normalizedProtocol === "euler";
     const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
     const depositOp = (isCompound || isMorpho || isEuler || isAlchemix) ? LendingOp.DepositCollateral : LendingOp.Deposit;
@@ -544,7 +546,7 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
 
     const normalizedProtocol = normalizeProtocolName(protocolName);
     const isCompound = normalizedProtocol === "compound";
-    const isMorpho = normalizedProtocol === "morpho-blue";
+    const isMorpho = normalizedProtocol === "morpho-blue" || normalizedProtocol === "morpho-midnight";
     const isAlchemix = normalizedProtocol === ALCHEMIX_GATEWAY_NAME;
 
     // Alchemix multiply uses a fundamentally different topology because alAssets have no
@@ -1108,7 +1110,7 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
     };
 
     return {
-      buildUnlockDebt: ({ fromProtocol, debtToken, expectedDebt, debtDecimals = 18, fromContext = "0x", flash: { version } }) => {
+      buildUnlockDebt: ({ fromProtocol, debtToken, expectedDebt, repayMax = true, debtDecimals = 18, fromContext = "0x", flash: { version } }) => {
         const from = normalizeProtocolName(fromProtocol);
         const expected = parseUnits(expectedDebt, debtDecimals);
         if (expected === 0n) throw new Error(`Invalid debt amount`);
@@ -1117,7 +1119,8 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
 
         // 1. Get Borrow Balance (creates UTXO)
         const utxoIndexForGetBorrow = utxoCount;
-        addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
+        if (repayMax) addProto(from, encodeLendingInstruction(LendingOp.GetBorrowBalance, debtToken, userAddress, 0n, fromCtx, 999) as `0x${string}`, true);
+        else addRouter(encodeToOutput(expected, debtToken) as `0x${string}`, true);
 
         // 2. Flash Loan (creates UTXO)
         // Use centralized version-to-enum mapping
@@ -1158,7 +1161,7 @@ export const useTransactionBuilder = (options?: UseKapanRouterV2Options) => {
         // Deposit collateral to destination protocol
         // For Morpho Blue and Euler V2, use DepositCollateral (supplies collateral for borrowing)
         // For other protocols, use Deposit (which handles collateral deposits)
-        const depositOp = (to === "morpho-blue" || to === "euler") ? LendingOp.DepositCollateral : LendingOp.Deposit;
+        const depositOp = (to === "morpho-blue" || to === "morpho-midnight" || to === "euler") ? LendingOp.DepositCollateral : LendingOp.Deposit;
         addProto(to, encodeLendingInstruction(depositOp, collateralToken, userAddress, 0n, toCtx, utxoIndexForWithdraw) as `0x${string}`, false);
       },
 

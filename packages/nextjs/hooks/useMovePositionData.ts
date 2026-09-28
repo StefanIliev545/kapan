@@ -1,3 +1,5 @@
+import { supportedMidnightChain } from "~~/utils/midnight/types";
+import { getEffectiveChainId } from "~~/utils/forkChain";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useAccount as useEvmAccount } from "wagmi";
 import { useNetworkAwareReadContract } from "~~/hooks/useNetworkAwareReadContract";
@@ -126,6 +128,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
         { name: "Compound V3", logo: getProtocolLogo("Compound V3") },
       ];
 
+      if (chainId && supportedMidnightChain(getEffectiveChainId(chainId))) protocols.push({name:"Morpho Midnight",logo:getProtocolLogo("Morpho Midnight")});
       // Add chain-specific protocols
       if (isSparkSupported(chainId)) {
         protocols.push({ name: "Spark", logo: getProtocolLogo("Spark") });
@@ -141,7 +144,7 @@ export function useMovePositionData(params: MovePositionInput): UseMovePositionD
       }
 
       return protocols.filter(
-        p => p.name.toLowerCase() !== fromProtocol.toLowerCase(),
+        p => p.name === "Morpho Midnight" || p.name.toLowerCase() !== fromProtocol.toLowerCase(),
       );
     }
     // Starknet: Vesu, VesuV2, Nostra

@@ -36,9 +36,9 @@ export const useEvmTransactionFlow = ({
   revokePermissions = false,
 }: UseEvmTransactionFlowParams) => {
   const { chain } = useAccount();
-  const { switchChain } = useSwitchChain();
+  const { switchChainAsync: switchChain } = useSwitchChain();
   const batchingPreference = useBatchingPreference();
-  const { executeFlowBatchedIfPossible, isAnyConfirmed, simulateInstructions } = useKapanRouterV2();
+  const { executeFlowBatchedIfPossible, isAnyConfirmed, simulateInstructions } = useKapanRouterV2({ chainId });
   const { hasActiveOrders: hasActiveADLOrders } = useHasActiveConditionalOrders();
 
   // Skip chain switching for hardhat (31337) - user manages wallet connection manually in dev mode

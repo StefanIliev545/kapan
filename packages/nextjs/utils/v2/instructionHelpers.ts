@@ -195,6 +195,8 @@ export function normalizeProtocolName(protocolName: string): string {
   // Remove all spaces
   normalized = normalized.replace(/\s+/g, "");
   
+  if (normalized === "morphomidnight" || normalized === "morphofixed") return "morpho-midnight";
+
   // Special case: Morpho Blue -> morpho-blue (gateway is registered with hyphen)
   if (normalized === "morphoblue") {
     return "morpho-blue";

@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 import { MarketParams } from "./interfaces/morpho/IMorphoBlue.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { AlchemixConstants } from "./gateways/alchemix/AlchemixConstants.sol";
+import { MorphoMidnightGatewayView } from "./gateways/midnight/MorphoMidnightGatewayView.sol";
 
 /**
  * @title Gateway View Interfaces
@@ -110,6 +111,7 @@ contract KapanViewRouter {
     bytes4 public constant AAVE_V3 = bytes4(keccak256("aave-v3"));
     bytes4 public constant COMPOUND_V3 = bytes4(keccak256("compound-v3"));
     bytes4 public constant MORPHO_BLUE = bytes4(keccak256("morpho-blue"));
+    bytes4 public constant MORPHO_MIDNIGHT = bytes4(keccak256("morpho-midnight"));
     bytes4 public constant EULER_V2 = bytes4(keccak256("euler-v2"));
     bytes4 public constant VENUS = bytes4(keccak256("venus"));
     bytes4 public constant ALCHEMIX = AlchemixConstants.PROTOCOL_ID;
@@ -535,6 +537,7 @@ contract KapanViewRouter {
         if (protocolId == AAVE_V3) return "aave-v3";
         if (protocolId == COMPOUND_V3) return "compound-v3";
         if (protocolId == MORPHO_BLUE) return "morpho-blue";
+        if (protocolId == MORPHO_MIDNIGHT) return "morpho-midnight";
         if (protocolId == EULER_V2) return "euler-v2";
         if (protocolId == VENUS) return "venus";
         if (protocolId == ALCHEMIX) return AlchemixConstants.GATEWAY_NAME;
@@ -570,6 +573,10 @@ contract KapanViewRouter {
         if (protocolId == MORPHO_BLUE) {
             MarketParams memory params = abi.decode(context, (MarketParams));
             return IMorphoBlueGatewayView(gateway).getCurrentLtvBps(params, user);
+        }
+        if (protocolId == MORPHO_MIDNIGHT) {
+            (bytes32 id,) = abi.decode(context, (bytes32, uint256));
+            return MorphoMidnightGatewayView(gateway).getCurrentLtvBps(id, user);
         }
         if (protocolId == EULER_V2) {
             // Context format: (borrowVault, collateralVaults[], subAccountIndex)
@@ -615,6 +622,10 @@ contract KapanViewRouter {
             MarketParams memory params = abi.decode(context, (MarketParams));
             return IMorphoBlueGatewayView(gateway).getPositionValue(params, user);
         }
+        if (protocolId == MORPHO_MIDNIGHT) {
+            (bytes32 id,) = abi.decode(context, (bytes32, uint256));
+            return MorphoMidnightGatewayView(gateway).getPositionValue(id, user);
+        }
         if (protocolId == VENUS) {
             return IVenusGatewayView(gateway).getUserAccountData(user);
         }
@@ -644,6 +655,11 @@ contract KapanViewRouter {
         string memory protocolName = _getProtocolName(protocolId);
         address gateway = gateways[protocolName];
         if (gateway == address(0)) revert GatewayNotSet(protocolName);
+
+        if (protocolId == MORPHO_MIDNIGHT) {
+            (bytes32 id, uint256 index) = abi.decode(context, (bytes32, uint256));
+            return MorphoMidnightGatewayView(gateway).getAssetPrice(id, index, collateralToken);
+        }
 
         if (protocolId == AAVE_V3) {
             return IAaveGatewayView(gateway).getAssetPrice(collateralToken);
@@ -730,6 +746,11 @@ contract KapanViewRouter {
         address gateway = gateways[protocolName];
         if (gateway == address(0)) revert GatewayNotSet(protocolName);
 
+        if (protocolId == MORPHO_MIDNIGHT) {
+            (bytes32 id, uint256 index) = abi.decode(context, (bytes32, uint256));
+            return MorphoMidnightGatewayView(gateway).getAssetPrice(id, index, debtToken);
+        }
+
         if (protocolId == AAVE_V3) {
             return IAaveGatewayView(gateway).getAssetPrice(debtToken);
         }
@@ -801,6 +822,13 @@ contract KapanViewRouter {
         string memory protocolName = _getProtocolName(protocolId);
         address gateway = gateways[protocolName];
         if (gateway == address(0)) revert GatewayNotSet(protocolName);
+
+        if (protocolId == MORPHO_MIDNIGHT) {
+            (bytes32 id, uint256 index) = abi.decode(context, (bytes32, uint256));
+            // Validate the collateral/debt pair as well as the slot before using its oracle.
+            uint256 price = MorphoMidnightGatewayView(gateway).getPairOraclePrice(id, index, collateralToken, debtToken);
+            return _calculateMorphoMinBuy(sellAmount, maxSlippageBps, price);
+        }
 
         if (protocolId == MORPHO_BLUE) {
             // For Morpho, use the Morpho oracle which gives collateral/loan exchange rate

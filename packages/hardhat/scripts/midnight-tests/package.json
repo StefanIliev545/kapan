@@ -1,0 +1,19 @@
+{
+  "name": "kapan-midnight-contract-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Isolated Osaka-capable test runner; Kapan contracts still compile for Cancun with solc 0.8.30",
+  "engines": { "node": ">=22.13.0" },
+  "dependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "2.1.2",
+    "@nomicfoundation/hardhat-ethers": "3.1.3",
+    "@openzeppelin/contracts": "5.0.2",
+    "chai": "4.5.0",
+    "ethers": "6.17.0",
+    "hardhat": "2.29.1",
+    "solc": "0.8.30",
+    "solc-midnight": "npm:solc@0.8.34",
+    "ts-node": "10.9.2",
+    "typescript": "5.5.4"
+  }
+}

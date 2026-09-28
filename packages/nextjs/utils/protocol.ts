@@ -37,6 +37,8 @@ export const getProtocolLogo = (protocolName: string): string => {
     "ZeroLend": "/logos/zerolend.svg",
     "zerolend": "/logos/zerolend.svg",
     // Morpho variants
+    "Morpho Midnight": MORPHO_LOGO,
+    "morpho-midnight": MORPHO_LOGO,
     "Morpho Blue": MORPHO_LOGO,
     "Morpho": MORPHO_LOGO,
     "morpho-blue": MORPHO_LOGO,

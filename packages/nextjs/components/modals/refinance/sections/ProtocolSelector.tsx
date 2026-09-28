@@ -52,7 +52,7 @@ const ProtocolTile = memo<ProtocolTileProps>(({
     >
       <div className="flex min-w-0 flex-nowrap items-center gap-2">
         <Image src={protocol.logo} alt={protocol.name} width={24} height={24} className="flex-shrink-0 rounded" />
-        <span className="flex-shrink-0 whitespace-nowrap text-sm">{protocol.name}</span>
+        <span className="min-w-0 text-sm leading-tight">{protocol.name}</span>
 
         {(isSelected && isVesu && vesuPools) && (
           selectedPool !== undefined && setSelectedPool ? (

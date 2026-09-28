@@ -91,6 +91,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     { name: "venus", deploymentName: "VenusGatewayWrite" },
     { name: "zerolend", deploymentName: "ZeroLendGatewayWrite" },
     { name: "morpho-blue", deploymentName: "MorphoBlueGatewayWrite" },
+    { name: "morpho-midnight", deploymentName: "MorphoMidnightGatewayWrite" },
     { name: "oneinch", deploymentName: "OneInchGateway" },
     { name: "pendle", deploymentName: "PendleGateway" },
     { name: "spark", deploymentName: "SparkGatewayWrite" },

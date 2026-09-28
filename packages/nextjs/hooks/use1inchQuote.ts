@@ -20,7 +20,7 @@ export type SwapAggregator = "1inch" | "kyber" | "pendle";
 
 // All call sites consume `OneInchSwapResponse`; we tag the winner so callers can
 // route the downstream `swapRouter` (approve target) to the right on-chain adapter.
-export type SwapQuoteResponse = OneInchSwapResponse & { aggregator: SwapAggregator };
+export type SwapQuoteResponse = OneInchSwapResponse & { aggregator: SwapAggregator; srcToken?: { address: Address }; dstToken?: { address: Address } };
 
 type Use1inchQuoteProps = {
     chainId: number;
@@ -142,7 +142,7 @@ export const use1inchQuote = ({
         is1inchSupported(chainId) || isKyberSupported(chainId) || isPendleSupported(chainId);
     const isEnabled = isQueryEnabled(anyAggregatorSupported, enabled, hasValidAmount(debouncedAmount), src, dst, from);
 
-    return useQuery<SwapQuoteResponse, Error>({
+    const query = useQuery<SwapQuoteResponse, Error>({
         queryKey: queryKeys.oneInchQuote(chainId, src, dst, debouncedAmount, from, slippage, preferredRouter),
         queryFn: async () => {
             const effectiveChainId = getEffectiveChainId(chainId);
@@ -235,4 +235,6 @@ export const use1inchQuote = ({
         enabled: isEnabled,
         ...queryOptions.quote,
     });
+    // Consumers that bind executable calldata to an amount must wait for debounce.
+    return { ...query, quotedAmount: debouncedAmount, isAmountCurrent: amount === debouncedAmount };
 };

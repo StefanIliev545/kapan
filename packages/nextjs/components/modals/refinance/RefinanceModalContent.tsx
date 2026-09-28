@@ -113,6 +113,8 @@ export type RefinanceModalContentProps = {
   /** Whether user has active ADL orders (disables revoke permissions) */
   hasActiveADLOrders?: boolean;
 
+  midnightSection?: ReactNode;
+
   // Error display
   errorMessage?: string;
 
@@ -284,6 +286,7 @@ export const RefinanceModalContent: FC<RefinanceModalContentProps> = (props) => 
 
             {/* Morpho Market Selector - uses context */}
             <MorphoMarketSection />
+            {props.midnightSection}
 
             <div className="divider my-2" />
 

@@ -1,3 +1,9 @@
+import { borrowingBounds, validateQuote } from "~~/utils/midnight/quotes";
+import { useMidnightFinancing } from "~~/hooks/midnight/useMidnightFinancing";
+import { FixedLoanTerms } from "~~/components/specific/morpho/midnight/FixedLoanTerms";
+import { collateralIndex, encodeMidnightContext } from "~~/utils/midnight/encoding";
+import { rememberMidnightMarket } from "~~/hooks/midnight/useMidnight";
+import type { FlashLoanVersion } from "~~/utils/flashLoan";
 import { track } from "@vercel/analytics";
 import React, {
   FC,
@@ -10,7 +16,7 @@ import React, {
 import { useMovePositionData } from "~~/hooks/useMovePositionData";
 import { useCollateralSupport } from "~~/hooks/scaffold-eth/useCollateralSupport";
 import { useKapanRouterV2 } from "~~/hooks/useKapanRouterV2";
-import { formatUnits, parseUnits, type Address } from "viem";
+import { decodeAbiParameters, parseAbiParameters, formatUnits, parseUnits, type Address } from "viem";
 import { useAccount } from "wagmi";
 import { useTokenPricesByAddress, priceToRaw } from "~~/hooks/useTokenPrice";
 import { useMovePositionState } from "~~/hooks/useMovePositionState";
@@ -19,7 +25,7 @@ import { useFlashLoanSelection } from "~~/hooks/useFlashLoanSelection";
 import { useMorphoMarketSupport } from "~~/hooks/useMorphoMarketSupport";
 import { useEulerMarketSupport } from "~~/hooks/useEulerMarketSupport";
 import { useEulerRefinanceSubAccount } from "~~/hooks/useEulerRefinanceSubAccount";
-import { encodeMorphoContext, encodeEulerContext, type MorphoMarketContextForEncoding, type EulerVaultContextForEncoding } from "~~/utils/v2/instructionHelpers";
+import { encodeMorphoContext, encodeEulerContext, normalizeProtocolName as normalizeGatewayProtocol, type MorphoMarketContextForEncoding, type EulerVaultContextForEncoding } from "~~/utils/v2/instructionHelpers";
 import {
   useMergedCollaterals,
   usePreselectedCollateralsEffect,
@@ -76,11 +82,12 @@ const getLtBps = (c: CollateralWithLt | null | undefined): number => {
 
 /** Normalize a protocol name by removing version suffixes and whitespace */
 const normalizeProtocolName = (protocol?: string) =>
-  (protocol || "").toLowerCase().replace(/\s+v\d+$/i, "").replace(/\s+/g, "");
+  normalizeGatewayProtocol(protocol || "");
 
 /** Determine flash loan provider version from its name */
-const resolveProviderVersion = (providerName: string): "aave" | "v2" | "v3" => {
+const resolveProviderVersion = (providerName: string): FlashLoanVersion => {
   const pv = providerName.toLowerCase();
+  if (pv.includes("morpho")) return "morpho";
   if (pv.includes("aave")) return "aave";
   if (pv.includes("v3")) return "v3";
   return "v2";
@@ -260,6 +267,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   fromProtocol,
   position,
   fromContext,
+  fromContexts,
   chainId,
   preSelectedCollaterals,
   disableCollateralSelection,
@@ -416,17 +424,49 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
   // Check if protocol uses custom support hooks (Morpho, Euler)
   // These protocols have their own market support hooks, so skip the generic one
+  const isMidnightSelected = selectedProtocol === "Morpho Midnight";
   const isMorphoSelected = selectedProtocol === "Morpho Blue";
+  const [midnightExecutionError, setMidnightExecutionError] = useState<string>();
+  const fixedCollaterals = useMemo(() => Object.entries(addedCollaterals).map(([address, amount]) => {
+    const token = collaterals.find(c => addrKey(c.address) === addrKey(address));
+    try {
+      if (!token) throw new Error("Unknown collateral decimals");
+      return { address, amount: parseUnits(amount, token.decimals) };
+    } catch {
+      return { address, amount: 0n };
+    }
+  }).filter(c => c.amount > 0n), [addedCollaterals, collaterals]);
+  const fixedAssets = debtAmountBigInt + (debtAmountBigInt * BigInt(hookSelectedProvider?.feeBps ?? 0) + 9999n) / 10000n;
+  const sourceFixedMarket = useMemo(() => {
+    if (normalizeProtocolName(fromProtocol) !== "morpho-midnight" || !fromContext) return undefined;
+    try {
+      return decodeAbiParameters(parseAbiParameters("bytes32,uint256,bytes"), fromContext as `0x${string}`)[0];
+    } catch {
+      return undefined;
+    }
+  }, [fromProtocol, fromContext]);
+  const fixed = useMidnightFinancing({
+    chainId: chainId || 1, loan: position.tokenAddress, assets: fixedAssets,
+    collaterals: fixedCollaterals, excludeMarketId: sourceFixedMarket,
+    enabled: isOpen && isMidnightSelected && debtConfirmed,
+  });
+  const midnightSupported = useMemo(() => Object.fromEntries(collateralAddresses.map(address => [
+    addrKey(address),
+    (fixed.selected ? [fixed.selected] : fixed.markets.data ?? []).some(m =>
+      m.collaterals.some(c => addrKey(c.token) === addrKey(address))),
+  ])), [collateralAddresses, fixed.selected, fixed.markets.data]);
   const isEulerSelected = selectedProtocol === "Euler V2";
-  const usesCustomSupportHook = isMorphoSelected || isEulerSelected;
+  const usesCustomSupportHook = isMorphoSelected || isEulerSelected || isMidnightSelected;
 
-  const { supportedCollaterals: effectiveSupportedMap, isLoading: isSupportLoading } = useCollateralSupport(
+  const { supportedCollaterals: genericSupportedMap, isLoading: isSupportLoading } = useCollateralSupport(
     selectedProtocol || filteredDestinationProtocols[0]?.name || "",
     position.tokenAddress,
     collateralAddresses.map(a => a.toLowerCase()),
     isOpen && collateralAddresses.length > 0 && Boolean(selectedProtocol || filteredDestinationProtocols[0]?.name) && !usesCustomSupportHook,
     chainId,
   );
+
+  const effectiveSupportedMap = isMidnightSelected ? midnightSupported : genericSupportedMap;
 
   /* ---------------------- Morpho market support ---------------------- */
 
@@ -619,7 +659,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
   ]);
 
   /* --------------------------- EVM Router helpers --------------------------- */
-  const { createMoveBuilder, executeFlowBatchedIfPossible, canDoAtomicBatch, simulateInstructions } = useKapanRouterV2();
+  const { createMoveBuilder, executeFlowBatchedIfPossible, canDoAtomicBatch, simulateInstructions } = useKapanRouterV2({ chainId });
 
   useEffect(() => {
     if (!isOpen) {
@@ -890,6 +930,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       return true;
     }
 
+    if (isMidnightSelected && !fixed.ready) return true;
+
     // For Morpho, must have a market selected
     if (isMorphoSelected && !selectedMorphoMarket) {
       console.log("[isActionDisabled] Morpho selected but no market");
@@ -914,10 +956,10 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
     }
 
     return false;
-  }, [debtConfirmed, selectedProtocol, addedCollaterals, isMorphoSelected, selectedMorphoMarket, morphoSupportedCollaterals, isEulerSelected, eulerContext, eulerSupportedCollaterals, effectiveSupportedMap, selectedEulerVault, eulerContextsByCollateral]);
+  }, [isMidnightSelected, fixed.ready, debtConfirmed, selectedProtocol, addedCollaterals, isMorphoSelected, selectedMorphoMarket, morphoSupportedCollaterals, isEulerSelected, eulerContext, eulerSupportedCollaterals, effectiveSupportedMap, selectedEulerVault, eulerContextsByCollateral]);
 
   const handleExecuteMove = useCallback(async () => {
-    if (!debtConfirmed || !selectedProtocol) {
+    if (!debtConfirmed || !selectedProtocol || (isMidnightSelected && !fixed.ready)) {
       return;
     }
 
@@ -930,8 +972,13 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
 
     try {
       setIsSubmitting(true);
+      setMidnightExecutionError(undefined);
       track("refinance_tx_begin", { ...baseProps });
 
+      if (isMidnightSelected && fixed.quote.data && fixed.selected && fixed.preview) {
+        validateQuote(fixed.quote.data, fixed.selected, fixedAssets);
+        borrowingBounds(fixed.quote.data, fixedAssets, fixed.preview.bounds.maxApr, 50, Math.floor(Date.now() / 1000), userAddress);
+      }
       const builder = createMoveBuilder();
       const providerVersion = resolveProviderVersion(selectedProvider || "");
       const normalizedTo = normalizeProtocolName(selectedProtocol);
@@ -944,7 +991,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       // Detect source protocol type for context handling
       const isFromMorpho = matchesProtocol(normalizedFrom, fromProtocol, "morphoblue") || matchesProtocol(normalizedFrom, fromProtocol, "morpho");
       const isFromEuler = matchesProtocol(normalizedFrom, fromProtocol, "euler");
-      const defaultSourceContext = computeDefaultSourceContext(isFromMorpho, isFromEuler, fromContext);
+      const defaultSourceContext = normalizedFrom === "morpho-midnight" && fromContext ? fromContext as `0x${string}` : computeDefaultSourceContext(isFromMorpho, isFromEuler, fromContext);
 
       // Build per-collateral source contexts for Euler (each collateral has its own vault)
       const eulerSourceContextsMap = isFromEuler
@@ -955,13 +1002,16 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         fromProtocol,
         debtToken: position.tokenAddress as Address,
         expectedDebt: debtAmount,
+        repayMax: isMidnightSelected ? state.isDebtMaxClicked || debtAmount === debtMaxRaw : true,
         debtDecimals: position.decimals,
         fromContext: defaultSourceContext,
         flash: { version: providerVersion, premiumBps: 9, bufferBps: 10 },
       });
 
       // Prepare Morpho context if destination is Morpho Blue
-      const morphoEncodedContext: `0x${string}` | undefined = isMorphoSelected && morphoContext
+      const morphoEncodedContext: `0x${string}` | undefined = isMidnightSelected && fixed.selected && fixed.quote.data && fixed.preview
+        ? encodeMidnightContext(fixed.selected.market_id, 0, fixed.quote.data, fixed.preview.bounds)
+        : isMorphoSelected && morphoContext
         ? encodeMorphoContext(morphoContext as MorphoMarketContextForEncoding) as `0x${string}`
         : undefined;
 
@@ -977,8 +1027,10 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
         const meta = collaterals.find(c => addrKey(c.address) === addrKey(addr));
         if (!meta) return;
         const isMax = collateralIsMaxMap[addr] === true;
-        const toContext = resolveDestContext(addr, isEulerSelected, eulerContextsByCollateral, morphoEncodedContext, meta.symbol);
-        const fromCtx = resolveSourceCtx(addr, isFromEuler, eulerSourceContextsMap, defaultSourceContext, meta.symbol);
+        const toContext = isMidnightSelected && fixed.selected
+          ? encodeMidnightContext(fixed.selected.market_id, collateralIndex(fixed.selected, addr))
+          : resolveDestContext(addr, isEulerSelected, eulerContextsByCollateral, morphoEncodedContext, meta.symbol);
+        const fromCtx = fromContexts?.[addrKey(addr)] ?? resolveSourceCtx(addr, isFromEuler, eulerSourceContextsMap, defaultSourceContext, meta.symbol);
 
         builder.buildMoveCollateral({
           fromProtocol,
@@ -1003,6 +1055,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       });
 
       const flow = builder.build();
+      if (isMidnightSelected && fixed.selected && userAddress) rememberMidnightMarket(chainId || 1, userAddress, fixed.selected.market_id);
 
       // Debug: log the built instructions
       console.log("[Euler Debug] Built flow instructions:", flow.length);
@@ -1018,6 +1071,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       track("refinance_tx_complete", successProps);
     } catch (error) {
       console.error("Refinance flow error:", error);
+      setMidnightExecutionError(error instanceof Error ? error.message : "Refinancing failed. Refresh the offers and retry.");
       const errorProps = {
         ...baseProps, batchingUsed, status: "error",
         error: error instanceof Error ? error.message : String(error),
@@ -1028,6 +1082,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       setIsSubmitting(false);
     }
   }, [
+    fixed, fixedAssets, isMidnightSelected, fromContexts, fromContext, userAddress, debtAmount, debtMaxRaw, state.isDebtMaxClicked, collateralIsMaxMap, effectiveRevokePermissions, morphoContext,
     debtConfirmed,
     selectedProtocol,
     fromProtocol,
@@ -1091,7 +1146,7 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       selectedProvider={selectedProvider ?? ""}
       setSelectedProvider={setSelectedProvider}
       collaterals={collaterals}
-      isLoadingCollaterals={isLoadingCollaterals || (isMorphoSelected ? isLoadingMorphoMarkets : isEulerSelected ? isLoadingEulerVaults : isSupportLoading)}
+      isLoadingCollaterals={isLoadingCollaterals || (isMidnightSelected ? fixed.markets.isLoading : isMorphoSelected ? isLoadingMorphoMarkets : isEulerSelected ? isLoadingEulerVaults : isSupportLoading)}
       effectiveSupportedMap={effectiveSupportedMap}
       addedCollaterals={addedCollaterals}
       expandedCollateral={expandedCollateral}
@@ -1103,11 +1158,11 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       disableCollateralSelection={disableCollateralSelection}
       preSelectedCollaterals={preSelectedCollaterals}
       getUsdValue={getUsdValue}
-      refiHF={refiHF}
-      hfColor={hfColor}
-      totalCollateralUsd={totalCollateralUsd}
-      ltv={ltv}
-      debtUsd={debtUsd}
+      refiHF={isMidnightSelected ? fixed.risk.data?.healthFactor ?? 0 : refiHF}
+      hfColor={isMidnightSelected ? hfTone(fixed.risk.data?.healthFactor ?? 0) : hfColor}
+      totalCollateralUsd={isMidnightSelected && fixed.risk.data ? toUsdRaw(fixed.risk.data.collateralValue, position.decimals, price8(position.tokenAddress, mergedPrices)) : totalCollateralUsd}
+      ltv={isMidnightSelected ? fixed.risk.data?.ltv.toFixed(1) ?? "—" : ltv}
+      debtUsd={isMidnightSelected && fixed.risk.data ? toUsdRaw(fixed.risk.data.totalDebt, position.decimals, price8(position.tokenAddress, mergedPrices)) : debtUsd}
       isActionDisabled={isActionDisabled}
       isSubmitting={isSubmitting}
       handleExecuteMove={handleExecuteMove}
@@ -1118,6 +1173,8 @@ export const RefinanceModalEvm: FC<RefinanceModalEvmProps> = ({
       setRevokePermissions={setRevokePermissions}
       hasActiveADLOrders={hasActiveADLOrders}
       apiProbes={null}
+      midnightSection={isMidnightSelected ? <FixedLoanTerms financing={fixed} symbol={position.name} decimals={position.decimals} /> : undefined}
+      errorMessage={midnightExecutionError}
       // Morpho-specific props
       isMorphoSelected={isMorphoSelected}
       morphoMarkets={morphoMarketsForSelectedCollateral}

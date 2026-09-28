@@ -24,7 +24,7 @@ Defined in `utils/v2/instructionHelpers.ts:4-13`:
 | Type | Creates UTXO? | Description |
 |------|--------------|-------------|
 | `FlashLoan` | **Yes** | Borrows from flash loan provider, creates output for repayment amount |
-| `PullToken` | **No** | Pulls tokens from user to router (requires user approval) |
+| `PullToken` | **Yes** | Pulls tokens from user to router and appends amount/token output (requires user approval) |
 | `PushToken` | **No** | Sends tokens from UTXO to user |
 | `ToOutput` | **Yes** | Creates a UTXO from hardcoded amount/token (no actual transfer) |
 | `Approve` | **Yes** (empty) | Approves gateway to spend UTXO. Creates empty output for index sync! |
@@ -146,3 +146,35 @@ context = encodeAbiParameters([{ type: "address" }], [marketAddress])
 // Morpho: full MarketParams tuple
 context = encodeMorphoContext({ loanToken, collateralToken, oracle, irm, lltv })
 ```
+
+
+## Morpho Midnight integration
+
+Use protocol name `morpho-midnight` (distinct from `morpho-blue`). Read
+`docs/morpho-midnight-contract-integration.md` before building instructions or quotes.
+
+- Write context is `abi.encode(marketId, collateralIndex, tradeData)`; view context accepts the first two fields.
+- `Borrow.amount` is exact **net cash received**. Face debt is larger at a discount and determines health. `Repay` uses face debt.
+- Midnight requires gateway authorization for **all** mutations, including supply collateral and repay.
+- `Deposit` buys lender credit against offers; it is not collateral supply. `DepositCollateral` supplies collateral. Use index `type(uint256).max` only for reading/redeeming lender credit.
+- Offers come from inline `Take[]` or publisher/key execution plans. The user's instruction retains rate, price, maturity/market, debt-unit and deadline bounds across refreshes.
+- A fixed offer price is not a fixed APR as maturity approaches. Always set execution-time `maxApr` for deferred borrowing.
+- Pure refinancing into Midnight still consumes offers. Direct face-value repayment out of Midnight does not.
+- Midnight's oracle values are in loan-token units, not necessarily USD. Health aggregates all collateral slots with their own LLTVs.
+- Use the isolated Osaka runner for upstream and deployed-core tests; Kapan contracts still compile with 0.8.30/Cancun.
+- Current UTXO behavior is authoritative in `contracts/v2/KapanRouter.sol` and `test/v2/helpers/instructionHelpers.ts` (under `packages/hardhat`). Some older flow examples below/above predate PullToken output creation.
+
+### Midnight frontend
+
+- Read `docs/morpho-midnight-frontend.md`. Group loans under Morpho while retaining `morpho-midnight` execution contexts and a Fixed loan position badge.
+- Use `useMidnightFinancing` for executable loan quotes and face-debt health; never apply Blue's cash-debt assumptions. Rebind quotes to market, amount and all collateral slots.
+- REST list endpoints cap pages at **20**, not 100; follow cursors. Quote takes have a separate limit of 32. Validate immutable market IDs and deployed core addresses.
+- `use1inchQuote.isAmountCurrent` must be true before using its debounced calldata. Select the returned aggregator's gateway, and reject stale quotes.
+- New Midnight aggregator builders live in `utils/midnight/flows.ts`; they use zero-fee flash providers and explicit refund outputs. Do not reuse a single collateral slot context for both sides of a collateral swap.
+- Read the router gateway registry before enabling transactions. API discovery and position reads must remain useful before gateway deployment.
+
+### Midnight deployment
+
+- Use only the `MorphoMidnightGateway` tag. Its script reuses and preflights the live router/helper, deploys a new view router, copies the live supported view registrations, and enables writes last. Broad deployment dependencies can redeploy unrelated routers or reset providers.
+- Existing trigger contracts retain their immutable old view-router address. Updating the frontend view router does not upgrade those triggers or enable Midnight limits.
+- Validate frontend builds against `yarn install --immutable`; a separate npm install can introduce incompatible Wagmi/core versions absent from the repository lockfile.

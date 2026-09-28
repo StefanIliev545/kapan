@@ -1,5 +1,9 @@
 "use client";
 
+import { formatUnits } from "viem";
+import { useMidnightPositions } from "~~/hooks/midnight/useMidnight";
+import { MidnightPositionsSection } from "./midnight/MidnightPositionsSection";
+import { MidnightMarketsSection } from "./midnight/MidnightMarketsSection";
 import { FC, useState, useMemo, useEffect, useCallback } from "react";
 import { useAccount } from "wagmi";
 import {
@@ -190,17 +194,34 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     return apiRows;
   }, [refreshedRows, apiRows, isRefreshing, isRefreshLoading, refreshEnabled]);
 
+  const fixed = useMidnightPositions(chainId, connectedAddress);
+
   // Compute totals and metrics using extracted helper
   const metrics = useMemo(
-    () => calculatePositionMetrics(rows, findYield),
-    [rows, findYield]
+    () => {
+      const variable = calculatePositionMetrics(rows, findYield);
+      const supplies = buildSuppliedPositions(rows, findYield);
+      const borrows = buildBorrowedPositions(rows);
+      for (const row of fixed.rows) {
+        const loan = fixed.tokens[row.loan_token.toLowerCase()];
+        const loanPrice = fixed.prices[row.loan_token.toLowerCase()] ?? 0;
+        borrows.push({balance: Number(formatUnits(BigInt(row.debt), loan.decimals)) * loanPrice, currentRate: 0});
+        for (const c of row.collaterals) {
+          const token = fixed.tokens[c.token.toLowerCase()];
+          supplies.push({balance: Number(formatUnits(BigInt(c.amount), token.decimals)) * (fixed.prices[c.token.toLowerCase()] ?? 0), currentRate: getExternalTokenYield(token.symbol, token.address, findYield)});
+        }
+      }
+      // Fixed interest is already included in face debt. Do not charge it again in projected yield.
+      return {...variable, ...calculateNetYieldMetrics(supplies, borrows), positionCount: rows.length + fixed.rows.length};
+    },
+    [rows, findYield, fixed.rows, fixed.tokens, fixed.prices]
   );
 
   // Report totals to global state for dashboard metrics
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
 
   useEffect(() => {
-    if (!hasLoadedOnce) {
+    if (!hasLoadedOnce && !fixed.isSuccess) {
       return;
     }
 
@@ -209,14 +230,14 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     // `calculateNetYieldMetrics`. Header now equals dashboard, by
     // construction.
     setProtocolTotals("Morpho", metrics.totalSupplied, metrics.totalBorrowed);
-  }, [hasLoadedOnce, metrics.totalSupplied, metrics.totalBorrowed, setProtocolTotals, effectiveChainId]);
+  }, [hasLoadedOnce, fixed.isSuccess, metrics.totalSupplied, metrics.totalBorrowed, setProtocolTotals, effectiveChainId]);
 
-  const hasPositions = rows.length > 0;
+  const hasPositions = rows.length > 0 || fixed.rows.length > 0;
 
   // Auto-expand when positions are found, stay collapsed when empty
   useEffect(() => {
     // Wait for initial load to complete
-    if (!hasLoadedOnce) {
+    if (!hasLoadedOnce && !fixed.isSuccess) {
       return;
     }
 
@@ -225,7 +246,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     } else {
       setIsCollapsed(true); // Stay collapsed when no positions
     }
-  }, [hasLoadedOnce, hasPositions]);
+  }, [hasLoadedOnce, fixed.isSuccess, hasPositions]);
 
   // Toggle collapsed state handler
   const toggleCollapsed = useCallback(() => {
@@ -267,7 +288,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
     <div className={`hide-scrollbar flex w-full flex-col ${isCollapsed ? 'p-1' : 'space-y-2 py-2 sm:p-3'}`}>
       {/* Protocol Header */}
       <BaseProtocolHeader
-        protocolName="Morpho Blue"
+        protocolName="Morpho"
         protocolIcon="/logos/morpho.svg"
         protocolUrl="https://app.morpho.org"
         isCollapsed={isCollapsed}
@@ -277,6 +298,8 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
         hasPositions={hasPositions}
         metrics={headerMetrics}
       />
+
+      {fixed.error && isCollapsed && <p role="alert" className="px-3 text-xs text-error">Fixed loans could not be loaded. Expand Morpho to retry.</p>}
 
       {/* Markets Section - expandable */}
       <CollapsibleSection isOpen={isMarketsOpen && !isCollapsed}>
@@ -288,11 +311,12 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
           showLowLiquidity={showLowLiquidity}
           onShowLowLiquidityChange={setShowLowLiquidity}
         />
+        <MidnightMarketsSection chainId={chainId} enabled={isMarketsOpen && !isCollapsed} />
       </CollapsibleSection>
 
       {/* Positions Container - collapsible with animation */}
       <CollapsibleSection isOpen={!isCollapsed}>
-        <MorphoPositionsSection
+        {(rows.length > 0 || fixed.rows.length === 0) && <MorphoPositionsSection
           title="Your Positions"
           rows={rows}
           markets={markets}
@@ -301,7 +325,8 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
           isUpdating={isUpdating}
           chainId={chainId}
           findYield={findYield}
-        />
+        />}
+        <MidnightPositionsSection key={`${chainId}:${connectedAddress}`} positions={fixed} chainId={chainId} />
       </CollapsibleSection>
     </div>
   );
