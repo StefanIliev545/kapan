@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MORPHO_GRAPHQL_API } from "~~/utils/constants";
+import { normalizeMorphoAsset, readMorphoGraphQLItems, type MorphoApiAsset } from "~~/utils/morpho/graphql";
 
 // Optimized query with server-side filtering support
 // Key filters: utilization_lte, supplyAssetsUsd_gte reduce junk at API level
@@ -47,13 +48,13 @@ const QUERY_MARKETS = `
           address
           symbol
           decimals
-          priceUsd
+          price { usd }
         }
         loanAsset {
           address
           symbol
           decimals
-          priceUsd
+          price { usd }
         }
         oracle {
           address
@@ -74,9 +75,30 @@ const QUERY_MARKETS = `
   }
 `;
 
-type MarketItem = any;
+interface MarketItem {
+  marketId: string;
+  uniqueKey: string;
+  listed: boolean | string | number;
+  collateralAsset: MorphoApiAsset | null;
+  loanAsset: MorphoApiAsset;
+  warnings?: {
+    level?: string;
+  }[];
+  supplyingVaults?: {
+    listed: boolean | string | number;
+    state?: {
+      totalAssetsUsd?: number | string;
+    };
+  }[];
+  state?: {
+    liquidityAssetsUsd?: number;
+    supplyApy?: number;
+    borrowApy?: number;
+    utilization?: number;
+  };
+}
 
-const safeFloat = (n: any): number => {
+const safeFloat = (n: unknown): number => {
   if (typeof n === "number") return Number.isFinite(n) ? n : 0;
   if (typeof n === "string") {
     const f = parseFloat(n);
@@ -85,7 +107,7 @@ const safeFloat = (n: any): number => {
   return 0;
 };
 
-const normalizeUtilization = (val: any): number => {
+const normalizeUtilization = (val: unknown): number => {
   const n = safeFloat(val);
   return n > 1.5 ? n / 100 : n;
 };
@@ -112,7 +134,7 @@ const isMarketTrusted = (m: MarketItem, isSearching: boolean): boolean => {
   // 2. Vault Trusted (Curated)
   // We check if a Listed Vault has >$10k in it.
   const hasTrustedVault = Array.isArray(m.supplyingVaults) && m.supplyingVaults.some(
-    (v: any) => {
+    (v) => {
       const vaultListed = v.listed === true || v.listed === "true" || v.listed === 1;
       const vaultAssets = safeFloat(v.state?.totalAssetsUsd);
       return vaultListed && vaultAssets > 10_000;
@@ -185,7 +207,6 @@ const parseRequestParams = (chainId: string, sp: URLSearchParams): RequestParams
 interface BatchResult {
   items: MarketItem[];
   hasMore: boolean;
-  error?: string;
 }
 
 /** Fetch a single page of markets from the Morpho GraphQL API with server-side filtering. */
@@ -196,7 +217,7 @@ const fetchMarketsBatch = async (
   listed?: boolean,
   searchTerm?: string,
 ): Promise<BatchResult> => {
-  const variables: Record<string, any> = {
+  const variables: Record<string, string | number | boolean> = {
     first,
     skip,
     chainId: params.chainIdInt,
@@ -218,21 +239,17 @@ const fetchMarketsBatch = async (
     next: { revalidate: listed ? 120 : 60 },
   });
 
-  const data = await res.json();
-
-  if (data.errors) {
-    const msg = data.errors[0]?.message || "";
-    if (msg.includes("No results")) {
-      return { items: [], hasMore: false };
-    }
-    if (params.debug) console.warn("[Morpho] GraphQL error:", data.errors);
-    return { items: [], hasMore: false, error: msg };
-  }
+  const rawItems = await readMorphoGraphQLItems<MarketItem>(res, "markets");
 
   // The API now keys markets by `marketId` (the `id`/`uniqueKey` fields were removed).
   // Alias it to `uniqueKey` so downstream map keys and the client response — which still
   // read `uniqueKey` — keep working unchanged.
-  const items = (data.data?.markets?.items || []).map((m: any) => ({ ...m, uniqueKey: m.marketId }));
+  const items = rawItems.map((m: MarketItem) => ({
+    ...m,
+    uniqueKey: m.marketId,
+    collateralAsset: m.collateralAsset ? normalizeMorphoAsset(m.collateralAsset) : null,
+    loanAsset: normalizeMorphoAsset(m.loanAsset),
+  }));
   return { items, hasMore: items.length === first };
 };
 
@@ -241,7 +258,7 @@ const fetchMarketsBatch = async (
 /** Check if a market has critical RED/HIGH-level warnings. */
 const hasCriticalWarning = (m: MarketItem): boolean => {
   return Array.isArray(m.warnings) && m.warnings.some(
-    (w: any) => ["RED", "HIGH"].includes(String(w?.level || "").toUpperCase()),
+    (w) => ["RED", "HIGH"].includes(String(w?.level || "").toUpperCase()),
   );
 };
 
@@ -381,8 +398,8 @@ export async function GET(
       markets: { items: sorted },
     });
 
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("[Morpho API Error]", e);
-    return NextResponse.json({ error: "Failed to fetch markets" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch markets" }, { status: 502 });
   }
 }

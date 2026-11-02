@@ -3,6 +3,7 @@ import { createPublicClient, http, Address, Hex, Chain } from "viem";
 import { base, arbitrum } from "viem/chains";
 import deployedContracts from "~~/contracts/deployedContracts";
 import { MORPHO_GRAPHQL_API } from "~~/utils/constants";
+import { normalizeMorphoAsset, readMorphoGraphQLItems } from "~~/utils/morpho/graphql";
 
 // ============ Types ============
 
@@ -157,13 +158,13 @@ const LISTED_MARKETS_QUERY = `
           address
           symbol
           decimals
-          priceUsd
+          price { usd }
         }
         loanAsset {
           address
           symbol
           decimals
-          priceUsd
+          price { usd }
         }
         oracle {
           address
@@ -202,13 +203,13 @@ const USER_POSITIONS_QUERY = `
             address
             symbol
             decimals
-            priceUsd
+            price { usd }
           }
           loanAsset {
             address
             symbol
             decimals
-            priceUsd
+            price { usd }
           }
           oracle {
             address
@@ -251,8 +252,8 @@ function chunkArray<T>(array: T[], size: number): T[][] {
 function mapApiMarket(m: any): MorphoMarket {
   return {
     uniqueKey: m.marketId,
-    collateralAsset: m.collateralAsset ?? null,
-    loanAsset: m.loanAsset,
+    collateralAsset: m.collateralAsset ? normalizeMorphoAsset(m.collateralAsset) : null,
+    loanAsset: normalizeMorphoAsset(m.loanAsset),
     oracle: m.oracle ?? null,
     irmAddress: m.irmAddress,
     lltv: m.lltv,
@@ -322,58 +323,36 @@ function convertOnChainToPosition(
 // ============ API Functions ============
 
 async function fetchMarkets(chainId: number): Promise<MorphoMarket[]> {
-  try {
-    const response = await fetch(MORPHO_GRAPHQL_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: LISTED_MARKETS_QUERY,
-        variables: { chainId, first: 500 },
-      }),
-      next: { revalidate: 60 },
-    });
+  const response = await fetch(MORPHO_GRAPHQL_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: LISTED_MARKETS_QUERY,
+      variables: { chainId, first: 500 },
+    }),
+    next: { revalidate: 60 },
+  });
 
-    const data = await response.json();
-    if (data.errors) {
-      console.error("[positions-onchain] GraphQL markets error:", data.errors);
-      return [];
-    }
-
-    return (data.data?.markets?.items || []).map(mapApiMarket);
-  } catch (error) {
-    console.error("[positions-onchain] Failed to fetch markets:", error);
-    return [];
-  }
+  return (await readMorphoGraphQLItems<any>(response, "markets")).map(mapApiMarket);
 }
 
 async function fetchGraphQLPositions(
   chainId: number,
   userAddress: string
 ): Promise<MorphoPosition[]> {
-  try {
-    const response = await fetch(MORPHO_GRAPHQL_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: USER_POSITIONS_QUERY,
-        variables: {
-          chainId,
-          userAddress: userAddress.toLowerCase(),
-        },
-      }),
-    });
+  const response = await fetch(MORPHO_GRAPHQL_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: USER_POSITIONS_QUERY,
+      variables: {
+        chainId,
+        userAddress: userAddress.toLowerCase(),
+      },
+    }),
+  });
 
-    const data = await response.json();
-    if (data.errors) {
-      console.error("[positions-onchain] GraphQL positions error:", data.errors);
-      return [];
-    }
-
-    return (data.data?.marketPositions?.items || []).map(mapApiPosition);
-  } catch (error) {
-    console.error("[positions-onchain] Failed to fetch GraphQL positions:", error);
-    return [];
-  }
+  return (await readMorphoGraphQLItems<any>(response, "marketPositions")).map(mapApiPosition);
 }
 
 async function fetchOnChainPositions(
@@ -520,6 +499,8 @@ export async function GET(
   const debug = request.nextUrl.searchParams.get("debug") === "true";
 
   try {
+    // Both discoveries are required: listed markets cover newly created positions,
+    // while user positions include markets outside the listed set.
     const [markets, graphQLPositions] = await Promise.all([
       fetchMarkets(chainId),
       fetchGraphQLPositions(chainId, userAddress),
@@ -547,7 +528,7 @@ export async function GET(
     console.error("[positions-onchain] Error:", error);
     return NextResponse.json(
       { error: "Failed to fetch positions" },
-      { status: 500 }
+      { status: 502 }
     );
   }
 }
