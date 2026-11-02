@@ -39,38 +39,35 @@ export async function fetchMorphoMarkets(
     showLowLiquidity?: boolean;
   }
 ): Promise<MorphoMarket[]> {
-  try {
-    const params = new URLSearchParams({
-      first: String(options?.first ?? 2000),
-      curation: options?.curation ?? "curated",
-      minLiquidityUsd: options?.minLiquidityUsd ?? "1000",
-      hideSaturated: String(options?.hideSaturated ?? true),
-    });
+  const params = new URLSearchParams({
+    first: String(options?.first ?? 2000),
+    curation: options?.curation ?? "curated",
+    minLiquidityUsd: options?.minLiquidityUsd ?? "1000",
+    hideSaturated: String(options?.hideSaturated ?? true),
+  });
 
-    if (options?.search?.trim()) {
-      params.set("search", options.search.trim());
-    }
-
-    if (options?.showLowLiquidity) {
-      params.set("showLowLiquidity", "true");
-      params.set("minLiquidityUsd", "0");
-      params.set("hideSaturated", "false");
-    }
-
-    const response = await fetch(`/api/morpho/${chainId}/markets?${params.toString()}`);
-    if (!response.ok) {
-      console.error(`[morpho/marketApi] Markets API error: ${response.status}`);
-      return [];
-    }
-    const data = await response.json();
-    const items: MorphoMarket[] = data?.markets?.items || [];
-
-    // Client-side safety net for liquidity-first ordering
-    return sortMarketsByLiquidityDesc(items);
-  } catch (error) {
-    console.error("[morpho/marketApi] Failed to fetch markets:", error);
-    return [];
+  if (options?.search?.trim()) {
+    params.set("search", options.search.trim());
   }
+
+  if (options?.showLowLiquidity) {
+    params.set("showLowLiquidity", "true");
+    params.set("minLiquidityUsd", "0");
+    params.set("hideSaturated", "false");
+  }
+
+  const response = await fetch(`/api/morpho/${chainId}/markets?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Morpho markets (HTTP ${response.status})`);
+  }
+  const data = await response.json();
+  const items = data?.markets?.items;
+  if (!Array.isArray(items)) {
+    throw new Error("Invalid Morpho markets response");
+  }
+
+  // Client-side safety net for liquidity-first ordering
+  return sortMarketsByLiquidityDesc(items);
 }
 
 /** Default stale time for market queries (5 minutes) */

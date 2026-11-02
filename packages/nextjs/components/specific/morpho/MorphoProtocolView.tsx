@@ -144,12 +144,15 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   const {
     markets,
     rows: apiRows,
-    isLoadingPositions,
     hasLoadedOnce,
     isUpdating,
+    positionsError,
+    marketsError,
+    refetchMarkets,
+    refetchPositions: refetchApiPositions,
   } = useMorphoLendingPositions(effectiveChainId, connectedAddress);
 
-  const { marketPairs, markets: browseMarkets, isLoading: isLoadingBrowseMarkets } = useMorphoMarkets(effectiveChainId, undefined, showLowLiquidity);
+  const { marketPairs, markets: browseMarkets, isLoading: isLoadingBrowseMarkets, error: browseMarketsError, refetch: refetchBrowseMarkets } = useMorphoMarkets(effectiveChainId, undefined, showLowLiquidity);
 
   // Fetch external yields (Pendle PT tokens, Maple syrup tokens, etc.) for APY display
   const { findYield } = useExternalYields(effectiveChainId);
@@ -278,6 +281,39 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
         metrics={headerMetrics}
       />
 
+      {Boolean(positionsError) && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 rounded-lg border border-error/20 bg-error/5 px-3 py-2 text-xs text-error"
+        >
+          <span>
+            {rows.length > 0
+              ? "Could not refresh variable-rate positions. Showing the last available data."
+              : "Variable-rate positions could not be loaded."}
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs shrink-0"
+            onClick={refetchApiPositions}
+            disabled={isUpdating}
+          >
+            {isUpdating ? "Retrying…" : "Retry"}
+          </button>
+        </div>
+      )}
+
+      {Boolean(marketsError || browseMarketsError) && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-error/20 bg-error/5 px-3 py-2 text-xs text-error">
+          <span>Morpho markets could not be loaded. Previously loaded data is retained.</span>
+          <button type="button" className="btn btn-ghost btn-xs shrink-0" onClick={() => {
+            refetchMarkets();
+            void refetchBrowseMarkets();
+          }}>
+            Retry markets
+          </button>
+        </div>
+      )}
+
       {/* Markets Section - expandable */}
       <CollapsibleSection isOpen={isMarketsOpen && !isCollapsed}>
         <MorphoMarketsSection
@@ -292,16 +328,16 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
 
       {/* Positions Container - collapsible with animation */}
       <CollapsibleSection isOpen={!isCollapsed}>
-        <MorphoPositionsSection
+        {(rows.length > 0 || !positionsError) && <MorphoPositionsSection
           title="Your Positions"
           rows={rows}
           markets={markets}
           userAddress={connectedAddress}
-          hasLoadedOnce={hasLoadedOnce || !isLoadingPositions}
+          hasLoadedOnce={hasLoadedOnce}
           isUpdating={isUpdating}
           chainId={chainId}
           findYield={findYield}
-        />
+        />}
       </CollapsibleSection>
     </div>
   );

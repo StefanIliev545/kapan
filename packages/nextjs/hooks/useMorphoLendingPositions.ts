@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { formatUnits } from "viem";
 import type { ProtocolPosition } from "~~/components/ProtocolView";
@@ -154,23 +154,19 @@ async function fetchMorphoPositions(
   chainId: number,
   userAddress: string
 ): Promise<MorphoPosition[]> {
-  try {
-    // Use the hybrid endpoint that combines on-chain and GraphQL data
-    // On-chain data ensures positions created through our UI are visible
-    // even if Morpho's indexer hasn't picked them up yet
-    const response = await fetch(
-      `/api/morpho/${chainId}/positions-onchain?user=${userAddress}`
-    );
-    if (!response.ok) {
-      console.error(`[useMorphoLendingPositions] Positions API error: ${response.status}`);
-      return [];
-    }
-    const data = await response.json();
-    return data?.userByAddress?.marketPositions || [];
-  } catch (error) {
-    console.error("[useMorphoLendingPositions] Failed to fetch positions:", error);
-    return [];
+  // On-chain data includes positions that Morpho's indexer has not picked up yet.
+  const response = await fetch(
+    `/api/morpho/${chainId}/positions-onchain?user=${userAddress}`
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Morpho positions (HTTP ${response.status})`);
   }
+  const data = await response.json();
+  const positions = data?.userByAddress?.marketPositions;
+  if (!Array.isArray(positions)) {
+    throw new Error("Invalid Morpho positions response");
+  }
+  return positions;
 }
 
 // ============ Hook Result ============
@@ -203,8 +199,6 @@ export function useMorphoLendingPositions(
   chainId: number,
   userAddress: string | undefined
 ): UseMorphoLendingPositionsResult {
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-
   // Fetch markets
   const {
     data: markets = [],
@@ -222,7 +216,7 @@ export function useMorphoLendingPositions(
 
   // Fetch user positions
   const {
-    data: positions = [],
+    data: positions,
     isLoading: isLoadingPositions,
     isFetching: isFetchingPositions,
     error: positionsError,
@@ -235,21 +229,15 @@ export function useMorphoLendingPositions(
     enabled: chainId > 0 && !!userAddress,
   });
 
-  // Track first load
-  useEffect(() => {
-    if (!isLoadingPositions && !hasLoadedOnce && userAddress) {
-      setHasLoadedOnce(true);
-    }
-  }, [isLoadingPositions, hasLoadedOnce, userAddress]);
-
-  // Reset on address or chainId change
-  useEffect(() => {
-    setHasLoadedOnce(false);
-  }, [userAddress, chainId]);
+  // Data belongs to the current query key and survives failed background refreshes.
+  // A failed initial request (or its pending retry) has never loaded successfully.
+  const hasLoadedOnce = positions !== undefined;
 
   // Build position rows
   const rows = useMemo<MorphoPositionRow[]>(() => {
-    if (!positions.length) return [];
+    if (!positions?.length) {
+      return [];
+    }
 
     return positions
       .filter((pos) => pos.collateral > 0 || pos.borrowAssets > 0)
