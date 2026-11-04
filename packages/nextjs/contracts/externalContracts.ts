@@ -261,7 +261,7 @@ function resolveEulerVaultLogo(lower: string): string | null {
   }
   const m = lower.match(/^e([a-z0-9]+)-\d+$/);
   if (!m) return null;
-  const eulerMap: Record<string, string> = { usdai: "/logos/susdai.svg" };
+  const eulerMap: Record<string, string> = { usdai: "/logos/usdai.svg" };
   return eulerMap[m[1]] ?? morphoOrLocalLogo(m[1]);
 }
 
@@ -323,7 +323,7 @@ const PNG_LOGO_MAP: Record<string, string> = {
   unibtc: "/logos/unibtc.png",
   xsbtc: "/logos/xsolvbtc.png",
   lyu: "/logos/lyu.png",
-  usdai: "/logos/susdai.svg",
+  usdai: "/logos/usdai.svg",
   frxusd: "/logos/frxusd.png",
   fxusd: "/logos/fxusd.png",
   bal: "/logos/bal.png",
