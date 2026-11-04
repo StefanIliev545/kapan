@@ -10,6 +10,11 @@ import { useTokenPricesByAddress } from "./useTokenPrice";
 import { tokenNameToLogo } from "~~/contracts/externalContracts";
 import { useGlobalState } from "~~/services/store/store";
 import { fetchHoldings, validDecimals, type Holding, type HoldingsIssue } from "~~/utils/wallet/holdings";
+import { AAVE_V3_PROVIDER_ADDRESSES } from "~~/utils/chainConfig";
+import { readAaveReceiptTokens, readCompoundReceiptTokens } from "~~/utils/wallet/protocolReceiptTokens";
+import deployedContracts from "~~/contracts/hardhat/deployedContracts";
+
+const receiptGateways: Record<number, { CompoundGatewayView?: { address: Address } }> = deployedContracts;
 // Major tokens whitelist (addresses by chainId)
 // These are always shown if user has balance
 const MAJOR_TOKENS: Record<
@@ -689,10 +694,37 @@ export function useWalletTokens(chainId?: number) {
     staleTime: 30000,
     refetchInterval: 60000,
   });
+  const aaveProvider = AAVE_V3_PROVIDER_ADDRESSES[effectiveChainId];
+  const aaveReceipts = useQuery({
+    queryKey: ["wallet-aave-receipt-tokens", effectiveChainId],
+    queryFn: () => {
+      return readAaveReceiptTokens(publicClient!, aaveProvider!);
+    },
+    enabled: !!userAddress && !!publicClient && !!aaveProvider,
+    staleTime: 60 * 60 * 1000,
+    retry: 1,
+  });
+  const compoundGateway = receiptGateways[effectiveChainId]?.CompoundGatewayView?.address;
+  const compoundReceipts = useQuery({
+    queryKey: ["wallet-compound-receipt-tokens", effectiveChainId, compoundGateway],
+    queryFn: () => {
+      return readCompoundReceiptTokens(publicClient!, compoundGateway!);
+    },
+    enabled: !!userAddress && !!publicClient && !!compoundGateway,
+    staleTime: 60 * 60 * 1000,
+    retry: 1,
+  });
   const tokenWhitelist = useMemo(() => {
     const candidates = buildWalletTokenWhitelist(effectiveChainId, discovery.data, pendlePTTokens);
-    return mergeIndexedHoldings(candidates, holdings.data?.holdings ?? []);
-  }, [effectiveChainId, discovery.data, pendlePTTokens, holdings.data]);
+    mergeIndexedHoldings(candidates, holdings.data?.holdings ?? []);
+    for (const address of aaveReceipts.data ?? []) {
+      candidates.delete(address);
+    }
+    for (const address of compoundReceipts.data ?? []) {
+      candidates.delete(address);
+    }
+    return candidates;
+  }, [effectiveChainId, discovery.data, pendlePTTokens, holdings.data, aaveReceipts.data, compoundReceipts.data]);
   const addressesNeedingPrices = useMemo(() => {
     return getAddressesNeedingPrices(tokenWhitelist);
   }, [tokenWhitelist]);
@@ -787,6 +819,10 @@ export function useWalletTokens(chainId?: number) {
       ...(query.data?.issues ?? []),
     ],
     isLoading: !!userAddress && (query.isLoading || discovery.isLoading || holdings.isLoading),
+    isDiscoveryIncomplete:
+      !!userAddress &&
+      !holdings.isLoading &&
+      (holdings.isError || holdings.data?.enumerationComplete !== true),
     isError:
       !!userAddress &&
       (!publicClient ||
