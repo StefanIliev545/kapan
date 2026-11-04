@@ -93,7 +93,7 @@ const ScaffoldEthApp = ({
     }
 
     if (isLandingRoute) {
-      return <LandingHeader />;
+      return <LandingHeader fixed={pathname !== "/"} />;
     }
 
     return <Header />;

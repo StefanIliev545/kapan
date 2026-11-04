@@ -7,11 +7,7 @@ import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
 import { useAppUrl } from "~~/hooks/common/useAppUrl";
 
-/**
- * Landing page header - minimal dark theme design
- * Keeps the app entry point available throughout the landing pages.
- */
-export const LandingHeader = () => {
+export const LandingHeader = ({ fixed = false }: { fixed?: boolean }) => {
   const appUrl = useAppUrl();
 
   const handleLaunchClick = useCallback(
@@ -24,11 +20,11 @@ export const LandingHeader = () => {
   );
 
   return (
-    <div className="fixed inset-x-0 top-0 z-50 bg-base-100/90 p-4 backdrop-blur-md md:px-8 md:py-6">
-      <div className="flex items-center justify-between">
+    <header className={`${fixed ? "fixed bg-base-100/90 backdrop-blur-md" : "absolute"} inset-x-0 top-0 z-30 px-5 sm:px-8`}>
+      <nav aria-label="Main navigation" className="mx-auto flex h-16 max-w-7xl items-center justify-between">
         {/* Left - Logo */}
         <Link href="/" className="group flex items-center gap-3">
-          <div className="relative size-8 md:size-10">
+          <div className="relative size-8">
             <Image
               alt="Kapan logo"
               className="object-contain"
@@ -67,7 +63,7 @@ export const LandingHeader = () => {
             <ArrowRightIcon className="size-3.5 transition-transform motion-safe:group-hover:translate-x-0.5 motion-reduce:transition-none" />
           </a>
         </div>
-      </div>
-    </div>
+      </nav>
+    </header>
   );
 };
