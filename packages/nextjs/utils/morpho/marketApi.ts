@@ -27,6 +27,7 @@ export { sortMarketsByLiquidityDesc };
  * @param options.minLiquidityUsd - Minimum liquidity in USD (default: "1000")
  * @param options.hideSaturated - Hide saturated markets (default: true)
  * @param options.showLowLiquidity - Show markets with low/zero liquidity (default: false)
+ * @param options.walletDiscovery - Discover trusted wallet assets independent of display liquidity filters
  */
 export async function fetchMorphoMarkets(
   chainId: number,
@@ -37,6 +38,7 @@ export async function fetchMorphoMarkets(
     minLiquidityUsd?: string;
     hideSaturated?: boolean;
     showLowLiquidity?: boolean;
+    walletDiscovery?: boolean;
   }
 ): Promise<MorphoMarket[]> {
   const params = new URLSearchParams({
@@ -54,6 +56,10 @@ export async function fetchMorphoMarkets(
     params.set("showLowLiquidity", "true");
     params.set("minLiquidityUsd", "0");
     params.set("hideSaturated", "false");
+  }
+
+  if (options?.walletDiscovery) {
+    params.set("walletDiscovery", "true");
   }
 
   const response = await fetch(`/api/morpho/${chainId}/markets?${params.toString()}`);

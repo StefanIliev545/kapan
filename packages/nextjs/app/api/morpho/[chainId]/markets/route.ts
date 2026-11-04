@@ -126,21 +126,23 @@ const isSuspiciousGToken = (m: MarketItem): boolean => {
   return false;
 };
 
+const hasMorphoTrustEvidence = (m: MarketItem): boolean => {
+  const marketListed = m.listed === true || m.listed === "true" || m.listed === 1;
+  if (marketListed) {
+    return true;
+  }
+  return Array.isArray(m.supplyingVaults) && m.supplyingVaults.some(vault => {
+    const vaultListed = vault.listed === true || vault.listed === "true" || vault.listed === 1;
+    const vaultAssets = safeFloat(vault.state?.totalAssetsUsd);
+    return vaultListed && vaultAssets > 10_000;
+  });
+};
+
 // Trust Logic - relaxed when searching
 const isMarketTrusted = (m: MarketItem, isSearching: boolean): boolean => {
-  // 1. Listed by Morpho (dynamically listed when a listed vault includes the market)
-  if (m.listed === true || m.listed === "true" || m.listed === 1) return true;
-
-  // 2. Vault Trusted (Curated)
-  // We check if a Listed Vault has >$10k in it.
-  const hasTrustedVault = Array.isArray(m.supplyingVaults) && m.supplyingVaults.some(
-    (v) => {
-      const vaultListed = v.listed === true || v.listed === "true" || v.listed === 1;
-      const vaultAssets = safeFloat(v.state?.totalAssetsUsd);
-      return vaultListed && vaultAssets > 10_000;
-    }
-  );
-  if (hasTrustedVault) return true;
+  if (hasMorphoTrustEvidence(m)) {
+    return true;
+  }
 
   // 3. Pendle / Special Logic
   const loanSym = (m.loanAsset?.symbol || "").toUpperCase();
@@ -167,6 +169,7 @@ interface RequestParams {
   curationMode: string;
   hideSaturated: boolean;
   showLowLiquidity: boolean;
+  walletDiscovery: boolean;
   debug: boolean;
   targetCount: number;
   serverMinSupplyUsd: number;
@@ -178,9 +181,10 @@ const parseRequestParams = (chainId: string, sp: URLSearchParams): RequestParams
   const chainIdInt = parseInt(chainId, 10);
   if (!Number.isFinite(chainIdInt) || chainIdInt <= 0) return null;
 
-  const search = (sp.get("search") || "").trim();
+  const walletDiscovery = sp.get("walletDiscovery") === "true";
+  const search = walletDiscovery ? "" : (sp.get("search") || "").trim();
   const isSearching = search.length > 0;
-  const showLowLiquidity = sp.get("showLowLiquidity") === "true";
+  const showLowLiquidity = walletDiscovery || sp.get("showLowLiquidity") === "true";
   const hideSaturated = showLowLiquidity ? false : sp.get("hideSaturated") === "true";
 
   return {
@@ -188,16 +192,17 @@ const parseRequestParams = (chainId: string, sp: URLSearchParams): RequestParams
     search,
     searchLower: search.toLowerCase(),
     isSearching,
-    curationMode: (sp.get("curation") || "curated").toLowerCase(),
+    curationMode: walletDiscovery ? "curated" : (sp.get("curation") || "curated").toLowerCase(),
     hideSaturated,
     showLowLiquidity,
+    walletDiscovery,
     debug: sp.get("debug") === "true",
-    targetCount: isSearching ? 200 : Math.min(parseInt(sp.get("first") || "1000", 10), 1500),
+    targetCount: walletDiscovery ? Number.POSITIVE_INFINITY : isSearching ? 200 : Math.min(parseInt(sp.get("first") || "1000", 10), 1500),
     // Low server-side floor to avoid hiding freshly listed markets with little supply yet.
     // Client-side minLiquidity handles stricter filtering.
     // When showLowLiquidity is on, drop the server floor to 0 to include near-empty markets.
     serverMinSupplyUsd: isSearching || showLowLiquidity ? 0 : 100,
-    serverMaxUtilization: hideSaturated ? 0.995 : 0.9999,
+    serverMaxUtilization: walletDiscovery ? 1 : hideSaturated ? 0.995 : 0.9999,
     minLiquidity: showLowLiquidity ? 0 : safeFloat(sp.get("minLiq") || sp.get("minLiquidityUsd") || "1000"),
   };
 };
@@ -286,6 +291,13 @@ const passesClientFilters = (m: MarketItem, params: RequestParams): boolean => {
   return true;
 };
 
+const passesMarketTrust = (market: MarketItem, params: RequestParams, requireTrust: boolean): boolean => {
+  if (params.walletDiscovery) {
+    return hasMorphoTrustEvidence(market);
+  }
+  return !requireTrust || isMarketTrusted(market, params.isSearching);
+};
+
 // --- Paginated market fetching ---
 
 const PAGE_SIZE = 200;
@@ -315,12 +327,17 @@ const fetchMarketCategory = async ({
     for (const m of batch.items) {
       if (allMarkets.has(m.uniqueKey)) continue;
       if (!passesClientFilters(m, params)) continue;
-      if (requireTrust && !isMarketTrusted(m, params.isSearching)) continue;
+      if (!passesMarketTrust(m, params, requireTrust)) {
+        continue;
+      }
       allMarkets.set(m.uniqueKey, m);
     }
 
     hasMore = batch.hasMore && allMarkets.size < params.targetCount;
     skip += PAGE_SIZE;
+  }
+  if (params.walletDiscovery && hasMore) {
+    throw new Error("Wallet market discovery exceeded its page limit");
   }
 };
 
