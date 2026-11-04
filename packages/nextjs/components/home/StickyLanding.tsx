@@ -3,11 +3,14 @@
 import React, { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { motion, AnimatePresence, useScroll, useSpring, useTransform, MotionValue } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useSpring, useTransform, useReducedMotion, MotionValue } from "framer-motion";
 import { ChevronDownIcon, ChevronUpIcon, ArrowRightIcon, ShieldCheckIcon, BoltIcon, CurrencyDollarIcon, SparklesIcon, PlusIcon, MinusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@radix-ui/themes";
 import { track } from "@vercel/analytics";
 import { StickySection, SectionData } from "./StickySection";
+import { AutomationExample } from "./AutomationExample";
+import { useLandingPresentation } from "./useLandingPresentation";
+import { useAppUrl } from "~~/hooks/common/useAppUrl";
 import { useKapanTheme } from "~~/hooks/useKapanTheme";
 import { useLandingSection } from "~~/contexts/LandingSectionContext";
 
@@ -46,6 +49,8 @@ const useHeroSceneEnabled = () => {
 // ================================
 
 // NeonLetter animations
+const STATIC_VISIBLE = { opacity: 1, x: 0, y: 0 };
+const NO_TRANSITION = { duration: 0, delay: 0 };
 const NEON_LETTER_INITIAL = { opacity: 0 };
 const NEON_LETTER_ANIMATE = {
   opacity: [0, 0, 0.8, 0, 0.6, 0.1, 0.9, 0.2, 1, 0.7, 1],
@@ -110,15 +115,7 @@ const SWAP_ARROW_TRANSITION = { duration: 1.2, repeat: Infinity };
 
 
 const LaunchAppButton = () => {
-  const appUrl = useMemo(() => {
-    if (typeof window === "undefined") return "/app";
-    const { protocol } = window.location;
-    const hostname = window.location.hostname;
-    const baseHost = hostname.replace(/^www\./, "");
-    if (window.location.host.endsWith("localhost:3000")) return `${protocol}//app.localhost:3000`;
-    if (hostname.startsWith("app.")) return `${protocol}//${window.location.host}`;
-    return `${protocol}//app.${baseHost}`;
-  }, []);
+  const appUrl = useAppUrl();
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
@@ -128,7 +125,7 @@ const LaunchAppButton = () => {
 
   return (
     <a
-      href="/app"
+      href={appUrl}
       onClick={handleClick}
       className="bg-primary text-primary-content group relative flex h-14 items-center justify-center overflow-hidden rounded-full px-9 text-[11px] font-bold uppercase tracking-[0.18em] shadow-lg shadow-black/30 transition-all duration-300 hover:shadow-[0_0_50px_rgba(59,130,246,0.25)] md:h-16 md:px-12"
     >
@@ -140,36 +137,24 @@ const LaunchAppButton = () => {
   );
 };
 
-const HeroContent = () => {
-  // Breadth, derived from the data (not a financial claim) — gives the hero substance.
-  const stats = [
-    { value: supportedProtocols.length, label: "Protocols" },
-    { value: networks.length, label: "Networks" },
-    { value: 1, label: "Screen" },
-  ];
-  return (
-    <div className="relative flex w-full flex-col items-center gap-7">
-      {/* Live breadth strip — terminal-styled, monospace */}
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-xs uppercase tracking-[0.22em] sm:text-sm">
-        <span className="relative flex size-2">
-          <span className="bg-accent absolute inline-flex size-2 animate-ping rounded-full opacity-75" />
-          <span className="bg-accent relative inline-flex size-2 rounded-full" />
-        </span>
-        {stats.map((s, i) => (
-          <span key={s.label} className="flex items-center gap-4">
-            {i > 0 && <span className="text-accent/50">/</span>}
-            <span>
-              <span className="text-base-content font-bold">{s.value}</span>{" "}
-              <span className="text-base-content/55">{s.label}</span>
-            </span>
-          </span>
-        ))}
-      </div>
-
-      <LaunchAppButton />
+const HeroContent = () => (
+  <div className="relative flex w-full flex-col items-center gap-6">
+    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-base-content/65 sm:text-sm">
+      <span>Existing positions</span>
+      <span aria-hidden="true" className="size-1 rounded-full bg-accent" />
+      <span>Your wallet</span>
+      <span aria-hidden="true" className="size-1 rounded-full bg-accent" />
+      <span>No Kapan fee</span>
     </div>
-  );
-};
+    <LaunchAppButton />
+    <a
+      href="/info"
+      className="text-sm text-base-content/65 underline decoration-base-content/25 underline-offset-4 transition-colors hover:text-base-content focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+    >
+      How it works, costs & permissions
+    </a>
+  </div>
+);
 
 // Supported networks
 const networks = [
@@ -193,10 +178,26 @@ const supportedProtocols = [
 
 const FeatureList = () => {
   const features = useMemo(() => [
-    { icon: ShieldCheckIcon, title: "Non-Custodial", desc: "Your assets never leave your wallet. Verify every move on the protocol's own frontend." },
-    { icon: BoltIcon, title: "Atomic Transactions", desc: "Six steps, one signature." },
-    { icon: CurrencyDollarIcon, title: "Zero Protocol Fees", desc: "No Kapan fee, ever. You pay gas and swap fees, nothing to us." },
-    { icon: SparklesIcon, title: "Any Gas Token", desc: "Pay gas in any token you hold — no native-token scramble (via AVNU Paymaster)." },
+    {
+      icon: ShieldCheckIcon,
+      title: "Your position stays yours",
+      desc: "Positions remain under your address on the underlying lending protocol.",
+    },
+    {
+      icon: BoltIcon,
+      title: "One atomic execution",
+      desc: "The position change completes or reverts. First-use approvals may be separate.",
+    },
+    {
+      icon: CurrencyDollarIcon,
+      title: "No Kapan service fee",
+      desc: "Gas, swap costs and any flash-loan fee still apply. Review the quote before signing.",
+    },
+    {
+      icon: SparklesIcon,
+      title: "More ways to pay for gas",
+      desc: "On Starknet, pay with supported tokens through AVNU Paymaster.",
+    },
   ], []);
 
   const supported = useMemo(() => [...supportedProtocols, ...networks], []);
@@ -205,8 +206,8 @@ const FeatureList = () => {
     <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8 px-4">
       {/* Feature cards — anchored with surface + depth, left-aligned */}
       <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
-        {features.map((f, i) => (
-          <div key={i} className="card-surface flex flex-col items-start gap-3 p-5 text-left">
+        {features.map((f) => (
+          <div key={f.title} className="card-surface flex flex-col items-start gap-3 p-5 text-left">
             <div className="bg-base-content/5 border-base-content/10 flex size-10 flex-shrink-0 items-center justify-center rounded-xl border">
               <f.icon className="text-base-content/70 size-5" />
             </div>
@@ -220,7 +221,7 @@ const FeatureList = () => {
 
       {/* Works across — one tidy static logo row, not three scrolling marquees */}
       <div className="border-base-content/10 flex w-full flex-col items-center gap-4 border-t pt-7">
-        <span className="text-base-content/50 text-[10px] uppercase tracking-[0.25em]">Works across</span>
+        <span className="text-base-content/50 text-[10px] uppercase tracking-[0.25em]">Explore supported networks & protocols</span>
         <div className="flex max-w-2xl flex-wrap items-center justify-center gap-x-6 gap-y-3">
           {supported.map(item => (
             <div key={item.name} className="flex items-center gap-1.5">
@@ -231,6 +232,9 @@ const FeatureList = () => {
             </div>
           ))}
         </div>
+        <p className="max-w-md text-center text-xs leading-relaxed text-base-content/60">
+          Actions vary by network, protocol and market. Choose a position in the app to see its available actions.
+        </p>
       </div>
     </div>
   );
@@ -238,6 +242,7 @@ const FeatureList = () => {
 
 // Neon letter flicker - each letter flickers on individually
 const NeonLetter = ({ letter, delay, animate }: { letter: string; delay: number; animate: boolean }) => {
+  const reduceMotion = useReducedMotion();
   const animateValue = useMemo(() =>
     animate ? NEON_LETTER_ANIMATE : NEON_LETTER_ANIMATE_INACTIVE,
     [animate]
@@ -253,9 +258,9 @@ const NeonLetter = ({ letter, delay, animate }: { letter: string; delay: number;
   return (
     <motion.span
       className="inline-block"
-      initial={NEON_LETTER_INITIAL}
-      animate={animateValue}
-      transition={transition}
+      initial={reduceMotion ? false : NEON_LETTER_INITIAL}
+      animate={reduceMotion ? STATIC_VISIBLE : animateValue}
+      transition={reduceMotion ? NO_TRANSITION : transition}
     >
       {letter}
     </motion.span>
@@ -264,6 +269,7 @@ const NeonLetter = ({ letter, delay, animate }: { letter: string; delay: number;
 
 // Final CTA section with Fallout neon sign effect
 const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
+  const reduceMotion = useReducedMotion();
   const letters = useMemo(() => "KAPAN".split(""), []);
 
   const logoAnimate = useMemo(() =>
@@ -301,9 +307,9 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
       <div className="flex flex-col items-center gap-4">
         {/* Logo flickers first */}
         <motion.div
-          initial={LOGO_INITIAL}
-          animate={logoAnimate}
-          transition={logoTransition}
+          initial={reduceMotion ? false : LOGO_INITIAL}
+          animate={reduceMotion ? STATIC_VISIBLE : logoAnimate}
+          transition={reduceMotion ? NO_TRANSITION : logoTransition}
           className="relative size-16 md:size-20"
         >
           <Image src="/seal-logo.png" alt="Kapan" fill className="object-contain" />
@@ -319,9 +325,9 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
 
       {/* Button flickers on after letters - big dramatic flicker */}
       <motion.div
-        initial={BUTTON_FLICKER_INITIAL}
-        animate={buttonAnimate}
-        transition={buttonTransition}
+        initial={reduceMotion ? false : BUTTON_FLICKER_INITIAL}
+        animate={reduceMotion ? STATIC_VISIBLE : buttonAnimate}
+        transition={reduceMotion ? NO_TRANSITION : buttonTransition}
       >
         <LaunchAppButton />
       </motion.div>
@@ -329,9 +335,9 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
       {/* Links slide up and fade in after button */}
       <motion.div
         className="flex flex-col items-center gap-4"
-        initial={LINKS_INITIAL}
-        animate={linksAnimate}
-        transition={LINKS_TRANSITION}
+        initial={reduceMotion ? false : LINKS_INITIAL}
+        animate={reduceMotion ? STATIC_VISIBLE : linksAnimate}
+        transition={reduceMotion ? NO_TRANSITION : LINKS_TRANSITION}
       >
         <div className="text-base-content/60 flex items-center gap-6 text-xs">
           <a href="https://discord.gg/Vjk6NhkxGv" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Discord</a>
@@ -513,7 +519,7 @@ const MockMorphoView = () => (
                     <Image src="/logos/ptusdai.svg" alt="PT-USDai" width={22} height={22} className="border-base-200 bg-base-200 rounded-full border-2" />
                     <Image src="/logos/usdc.svg" alt="USDC" width={22} height={22} className="border-base-200 bg-base-200 rounded-full border-2" />
                   </div>
-                  <span className="text-sm font-semibold">PT-USDai-19FEB2026/USDC</span>
+                  <span className="text-sm font-semibold">PT-USDai/USDC</span>
                 </div>
               </MockTooltip>
               <div className="flex items-center gap-1.5">
@@ -787,12 +793,15 @@ const BrowserFrame = ({ children, url = "app.kapan.finance" }: { children: React
 );
 
 const DashboardPreview = () => (
-  <BrowserFrame url="app.kapan.finance">
-    <MockMorphoView />
-    <div className="pointer-events-none">
-      <MockAaveHeader />
-    </div>
-  </BrowserFrame>
+  <div className="w-full">
+    <BrowserFrame url="app.kapan.finance">
+      <MockMorphoView />
+      <div className="pointer-events-none">
+        <MockAaveHeader />
+      </div>
+    </BrowserFrame>
+    <p className="mt-3 text-xs text-base-content/55">Example portfolio · illustrative balances and rates</p>
+  </div>
 );
 
 // Animated flow component - shows the transaction being built
@@ -933,6 +942,7 @@ const RateDisplay = ({
 
 // Animated arrow for horizontal flow
 const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?: boolean }) => {
+  const reduceMotion = useReducedMotion();
   const transition = useMemo(() => ({ delay, duration: 0.3 }), [delay]);
   const arrowAnimate = useMemo(() =>
     vertical ? FLOW_ARROW_VERTICAL : FLOW_ARROW_HORIZONTAL,
@@ -947,8 +957,8 @@ const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?:
       className={`flex items-center justify-center ${vertical ? "py-2" : "px-4"}`}
     >
       <motion.div
-        animate={arrowAnimate}
-        transition={FLOW_ARROW_TRANSITION}
+        animate={reduceMotion ? STATIC_VISIBLE : arrowAnimate}
+        transition={reduceMotion ? NO_TRANSITION : FLOW_ARROW_TRANSITION}
       >
         <ArrowRightIcon className={`text-base-content/60 size-5${vertical ? "rotate-90" : ""}`} />
       </motion.div>
@@ -1071,8 +1081,21 @@ const BorrowCard = () => (
   </ActionContent>
 );
 
+const SwapArrow = () => {
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      animate={reduceMotion ? STATIC_VISIBLE : SWAP_ARROW_ANIMATE}
+      transition={reduceMotion ? NO_TRANSITION : SWAP_ARROW_TRANSITION}
+    >
+      <ArrowRightIcon className="text-primary size-6" />
+    </motion.div>
+  );
+};
+
 const SwapCard = () => (
-  <ActionContent description="Swap your collateral or debt without closing the position. Nothing to unwind.">
+  <ActionContent description="Change the collateral or debt in an existing position. Kapan bundles the supported steps into one transaction.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-6 md:hidden">
       <FlowStep delay={0}>
@@ -1097,9 +1120,7 @@ const SwapCard = () => (
       </HFlowStep>
       <HFlowStep delay={0.15}>
         <div className="flex flex-col items-center px-8">
-          <motion.div animate={SWAP_ARROW_ANIMATE} transition={SWAP_ARROW_TRANSITION}>
-            <ArrowRightIcon className="text-primary size-6" />
-          </motion.div>
+          <SwapArrow />
           <span className="text-base-content/60 mt-1 text-[9px] uppercase tracking-widest">swap</span>
         </div>
       </HFlowStep>
@@ -1117,7 +1138,7 @@ const SwapCard = () => (
 );
 
 const LoopCard = () => (
-  <ActionContent description="Open a leveraged position in one move. Start from any token you hold.">
+  <ActionContent description="Build a leveraged position from a supported token. Review borrowing costs alongside the collateral yield.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-6 md:hidden">
       <FlowStep delay={0}>
@@ -1196,7 +1217,7 @@ const LoopCard = () => (
 );
 
 const PendleCard = () => (
-  <ActionContent description="Put Pendle PT tokens to work. Fixed-rate until maturity, looped in one move.">
+  <ActionContent description="Use Pendle PT as collateral in supported markets. PT yield to maturity and variable borrowing costs both affect your return.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-6 md:hidden">
       <FlowStep delay={0}>
@@ -1209,12 +1230,12 @@ const PendleCard = () => (
           </div>
           <div>
             <div className="text-base-content/60 text-[10px] uppercase tracking-wider">Pendle PT</div>
-            <div className="font-semibold">PT-USDai-19FEB2026</div>
+            <div className="font-semibold">PT-USDai</div>
           </div>
         </div>
       </FlowStep>
       <FlowStep delay={0.2}>
-        <RateDisplay newRate="8.42%" label="Fixed APY" />
+        <RateDisplay newRate="8.42%" label="PT yield at entry" />
       </FlowStep>
       <FlowStep delay={0.4}>
         <div className="text-base-content/60 flex items-center gap-4 text-xs">
@@ -1239,14 +1260,14 @@ const PendleCard = () => (
           </div>
           <div>
             <div className="text-base-content/60 text-[10px] uppercase tracking-wider">Pendle PT Token</div>
-            <div className="text-lg font-semibold">PT-USDai-19FEB2026</div>
+            <div className="text-lg font-semibold">PT-USDai</div>
           </div>
         </div>
       </HFlowStep>
       <FlowArrow delay={0.15} />
       <HFlowStep delay={0.25}>
         <div className="flex flex-col items-center px-8">
-          <RateDisplay newRate="8.42%" label="Fixed APY" />
+          <RateDisplay newRate="8.42%" label="PT yield at entry" />
         </div>
       </HFlowStep>
       <HFlowStep delay={0.4}>
@@ -1261,7 +1282,7 @@ const PendleCard = () => (
 );
 
 const RefinanceCard = () => (
-  <ActionContent description="Move a whole position to a cheaper protocol in one move.">
+  <ActionContent description="Move collateral and debt together to a supported market on the same network. No upfront debt repayment needed.">
     {/* Mobile: Vertical */}
     <div className="flex flex-col items-center gap-5 md:hidden">
       <FlowStep delay={0}>
@@ -1313,13 +1334,9 @@ const RefinanceCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.2}>
-        <motion.div
-          className="px-4"
-          animate={SWAP_ARROW_ANIMATE}
-          transition={SWAP_ARROW_TRANSITION}
-        >
-          <ArrowRightIcon className="text-primary size-6" />
-        </motion.div>
+        <div className="px-4">
+          <SwapArrow />
+        </div>
       </HFlowStep>
       <HFlowStep delay={0.3}>
         <div className="flex flex-col items-center gap-2">
@@ -1338,16 +1355,17 @@ const RefinanceCard = () => (
 
 // Action tabs - simpler, tighter design
 const actionTabs = [
+  { id: "refinance", label: "Refinance" },
+  { id: "swap", label: "Swap" },
+  { id: "automate", label: "Automate" },
+  { id: "loop", label: "Loop" },
+  { id: "pendle", label: "Pendle" },
   { id: "lend", label: "Lend" },
   { id: "borrow", label: "Borrow" },
-  { id: "loop", label: "Loop" },
-  { id: "swap", label: "Swap" },
-  { id: "refinance", label: "Refinance" },
-  { id: "pendle", label: "Pendle" },
 ];
 
 const ActionTabs = () => {
-  const [activeTab, setActiveTab] = useState("lend");
+  const [activeTab, setActiveTab] = useState("refinance");
 
   // Create stable callbacks for each tab
   const handleTabClick = useCallback((tabId: string) => {
@@ -1357,21 +1375,28 @@ const ActionTabs = () => {
   // Render card based on active tab
   const renderCard = useCallback(() => {
     switch (activeTab) {
-      case "lend": return <LendCard />;
-      case "borrow": return <BorrowCard />;
-      case "loop": return <LoopCard />;
-      case "swap": return <SwapCard />;
-      case "refinance": return <RefinanceCard />;
-      case "pendle": return <PendleCard />;
-      default: return <LendCard />;
+      case "lend":
+        return <LendCard />;
+      case "borrow":
+        return <BorrowCard />;
+      case "loop":
+        return <LoopCard />;
+      case "swap":
+        return <SwapCard />;
+      case "automate":
+        return <AutomationExample />;
+      case "pendle":
+        return <PendleCard />;
+      default:
+        return <RefinanceCard />;
     }
   }, [activeTab]);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4">
+    <div className="mx-auto w-full max-w-5xl px-0 sm:px-4">
       {/* Tight tab bar — scrolls horizontally on mobile instead of clipping */}
-      <div className="hide-scrollbar -mx-4 mb-8 flex items-center overflow-x-auto px-4 md:mx-0 md:justify-center">
-        <div className="border-base-content/10 inline-flex shrink-0 items-center gap-0 border-b">
+      <div className="mb-6 flex justify-center">
+        <div aria-label="Explore position actions" className="border-base-content/10 flex flex-wrap justify-center gap-0 border-b">
           {actionTabs.map((tab) => (
             <TabButton
               key={tab.id}
@@ -1384,7 +1409,7 @@ const ActionTabs = () => {
       </div>
 
       {/* Content area - allows breathing room for animated content */}
-      <div className="flex min-h-[320px] items-start justify-center pt-4 sm:min-h-[380px]">
+      <div className="flex min-h-[330px] items-start justify-center pt-2">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -1393,11 +1418,17 @@ const ActionTabs = () => {
             exit={ACTION_TAB_CONTENT_EXIT}
             transition={ACTION_TAB_CONTENT_TRANSITION}
             className="w-full"
+            id="landing-action-example"
+            role="region"
+            aria-label={`${actionTabs.find(tab => tab.id === activeTab)?.label} example`}
           >
             {renderCard()}
           </motion.div>
         </AnimatePresence>
       </div>
+      <p className="mt-5 text-center text-xs leading-relaxed text-base-content/55">
+        Illustrative examples, not live quotes. Availability and execution costs depend on the selected market.
+      </p>
     </div>
   );
 };
@@ -1418,12 +1449,15 @@ const TabButton = ({
 
   return (
     <button
+      type="button"
+      aria-pressed={isActive}
+      aria-controls="landing-action-example"
       onClick={handleClick}
       className={`
-        relative p-3 text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors sm:px-5 sm:text-xs
+        focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent relative p-3 text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors sm:px-4 sm:text-xs
         ${isActive
           ? "text-base-content"
-          : "text-base-content/60 hover:text-base-content/60"}
+          : "text-base-content/60 hover:text-base-content"}
       `}
     >
       {tab.label}
@@ -1447,6 +1481,7 @@ export const StickyLanding = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { setCurrentSection, setTotalSections } = useLandingSection();
   const isHeroSceneEnabled = useHeroSceneEnabled();
+  const isCinematic = useLandingPresentation();
 
   // Force kapan dark theme on landing page
   useKapanTheme();
@@ -1460,11 +1495,11 @@ export const StickyLanding = () => {
       // The scramble decodes once on load (the "cool effect") then SETTLES on the last phrase —
       // so a cold visitor still lands on a readable headline instead of an endless cycle. The H1
       // also SSRs real text now (TextScramble seeds from phrases[0]), so it's not empty for crawlers.
-      title: "SEE EVERYTHING.",
-      titlePhrases: ["SEE EVERYTHING.", "THEN ACT ON IT.", "ALL ON ONE SCREEN."],
+      title: "YOUR DEFI. YOUR MOVE.",
+      titlePhrases: ["YOUR DEFI. YOUR MOVE."],
       loopTitle: false,
       description:
-        "Every lending position across Aave, Compound, Morpho and Venus on one screen — then move a whole position to a cheaper protocol in one transaction, without unwinding it.",
+        "Refinance debt, change collateral and automate leverage. Manage the lending positions you already hold, from your own wallet.",
       content: <HeroContent />,
       headingLevel: "h1",
     },
@@ -1472,28 +1507,28 @@ export const StickyLanding = () => {
       tag: "01 / PORTFOLIO",
       title: "STOP COUNTING TABS.",
       description:
-        "Every position, every chain, one view. See your rates and how close you are to liquidation — before the market tells you.",
+        "Choose a network. See your collateral, debt, rates and liquidation exposure across supported protocols, with the actions right beside each position.",
       content: <DashboardPreview />,
       compactHeader: true,
     },
     {
       tag: "02 / ACTIONS",
-      title: "MOVE IT IN ONE STEP.",
-      description: "Lend, borrow, loop, swap collateral, refinance. Each one is a single signature, no extra capital to bring.",
+      title: "WHAT’S YOUR NEXT MOVE?",
+      description: "A different rate. A different asset. A rule for your leverage. Explore what you can change.",
       content: <ActionTabs />,
       compactHeader: true,
     },
     {
       tag: "03 / WHY",
-      title: "BUILT FOR YOU.",
-      description: "Your keys, your call. No custody, no Kapan fee.",
+      title: "YOUR WALLET. YOUR CALL.",
+      description: "Keep control of your position. Know what you authorize and what you pay.",
       content: <FeatureList />,
       compactHeader: true,
     },
     {
       tag: "04 / START",
       title: "GET STARTED.",
-      description: "Connect your wallet. See everything. Move what you want.",
+      description: "Find your position. Compare your options. Review the details before you sign.",
       content: <FinalCTA />,
     },
   ], []);
@@ -1551,26 +1586,26 @@ export const StickyLanding = () => {
       {/* Scroll container */}
       <div
         ref={containerRef}
-        className="hide-scrollbar relative z-10 size-full snap-y snap-mandatory overflow-y-auto scroll-smooth"
+        className={`hide-scrollbar relative z-10 size-full overflow-y-auto ${isCinematic ? "snap-y snap-mandatory scroll-smooth" : ""}`}
       >
         {/* Total height based on sections */}
-        <div style={containerHeight} className="relative">
+        <div style={isCinematic ? containerHeight : undefined} className="relative">
           {/* Snap targets */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col">
+          {isCinematic && <div className="pointer-events-none absolute inset-0 flex flex-col" aria-hidden="true">
             {sections.map((_, i) => (
               <div key={i} className="h-screen w-full snap-start" />
             ))}
-          </div>
+          </div>}
 
           {/* Sticky viewport */}
-          <div className="sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden">
+          <div className={isCinematic ? "sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden" : "relative flex w-full flex-col"}>
             {/* Scroll progress indicator */}
-            <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
+            {isCinematic && <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
               <motion.div
                 className="bg-base-content/40 w-full origin-top"
                 style={scrollProgressStyle}
               />
-            </div>
+            </div>}
 
             {/* Sections */}
             {sections.map((section, i) => (
@@ -1580,17 +1615,18 @@ export const StickyLanding = () => {
                 index={i}
                 total={sections.length}
                 scrollYProgress={smoothProgress}
+                isCinematic={isCinematic}
               />
             ))}
 
             {/* Scroll hint on first section */}
-            <motion.div
+            {isCinematic && <motion.div
               style={scrollHintStyle}
               className="text-base-content/60 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="landing-tag">Scroll to explore</span>
-              <ChevronDownIcon className="size-5 animate-bounce" />
-            </motion.div>
+              <ChevronDownIcon className="size-5 motion-safe:animate-bounce" />
+            </motion.div>}
           </div>
         </div>
       </div>

@@ -6,7 +6,6 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
-import { useLandingSection } from "~~/contexts/LandingSectionContext";
 import { useAppUrl } from "~~/hooks/common";
 
 // Animation constants for Launch App button (Fallout neon sign flicker)
@@ -29,15 +28,11 @@ const LAUNCH_BUTTON_TRANSITION = {
 
 /**
  * Landing page header - minimal dark theme design
- * Shows Launch App button when not on CTA sections (0 and last)
+ * Keeps the app entry point available throughout the landing pages.
  */
 export const LandingHeader = () => {
-  const { currentSection, totalSections } = useLandingSection();
   const appUrl = useAppUrl();
 
-  // Show launch button on sections that don't have their own CTA (sections 1-4)
-  // Section 0 = Hero (has CTA), Section 5 = Final CTA (has CTA)
-  const showLaunchButton = currentSection > 0 && currentSection < totalSections - 1;
 
   const handleLaunchClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -49,7 +44,7 @@ export const LandingHeader = () => {
   );
 
   return (
-    <div className="fixed inset-x-0 top-0 z-50 p-4 md:px-8 md:py-6">
+    <div className="fixed inset-x-0 top-0 z-50 bg-base-100/90 p-4 backdrop-blur-md md:px-8 md:py-6">
       <div className="flex items-center justify-between">
         {/* Left - Logo */}
         <Link href="/" className="group flex items-center gap-3">
@@ -62,13 +57,13 @@ export const LandingHeader = () => {
               priority
             />
           </div>
-          <span className="text-base-content/60 group-hover:text-base-content/100 text-sm font-bold uppercase tracking-wider transition-colors duration-300 md:text-base">
+          <span className="hidden sm:inline text-base-content/60 group-hover:text-base-content/100 text-sm font-bold uppercase tracking-wider transition-colors duration-300 md:text-base">
             Kapan
           </span>
         </Link>
 
         {/* Right - Nav links */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Link
             href="/info"
             className="text-base-content/50 hover:text-base-content/100 text-xs font-semibold uppercase tracking-wider transition-colors duration-300"
@@ -82,11 +77,11 @@ export const LandingHeader = () => {
             About
           </Link>
           
-          {/* Launch App button (shown on non-CTA sections) - Fallout neon sign flicker */}
+          {/* App entry stays available when sections have different heights. */}
           <AnimatePresence>
-            {showLaunchButton && (
+            {(
               <motion.a
-                href="/app"
+                href={appUrl}
                 onClick={handleLaunchClick}
                 initial={LAUNCH_BUTTON_INITIAL}
                 animate={LAUNCH_BUTTON_ANIMATE}
@@ -94,7 +89,7 @@ export const LandingHeader = () => {
                 transition={LAUNCH_BUTTON_TRANSITION}
                 className="bg-primary/10 hover:bg-primary/20 border-primary/20 hover:border-primary/40 text-primary group flex items-center gap-2 rounded-lg border px-4 py-2 transition-all duration-300"
               >
-                <span className="text-xs font-semibold uppercase tracking-wider">Launch App</span>
+                <span className="whitespace-nowrap text-[10px] sm:text-xs font-semibold uppercase tracking-wider">Launch App</span>
                 <ArrowRightIcon className="size-3.5 transition-transform group-hover:translate-x-0.5" />
               </motion.a>
             )}

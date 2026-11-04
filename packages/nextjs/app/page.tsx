@@ -6,7 +6,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return getMetadata({
     title: "Kapan Finance — Manage Your DeFi Positions",
     description:
-      "See all your DeFi lending and borrowing positions across Aave, Compound, Morpho, and Venus in one place — compare rates across protocols and chains, and act on them without leaving the page.",
+      "Refinance debt, swap collateral and automate leverage on supported lending markets. Manage existing DeFi positions from your own wallet, with no Kapan service fee.",
   });
 }
 
@@ -29,7 +29,7 @@ const structuredData = {
       applicationCategory: "FinanceApplication",
       operatingSystem: "Web",
       description:
-        "View, compare, and manage DeFi lending and borrowing positions across Aave, Compound, Morpho, and Venus on Arbitrum, Base, Ethereum and more.",
+        "Manage existing DeFi lending positions: compare rates, refinance debt, swap collateral and configure leverage automation on supported markets.",
       publisher: { "@id": "https://kapan.finance/#organization" },
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     },

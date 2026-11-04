@@ -33,6 +33,7 @@ interface StickySectionProps {
   index: number;
   total: number;
   scrollYProgress: MotionValue<number>;
+  isCinematic?: boolean;
 }
 
 export const StickySection = ({
@@ -40,6 +41,7 @@ export const StickySection = ({
   index,
   total,
   scrollYProgress,
+  isCinematic = true,
 }: StickySectionProps) => {
   const center = index / (total - 1);
   const neighborDistance = 1 / (total - 1);
@@ -62,7 +64,7 @@ export const StickySection = ({
   const pointerEvents = useTransform(opacity, (v) => (v > 0.5 ? "auto" : "none"));
   
   // Track if this section is active (opacity > 0.8)
-  const [, setIsActive] = useState(false);
+  const [isActive, setIsActive] = useState(index === 0);
   const [hasBeenActive, setHasBeenActive] = useState(false);
   
   useEffect(() => {
@@ -87,7 +89,7 @@ export const StickySection = ({
 
   // Clone content element and inject isActive prop if it accepts it
   const contentWithProps = section.content && isValidElement(section.content)
-    ? cloneElement(section.content as React.ReactElement<SectionContentProps>, { isActive: hasBeenActive })
+    ? cloneElement(section.content as React.ReactElement<SectionContentProps>, { isActive: hasBeenActive || !isCinematic })
     : section.content;
 
   // Memoize motion style object to avoid creating new object on each render
@@ -101,8 +103,12 @@ export const StickySection = ({
 
   return (
     <motion.div
-      style={motionStyle}
-      className="absolute inset-0 flex items-center justify-center overflow-hidden"
+      style={isCinematic ? motionStyle : undefined}
+      aria-hidden={isCinematic && !isActive}
+      inert={isCinematic && !isActive}
+      className={isCinematic
+        ? "absolute inset-0 flex items-center justify-center overflow-hidden"
+        : "relative flex min-h-[100svh] w-full items-center justify-center py-24"}
     >
       <div className={`w-full ${isCompact ? "max-w-7xl" : "max-w-5xl"} flex flex-col items-center px-6 text-center md:px-8`}>
         {/* Tag + Title + Description */}
@@ -127,7 +133,7 @@ export const StickySection = ({
           </span>
 
           {/* Main title */}
-          <Heading className={`landing-title text-base-content ${isCompact ? "text-3xl sm:text-4xl md:text-5xl lg:text-6xl" : "text-5xl sm:text-6xl md:text-7xl lg:text-8xl"}`}>
+          <Heading className={`landing-title text-base-content ${isCompact ? "text-3xl sm:text-4xl md:text-5xl lg:text-6xl" : "text-[2.75rem] sm:text-6xl md:text-7xl lg:text-8xl"}`}>
             {section.titlePhrases ? (
               <TextScramble
                 phrases={section.titlePhrases}

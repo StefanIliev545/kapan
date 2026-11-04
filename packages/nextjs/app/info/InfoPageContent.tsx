@@ -2,10 +2,11 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { motion, useScroll, useSpring, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 // Note: Header is rendered by ScaffoldEthAppWithProviders (LandingHeader for /info route)
 import { ChevronDownIcon, ArrowRightIcon, ShieldCheckIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
+import { useLandingPresentation } from "~~/components/home/useLandingPresentation";
 import { useKapanTheme } from "~~/hooks/useKapanTheme";
 
 // Static animation variants - extracted to module level to avoid recreation
@@ -30,6 +31,7 @@ const ScrambleText = ({
   const [displayText, setDisplayText] = useState("");
   const [hasRevealed, setHasRevealed] = useState(false);
   const frameRef = useRef<number | null>(null);
+  const shouldReduceMotion = useReducedMotion();
 
   const scrambleReveal = useCallback(() => {
     const length = text.length;
@@ -79,25 +81,30 @@ const ScrambleText = ({
   }, [text, duration]);
 
   useEffect(() => {
+    if (shouldReduceMotion) {
+      setDisplayText(text);
+      setHasRevealed(true);
+      return;
+    }
     if (isActive && !hasRevealed) {
       scrambleReveal();
     }
     return () => {
       if (frameRef.current) { cancelAnimationFrame(frameRef.current); }
     };
-  }, [isActive, hasRevealed, scrambleReveal]);
+  }, [isActive, hasRevealed, scrambleReveal, shouldReduceMotion, text]);
 
   // Initialize with scrambled text
   useEffect(() => {
-    if (!displayText && !hasRevealed) {
+    if (!shouldReduceMotion && !displayText && !hasRevealed) {
       const initial = text.split("").map((char) => 
         char === " " || char === "." ? char : getRandomChar()
       ).join("");
       setDisplayText(initial);
     }
-  }, [text, displayText, hasRevealed]);
+  }, [text, displayText, hasRevealed, shouldReduceMotion]);
 
-  return <>{displayText}</>;
+  return <>{shouldReduceMotion ? text : displayText}</>;
 };
 
 type FAQItem = {
@@ -190,13 +197,16 @@ const StickySection = ({
   index,
   total,
   scrollYProgress,
+  isCinematic,
 }: {
   section: SectionData;
   index: number;
   total: number;
   scrollYProgress: ReturnType<typeof useSpring>;
+  isCinematic: boolean;
 }) => {
   // First section starts active
+  const [isActive, setIsActive] = useState(index === 0);
   const [hasBeenActive, setHasBeenActive] = useState(index === 0);
   
   const center = index / (total - 1);
@@ -216,6 +226,7 @@ const StickySection = ({
   useEffect(() => {
     const unsubscribe = opacity.on("change", (v) => {
       const active = v > 0.8;
+      setIsActive(active);
       if (active && !hasBeenActive) {
         setHasBeenActive(true);
       }
@@ -234,8 +245,12 @@ const StickySection = ({
 
   return (
     <motion.div
-      style={motionStyle}
-      className="absolute inset-0 flex items-center justify-center overflow-hidden"
+      style={isCinematic ? motionStyle : undefined}
+      aria-hidden={isCinematic && !isActive}
+      inert={isCinematic && !isActive}
+      className={isCinematic
+        ? "absolute inset-0 flex items-center justify-center overflow-hidden"
+        : "relative flex min-h-[100svh] w-full items-center justify-center py-24"}
     >
       <div className="flex w-full max-w-4xl flex-col items-center px-6 text-center md:px-8">
         {/* Tag + Title */}
@@ -245,14 +260,14 @@ const StickySection = ({
             {section.tag}
           </span>
           <h2 className="text-4xl font-black uppercase tracking-tight md:text-5xl lg:text-6xl">
-            <ScrambleText text={section.title} isActive={hasBeenActive} duration={600} />
+            <ScrambleText text={section.title} isActive={hasBeenActive || !isCinematic} duration={600} />
           </h2>
         </div>
 
         {/* Content */}
         <div className="w-full">
           {section.ContentComponent ? (
-            <section.ContentComponent isActive={hasBeenActive} />
+            <section.ContentComponent isActive={hasBeenActive || !isCinematic} />
           ) : (
             section.content
           )}
@@ -266,10 +281,10 @@ const StickySection = ({
 const MissionContent = ({ isActive }: { isActive: boolean }) => (
   <div className="mx-auto max-w-2xl space-y-6">
     <p className="text-base-content/50 text-lg leading-relaxed md:text-xl">
-      <ScrambleText text="Deposit. Borrow. Swap. Refinance. Loop. Close." isActive={isActive} duration={700} />
+      <ScrambleText text="Refinance. Swap. Leverage. Repay. Automate." isActive={isActive} duration={700} />
     </p>
     <p className="text-base-content/50 text-lg leading-relaxed md:text-xl">
-      <ScrambleText text="Any combination. Any protocol. One transaction." isActive={isActive} duration={700} />
+      <ScrambleText text="Manage existing positions with the actions available for your protocol and chain." isActive={isActive} duration={700} />
     </p>
   </div>
 );
@@ -277,9 +292,9 @@ const MissionContent = ({ isActive }: { isActive: boolean }) => (
 // Features content - staggered scramble for each feature
 const FeaturesContent = ({ isActive }: { isActive: boolean }) => {
   const features = [
-    { title: "ATOMIC", desc: "One tx. All actions. Reverts if anything fails." },
-    { title: "NON-CUSTODIAL", desc: "Your keys. Your assets. Always." },
-    { title: "ZERO FEES", desc: "We don't take a cut. Ever." },
+    { title: "ATOMIC", desc: "Execution succeeds together or reverts. Approvals may be separate." },
+    { title: "NON-CUSTODIAL", desc: "Manage your positions in the underlying lending protocols." },
+    { title: "NO KAPAN FEE", desc: "Gas, swap costs and any flash-loan fees still apply." },
   ];
 
   // Stagger delays for each feature
@@ -346,6 +361,9 @@ const IntegrationsContent = ({ isActive }: { isActive: boolean }) => (
         {routers.map((item) => <IntegrationItem key={item.name} {...item} />)}
       </div>
     </div>
+    <p className="text-base-content/70 text-sm">
+      <ScrambleText text="Available actions vary by protocol, chain and asset. Check your position in the app." isActive={isActive} duration={500} />
+    </p>
   </div>
 );
 
@@ -433,7 +451,7 @@ const FAQAccordionScramble = ({
 const SecurityContent = ({ isActive }: { isActive: boolean }) => (
   <div className="flex flex-col items-center gap-6">
     <p className="text-base-content/70 max-w-md text-sm">
-      <ScrambleText text="Audited. Verified. Open source." isActive={isActive} duration={500} />
+      <ScrambleText text="CODESPECT reviewed the Starknet contracts specified in this report. The audit does not cover every chain or current deployment." isActive={isActive} duration={500} />
     </p>
     <a
       href="/audits/022_CODESPECT_KAPAN_FINANCE.pdf"
@@ -484,6 +502,7 @@ const PROGRESS_STYLE = { height: "100%" };
 
 const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
   useKapanTheme();
+  const isCinematic = useLandingPresentation();
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -499,19 +518,19 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
   const sections: SectionData[] = useMemo(() => [
     {
       tag: "01 / MISSION",
-      title: "ONE TRANSACTION.",
+      title: "YOUR POSITIONS.",
       content: null,
       ContentComponent: MissionContent,
     },
     {
       tag: "02 / FEATURES",
-      title: "NO COMPROMISES.",
+      title: "YOUR CONTROLS.",
       content: null,
       ContentComponent: FeaturesContent,
     },
     {
       tag: "03 / INTEGRATIONS",
-      title: "EVERYWHERE.",
+      title: "CONNECTED.",
       content: null,
       ContentComponent: IntegrationsContent,
     },
@@ -523,7 +542,7 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
     },
     {
       tag: "05 / SECURITY",
-      title: "AUDITED.",
+      title: "AUDIT SCOPE.",
       content: null,
       ContentComponent: SecurityContent,
     },
@@ -567,25 +586,25 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
       {/* Scroll container */}
       <div
         ref={containerRef}
-        className="hide-scrollbar relative z-10 size-full snap-y snap-mandatory overflow-y-auto scroll-smooth"
+        className={`hide-scrollbar relative z-10 size-full overflow-y-auto ${isCinematic ? "snap-y snap-mandatory scroll-smooth" : ""}`}
       >
-        <div style={scrollContainerStyle} className="relative">
+        <div style={isCinematic ? scrollContainerStyle : undefined} className="relative">
           {/* Snap targets */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col">
+          {isCinematic && <div className="pointer-events-none absolute inset-0 flex flex-col" aria-hidden="true">
             {sections.map((_, i) => (
               <div key={i} className="h-screen w-full snap-start" />
             ))}
-          </div>
+          </div>}
 
           {/* Sticky viewport */}
-          <div className="sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden">
+          <div className={isCinematic ? "sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden" : "relative flex w-full flex-col"}>
             {/* Progress indicator */}
-            <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
+            {isCinematic && <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
               <motion.div
                 className="bg-base-content/40 w-full origin-top"
                 style={progressIndicatorStyle}
               />
-            </div>
+            </div>}
 
             {/* Sections */}
             {sections.map((section, i) => (
@@ -595,17 +614,18 @@ const InfoPageContent = ({ faqItems }: { faqItems: FAQItem[] }) => {
                 index={i}
                 total={sections.length}
                 scrollYProgress={smoothProgress}
+                isCinematic={isCinematic}
               />
             ))}
 
             {/* Scroll hint */}
-            <motion.div
+            {isCinematic && <motion.div
               style={scrollHintStyle}
               className="text-base-content/60 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
             >
               <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>
               <ChevronDownIcon className="size-4 animate-bounce" />
-            </motion.div>
+            </motion.div>}
           </div>
         </div>
       </div>
