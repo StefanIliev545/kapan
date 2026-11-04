@@ -9,7 +9,6 @@ if (typeof BigInt !== "undefined") {
 }
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import {
   StarknetConfig,
   argent,
@@ -23,7 +22,6 @@ import { Toaster } from "sonner";
 import { Fordefi } from "starknetkit/fordefi";
 import { Keplr } from "starknetkit/keplr";
 import { MetaMask } from "starknetkit/metamask";
-import { WagmiProvider } from "wagmi";
 import { PendingOrdersDrawer } from "~~/components/common/PendingOrdersDrawer";
 import { Footer } from "~~/components/Footer";
 import { Header } from "~~/components/Header";
@@ -33,14 +31,13 @@ import { WalletAnalytics } from "~~/components/WalletAnalytics";
 import { StarknetWalletAnalytics } from "~~/components/StarknetWalletAnalytics";
 import { StarknetSessionRecovery } from "~~/components/StarknetSessionRecovery";
 import { usePathname } from "next/navigation";
-import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useInitializeNativeCurrencyPrice } from "~~/hooks/scaffold-eth";
 import { useBridgeTracking } from "~~/hooks/useBridgeTracking";
 import { BlockNumberProvider } from "~~/hooks/scaffold-eth";
 import { StarkBlockNumberProvider } from "~~/hooks/scaffold-stark";
 import { appChains } from "~~/services/web3/connectors";
 import provider, { paymasterProvider } from "~~/services/web3/provider";
-import { wagmiConfig } from "~~/services/web3/wagmiConfig";
+import { EvmWalletProvider } from "~~/components/wallet/EvmWalletProvider";
 import { AccountProvider } from "~~/contexts/AccountContext";
 import { SelectedGasTokenProvider } from "~~/contexts/SelectedGasTokenContext";
 import { LandingSectionProvider } from "~~/contexts/LandingSectionContext";
@@ -160,24 +157,19 @@ export const ScaffoldEthAppWithProviders = ({
     >
       <Suspense fallback={null}>
         <AccountProvider>
-          <WagmiProvider config={wagmiConfig}>
+          <EvmWalletProvider>
             <BlockNumberProvider>
               <StarkBlockNumberProvider>
                 <ProgressBar height="3px" color="#2299dd" />
-                <RainbowKitProvider
-                  avatar={BlockieAvatar}
-                  theme={darkTheme()}
-                >
-                  <ReferralProvider>
-                    <StarknetSessionRecovery />
-                    <StarknetWalletAnalytics />
-                    <WalletAnalytics />
-                    <ScaffoldEthApp>{children}</ScaffoldEthApp>
-                  </ReferralProvider>
-                </RainbowKitProvider>
+                <ReferralProvider>
+                  <StarknetSessionRecovery />
+                  <StarknetWalletAnalytics />
+                  <WalletAnalytics />
+                  <ScaffoldEthApp>{children}</ScaffoldEthApp>
+                </ReferralProvider>
               </StarkBlockNumberProvider>
             </BlockNumberProvider>
-          </WagmiProvider>
+          </EvmWalletProvider>
         </AccountProvider>
       </Suspense>
     </StarknetConfig>

@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 import { MutateOptions } from "@tanstack/react-query";
 import { Abi, ExtractAbiFunctionNames } from "abitype";
 import { getPublicClient } from "@wagmi/core";
-import { Config, UseWriteContractParameters, useAccount, useWriteContract } from "wagmi";
+import { Config, UseWriteContractParameters, useAccount, useConfig, useWriteContract } from "wagmi";
 import { WriteContractErrorType, WriteContractReturnType } from "wagmi/actions";
 import { WriteContractVariables } from "wagmi/query";
 import { useDeployedContractInfo, useSelectedNetwork, useTransactor } from "~~/hooks/scaffold-eth";
-import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 import { AllowedChainIds, notification } from "~~/utils/scaffold-eth";
 
 // Chains where MetaMask gas estimation is unreliable and we should estimate ourselves
@@ -58,6 +57,7 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
   configOrName: UseScaffoldWriteConfig<TContractName> | TContractName,
   writeContractParams?: UseWriteContractParameters,
 ): ScaffoldWriteContractReturnType<TContractName> {
+  const wagmiConfig = useConfig();
   const finalConfig =
     typeof configOrName === "string"
       ? { contractName: configOrName, writeContractParams, chainId: undefined }
@@ -114,7 +114,7 @@ export function useScaffoldWriteContract<TContractName extends ContractName>(
       let gasOverride: { gas?: bigint } = {};
       if (CHAINS_WITH_GAS_ESTIMATION_ISSUES.has(accountChain.id) && accountAddress) {
         try {
-          const publicClient = getPublicClient(wagmiConfig, { chainId: accountChain.id as 130 });
+          const publicClient = getPublicClient(wagmiConfig, { chainId: accountChain.id });
           if (publicClient) {
             const gasEstimate = await publicClient.estimateContractGas({
               address: deployedContractData.address,

@@ -1,24 +1,26 @@
-import { useRef, useState, useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { NetworkOptions } from "./NetworkOptions";
+import { toast } from "sonner";
 import { getAddress } from "viem";
 import { Address } from "viem";
-import { useDisconnect } from "wagmi";
 import {
   ArrowLeftOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
   ArrowsRightLeftIcon,
   CheckCircleIcon,
   ChevronDownIcon,
+  ClipboardDocumentListIcon,
   DocumentDuplicateIcon,
   QrCodeIcon,
-  ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
-import { BlockieAvatar, isENS } from "~~/components/scaffold-eth";
-import { useOutsideClick, useCopyToClipboard } from "~~/hooks/scaffold-eth";
-import { getTargetNetworks } from "~~/utils/scaffold-eth";
-import { truncateAddress } from "~~/utils/address";
 import { ReferralDropdownSection } from "~~/components/referral/ReferralDropdownSection";
+import { BlockieAvatar, isENS } from "~~/components/scaffold-eth";
+import { useEvmWalletSession } from "~~/components/wallet/EvmWalletSession";
+import { useEvmDisconnect } from "~~/components/wallet/useEvmDisconnect";
+import { useCopyToClipboard, useOutsideClick } from "~~/hooks/scaffold-eth";
+import { truncateAddress } from "~~/utils/address";
+import { getTargetNetworks } from "~~/utils/scaffold-eth";
 
 const allowedNetworks = getTargetNetworks();
 
@@ -35,7 +37,8 @@ export const AddressInfoDropdown = ({
   displayName,
   blockExplorerAddressLink,
 }: AddressInfoDropdownProps) => {
-  const { disconnect } = useDisconnect();
+  const { disconnect, pending } = useEvmDisconnect();
+  const session = useEvmWalletSession();
   const checkSumAddress = getAddress(address);
 
   const { copy, isCopied: addressCopied } = useCopyToClipboard();
@@ -56,13 +59,25 @@ export const AddressInfoDropdown = ({
     setSelectingNetwork(true);
   }, []);
 
+  const handleExportWallet = async () => {
+    closeDropdown();
+    try {
+      await session.exportWallet?.();
+    } catch {
+      toast.error("Could not open wallet export. Please try again.");
+    }
+  };
+
   const handleDisconnect = useCallback(() => {
     disconnect();
   }, [disconnect]);
 
   return (
     <details ref={dropdownRef} className="dropdown dropdown-end flex-none leading-3">
-      <summary tabIndex={0} className="hover:bg-base-200 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-colors">
+      <summary
+        tabIndex={0}
+        className="hover:bg-base-200 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-colors"
+      >
         <BlockieAvatar address={checkSumAddress} size={24} ensImage={ensAvatar} />
         <span className="text-sm font-medium">
           {isENS(displayName) ? displayName : truncateAddress(checkSumAddress)}
@@ -80,12 +95,9 @@ export const AddressInfoDropdown = ({
               <div className="flex items-center gap-3">
                 <BlockieAvatar address={checkSumAddress} size={40} ensImage={ensAvatar} />
                 <div className="min-w-0">
-                  {isENS(displayName) && (
-                    <p className="truncate font-medium">{displayName}</p>
-                  )}
-                  <p className="text-base-content/50 font-mono text-sm">
-                    {truncateAddress(checkSumAddress)}
-                  </p>
+                  {session.kind === "email" && <p className="text-base-content/60 text-xs">Email wallet</p>}
+                  {isENS(displayName) && <p className="truncate font-medium">{displayName}</p>}
+                  <p className="text-base-content/50 font-mono text-sm">{truncateAddress(checkSumAddress)}</p>
                 </div>
               </div>
             </div>
@@ -136,6 +148,17 @@ export const AddressInfoDropdown = ({
                 <ArrowTopRightOnSquareIcon className="text-base-content/40 ml-auto size-3" />
               </a>
 
+              {session.kind === "email" && (
+                <button
+                  type="button"
+                  onClick={handleExportWallet}
+                  className="hover:bg-base-200 flex w-full items-center gap-3 px-4 py-2.5 transition-colors"
+                >
+                  <ArrowTopRightOnSquareIcon className="text-base-content/60 size-5" />
+                  <span className="text-sm">Export email wallet</span>
+                </button>
+              )}
+
               {/* Switch Network */}
               {allowedNetworks.length > 1 && (
                 <button
@@ -155,10 +178,11 @@ export const AddressInfoDropdown = ({
             <div className="border-base-200 border-t py-2">
               <button
                 onClick={handleDisconnect}
+                disabled={pending}
                 className="hover:bg-error/10 text-error flex w-full items-center gap-3 px-4 py-2.5 transition-colors"
               >
                 <ArrowLeftOnRectangleIcon className="size-5" />
-                <span className="text-sm">Disconnect</span>
+                <span className="text-sm">{session.kind === "email" ? "Sign out" : "Disconnect"}</span>
               </button>
             </div>
           </>
