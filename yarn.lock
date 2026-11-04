@@ -8191,6 +8191,7 @@ __metadata:
     "@rainbow-me/rainbowkit": 2.1.6
     "@react-three/fiber": ^9.6.0
     "@scaffold-stark/stark-burner": ^0.1.13
+    "@solana-program/system": 0.10.0
     "@solana/wallet-adapter-react": 0.15.35
     "@starknet-react/chains": ^5.0.3
     "@starknet-react/core": ^5.0.3
@@ -8198,6 +8199,7 @@ __metadata:
     "@storybook/react": ^8.5.0
     "@storybook/react-vite": ^8.5.0
     "@storybook/test": ^8.5.0
+    "@stripe/stripe-js": 1.54.2
     "@tanstack/react-query": ^5.72.2
     "@tanstack/react-table": ^8.21.3
     "@testing-library/dom": ^10.4.0
@@ -8461,6 +8463,15 @@ __metadata:
   peerDependencies:
     "@solana/kit": ^5.0
   checksum: 9dd948894b1bb11166d4897ae94fc6bf3b8b806e63565c0d9fdda09c0c2e0c6b14411fce00e33a6ee468eb43d395f7555f8fce7b4e18310fd757d8357ef9b380
+  languageName: node
+  linkType: hard
+
+"@solana-program/system@npm:0.10.0":
+  version: 0.10.0
+  resolution: "@solana-program/system@npm:0.10.0"
+  peerDependencies:
+    "@solana/kit": ^5.0
+  checksum: 1772fc40e2edceb10e85a5b48d347271c8b484a0b8a887fc86453644e28f8590421c20b6d2abd2e74fd4093c000efb1bddddbd928c913c9b169c0e7f0f46b8d3
   languageName: node
   linkType: hard
 
@@ -10434,6 +10445,13 @@ __metadata:
   peerDependencies:
     "@stripe/stripe-js": ^1.46.0
   checksum: b169e1e08978827d1e90767539a4320a2d0f2c9b7325e5e449e328bc3a7ff4eb9606a98374fe79fe1c7bf7ebe178f4f76ca83bb5b17222e0a40bdc9f50a66b6b
+  languageName: node
+  linkType: hard
+
+"@stripe/stripe-js@npm:1.54.2":
+  version: 1.54.2
+  resolution: "@stripe/stripe-js@npm:1.54.2"
+  checksum: d5c4a71383c33da3f3badd2ac03073a90250fc0e04b2ecd571f73f34db2266c9fdfc64947410845d58dce074547424bd133f8f24bf86de69dfeb73d140c0bdc8
   languageName: node
   linkType: hard
 
