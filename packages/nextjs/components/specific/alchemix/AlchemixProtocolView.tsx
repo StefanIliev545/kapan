@@ -25,7 +25,7 @@ import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
 import { LTVAutomationModal } from "~~/components/modals/LTVAutomationModal";
 import { formatUnits } from "viem";
 import { PositionManager } from "~~/utils/position";
-import { useGlobalState } from "~~/services/store/store";
+import { useSetProtocolTotals } from "~~/contexts/DashboardTotalsContext";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { MetricColors } from "~~/utils/protocolMetrics";
 import { formatCurrencyCompact } from "~~/utils/formatNumber";
@@ -152,7 +152,7 @@ export const AlchemixProtocolView: FC<AlchemixProtocolViewProps> = ({ chainId: p
   }, [positions, getPriceRaw, getDebtPriceRaw, usdValue, vaultYields]);
 
   // Report totals to global dashboard balance
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
   useEffect(() => {
     if (!hasLoadedOnce) return;
     setProtocolTotals("Alchemix", metrics.totalSupplied, metrics.totalBorrowed);

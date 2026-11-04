@@ -7,7 +7,7 @@ import { ChevronDownIcon, InformationCircleIcon, WalletIcon } from "@heroicons/r
 import { LoadingSpinner } from "~~/components/common/Loading";
 import { useTxCompletedListenerDelayed } from "~~/hooks/common/useTxCompletedListener";
 import { type WalletToken, useWalletTokens } from "~~/hooks/useWalletTokens";
-import { useGlobalState } from "~~/services/store/store";
+import { useSetProtocolTotals } from "~~/contexts/DashboardTotalsContext";
 import { is1inchSupported } from "~~/utils/chainFeatures";
 
 const WalletSwapModal = dynamic(
@@ -85,7 +85,7 @@ export function WalletSection({ chainId, defaultExpanded = false }: WalletSectio
     setShown(previous => new Set([...previous, identity(address)]));
   };
 
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
   useEffect(() => {
     if (isLoading || isRefreshing || isError || !valuationAvailable) {
       return;

@@ -42,9 +42,8 @@ vi.mock("~~/hooks/useExternalYields", () => ({
 }));
 vi.mock("~~/hooks/common", () => ({ useTxCompletedListenerDelayed: () => undefined }));
 vi.mock("~~/utils/forkChain", () => ({ getEffectiveChainId: (chainId: number) => chainId }));
-vi.mock("~~/services/store/store", () => ({
-  useGlobalState: (select: (state: { setProtocolTotals: typeof mocks.setProtocolTotals }) => unknown) =>
-    select({ setProtocolTotals: mocks.setProtocolTotals }),
+vi.mock("~~/contexts/DashboardTotalsContext", () => ({
+  useSetProtocolTotals: () => mocks.setProtocolTotals,
 }));
 vi.mock("~~/components/specific/common", () => ({
   BaseProtocolHeader: ({ onToggleCollapsed }: { onToggleCollapsed: () => void }) => (

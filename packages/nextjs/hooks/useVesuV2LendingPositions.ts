@@ -15,9 +15,7 @@ import {
   computeUsdValue,
   parsePositionTuples,
   toHexAddress,
-  type PositionTuple,
 } from "./useProtocolPositions";
-import { usePositionLoadingState } from "./useProtocolPositions/usePositionLoadingState";
 
 const ZERO_ADDRESS = normalizeStarknetAddress(0n);
 
@@ -108,7 +106,9 @@ interface UseVesuV2LendingPositionsResult {
   isLoadingPositions: boolean;
   isLoadingAssets: boolean;
   refetchPositions: () => void;
+  refetchAssets: () => void;
   assetsError?: unknown;
+  positionsError?: unknown;
 }
 
 export const useVesuV2LendingPositions = (
@@ -116,7 +116,7 @@ export const useVesuV2LendingPositions = (
   poolAddress: string,
 ): UseVesuV2LendingPositionsResult => {
   const normalizedPoolAddress = normalizeStarknetAddress(poolAddress);
-  const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError } = useVesuV2Assets(normalizedPoolAddress);
+  const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError, refetchAssets } = useVesuV2Assets(normalizedPoolAddress);
 
   // Paginate `get_all_positions_range` into small windows. Each call iterates
   // `end - start` pairs and does a `pool.context()` read per pair — the wider
@@ -179,24 +179,17 @@ export const useVesuV2LendingPositions = (
   }, [part0.error, part1.error, part2.error, part3.error, part4.error]);
 
   const mergedUserPositions = useMemo(
-    () => parts.flatMap(p => parsePositionTuples(p.data)),
+    () => userAddress ? parts.flatMap(p => parsePositionTuples(p.data)) : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [part0.data, part1.data, part2.data, part3.data, part4.data],
+    [userAddress, part0.data, part1.data, part2.data, part3.data, part4.data],
   );
 
-  const isLoadingPositions = parts.some(p => p.isLoading);
-  const isFetchingPositions = parts.some(p => p.isFetching);
+  // Query results are already cached by account, pool, and chain. Empty pages
+  // are successful results too; missing or failed pages are not a complete load.
+  const hasLoadedOnce = !!userAddress && parts.every(p => p.data !== undefined);
+  const isLoadingPositions = !!userAddress && parts.some(p => p.isLoading);
+  const isUpdating = hasLoadedOnce && parts.some(p => p.isFetching);
   const positionsError = parts.find(p => p.error)?.error;
-
-  // Use shared loading state hook
-  const { hasLoadedOnce, isUpdating, setCachedData, getCachedData } = usePositionLoadingState({
-    isLoading: isLoadingPositions,
-    isFetching: isFetchingPositions,
-    userAddress,
-    poolId: normalizedPoolAddress,
-    error: positionsError,
-    data: mergedUserPositions.length > 0 ? mergedUserPositions : undefined,
-  });
 
   const refetchPositions = useCallback(() => {
     if (!userAddress) return;
@@ -216,19 +209,6 @@ export const useVesuV2LendingPositions = (
       refetchPositionsRef.current?.();
     }
   }, [userAddress]);
-
-  // Cache positions when loading completes
-  useEffect(() => {
-    if (!userAddress) {
-      setCachedData<PositionTuple[]>([]);
-      return;
-    }
-    if (!isLoadingPositions && mergedUserPositions.length > 0) {
-      setCachedData(mergedUserPositions);
-    }
-  }, [mergedUserPositions, isLoadingPositions, userAddress, setCachedData]);
-
-  const cachedPositions = getCachedData<PositionTuple[]>() ?? [];
 
   const suppliablePositions = useMemo(() => {
     // Suppliable = union(collaterals, debts). Re7 USDC pools list USDC as a
@@ -283,11 +263,11 @@ export const useVesuV2LendingPositions = (
   }, [assetsWithRates, debtSet]);
 
   const rows = useMemo(() => {
-    if (!userAddress || cachedPositions.length === 0) {
+    if (!userAddress || mergedUserPositions.length === 0) {
       return [];
     }
 
-    return cachedPositions
+    return mergedUserPositions
       .map((position, index) => {
         const [collateralAddressRaw, debtAddressRaw, stats] = position;
         const isEmptyPosition = stats.collateral_amount === 0n && stats.nominal_debt === 0n;
@@ -374,7 +354,7 @@ export const useVesuV2LendingPositions = (
         } satisfies VesuPositionRow;
       })
       .filter(Boolean) as VesuPositionRow[];
-  }, [assetMap, cachedPositions, normalizedPoolAddress, userAddress]);
+  }, [assetMap, mergedUserPositions, normalizedPoolAddress, userAddress]);
 
   return {
     assetsWithRates,
@@ -386,7 +366,9 @@ export const useVesuV2LendingPositions = (
     isLoadingPositions,
     isLoadingAssets,
     refetchPositions,
+    refetchAssets,
     assetsError,
+    positionsError,
   };
 };
 

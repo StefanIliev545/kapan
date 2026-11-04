@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
@@ -95,6 +95,7 @@ export const useVesuAssets = (poolId: bigint) => {
   const {
     data: supportedAssets,
     error: assetsError,
+    refetch: refetchSupportedAssets,
   } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_assets_ui",
@@ -103,13 +104,13 @@ export const useVesuAssets = (poolId: bigint) => {
   });
 
   // Fetch explicit allowlists for collateral and debt to correctly mark supply/borrow capability
-  const { data: supportedCollaterals } = useScaffoldReadContract({
+  const { data: supportedCollaterals, refetch: refetchSupportedCollaterals } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_collateral_assets",
     args: [poolId],
     refetchInterval: 0,
   });
-  const { data: supportedDebts } = useScaffoldReadContract({
+  const { data: supportedDebts, refetch: refetchSupportedDebts } = useScaffoldReadContract({
     contractName: "VesuGateway",
     functionName: "get_supported_debt_assets",
     args: [poolId],
@@ -117,6 +118,12 @@ export const useVesuAssets = (poolId: bigint) => {
   });
 
   useLogError(assetsError, "Error fetching supported assets:");
+
+  const refetchAssets = useCallback(() => {
+    void refetchSupportedAssets();
+    void refetchSupportedCollaterals();
+    void refetchSupportedDebts();
+  }, [refetchSupportedAssets, refetchSupportedCollaterals, refetchSupportedDebts]);
 
   const normalizedAssets = useMemo(() => parseSupportedAssets(supportedAssets), [supportedAssets]);
 
@@ -177,6 +184,7 @@ export const useVesuAssets = (poolId: bigint) => {
     debtSet,
     isLoading: supportedAssets == null,
     assetsError,
+    refetchAssets,
   };
 };
 

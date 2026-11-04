@@ -6,7 +6,7 @@ import { LpPositionCard } from "./LpPositionCard";
 import { CollapsibleSection } from "~~/components/common/CollapsibleSection";
 import { LoadingSpinner } from "~~/components/common/Loading";
 import { useTokenPricesByAddress } from "~~/hooks/useTokenPrice";
-import { useGlobalState } from "~~/services/store/store";
+import { useSetProtocolTotals } from "~~/contexts/DashboardTotalsContext";
 import { MetricColors } from "~~/utils/protocolMetrics";
 import type { UniToken, UniswapPosition } from "~~/utils/uniswapMath";
 
@@ -87,7 +87,7 @@ export const LpProtocolView: FC<LpProtocolViewProps> = ({
     return { value, fees, inRange, outOfRange, count: rows.length };
   }, [rows]);
 
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
   useEffect(() => {
     if (!hasLoadedOnce) return;
     setProtocolTotals(protocolName, totals.value, 0);

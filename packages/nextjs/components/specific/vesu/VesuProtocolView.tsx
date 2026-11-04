@@ -20,7 +20,7 @@ import { VESU_V1_POOLS, VESU_V2_POOLS, getV1PoolDisplay, getV2PoolDisplay } from
 import { VesuMarketSection } from "./VesuMarketSection";
 import { VesuPositionsSection } from "./VesuPositionsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
-import { useGlobalState } from "~~/services/store/store";
+import { useSetProtocolTotals } from "~~/contexts/DashboardTotalsContext";
 import { formatCurrency } from "~~/utils/formatNumber";
 
 type VesuVersionKey = "v1" | "v2";
@@ -116,9 +116,18 @@ function PoolPositionRow<T extends string>({
 }: PoolPositionRowProps<T>) {
   const disp = getPoolDisplay(rawName);
   const name = disp.name;
-  const shouldRender = data.rows.length > 0 || rawName === defaultPoolName;
+  const positionsError = data.positionsError ?? data.assetsError;
+  const positionsReady = data.hasLoadedOnce && (
+    data.rows.length > 0 || (!data.isLoadingAssets && !data.assetsError)
+  );
+  const shouldRender = data.rows.length > 0 || !!positionsError || rawName === defaultPoolName;
 
   const metrics = useMemo(() => computeMetrics(data.rows), [computeMetrics, data.rows]);
+
+  const handleRetryPositions = useCallback(() => {
+    data.refetchPositions();
+    data.refetchAssets();
+  }, [data.refetchPositions, data.refetchAssets]);
 
   const handleBorrowRequest = useCallback(({ tokens, collateralAddress, vesuContext, position }: { tokens: AssetWithRates[]; collateralAddress: string; vesuContext: VesuContext; position: PositionManager }) => {
     onBorrowRequest({ version, tokens, collateralAddress, vesuContext, position });
@@ -148,8 +157,10 @@ function PoolPositionRow<T extends string>({
         assetsWithRates={data.assetsWithRates}
         userAddress={userAddress}
         accountStatus={accountStatus}
-        hasLoadedOnce={data.hasLoadedOnce}
+        hasLoadedOnce={positionsReady}
         isUpdating={data.isUpdating}
+        positionsError={positionsError}
+        onRetryPositions={handleRetryPositions}
         onBorrowRequest={handleBorrowRequest}
         onDepositRequest={handleDepositRequest}
         protocolName={protocolName}
@@ -246,7 +257,7 @@ export const VesuProtocolView: FC = () => {
     setIsPositionsCollapsed(p => ({ ...p, v2: !p.v2 }));
   }, []);
 
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
 
   const computeMetrics = useCallback((rows: VesuPositionRow[]) => {
     if (rows.length === 0) {
@@ -340,7 +351,15 @@ export const VesuProtocolView: FC = () => {
 
   useTxCompletedListener(handleTxCompleted);
 
+  const allPoolsReady = [...Object.values(v1All), ...Object.values(v2All)].every(
+    data => data.hasLoadedOnce && !data.positionsError && !data.isLoadingAssets && !data.assetsError,
+  );
+
   useEffect(() => {
+    if (!allPoolsReady) {
+      return;
+    }
+
     const allRows = [
       ...v1All.Genesis.rows,
       ...v1All.CarmineRunes.rows,
@@ -352,11 +371,6 @@ export const VesuProtocolView: FC = () => {
       ...v2All.Re7USDCPrime.rows,
       ...v2All.Re7USDCStableCore.rows,
     ];
-
-    const anyDataLoaded = allRows.some(row => row.supply.balance !== 0 || (row.borrow && row.borrow.balance !== 0));
-    if (!anyDataLoaded && status !== "connected") {
-      return;
-    }
 
     let totalSupplied = 0;
     let totalBorrowed = 0;
@@ -371,7 +385,7 @@ export const VesuProtocolView: FC = () => {
     setProtocolTotals("Vesu", totalSupplied, totalBorrowed);
   }, [
     setProtocolTotals,
-    status,
+    allPoolsReady,
     v1All.CarmineRunes.rows,
     v1All.Genesis.rows,
     v1All.Re7StarknetEcosystem.rows,
