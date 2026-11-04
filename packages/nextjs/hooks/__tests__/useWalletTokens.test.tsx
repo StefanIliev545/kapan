@@ -15,6 +15,9 @@ const state = vi.hoisted(() => {
     held: "0x0a1a1a107e45b7ced86833863f482bc5f4ed82ef",
     getBalance: vi.fn(),
     multicall: vi.fn(),
+    readContract: vi.fn(),
+    aaveReceipts: [] as string[],
+    compoundReceipts: [] as string[],
     fetchMarkets: vi.fn(),
     fetchHoldings: vi.fn(),
     indexed: [] as Holding[],
@@ -34,6 +37,7 @@ vi.mock("wagmi", () => {
       return {
         getBalance: state.getBalance,
         multicall: state.multicall,
+        readContract: state.readContract,
       };
     },
   };
@@ -179,6 +183,22 @@ beforeEach(() => {
     };
   });
   state.getBalance.mockReset().mockResolvedValue(0n);
+  state.aaveReceipts = [];
+  state.compoundReceipts = [];
+  state.readContract.mockReset().mockImplementation(async ({ functionName }) => {
+    if (functionName === "getPoolDataProvider") {
+      return "0x0000000000000000000000000000000000000040";
+    }
+    if (functionName === "allActiveComets") {
+      return state.compoundReceipts;
+    }
+    return state.aaveReceipts.map((tokenAddress) => {
+      return {
+        symbol: "aToken",
+        tokenAddress,
+      };
+    });
+  });
   state.fetchMarkets.mockReset().mockImplementation(async () => {
     return state.markets;
   });
@@ -370,6 +390,7 @@ it("retains positive indexed ownership as unresolved and stale when current RPC 
   expect(result.current.tokens).toEqual([]);
   expect(result.current.isError).toBe(true);
   expect(result.current.valuationAvailable).toBe(false);
+  expect(result.current.isDiscoveryIncomplete).toBe(false);
 });
 it.each([0, 6, 18])("recovers missing decimals through a validated RPC read (%s)", async (decimals) => {
   selectUnknown();
@@ -423,6 +444,7 @@ it.each([undefined, -1, 256, 1.5, "18"])(
     });
     expect(result.current.tokens).toEqual([]);
     expect(result.current.isError).toBe(true);
+    expect(result.current.isDiscoveryIncomplete).toBe(false);
   },
 );
 it("keeps native balance and successful ERC-20 reads when another call fails", async () => {
@@ -500,12 +522,42 @@ it("reports an incomplete empty indexed scan and recovers on retry", async () =>
   });
   expect(result.current.tokens).toEqual([]);
   expect(result.current.isError).toBe(true);
+  expect(result.current.isDiscoveryIncomplete).toBe(true);
   await act(async () => {
     await result.current.refetch();
   });
   await waitFor(() => {
     expect(result.current.isError).toBe(false);
+    expect(result.current.isDiscoveryIncomplete).toBe(false);
   });
+});
+it("keeps complete indexed discovery separate from failed protocol enrichment", async () => {
+  state.fetchMarkets.mockRejectedValue(new Error("Morpho unavailable"));
+  const { result } = setup();
+  await waitFor(() => {
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isError).toBe(true);
+  });
+  expect(result.current.isDiscoveryIncomplete).toBe(false);
+});
+it("reports a failed indexed fetch as incomplete discovery", async () => {
+  state.fetchHoldings.mockRejectedValue(new Error("Provider unavailable"));
+  const { result } = setup();
+  await waitFor(() => {
+    expect(result.current.isDiscoveryIncomplete).toBe(true);
+  });
+  expect(result.current.isError).toBe(true);
+});
+it("does not report discovery failure while the first indexed request is pending", async () => {
+  state.fetchHoldings.mockImplementation(() => {
+    return new Promise(() => {});
+  });
+  const { result } = setup();
+  await waitFor(() => {
+    expect(state.fetchHoldings).toHaveBeenCalled();
+  });
+  expect(result.current.isLoading).toBe(true);
+  expect(result.current.isDiscoveryIncomplete).toBe(false);
 });
 it("shows held Arbitrum USDAI even when protocol discovery is empty", async () => {
   const { result } = setup();
@@ -709,4 +761,103 @@ it("does not invent ownership from an indexed zero balance when fallback reads f
   expect(result.current.unresolvedHoldings).toEqual([]);
   expect(result.current.tokenCount).toBe(0);
   expect(result.current.isError).toBe(true);
+});
+
+it("excludes Aave receipt addresses without hiding underlying tokens or same-symbol tokens", async () => {
+  const receipt = "0x00000000000000000000000000000000000000ab";
+  const lookalike = "0x00000000000000000000000000000000000000cd";
+  state.aaveReceipts = [receipt.toUpperCase().replace("0X", "0x")];
+  state.indexed = [
+    indexedHolding(receipt, {
+      symbol: "aArbUSDai",
+    }),
+    indexedHolding(lookalike, {
+      symbol: "aArbUSDai",
+    }),
+  ];
+  state.multicall.mockImplementation(async ({ contracts }) => {
+    return contracts.map((call: { address: string }) => {
+      const isHeld = [state.held, receipt, lookalike].includes(call.address);
+      return {
+        status: "success",
+        result: isHeld ? 10n ** 18n : 0n,
+      };
+    });
+  });
+  const { result } = setup();
+  await waitFor(() => {
+    expect(result.current.tokens.map((token) => token.address).sort()).toEqual([state.held, lookalike].sort());
+  });
+  expect(result.current.tokens.find((token) => token.address === state.held)?.symbol).toBe("USDai");
+  expect(result.current.tokens.find((token) => token.address === lookalike)?.symbol).toBe("aArbUSDai");
+});
+it("keeps holdings visible when Aave receipt lookup is unavailable", async () => {
+  selectUnknown();
+  state.readContract.mockRejectedValue(new Error("Aave metadata unavailable"));
+  const { result } = setup();
+  await waitFor(() => {
+    expect(result.current.tokens[0]?.address).toBe(state.held);
+  });
+  expect(result.current.isDiscoveryIncomplete).toBe(false);
+});
+it("scopes Aave receipt exclusion to its chain", async () => {
+  selectUnknown();
+  state.aaveReceipts = [state.held];
+  const { result, rerender } = setup();
+  await waitFor(() => {
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.tokens).toEqual([]);
+  });
+  state.aaveReceipts = [];
+  rerender({
+    chain: 8453,
+  });
+  await waitFor(() => {
+    expect(result.current.tokens[0]?.address).toBe(state.held);
+  });
+});
+it("does not request Aave metadata on a chain without a configured provider", async () => {
+  selectUnknown();
+  const { result } = setup(130);
+  await waitFor(() => {
+    expect(result.current.tokens[0]?.address).toBe(state.held);
+  });
+  expect(state.readContract).not.toHaveBeenCalledWith(expect.objectContaining({
+    functionName: "getPoolDataProvider",
+  }));
+});
+
+it("excludes registered Compound receipts and retains COMP and same-symbol holdings", async () => {
+  const receipt = "0x00000000000000000000000000000000000000ab";
+  const comp = "0x00000000000000000000000000000000000000cd";
+  const lookalike = "0x00000000000000000000000000000000000000ef";
+  state.compoundReceipts = [receipt.toUpperCase().replace("0X", "0x")];
+  state.indexed = [
+    indexedHolding(receipt, {
+      symbol: "cUSDCv3",
+    }),
+    indexedHolding(comp, {
+      symbol: "COMP",
+    }),
+    indexedHolding(lookalike, {
+      symbol: "cUSDCv3",
+    }),
+  ];
+  state.multicall.mockImplementation(async ({ contracts }) => {
+    return contracts.map((call: { address: string }) => {
+      const isHeld = [state.held, receipt, comp, lookalike].includes(call.address);
+      return {
+        status: "success",
+        result: isHeld ? 10n ** 18n : 0n,
+      };
+    });
+  });
+  const { result } = setup();
+  await waitFor(() => {
+    const addresses = result.current.tokens.map((token) => {
+      return token.address;
+    });
+    expect(addresses.sort()).toEqual([state.held, comp, lookalike].sort());
+  });
+  expect(result.current.tokens.find((token) => token.address === comp)?.symbol).toBe("COMP");
 });

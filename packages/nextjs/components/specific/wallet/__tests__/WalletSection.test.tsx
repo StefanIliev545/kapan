@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { type ReactNode } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { WalletSection } from "../WalletSection";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { WalletToken } from "~~/hooks/useWalletTokens";
+
 const mocks = vi.hoisted(() => {
   return {
     wallet: vi.fn(),
@@ -10,75 +11,22 @@ const mocks = vi.hoisted(() => {
     setProtocolTotals: vi.fn(),
   };
 });
-vi.mock("~~/hooks/useWalletTokens", () => {
-  return {
-    useWalletTokens: mocks.wallet,
-  };
-});
-vi.mock("~~/services/store/store", () => {
-  return {
-    useGlobalState: (select: (state: { setProtocolTotals: typeof mocks.setProtocolTotals }) => unknown) => {
-      return select({
-        setProtocolTotals: mocks.setProtocolTotals,
-      });
-    },
-  };
-});
-vi.mock("~~/hooks/common/useTxCompletedListener", () => {
-  return {
-    useTxCompletedListenerDelayed: () => {},
-  };
-});
-vi.mock("next/dynamic", () => {
-  return {
-    default: () => {
-      return function Modal() {
-        return null;
-      };
-    },
-  };
-});
-vi.mock("framer-motion", () => {
-  return {
-    AnimatePresence: ({ children }: { children: ReactNode }) => {
-      return <>{children}</>;
-    },
-    motion: {
-      div: ({ children }: { children: ReactNode }) => {
-        return <div>{children}</div>;
-      },
-    },
-  };
-});
-vi.mock("~~/components/common/TokenDisplay", () => {
-  return {
-    TokenIcon: () => {
-      return null;
-    },
-  };
-});
-vi.mock("~~/components/common/TokenSymbolDisplay", () => {
-  return {
-    TokenSymbolDisplay: ({ symbol }: { symbol: string }) => {
-      return <span>{symbol}</span>;
-    },
-  };
-});
-vi.mock("~~/components/common/AmountDisplay", () => {
-  return {
-    UsdDisplay: ({ value }: { value: number }) => {
-      return <span>{value}</span>;
-    },
-  };
-});
-vi.mock("~~/utils/chainFeatures", () => {
-  return {
-    is1inchSupported: () => {
-      return false;
-    },
-  };
-});
-const token = {
+
+vi.mock("~~/hooks/useWalletTokens", () => ({ useWalletTokens: mocks.wallet }));
+vi.mock("~~/services/store/store", () => ({
+  useGlobalState: (select: (state: { setProtocolTotals: typeof mocks.setProtocolTotals }) => unknown) => {
+    return select({ setProtocolTotals: mocks.setProtocolTotals });
+  },
+}));
+vi.mock("~~/hooks/common/useTxCompletedListener", () => ({ useTxCompletedListenerDelayed: () => {} }));
+vi.mock("next/dynamic", () => ({ default: () => () => null }));
+vi.mock("~~/components/common/TokenDisplay", () => ({ TokenIcon: () => null }));
+vi.mock("~~/components/common/TokenSymbolDisplay", () => ({
+  TokenSymbolDisplay: ({ symbol }: { symbol: string }) => <span>{symbol}</span>,
+}));
+vi.mock("~~/utils/chainFeatures", () => ({ is1inchSupported: () => true }));
+
+const token: WalletToken = {
   address: "0x0a1a1a107e45b7ced86833863f482bc5f4ed82ef",
   symbol: "USDai",
   name: "USDai",
@@ -89,15 +37,31 @@ const token = {
   price: 1,
   icon: "/token.svg",
   source: "major",
+  valuationAvailable: true,
 };
+const indexedToken: WalletToken = {
+  ...token,
+  address: "0x1111111111111111111111111111111111111111",
+  symbol: "NEW",
+  name: "New token",
+  balance: 7n * 10n ** 18n,
+  balanceFormatted: 7,
+  usdValue: 7,
+  source: "indexed",
+};
+const unresolved = {
+  address: "0x2222222222222222222222222222222222222222",
+  rawBalance: "2678",
+  reason: "decimals",
+};
+
 function walletResult(overrides: Record<string, unknown> = {}) {
   return {
     tokens: [token],
     isLoading: false,
     isError: false,
-    error: null,
+    isDiscoveryIncomplete: false,
     totalValue: 25,
-    tokenCount: 1,
     refetch: mocks.refetch,
     unresolvedHoldings: [],
     valuationAvailable: true,
@@ -105,116 +69,156 @@ function walletResult(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+function walletHeader() {
+  return screen.getByRole("button", { name: "Toggle wallet holdings" });
+}
+
+function openGroup(label: string) {
+  const summary = screen.getByText(label, { selector: "summary" });
+  fireEvent.click(summary);
+  const group = summary.closest("details")!;
+  expect(group.open).toBe(true);
+  return group;
+}
+
+function openDetails(label: string, container: HTMLElement = document.body) {
+  const button = within(container).getByRole("button", { name: `Details for ${label}` });
+  fireEvent.click(button);
+  expect(button.getAttribute("aria-expanded")).toBe("true");
+}
+
+function hideToken(label: string) {
+  openDetails(label);
+  fireEvent.click(screen.getByRole("button", { name: `Hide ${label}` }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.wallet.mockReturnValue(walletResult());
 });
-afterEach(() => {
-  cleanup();
+afterEach(cleanup);
+
+it("shows the known balance and reports a complete portfolio contribution", () => {
+  render(<WalletSection chainId={42161} defaultExpanded />);
+  expect(walletHeader().textContent).toContain("Balance$25.00");
+  expect(screen.getByText("USDai")).toBeTruthy();
+  expect(mocks.setProtocolTotals).toHaveBeenCalledWith("Wallet", 25, 0);
+  expect(screen.queryByRole("status")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Hide USDai" })).toBeNull();
 });
-it.each([false, true])(
-  "labels partial discovery when expanded=%s without reporting a complete portfolio total",
-  (expanded) => {
-    mocks.wallet.mockReturnValue(
-      walletResult({
-        isError: true,
-        error: new Error("Discovery unavailable"),
-      }),
-    );
-    render(<WalletSection chainId={42161} defaultExpanded={expanded} />);
-    expect(screen.getByRole("alert").textContent).toContain("Wallet discovery is incomplete");
-    expect(screen.getByRole("alert").textContent).toContain("may be partial");
-    expect(screen.getByText("Balance (incomplete)").parentElement?.textContent).toContain("25");
-    expect(screen.getByText("Tokens (incomplete)").parentElement?.textContent).toContain("1");
-    expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
-    if (expanded) {
-      expect(screen.getByText("USDai")).toBeTruthy();
-    }
-  },
-);
-it.each([false, true])(
-  "shows failed empty discovery when expanded=%s instead of a successful empty wallet",
-  (expanded) => {
-    mocks.wallet.mockReturnValue(
-      walletResult({
-        tokens: [],
-        totalValue: 0,
-        tokenCount: 0,
-        isError: true,
-        error: new Error("Discovery unavailable"),
-      }),
-    );
-    render(<WalletSection chainId={42161} defaultExpanded={expanded} />);
-    expect(screen.getByRole("alert").textContent).toContain("could not be fully loaded");
-    expect(screen.queryByText("No tokens found in wallet")).toBeNull();
-    expect(screen.getByText("Balance (incomplete)").parentElement?.textContent).toContain("—");
-    expect(screen.getByText("Tokens (incomplete)").parentElement?.textContent).toContain("—");
-    expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
-    if (expanded) {
-      expect(screen.getByText("Token list unavailable")).toBeTruthy();
-    }
-  },
-);
-it("retries the wallet hook and restores complete statistics after recovery", () => {
+
+it.each([false, true])("shows partial balances with a compact retry status when expanded=%s", expanded => {
   mocks.wallet.mockReturnValue(
     walletResult({
       isError: true,
+      isDiscoveryIncomplete: true,
     }),
   );
-  const { rerender } = render(<WalletSection chainId={42161} defaultExpanded />);
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: "Retry",
-    }),
-  );
-  expect(mocks.refetch).toHaveBeenCalledOnce();
-  mocks.wallet.mockReturnValue(walletResult());
-  rerender(<WalletSection chainId={42161} defaultExpanded />);
-  expect(screen.queryByRole("alert")).toBeNull();
-  expect(screen.getByText("Balance")).toBeTruthy();
-  expect(screen.getByText("Tokens")).toBeTruthy();
-  expect(mocks.setProtocolTotals).toHaveBeenCalledWith("Wallet", 25, 0);
+  render(<WalletSection chainId={42161} defaultExpanded={expanded} />);
+  expect(screen.getByRole("status").textContent).toContain("Showing available balances");
+  expect(walletHeader().textContent).toContain("Known value$25.00");
+  expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
 });
-it("keeps successful empty discovery distinct from failure", () => {
+
+it.each([false, true])("does not call an empty failed scan a zero wallet when expanded=%s", expanded => {
   mocks.wallet.mockReturnValue(
     walletResult({
       tokens: [],
       totalValue: 0,
-      tokenCount: 0,
+      isError: true,
+      isDiscoveryIncomplete: true,
+    }),
+  );
+  render(<WalletSection chainId={42161} defaultExpanded={expanded} />);
+  expect(screen.getByRole("status").textContent).toContain("Couldn't load your wallet holdings");
+  expect(walletHeader().textContent).toContain("Known value—");
+  expect(screen.queryByText("No tokens found in wallet")).toBeNull();
+  expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
+});
+
+it("retries discovery and removes its status when the complete scan recovers", () => {
+  mocks.wallet.mockReturnValue(
+    walletResult({
+      isError: true,
+      isDiscoveryIncomplete: true,
+    }),
+  );
+  const { rerender } = render(<WalletSection chainId={42161} defaultExpanded />);
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(mocks.refetch).toHaveBeenCalledOnce();
+  mocks.wallet.mockReturnValue(walletResult());
+  rerender(<WalletSection chainId={42161} defaultExpanded />);
+  expect(screen.queryByRole("status")).toBeNull();
+  expect(walletHeader().textContent).toContain("Balance$25.00");
+  expect(mocks.setProtocolTotals).toHaveBeenCalledWith("Wallet", 25, 0);
+});
+
+it("keeps an empty successful wallet distinct from a failed scan", () => {
+  mocks.wallet.mockReturnValue(
+    walletResult({
+      tokens: [],
+      totalValue: 0,
     }),
   );
   render(<WalletSection chainId={42161} defaultExpanded />);
   expect(screen.getByText("No tokens found in wallet")).toBeTruthy();
-  expect(screen.queryByRole("alert")).toBeNull();
+  expect(walletHeader().textContent).toContain("Balance$0.00");
   expect(mocks.setProtocolTotals).toHaveBeenCalledWith("Wallet", 0, 0);
 });
-it("does not overwrite the last complete portfolio contribution with partial discovery", () => {
+
+it("does not replace the last complete aggregate with partial data", () => {
   const { rerender } = render(<WalletSection chainId={42161} />);
-  expect(mocks.setProtocolTotals).toHaveBeenCalledWith("Wallet", 25, 0);
   mocks.setProtocolTotals.mockClear();
   mocks.wallet.mockReturnValue(
     walletResult({
-      isError: true,
-      totalValue: 5,
       tokens: [
         {
           ...token,
           usdValue: 5,
         },
       ],
+      totalValue: 5,
+      isError: true,
+      isDiscoveryIncomplete: true,
     }),
   );
   rerender(<WalletSection chainId={42161} />);
-  expect(screen.getByRole("alert")).toBeTruthy();
+  expect(walletHeader().textContent).toContain("Known value$5.00");
   expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
 });
-it("keeps an unknown unpriced holding visible and withholds a complete zero valuation", () => {
+
+it("preserves the known subtotal when other holdings have missing prices or precision", () => {
+  mocks.wallet.mockReturnValue(
+    walletResult({
+      tokens: [
+        token,
+        {
+          ...indexedToken,
+          usdValue: 0,
+          price: 0,
+          valuationAvailable: false,
+        },
+      ],
+      unresolvedHoldings: [unresolved],
+      valuationAvailable: false,
+      isError: true,
+    }),
+  );
+  render(<WalletSection chainId={42161} defaultExpanded />);
+  expect(walletHeader().textContent).toContain("Shown value$25.00");
+  expect(screen.queryByRole("status")).toBeNull();
+  expect(screen.getByText("Other tokens (2)").closest("details")?.open).toBe(false);
+  expect(screen.queryByText(/Indexed raw balance:/)).toBeNull();
+  expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
+});
+
+it("keeps unpriced protocol tokens in the main list without reporting a false zero value", () => {
   mocks.wallet.mockReturnValue(
     walletResult({
       tokens: [
         {
           ...token,
-          source: "indexed",
           usdValue: 0,
           price: 0,
           valuationAvailable: false,
@@ -226,21 +230,41 @@ it("keeps an unknown unpriced holding visible and withholds a complete zero valu
   );
   render(<WalletSection chainId={42161} defaultExpanded />);
   expect(screen.getByText("USDai")).toBeTruthy();
-  expect(screen.getByText("Unverified")).toBeTruthy();
-  expect(screen.getByText("Value unavailable")).toBeTruthy();
-  expect(screen.getByText("Balance").parentElement?.textContent).toContain("—");
-  expect(screen.getByText(/Wallet valuation unavailable/)).toBeTruthy();
+  expect(walletHeader().textContent).toContain("Known value—");
+  expect(screen.getByText(/1 token has no current price/)).toBeTruthy();
+  expect(screen.queryByRole("status")).toBeNull();
   expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
 });
-it("shows raw indexed balances as stale and read-only when the current RPC read fails", () => {
+
+it("collapses indexed tokens even when priced, and allows promoting a legitimate holding", () => {
+  mocks.wallet.mockReturnValue(
+    walletResult({
+      tokens: [token, indexedToken],
+      totalValue: 32,
+    }),
+  );
+  render(<WalletSection chainId={42161} defaultExpanded />);
+  expect(walletHeader().textContent).toContain("Shown value$25.00");
+  expect(screen.getByText("NEW").closest("details")?.open).toBe(false);
+  expect(mocks.setProtocolTotals).toHaveBeenLastCalledWith("Wallet", 25, 0);
+  const group = openGroup("Other tokens (1)");
+  openDetails("NEW", group);
+  fireEvent.click(within(group).getByRole("button", { name: "Show in wallet" }));
+  expect(screen.getByText("NEW").closest("details")).toBeNull();
+  expect(screen.queryByText("Other tokens (1)")).toBeNull();
+  expect(walletHeader().textContent).toContain("Balance$32.00");
+  expect(mocks.setProtocolTotals).toHaveBeenLastCalledWith("Wallet", 32, 0);
+  expect(screen.getByRole("img", { name: "Unverified token" })).toBeTruthy();
+});
+
+it("keeps unresolved holdings accessible through details and never offers transaction actions for them", () => {
   mocks.wallet.mockReturnValue(
     walletResult({
       tokens: [],
       totalValue: 0,
       unresolvedHoldings: [
         {
-          address: token.address,
-          rawBalance: "25000000000000000000",
+          ...unresolved,
           reason: "balance",
         },
       ],
@@ -249,126 +273,142 @@ it("shows raw indexed balances as stale and read-only when the current RPC read 
     }),
   );
   render(<WalletSection chainId={42161} defaultExpanded />);
-  expect(screen.getByRole("alert").textContent).toContain("Available tokens are shown");
-  expect(screen.getByText(/Raw balance:/).textContent).toContain("indexed, stale/unverified");
-  expect(screen.getByText(/Amount and value unavailable/)).toBeTruthy();
-  expect(
-    screen.queryByRole("button", {
-      name: /Swap|Bridge/,
-    }),
-  ).toBeNull();
-  expect(screen.queryByText("No tokens found in wallet")).toBeNull();
+  expect(screen.queryByText(/Indexed raw balance:/)).toBeNull();
+  const group = openGroup("Other tokens (1)");
+  expect(screen.queryByRole("button", { name: /Swap|Bridge/ })).toBeNull();
+  openDetails("0x2222…2222", group);
+  expect(screen.getByText(/Indexed raw balance:/).textContent).toContain("2678");
+  expect(screen.getByText(/indexed amount may be out of date/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Show in wallet" })).toBeNull();
   expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
 });
-it("keeps unknowns visible by default and makes hide/reveal/restore explicit without reducing portfolio totals", () => {
+
+it("excludes hidden holdings from portfolio value and restores their contribution explicitly", () => {
   render(<WalletSection chainId={42161} defaultExpanded />);
-  expect(screen.getByText("USDai")).toBeTruthy();
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: "Hide USDai",
-    }),
-  );
-  expect(screen.queryByText("USDai")).toBeNull();
-  expect(screen.getByText("Displayed balance (filtered)")).toBeTruthy();
-  expect(screen.getByText("Displayed tokens (filtered)").parentElement?.textContent).toContain("0");
-  expect(
-    screen.queryByRole("button", {
-      name: "Bridge USDai",
-    }),
-  ).toBeNull();
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: "Show hidden tokens",
-    }),
-  );
-  expect(screen.getByText(/Hidden by you/)).toBeTruthy();
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: `Restore ${token.address}`,
-    }),
-  );
-  expect(screen.getByText("USDai")).toBeTruthy();
-  expect(screen.queryByText("Displayed balance (filtered)")).toBeNull();
-  expect(
-    mocks.setProtocolTotals.mock.calls.every((call) => {
-      return call[1] === 25;
-    }),
-  ).toBe(true);
+  hideToken("USDai");
+  expect(screen.getByText("USDai").closest("details")?.open).toBe(false);
+  expect(walletHeader().textContent).toContain("Shown value—");
+  expect(mocks.setProtocolTotals).toHaveBeenLastCalledWith("Wallet", 0, 0);
+  const group = openGroup("Hidden tokens (1)");
+  expect(within(group).queryByRole("button", { name: /Swap|Bridge/ })).toBeNull();
+  openDetails("USDai", group);
+  fireEvent.click(within(group).getByRole("button", { name: "Restore USDai" }));
+  expect(screen.getByText("USDai").closest("details")).toBeNull();
+  expect(screen.queryByText("Hidden tokens (1)")).toBeNull();
+  expect(walletHeader().textContent).toContain("Balance$25.00");
+  expect(mocks.setProtocolTotals).toHaveBeenLastCalledWith("Wallet", 25, 0);
 });
-it("scopes user filtering to account and chain and remembers it only for this component session", () => {
+
+it("scopes hiding to the wallet and chain, retaining it only for the component session", () => {
   const { rerender, unmount } = render(<WalletSection chainId={42161} defaultExpanded />);
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: "Hide USDai",
-    }),
-  );
-  mocks.wallet.mockReturnValue(
-    walletResult({
-      visibilityScope: "42161:wallet-two",
-    }),
-  );
+  hideToken("USDai");
+  mocks.wallet.mockReturnValue(walletResult({ visibilityScope: "42161:wallet-two" }));
   rerender(<WalletSection chainId={42161} defaultExpanded />);
-  expect(screen.getByText("USDai")).toBeTruthy();
-  mocks.wallet.mockReturnValue(
-    walletResult({
-      visibilityScope: "1:wallet-one",
-    }),
-  );
+  expect(screen.getByText("USDai").closest("details")).toBeNull();
+  mocks.wallet.mockReturnValue(walletResult({ visibilityScope: "1:wallet-one" }));
   rerender(<WalletSection chainId={1} defaultExpanded />);
-  expect(screen.getByText("USDai")).toBeTruthy();
+  expect(screen.getByText("USDai").closest("details")).toBeNull();
   mocks.wallet.mockReturnValue(walletResult());
   rerender(<WalletSection chainId={42161} defaultExpanded />);
-  expect(screen.queryByText("USDai")).toBeNull();
+  expect(screen.getByText("Hidden tokens (1)")).toBeTruthy();
   unmount();
   render(<WalletSection chainId={42161} defaultExpanded />);
-  expect(screen.getByText("USDai")).toBeTruthy();
+  expect(screen.getByText("USDai").closest("details")).toBeNull();
 });
-it("allows hiding and restoring unresolved rows without offering modal actions", () => {
+
+it("does not carry an explicit show choice into another wallet", () => {
+  const result = walletResult({
+    tokens: [indexedToken],
+    totalValue: 7,
+  });
+  mocks.wallet.mockReturnValue(result);
+  const { rerender } = render(<WalletSection chainId={42161} defaultExpanded />);
+  const group = openGroup("Other tokens (1)");
+  openDetails("NEW", group);
+  fireEvent.click(within(group).getByRole("button", { name: "Show in wallet" }));
+  mocks.wallet.mockReturnValue({
+    ...result,
+    visibilityScope: "42161:wallet-two",
+  });
+  rerender(<WalletSection chainId={42161} defaultExpanded />);
+  expect(screen.getByText("NEW").closest("details")?.open).toBe(false);
+  mocks.wallet.mockReturnValue(result);
+  rerender(<WalletSection chainId={42161} defaultExpanded />);
+  expect(screen.getByText("NEW").closest("details")).toBeNull();
+});
+
+it("keeps tiny positive amounts and values distinct from zero", () => {
   mocks.wallet.mockReturnValue(
     walletResult({
-      tokens: [],
-      unresolvedHoldings: [
+      tokens: [
         {
-          address: token.address,
-          rawBalance: "25",
-          reason: "decimals",
+          ...token,
+          balanceFormatted: 0.0000001,
+          usdValue: 0.001,
         },
       ],
-      isError: true,
-      valuationAvailable: false,
+      totalValue: 0.001,
     }),
   );
   render(<WalletSection chainId={42161} defaultExpanded />);
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: `Hide ${token.address}`,
-    }),
-  );
-  expect(screen.queryByText(/Raw balance:/)).toBeNull();
-  expect(screen.getByRole("alert")).toBeTruthy();
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: "Show hidden tokens",
-    }),
-  );
-  expect(
-    screen.queryByRole("button", {
-      name: /Swap|Bridge/,
-    }),
-  ).toBeNull();
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: `Restore ${token.address}`,
-    }),
-  );
-  expect(screen.getByText(/Raw balance:/)).toBeTruthy();
+  expect(walletHeader().textContent).toContain("<$0.01");
+  expect(screen.getAllByText("<0.0001").length).toBeGreaterThan(0);
 });
-it("uses a native button with an expanded state for the holdings disclosure", () => {
+
+it("keeps the main holdings disclosure keyboard accessible", () => {
   render(<WalletSection chainId={42161} />);
-  const toggle = screen.getByRole("button", {
-    name: "Toggle wallet holdings",
-  });
+  const toggle = walletHeader();
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(toggle);
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
+});
+
+it("does not label failed native balance reads as an empty wallet after successful enumeration", () => {
+  mocks.wallet.mockReturnValue(
+    walletResult({
+      tokens: [],
+      totalValue: 0,
+      isError: true,
+      isDiscoveryIncomplete: false,
+      valuationAvailable: true,
+    }),
+  );
+  render(<WalletSection chainId={42161} defaultExpanded />);
+  expect(walletHeader().textContent).toContain("Known value—");
+  expect(screen.getByRole("status").textContent).toContain("Couldn't load your wallet holdings");
+  expect(screen.queryByText("No tokens found in wallet")).toBeNull();
+  expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+  expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
+});
+
+it("labels successfully loaded balances as partial when another balance read failed", () => {
+  mocks.wallet.mockReturnValue(
+    walletResult({
+      isError: true,
+      isDiscoveryIncomplete: false,
+      valuationAvailable: true,
+    }),
+  );
+  render(<WalletSection chainId={42161} defaultExpanded />);
+  expect(walletHeader().textContent).toContain("Known value$25.00");
+  expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
+});
+
+it("does not include unverified provider prices in portfolio totals before an explicit show choice", () => {
+  mocks.wallet.mockReturnValue(
+    walletResult({
+      tokens: [
+        token,
+        {
+          ...indexedToken,
+          usdValue: 1000000,
+          price: 1000000 / 7,
+        },
+      ],
+      totalValue: 1000025,
+    }),
+  );
+  render(<WalletSection chainId={42161} defaultExpanded />);
+  expect(walletHeader().textContent).toContain("Shown value$25.00");
+  expect(mocks.setProtocolTotals).toHaveBeenLastCalledWith("Wallet", 25, 0);
 });
