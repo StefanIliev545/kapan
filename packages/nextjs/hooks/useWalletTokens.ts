@@ -14,7 +14,7 @@ import { AAVE_V3_PROVIDER_ADDRESSES } from "~~/utils/chainConfig";
 import { readAaveReceiptTokens, readCompoundReceiptTokens } from "~~/utils/wallet/protocolReceiptTokens";
 import deployedContracts from "~~/contracts/hardhat/deployedContracts";
 
-const receiptGateways: Record<number, { CompoundGatewayView?: { address: Address } }> = deployedContracts;
+const receiptGateways: Partial<Record<number, Partial<Record<string, { address: Address }>>>> = deployedContracts;
 // Major tokens whitelist (addresses by chainId)
 // These are always shown if user has balance
 const MAJOR_TOKENS: Record<
