@@ -29,7 +29,7 @@ import type { SwapAsset } from "~~/components/modals/SwapModalShell";
 import { useADLContracts } from "~~/hooks/useADLOrder";
 import { useActiveADL, formatLtvPercent } from "~~/hooks/useConditionalOrders";
 import { AddButton } from "~~/components/common/AddButton";
-import { useGlobalState } from "~~/services/store/store";
+import { useSetProtocolTotals } from "~~/contexts/DashboardTotalsContext";
 import { useModal } from "~~/hooks/useModal";
 import { PositionManager } from "~~/utils/position";
 import { formatBps } from "~~/utils/risk";
@@ -641,7 +641,7 @@ export const CompoundProtocolView: FC<CompoundProtocolViewProps> = ({ chainId })
   }, [activeMarkets]);
 
   // Report totals to global state
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
 
   useEffect(() => {
     if (!hasLoadedOnce) return;

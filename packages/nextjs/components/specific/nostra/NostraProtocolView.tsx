@@ -3,12 +3,12 @@ import { FC, useEffect } from "react";
 import { ProtocolView } from "../../ProtocolView";
 import { useAccount } from "~~/hooks/useAccount";
 import { useNostraLendingPositions } from "~~/hooks/useNostraLendingPositions";
-import { useGlobalState } from "~~/services/store/store";
+import { useSetProtocolTotals } from "~~/contexts/DashboardTotalsContext";
 
 export const NostraProtocolView: FC = () => {
   const { viewingAddress, isViewingOtherAddress } = useAccount();
   const { suppliedPositions, borrowedPositions, isLoading, hasLoadedOnce } = useNostraLendingPositions();
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
 
   useEffect(() => {
     if (isLoading) {

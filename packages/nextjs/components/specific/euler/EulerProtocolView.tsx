@@ -35,7 +35,7 @@ import type { Address } from "viem";
 import { encodeEulerContext } from "~~/utils/v2/instructionHelpers";
 import { useTokenPricesByAddress } from "~~/hooks/useTokenPrice";
 import { getEffectiveChainId } from "~~/utils/forkChain";
-import { useGlobalState } from "~~/services/store/store";
+import { useSetProtocolTotals } from "~~/contexts/DashboardTotalsContext";
 import { useModal } from "~~/hooks/useModal";
 import { BasicCollateral } from "~~/hooks/useMovePositionData";
 import { useTxCompletedListenerDelayed } from "~~/hooks/common/useTxCompletedListener";
@@ -1028,7 +1028,7 @@ export const EulerProtocolView: FC<EulerProtocolViewProps> = ({
   const positionGroups = useEulerPositionGroups(effectiveChainId, enrichedPositionGroups);
 
   // Report totals to global state (using balance + price calculation from metrics)
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
 
   useEffect(() => {
     if (!hasLoadedOnce) return;

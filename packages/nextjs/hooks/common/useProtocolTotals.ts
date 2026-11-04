@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { useGlobalState } from "~~/services/store/store";
+import { useSetProtocolTotals } from "~~/contexts/DashboardTotalsContext";
 
 /**
- * Hook to set protocol totals in the global state.
+ * Publish protocol totals to the current dashboard's wallet/network scope.
  * Automatically updates when positions change.
  *
  * @param protocolName - The name of the protocol (e.g., "Aave", "Morpho")
@@ -31,10 +31,12 @@ export function useProtocolTotals(
   totalBorrowed: number,
   enabled = true
 ): void {
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      return;
+    }
     setProtocolTotals(protocolName, totalSupplied, totalBorrowed);
   }, [protocolName, totalSupplied, totalBorrowed, enabled, setProtocolTotals]);
 }
@@ -63,10 +65,12 @@ export function useProtocolTotalsFromPositions<
   borrowedPositions: T[],
   enabled = true
 ): void {
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      return;
+    }
 
     const totalSupplied = suppliedPositions.reduce((sum, p) => sum + p.balance, 0);
     const totalBorrowed = borrowedPositions.reduce(

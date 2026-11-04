@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, startTransition, useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import type { NextPage } from "next";
 import { hardhat } from "viem/chains";
@@ -12,8 +12,8 @@ import StableArea from "~~/components/common/StableArea";
 import { SupportBanner } from "~~/components/common/SupportBanner";
 import { DashboardMetrics } from "~~/components/dashboard/DashboardMetrics";
 import { DashboardLayout } from "~~/components/layouts/DashboardLayout";
+import { DashboardTotalsProvider, useDashboardTotals } from "~~/contexts/DashboardTotalsContext";
 import { useAccount as useStarknetAccount } from "~~/hooks/useAccount";
-import { useGlobalState } from "~~/services/store/store";
 
 const AaveProtocolView = dynamic(
   () => import("~~/components/specific/aave/AaveProtocolView").then(module => module.AaveProtocolView),
@@ -170,37 +170,43 @@ const StarknetNetworkPane = () => (
 const App: NextPage = () => {
   const initialNetwork = process.env.NEXT_PUBLIC_ENABLE_HARDHAT_UI === "true" ? "hardhat" : "base";
   const [selectedNetwork, setSelectedNetwork] = useState(initialNetwork);
-  const totalSupplied = useGlobalState(state => state.totalSupplied);
-  const totalBorrowed = useGlobalState(state => state.totalBorrowed);
-  const totalNet = useGlobalState(state => state.totalNet);
-  const resetTotals = useGlobalState(state => state.resetTotals);
-  const loadedProtocolCount = useGlobalState(state => state.loadedProtocolCount);
   const { address: evmAddress } = useEvmAccount();
-  const { viewingAddress: starknetAddress } = useStarknetAccount();
-  const lastSeenAddresses = useRef<{ evm?: string; starknet?: string }>({});
-  const selectedEvmNetwork = evmNetworks[selectedNetwork];
-  const expectedProtocolCount = useMemo(
-    () => (selectedNetwork === "starknet" ? 2 : selectedEvmNetwork ? selectedEvmNetwork.protocols.length + 1 : 0),
-    [selectedEvmNetwork, selectedNetwork],
-  );
+  const { viewingAddress: starknetAddress, chainId: starknetChainId } = useStarknetAccount();
+  const isStarknet = selectedNetwork === "starknet";
+  const address = isStarknet ? starknetAddress : evmAddress;
+  const chainId = isStarknet ? starknetChainId : evmNetworks[selectedNetwork]?.chainId;
+  const scope = `${selectedNetwork}:${chainId ?? ""}:${address?.toLowerCase() ?? ""}`;
 
   const handleNetworkChange = useCallback((id: string) => {
     startTransition(() => setSelectedNetwork(id));
   }, []);
 
-  useEffect(() => {
-    resetTotals(expectedProtocolCount);
-  }, [expectedProtocolCount, resetTotals, selectedNetwork]);
+  return (
+    <DashboardTotalsProvider scope={scope} connected={!!address}>
+      <DashboardContent
+        scope={scope}
+        initialNetwork={initialNetwork}
+        selectedNetwork={selectedNetwork}
+        onNetworkChange={handleNetworkChange}
+        connected={!!address}
+      />
+    </DashboardTotalsProvider>
+  );
+};
 
-  useEffect(() => {
-    const nextEvm = evmAddress ?? "";
-    const nextStarknet = starknetAddress ?? "";
-    const previous = lastSeenAddresses.current;
-    if (previous.evm === nextEvm && previous.starknet === nextStarknet) return;
+interface DashboardContentProps {
+  scope: string;
+  initialNetwork: string;
+  selectedNetwork: string;
+  onNetworkChange: (network: string) => void;
+  connected: boolean;
+}
 
-    lastSeenAddresses.current = { evm: nextEvm, starknet: nextStarknet };
-    if (nextEvm || nextStarknet) resetTotals(expectedProtocolCount);
-  }, [evmAddress, expectedProtocolCount, resetTotals, starknetAddress]);
+function DashboardContent({ scope, initialNetwork, selectedNetwork, onNetworkChange, connected }: DashboardContentProps) {
+  const { totalSupplied, totalBorrowed, totalNet, loadedProtocolCount } = useDashboardTotals();
+  const selectedEvmNetwork = evmNetworks[selectedNetwork];
+  const evmSourceCount = selectedEvmNetwork ? selectedEvmNetwork.protocols.length + 1 : 0;
+  const expectedProtocolCount = selectedNetwork === "starknet" ? 2 : evmSourceCount;
 
   return (
     <DashboardLayout>
@@ -214,9 +220,9 @@ const App: NextPage = () => {
                 netWorth={totalNet}
                 totalSupply={totalSupplied}
                 totalDebt={totalBorrowed}
-                isLoading={loadedProtocolCount === 0}
+                isLoading={connected && loadedProtocolCount === 0}
                 loadedSources={loadedProtocolCount}
-                expectedSources={expectedProtocolCount}
+                expectedSources={connected ? expectedProtocolCount : 0}
               />
             </div>
           </div>
@@ -224,16 +230,16 @@ const App: NextPage = () => {
             networks={networkOptions}
             value={selectedNetwork}
             defaultNetwork={initialNetwork}
-            onNetworkChange={handleNetworkChange}
+            onNetworkChange={onNetworkChange}
           />
           <div className="sm:hidden">
             <DashboardMetrics
               netWorth={totalNet}
               totalSupply={totalSupplied}
               totalDebt={totalBorrowed}
-              isLoading={loadedProtocolCount === 0}
+              isLoading={connected && loadedProtocolCount === 0}
               loadedSources={loadedProtocolCount}
-              expectedSources={expectedProtocolCount}
+              expectedSources={connected ? expectedProtocolCount : 0}
             />
           </div>
         </header>
@@ -251,9 +257,9 @@ const App: NextPage = () => {
         )}
 
         {selectedNetwork === "starknet" ? (
-          <StarknetNetworkPane />
+          <StarknetNetworkPane key={scope} />
         ) : selectedEvmNetwork ? (
-          <EvmNetworkPane network={selectedEvmNetwork} />
+          <EvmNetworkPane key={scope} network={selectedEvmNetwork} />
         ) : null}
         <div className="mt-12">
           <SupportBanner />
@@ -261,6 +267,6 @@ const App: NextPage = () => {
       </div>
     </DashboardLayout>
   );
-};
+}
 
 export default App;

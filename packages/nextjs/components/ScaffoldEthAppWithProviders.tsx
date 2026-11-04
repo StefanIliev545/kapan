@@ -47,6 +47,7 @@ import { LandingSectionProvider } from "~~/contexts/LandingSectionContext";
 import { ReferralProvider } from "~~/contexts/ReferralContext";
 import { ControllerConnector } from "@cartridge/connector";
 import { constants } from "starknet";
+import { queryClient } from "~~/lib/queryClient";
 
 const cartridgeConnector = new ControllerConnector({
   chains: [
@@ -149,6 +150,7 @@ export const ScaffoldEthAppWithProviders = ({
 
   return (
     <StarknetConfig
+      queryClient={queryClient}
       chains={appChains}
       provider={provider}
       paymasterProvider={paymasterProvider}

@@ -12,7 +12,7 @@ import { MorphoPositionsSection } from "./MorphoPositionsSection";
 import { MorphoMarketsSection } from "./MorphoMarketsSection";
 import { calculateNetYieldMetrics } from "~~/utils/netYield";
 import { getEffectiveChainId } from "~~/utils/forkChain";
-import { useGlobalState } from "~~/services/store/store";
+import { useSetProtocolTotals } from "~~/contexts/DashboardTotalsContext";
 import { useExternalYields, hasExternalYield, type ExternalYield } from "~~/hooks/useExternalYields";
 import { BaseProtocolHeader, type HeaderMetric } from "../common";
 import { useTxCompletedListenerDelayed } from "~~/hooks/common";
@@ -200,7 +200,7 @@ export const MorphoProtocolView: FC<MorphoProtocolViewProps> = ({
   );
 
   // Report totals to global state for dashboard metrics
-  const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
+  const setProtocolTotals = useSetProtocolTotals();
 
   useEffect(() => {
     if (!hasLoadedOnce) {

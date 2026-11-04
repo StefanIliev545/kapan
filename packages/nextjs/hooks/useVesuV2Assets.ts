@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-stark";
 import type { TokenMetadata } from "~~/utils/protocols";
 import type { AssetWithRates } from "~~/hooks/useVesuAssets";
@@ -183,6 +183,7 @@ export const useVesuV2Assets = (poolAddress: string) => {
   const {
     data: supportedAssets,
     error: assetsError,
+    refetch: refetchSupportedAssets,
   } = useScaffoldReadContract({
     contractName: "VesuGatewayV2",
     functionName: "get_supported_assets_ui",
@@ -195,6 +196,7 @@ export const useVesuV2Assets = (poolAddress: string) => {
   const [poolRates, setPoolRates] = useState<Record<string, { borrowAPR: number; supplyAPY: number }>>({});
   const [ratesError, setRatesError] = useState<Error | null>(null);
   const [isRatesLoading, setIsRatesLoading] = useState(false);
+  const [ratesRetryCount, setRatesRetryCount] = useState(0);
 
   useEffect(() => {
     if (!poolAddress) {
@@ -246,23 +248,30 @@ export const useVesuV2Assets = (poolAddress: string) => {
       isMounted = false;
       abortController.abort();
     };
-  }, [poolAddress]);
+  }, [poolAddress, ratesRetryCount]);
 
   const normalizedAssets = useMemo(() => parseSupportedAssets(supportedAssets), [supportedAssets]);
 
   // Fetch explicit allowlists for collateral and debt (V2 variant)
-  const { data: supportedCollaterals } = useScaffoldReadContract({
+  const { data: supportedCollaterals, refetch: refetchSupportedCollaterals } = useScaffoldReadContract({
     contractName: "VesuGatewayV2",
     functionName: "get_supported_collateral_assets",
     args: [poolAddress],
     refetchInterval: 0,
   });
-  const { data: supportedDebts } = useScaffoldReadContract({
+  const { data: supportedDebts, refetch: refetchSupportedDebts } = useScaffoldReadContract({
     contractName: "VesuGatewayV2",
     functionName: "get_supported_debt_assets",
     args: [poolAddress],
     refetchInterval: 0,
   });
+
+  const refetchAssets = useCallback(() => {
+    void refetchSupportedAssets();
+    void refetchSupportedCollaterals();
+    void refetchSupportedDebts();
+    setRatesRetryCount(count => count + 1);
+  }, [refetchSupportedAssets, refetchSupportedCollaterals, refetchSupportedDebts]);
 
   const assetsWithRates = useMemo<AssetWithRates[]>(() => {
     return normalizedAssets.map(asset => {
@@ -318,6 +327,7 @@ export const useVesuV2Assets = (poolAddress: string) => {
     debtSet,
     isLoading: supportedAssets == null || isRatesLoading,
     assetsError: assetsError ?? ratesError,
+    refetchAssets,
   };
 };
 

@@ -20,9 +20,7 @@ import {
   normalizePrice,
   computeUsdValue,
   parsePositionTuples,
-  type PositionTuple,
 } from "./useProtocolPositions";
-import { usePositionLoadingState } from "./useProtocolPositions/usePositionLoadingState";
 
 export type VesuPositionRow = {
   key: string;
@@ -51,14 +49,16 @@ interface UseVesuLendingPositionsResult {
   isLoadingPositions: boolean;
   isLoadingAssets: boolean;
   refetchPositions: () => void;
+  refetchAssets: () => void;
   assetsError?: unknown;
+  positionsError?: unknown;
 }
 
 export const useVesuLendingPositions = (
   userAddress: string | undefined,
   poolId: bigint,
 ): UseVesuLendingPositionsResult => {
-  const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError } = useVesuAssets(poolId);
+  const { assetsWithRates, assetMap, collateralSet, debtSet, isLoading: isLoadingAssets, assetsError, refetchAssets } = useVesuAssets(poolId);
 
   // See note on V2 hook — paginate into small windows to stay under Starknet's
   // per-call step budget. Each window reads `pool.context()` per pair.
@@ -105,24 +105,17 @@ export const useVesuLendingPositions = (
   }, [part0.error, part1.error, part2.error, part3.error, part4.error]);
 
   const mergedUserPositions = useMemo(
-    () => parts.flatMap(p => parsePositionTuples(p.data)),
+    () => userAddress ? parts.flatMap(p => parsePositionTuples(p.data)) : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [part0.data, part1.data, part2.data, part3.data, part4.data],
+    [userAddress, part0.data, part1.data, part2.data, part3.data, part4.data],
   );
 
-  const isLoadingPositions = parts.some(p => p.isLoading);
-  const isFetchingPositions = parts.some(p => p.isFetching);
+  // Query results are already cached by account, pool, and chain. Empty pages
+  // are successful results too; missing or failed pages are not a complete load.
+  const hasLoadedOnce = !!userAddress && parts.every(p => p.data !== undefined);
+  const isLoadingPositions = !!userAddress && parts.some(p => p.isLoading);
+  const isUpdating = hasLoadedOnce && parts.some(p => p.isFetching);
   const positionsError = parts.find(p => p.error)?.error;
-
-  // Use shared loading state hook
-  const { hasLoadedOnce, isUpdating, setCachedData, getCachedData } = usePositionLoadingState({
-    isLoading: isLoadingPositions,
-    isFetching: isFetchingPositions,
-    userAddress,
-    poolId: poolId.toString(),
-    error: positionsError,
-    data: mergedUserPositions.length > 0 ? mergedUserPositions : undefined,
-  });
 
   const refetchPositions = useCallback(() => {
     if (!userAddress) return;
@@ -142,19 +135,6 @@ export const useVesuLendingPositions = (
       refetchPositionsRef.current?.();
     }
   }, [userAddress]);
-
-  // Cache positions when loading completes
-  useEffect(() => {
-    if (!userAddress) {
-      setCachedData<PositionTuple[]>([]);
-      return;
-    }
-    if (!isLoadingPositions && mergedUserPositions.length > 0) {
-      setCachedData(mergedUserPositions);
-    }
-  }, [mergedUserPositions, isLoadingPositions, userAddress, setCachedData]);
-
-  const cachedPositions = getCachedData<PositionTuple[]>() ?? [];
 
   const suppliablePositions = useMemo<ProtocolPosition[]>(() => {
     const zeroCounterpart = normalizeStarknetAddress(0n);
@@ -214,7 +194,7 @@ export const useVesuLendingPositions = (
   const rows = useMemo<VesuPositionRow[]>(() => {
     if (assetMap.size === 0) return [];
 
-    return cachedPositions.flatMap((position, index) => {
+    return mergedUserPositions.flatMap((position, index) => {
       const collateralAddress = toHexAddress(position[0]);
       const debtAddress = toHexAddress(position[1]);
       const positionData = position[2];
@@ -334,7 +314,7 @@ export const useVesuLendingPositions = (
         },
       ];
     });
-  }, [assetMap, cachedPositions, poolId]);
+  }, [assetMap, mergedUserPositions, poolId]);
 
   return {
     assetsWithRates,
@@ -346,7 +326,9 @@ export const useVesuLendingPositions = (
     isLoadingPositions,
     isLoadingAssets,
     refetchPositions,
+    refetchAssets,
     assetsError,
+    positionsError,
   };
 };
 

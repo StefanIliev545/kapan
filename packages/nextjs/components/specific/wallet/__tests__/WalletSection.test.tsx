@@ -13,10 +13,8 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("~~/hooks/useWalletTokens", () => ({ useWalletTokens: mocks.wallet }));
-vi.mock("~~/services/store/store", () => ({
-  useGlobalState: (select: (state: { setProtocolTotals: typeof mocks.setProtocolTotals }) => unknown) => {
-    return select({ setProtocolTotals: mocks.setProtocolTotals });
-  },
+vi.mock("~~/contexts/DashboardTotalsContext", () => ({
+  useSetProtocolTotals: () => mocks.setProtocolTotals,
 }));
 vi.mock("~~/hooks/common/useTxCompletedListener", () => ({ useTxCompletedListenerDelayed: () => {} }));
 vi.mock("next/dynamic", () => ({ default: () => () => null }));

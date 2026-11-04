@@ -205,6 +205,8 @@ interface VesuPositionsSectionProps {
   accountStatus?: string;
   hasLoadedOnce: boolean;
   isUpdating: boolean;
+  positionsError?: unknown;
+  onRetryPositions?: () => void;
   onBorrowRequest: (request: BorrowSelectionRequest) => void;
   onDepositRequest: () => void;
   protocolName?: string;
@@ -222,6 +224,8 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
   accountStatus,
   hasLoadedOnce,
   isUpdating,
+  positionsError,
+  onRetryPositions,
   onBorrowRequest,
   onDepositRequest,
   protocolName = "Vesu",
@@ -509,6 +513,10 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
     };
   }, [swapRow]);
   const renderPositions = () => {
+    if (userAddress && positionsError && !hasLoadedOnce) {
+      return null;
+    }
+
     if (accountStatus === "connecting" || (userAddress && !hasLoadedOnce)) {
       return (
         <div className="flex justify-center py-6">
@@ -554,7 +562,7 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-1">
             <h2 className="card-title text-lg">{title}</h2>
-            {userAddress && (
+            {userAddress && hasLoadedOnce && (
               <div className="text-base-content/70 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                 <span className="flex items-center gap-1">
                   <span>Balance:</span>
@@ -592,6 +600,20 @@ export const VesuPositionsSection: FC<VesuPositionsSectionProps> = ({
         </div>
 
         <div className="space-y-4">
+          {userAddress && !!positionsError && (
+            <div role="alert" className="border-warning/20 bg-warning/10 text-warning flex items-center justify-between gap-3 rounded-md border p-4 text-sm">
+              <span>
+                {hasLoadedOnce
+                  ? "Unable to refresh positions. Showing the last available data."
+                  : "Unable to load all positions. Your balance is unavailable."}
+              </span>
+              {onRetryPositions && (
+                <button type="button" className="btn btn-sm btn-outline" onClick={onRetryPositions}>
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
           {renderPositions()}
 
           <div className="border-base-300 overflow-hidden rounded-2xl border border-dashed">
