@@ -1,7 +1,7 @@
 "use client";
 
-import { ReactNode, cloneElement, isValidElement, useState, useEffect, useMemo } from "react";
-import { motion, MotionValue, useTransform } from "framer-motion";
+import { ReactNode, cloneElement, isValidElement, useRef } from "react";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import { TextScramble } from "./TextScramble";
 
 export interface SectionData {
@@ -31,52 +31,12 @@ const decorativeLineWhileInView = { width: "40px" };
 interface StickySectionProps {
   section: SectionData;
   index: number;
-  total: number;
-  scrollYProgress: MotionValue<number>;
-  isCinematic?: boolean;
 }
 
-export const StickySection = ({
-  section,
-  index,
-  total,
-  scrollYProgress,
-  isCinematic = true,
-}: StickySectionProps) => {
-  const center = index / (total - 1);
-  const neighborDistance = 1 / (total - 1);
-  const inputRange = [center - neighborDistance, center, center + neighborDistance];
-
-  // Opacity: fade in and out as we scroll through
-  const opacity = useTransform(
-    scrollYProgress,
-    [center - neighborDistance * 0.4, center, center + neighborDistance * 0.4],
-    [0, 1, 0]
-  );
-
-  // Scale: slightly smaller when not in focus
-  const scale = useTransform(scrollYProgress, inputRange, [0.95, 1, 0.95]);
-  
-  // Y position: slide up as we scroll
-  const y = useTransform(scrollYProgress, inputRange, [40, 0, -40]);
-
-  // Pointer events: only interactive when visible
-  const pointerEvents = useTransform(opacity, (v) => (v > 0.5 ? "auto" : "none"));
-  
-  // Track if this section is active (opacity > 0.8)
-  const [isActive, setIsActive] = useState(index === 0);
-  const [hasBeenActive, setHasBeenActive] = useState(false);
-  
-  useEffect(() => {
-    const unsubscribe = opacity.on("change", (v) => {
-      const active = v > 0.8;
-      setIsActive(active);
-      if (active && !hasBeenActive) {
-        setHasBeenActive(true);
-      }
-    });
-    return () => unsubscribe();
-  }, [opacity, hasBeenActive]);
+export const StickySection = ({ section, index }: StickySectionProps) => {
+  const sectionRef = useRef<HTMLElement>(null);
+  const hasBeenVisible = useInView(sectionRef, { once: true, amount: 0.15 });
+  const reduceMotion = useReducedMotion();
 
   const isCompact = section.compactHeader;
 
@@ -89,33 +49,22 @@ export const StickySection = ({
 
   // Clone content element and inject isActive prop if it accepts it
   const contentWithProps = section.content && isValidElement(section.content)
-    ? cloneElement(section.content as React.ReactElement<SectionContentProps>, { isActive: hasBeenActive || !isCinematic })
+    ? cloneElement(section.content as React.ReactElement<SectionContentProps>, { isActive: hasBeenVisible || !!reduceMotion })
     : section.content;
 
-  // Memoize motion style object to avoid creating new object on each render
-  const motionStyle = useMemo(() => ({
-    opacity,
-    scale,
-    y,
-    zIndex: index,
-    pointerEvents,
-  }), [opacity, scale, y, index, pointerEvents]);
-
   return (
-    <motion.div
-      style={isCinematic ? motionStyle : undefined}
-      aria-hidden={isCinematic && !isActive}
-      inert={isCinematic && !isActive}
-      className={isCinematic
-        ? "absolute inset-0 flex items-center justify-center overflow-hidden"
-        : "relative flex min-h-[100svh] w-full items-center justify-center py-24"}
+    <section
+      ref={sectionRef}
+      id={`landing-section-${index}`}
+      aria-labelledby={`landing-heading-${index}`}
+      className="relative flex min-h-[100svh] w-full scroll-mt-24 items-center justify-center pb-20 pt-28 md:pt-32"
     >
       <div className={`w-full ${isCompact ? "max-w-7xl" : "max-w-5xl"} flex flex-col items-center px-6 text-center md:px-8`}>
         {/* Tag + Title + Description */}
         <div className={`flex flex-col items-center ${isCompact ? "mb-4 gap-2 md:mb-6 md:gap-3" : "mb-8 gap-4 md:mb-12 md:gap-6"}`}>
           {/* Decorative line */}
           <motion.div
-            initial={decorativeLineInitial}
+            initial={reduceMotion ? false : decorativeLineInitial}
             whileInView={decorativeLineWhileInView}
             className="bg-base-content/20 h-[1px]"
           />
@@ -133,7 +82,7 @@ export const StickySection = ({
           </span>
 
           {/* Main title */}
-          <Heading className={`landing-title text-base-content ${isCompact ? "text-3xl sm:text-4xl md:text-5xl lg:text-6xl" : "text-[2.75rem] sm:text-6xl md:text-7xl lg:text-8xl"}`}>
+          <Heading id={`landing-heading-${index}`} className={`landing-title text-balance text-base-content ${isCompact ? "text-3xl sm:text-4xl md:text-5xl lg:text-6xl" : "text-[2.75rem] sm:text-6xl md:text-7xl lg:text-8xl"}`}>
             {section.titlePhrases ? (
               <TextScramble
                 phrases={section.titlePhrases}
@@ -159,7 +108,7 @@ export const StickySection = ({
           </div>
         )}
       </div>
-    </motion.div>
+    </section>
   );
 };
 

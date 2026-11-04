@@ -1,18 +1,17 @@
 "use client";
 
-import React, { useRef, useMemo, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { motion, AnimatePresence, useScroll, useSpring, useTransform, useReducedMotion, MotionValue } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion } from "framer-motion";
 import { ChevronDownIcon, ChevronUpIcon, ArrowRightIcon, ShieldCheckIcon, BoltIcon, CurrencyDollarIcon, SparklesIcon, PlusIcon, MinusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@radix-ui/themes";
 import { track } from "@vercel/analytics";
 import { StickySection, SectionData } from "./StickySection";
 import { AutomationExample } from "./AutomationExample";
-import { useLandingPresentation } from "./useLandingPresentation";
+import { HeroSceneBoundary } from "./HeroSceneBoundary";
 import { useAppUrl } from "~~/hooks/common/useAppUrl";
 import { useKapanTheme } from "~~/hooks/useKapanTheme";
-import { useLandingSection } from "~~/contexts/LandingSectionContext";
 
 // r3f refers to `window` at module init, so bail out of SSR for the scene.
 // Loading fallback is null because the existing radial-glow + grid already
@@ -65,18 +64,6 @@ const LOGO_ANIMATE = {
 };
 const LOGO_ANIMATE_INACTIVE = { opacity: 0 };
 const LOGO_TRANSITION_TIMES = [0, 0.05, 0.1, 0.18, 0.28, 0.35, 0.4, 0.5, 0.58, 0.68, 0.78, 0.88, 0.94, 1];
-
-const BUTTON_FLICKER_INITIAL = { opacity: 0 };
-const BUTTON_FLICKER_ANIMATE = {
-  opacity: [0, 0, 1, 0, 0.8, 0, 1, 0.3, 1, 0.6, 1, 1],
-};
-const BUTTON_FLICKER_ANIMATE_INACTIVE = { opacity: 0 };
-const BUTTON_FLICKER_TIMES = [0, 0.1, 0.15, 0.22, 0.3, 0.38, 0.5, 0.6, 0.72, 0.82, 0.92, 1];
-
-const LINKS_INITIAL = { opacity: 0, y: 20 };
-const LINKS_ANIMATE_ACTIVE = { opacity: 1, y: 0 };
-const LINKS_ANIMATE_INACTIVE = { opacity: 0, y: 20 };
-const LINKS_TRANSITION = { delay: 4.2, duration: 0.6, ease: "easeOut" as const };
 
 // FlowStep animations
 const FLOW_STEP_INITIAL = { opacity: 0, y: 10 };
@@ -284,23 +271,6 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
     ease: "linear" as const,
   }), []);
 
-  const buttonAnimate = useMemo(() =>
-    isActive ? BUTTON_FLICKER_ANIMATE : BUTTON_FLICKER_ANIMATE_INACTIVE,
-    [isActive]
-  );
-
-  const buttonTransition = useMemo(() => ({
-    delay: 3.0,
-    duration: 1.0,
-    times: BUTTON_FLICKER_TIMES,
-    ease: "linear" as const,
-  }), []);
-
-  const linksAnimate = useMemo(() =>
-    isActive ? LINKS_ANIMATE_ACTIVE : LINKS_ANIMATE_INACTIVE,
-    [isActive]
-  );
-
   return (
     <div className="flex flex-col items-center gap-10 px-4 text-center">
       {/* Logo + KAPAN text - Fallout sign style */}
@@ -323,22 +293,9 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
         </div>
       </div>
 
-      {/* Button flickers on after letters - big dramatic flicker */}
-      <motion.div
-        initial={reduceMotion ? false : BUTTON_FLICKER_INITIAL}
-        animate={reduceMotion ? STATIC_VISIBLE : buttonAnimate}
-        transition={reduceMotion ? NO_TRANSITION : buttonTransition}
-      >
-        <LaunchAppButton />
-      </motion.div>
+      <LaunchAppButton />
 
-      {/* Links slide up and fade in after button */}
-      <motion.div
-        className="flex flex-col items-center gap-4"
-        initial={reduceMotion ? false : LINKS_INITIAL}
-        animate={reduceMotion ? STATIC_VISIBLE : linksAnimate}
-        transition={reduceMotion ? NO_TRANSITION : LINKS_TRANSITION}
-      >
+      <div className="flex flex-col items-center gap-4">
         <div className="text-base-content/60 flex items-center gap-6 text-xs">
           <a href="https://discord.gg/Vjk6NhkxGv" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Discord</a>
           <a href="https://t.me/+vYCKr2TrOXRiODg0" target="_blank" rel="noopener noreferrer" className="hover:text-base-content/60 transition-colors">Telegram</a>
@@ -353,7 +310,7 @@ const FinalCTA = ({ isActive = false }: { isActive?: boolean }) => {
         >
           Starknet Audit by Codespect
         </a>
-      </motion.div>
+      </div>
     </div>
   );
 };
@@ -960,7 +917,7 @@ const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?:
         animate={reduceMotion ? STATIC_VISIBLE : arrowAnimate}
         transition={reduceMotion ? NO_TRANSITION : FLOW_ARROW_TRANSITION}
       >
-        <ArrowRightIcon className={`text-base-content/60 size-5${vertical ? "rotate-90" : ""}`} />
+        <ArrowRightIcon className={`text-base-content/60 size-5 ${vertical ? "rotate-90" : ""}`} />
       </motion.div>
     </motion.div>
   );
@@ -968,7 +925,7 @@ const FlowArrow = ({ delay = 0, vertical = false }: { delay?: number; vertical?:
 
 // Action content wrapper - horizontal on desktop, vertical on mobile
 const ActionContent = ({ children, description }: { children: React.ReactNode; description: string }) => (
-  <div className="mx-auto w-full max-w-4xl">
+  <div className="mx-auto w-full max-w-5xl">
     <motion.p
       initial={ACTION_CONTENT_INITIAL}
       animate={ACTION_CONTENT_ANIMATE}
@@ -983,7 +940,7 @@ const ActionContent = ({ children, description }: { children: React.ReactNode; d
 const LendCard = () => (
   <ActionContent description="Put assets to work. See which protocol pays more before you commit.">
     {/* Mobile: Vertical */}
-    <div className="flex flex-col items-center gap-6 md:hidden">
+    <div className="flex flex-col items-center gap-6 lg:hidden">
       <FlowStep delay={0}>
         <TokenDisplay logo="/logos/usdc.svg" symbol="USDC" amount="5,000" label="Deposit" size="lg" />
       </FlowStep>
@@ -1006,7 +963,7 @@ const LendCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden items-center justify-center gap-0 md:flex">
+    <div className="hidden items-center justify-center gap-0 lg:flex">
       <HFlowStep delay={0}>
         <TokenDisplay logo="/logos/usdc.svg" symbol="USDC" amount="5,000" label="Deposit" size="lg" />
       </HFlowStep>
@@ -1033,7 +990,7 @@ const LendCard = () => (
 const BorrowCard = () => (
   <ActionContent description="Borrow against what you hold. See who charges least, then go there.">
     {/* Mobile: Vertical */}
-    <div className="flex flex-col items-center gap-6 md:hidden">
+    <div className="flex flex-col items-center gap-6 lg:hidden">
       <FlowStep delay={0}>
         <TokenDisplay logo="/logos/wsteth.svg" symbol="wstETH" amount="5.25" label="Collateral" size="lg" />
       </FlowStep>
@@ -1053,7 +1010,7 @@ const BorrowCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden items-center justify-center gap-0 md:flex">
+    <div className="hidden items-center justify-center gap-0 lg:flex">
       <HFlowStep delay={0}>
         <TokenDisplay logo="/logos/wsteth.svg" symbol="wstETH" amount="5.25" label="Collateral" size="lg" />
       </HFlowStep>
@@ -1097,7 +1054,7 @@ const SwapArrow = () => {
 const SwapCard = () => (
   <ActionContent description="Change the collateral or debt in an existing position. Kapan bundles the supported steps into one transaction.">
     {/* Mobile: Vertical */}
-    <div className="flex flex-col items-center gap-6 md:hidden">
+    <div className="flex flex-col items-center gap-6 lg:hidden">
       <FlowStep delay={0}>
         <TokenDisplay logo="/logos/weth.svg" symbol="WETH" amount="2.5" label="From" size="lg" />
       </FlowStep>
@@ -1114,7 +1071,7 @@ const SwapCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden items-center justify-center gap-0 md:flex">
+    <div className="hidden items-center justify-center gap-0 lg:flex">
       <HFlowStep delay={0}>
         <TokenDisplay logo="/logos/weth.svg" symbol="WETH" amount="2.5" label="Current collateral" size="lg" />
       </HFlowStep>
@@ -1140,7 +1097,7 @@ const SwapCard = () => (
 const LoopCard = () => (
   <ActionContent description="Build a leveraged position from a supported token. Review borrowing costs alongside the collateral yield.">
     {/* Mobile: Vertical */}
-    <div className="flex flex-col items-center gap-6 md:hidden">
+    <div className="flex flex-col items-center gap-6 lg:hidden">
       <FlowStep delay={0}>
         <div className="flex items-center gap-3">
           <Image src="/logos/wsteth.svg" alt="wstETH" width={36} height={36} className="rounded-full" />
@@ -1175,7 +1132,7 @@ const LoopCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden items-center justify-center gap-0 md:flex">
+    <div className="hidden items-center justify-center gap-0 lg:flex">
       <HFlowStep delay={0}>
         <div className="flex items-center gap-3">
           <Image src="/logos/wsteth.svg" alt="wstETH" width={40} height={40} className="rounded-full" />
@@ -1219,7 +1176,7 @@ const LoopCard = () => (
 const PendleCard = () => (
   <ActionContent description="Use Pendle PT as collateral in supported markets. PT yield to maturity and variable borrowing costs both affect your return.">
     {/* Mobile: Vertical */}
-    <div className="flex flex-col items-center gap-6 md:hidden">
+    <div className="flex flex-col items-center gap-6 lg:hidden">
       <FlowStep delay={0}>
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -1249,7 +1206,7 @@ const PendleCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden items-center justify-center gap-0 md:flex">
+    <div className="hidden items-center justify-center gap-0 lg:flex">
       <HFlowStep delay={0}>
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -1284,7 +1241,7 @@ const PendleCard = () => (
 const RefinanceCard = () => (
   <ActionContent description="Move collateral and debt together to a supported market on the same network. No upfront debt repayment needed.">
     {/* Mobile: Vertical */}
-    <div className="flex flex-col items-center gap-5 md:hidden">
+    <div className="flex flex-col items-center gap-5 lg:hidden">
       <FlowStep delay={0}>
         <ProtocolBadge logo="/logos/aave.svg" name="Aave V3" size="lg" />
       </FlowStep>
@@ -1310,7 +1267,7 @@ const RefinanceCard = () => (
     </div>
 
     {/* Desktop: Horizontal */}
-    <div className="hidden items-center justify-center gap-0 md:flex">
+    <div className="hidden items-center justify-center gap-0 lg:flex">
       <HFlowStep delay={0}>
         <div className="flex flex-col items-center gap-2">
           <ProtocolBadge logo="/logos/aave.svg" name="Aave V3" size="lg" />
@@ -1318,9 +1275,9 @@ const RefinanceCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.1}>
-        <div className="border-base-content/5 mx-4 flex flex-col items-center gap-3 border-x px-8 py-2">
+        <div className="border-base-content/5 mx-2 flex flex-col items-center gap-3 border-x px-4 py-2">
           <div className="text-base-content/60 text-[10px] uppercase tracking-wider">Position</div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Image src="/logos/wsteth.svg" alt="wstETH" width={24} height={24} />
               <span className="font-mono">5.25 wstETH</span>
@@ -1334,7 +1291,7 @@ const RefinanceCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.2}>
-        <div className="px-4">
+        <div className="px-2">
           <SwapArrow />
         </div>
       </HFlowStep>
@@ -1345,7 +1302,7 @@ const RefinanceCard = () => (
         </div>
       </HFlowStep>
       <HFlowStep delay={0.45}>
-        <div className="border-base-content/10 ml-4 border-l pl-8">
+        <div className="border-base-content/10 ml-3 border-l pl-4">
           <RateDisplay oldRate="4.80%" newRate="3.20%" label="APR" />
         </div>
       </HFlowStep>
@@ -1472,16 +1429,10 @@ const TabButton = ({
   );
 };
 
-// Scroll hint opacity hook
-const useScrollHintOpacity = (smoothProgress: MotionValue<number>) => {
-  return useTransform(smoothProgress, [0, 0.1], [1, 0]);
-};
-
 export const StickyLanding = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { setCurrentSection, setTotalSections } = useLandingSection();
   const isHeroSceneEnabled = useHeroSceneEnabled();
-  const isCinematic = useLandingPresentation();
+  const { scrollYProgress } = useScroll();
+  const backdropOpacity = useTransform(scrollYProgress, [0, 0.25, 0.5], [0.16, 0.09, 0.03]);
 
   // Force kapan dark theme on landing page
   useKapanTheme();
@@ -1533,103 +1484,23 @@ export const StickyLanding = () => {
     },
   ], []);
 
-  const { scrollYProgress } = useScroll({ container: containerRef });
-  const scrollSpringConfig = useMemo(() => ({ stiffness: 100, damping: 30 }), []);
-  const smoothProgress = useSpring(scrollYProgress, scrollSpringConfig);
-
-  // Track current section for header CTA visibility
-  useEffect(() => {
-    setTotalSections(sections.length);
-
-    const unsubscribe = scrollYProgress.on("change", (progress) => {
-      const sectionIndex = Math.round(progress * (sections.length - 1));
-      setCurrentSection(sectionIndex);
-    });
-
-    return () => unsubscribe();
-  }, [scrollYProgress, sections.length, setCurrentSection, setTotalSections]);
-
-  const scrollProgressStyle = useMemo(() => ({ height: "100%", scaleY: smoothProgress }), [smoothProgress]);
-
-  const containerHeight = useMemo(() => ({ height: `${sections.length * 100}vh` }), [sections.length]);
-
-  const scrollHintOpacity = useScrollHintOpacity(smoothProgress);
-
-  const scrollHintStyle = useMemo(() => ({ opacity: scrollHintOpacity }), [scrollHintOpacity]);
-
   return (
-    <div className="bg-base-100 text-base-content fixed inset-0 overflow-hidden">
-      {/* Layered premium backdrop — depth instead of a flat black + busy wireframe.
-         Soft accent glow (top), vignette (focus), dimmed 3D texture, film grain. */}
-      <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_20%,rgba(59,130,246,0.10),transparent_72%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.6)_100%)]" />
-
-      {/* 3D hero scene — dimmed to a faint texture so it adds depth without the busy "node graph"
-         look. Fades further as you scroll past the first sections. pointer-events-none so clicks
-         pass through to the CTA (r3f's Canvas otherwise re-enables pointer-events and swallows them). */}
-      <motion.div
-        className="pointer-events-none absolute inset-0"
-        style={{ opacity: useTransform(smoothProgress, [0, 0.25, 0.5], [0.16, 0.09, 0.03]) }}
-      >
-        {isHeroSceneEnabled && <HeroScene />}
-      </motion.div>
-
-      {/* Film grain — subtle premium texture over the dark. */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-soft-light"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-        }}
-      />
-
-      {/* Scroll container */}
-      <div
-        ref={containerRef}
-        className={`hide-scrollbar relative z-10 size-full overflow-y-auto ${isCinematic ? "snap-y snap-mandatory scroll-smooth" : ""}`}
-      >
-        {/* Total height based on sections */}
-        <div style={isCinematic ? containerHeight : undefined} className="relative">
-          {/* Snap targets */}
-          {isCinematic && <div className="pointer-events-none absolute inset-0 flex flex-col" aria-hidden="true">
-            {sections.map((_, i) => (
-              <div key={i} className="h-screen w-full snap-start" />
-            ))}
-          </div>}
-
-          {/* Sticky viewport */}
-          <div className={isCinematic ? "sticky top-0 flex h-screen w-full items-center justify-center overflow-hidden" : "relative flex w-full flex-col"}>
-            {/* Scroll progress indicator */}
-            {isCinematic && <div className="bg-base-content/5 absolute right-6 top-1/2 hidden h-48 w-[1px] -translate-y-1/2 md:right-12 lg:block">
-              <motion.div
-                className="bg-base-content/40 w-full origin-top"
-                style={scrollProgressStyle}
-              />
-            </div>}
-
-            {/* Sections */}
-            {sections.map((section, i) => (
-              <StickySection
-                key={i}
-                section={section}
-                index={i}
-                total={sections.length}
-                scrollYProgress={smoothProgress}
-                isCinematic={isCinematic}
-              />
-            ))}
-
-            {/* Scroll hint on first section */}
-            {isCinematic && <motion.div
-              style={scrollHintStyle}
-              className="text-base-content/60 absolute bottom-12 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3"
-            >
-              <span className="landing-tag">Scroll to explore</span>
-              <ChevronDownIcon className="size-5 motion-safe:animate-bounce" />
-            </motion.div>}
-          </div>
-        </div>
+    <div className="bg-base-100 text-base-content relative isolate">
+      <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
+        <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_20%,rgba(59,130,246,0.10),transparent_72%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.6)_100%)]" />
+        <motion.div className="absolute inset-0" style={{ opacity: backdropOpacity }}>
+          {isHeroSceneEnabled && (
+            <HeroSceneBoundary>
+              <HeroScene />
+            </HeroSceneBoundary>
+          )}
+        </motion.div>
       </div>
+
+      {sections.map((section, index) => (
+        <StickySection key={section.tag} section={section} index={index} />
+      ))}
     </div>
   );
 };

@@ -3,28 +3,9 @@
 import { useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { track } from "@vercel/analytics";
-import { useAppUrl } from "~~/hooks/common";
-
-// Animation constants for Launch App button (Fallout neon sign flicker)
-const LAUNCH_BUTTON_INITIAL = { opacity: 0 };
-
-const LAUNCH_BUTTON_ANIMATE = {
-  // Neon sign flicker: dark -> try to turn on -> fail -> try again -> flicker -> stabilize
-  opacity: [0, 0, 0.8, 0, 0, 0.6, 0.1, 0.9, 0.2, 1, 0.7, 1, 1],
-};
-
-const LAUNCH_BUTTON_EXIT = {
-  opacity: [1, 0.5, 0.8, 0, 0.3, 0],
-};
-
-const LAUNCH_BUTTON_TRANSITION = {
-  duration: 1.4,
-  times: [0, 0.1, 0.15, 0.22, 0.35, 0.42, 0.47, 0.55, 0.62, 0.75, 0.85, 0.92, 1],
-  ease: "linear" as const,
-};
+import { useAppUrl } from "~~/hooks/common/useAppUrl";
 
 /**
  * Landing page header - minimal dark theme design
@@ -32,7 +13,6 @@ const LAUNCH_BUTTON_TRANSITION = {
  */
 export const LandingHeader = () => {
   const appUrl = useAppUrl();
-
 
   const handleLaunchClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -57,7 +37,7 @@ export const LandingHeader = () => {
               priority
             />
           </div>
-          <span className="hidden sm:inline text-base-content/60 group-hover:text-base-content/100 text-sm font-bold uppercase tracking-wider transition-colors duration-300 md:text-base">
+          <span className="hidden sm:inline text-base-content/60 group-hover:text-base-content/100 text-sm font-bold uppercase tracking-wider transition-colors duration-300 motion-reduce:transition-none md:text-base">
             Kapan
           </span>
         </Link>
@@ -66,34 +46,26 @@ export const LandingHeader = () => {
         <div className="flex items-center gap-3 sm:gap-4">
           <Link
             href="/info"
-            className="text-base-content/50 hover:text-base-content/100 text-xs font-semibold uppercase tracking-wider transition-colors duration-300"
+            className="text-base-content/50 hover:text-base-content/100 text-xs font-semibold uppercase tracking-wider transition-colors duration-300 motion-reduce:transition-none"
           >
             Info
           </Link>
           <Link
             href="/about"
-            className="text-base-content/50 hover:text-base-content/100 text-xs font-semibold uppercase tracking-wider transition-colors duration-300"
+            className="text-base-content/50 hover:text-base-content/100 text-xs font-semibold uppercase tracking-wider transition-colors duration-300 motion-reduce:transition-none"
           >
             About
           </Link>
           
           {/* App entry stays available when sections have different heights. */}
-          <AnimatePresence>
-            {(
-              <motion.a
-                href={appUrl}
-                onClick={handleLaunchClick}
-                initial={LAUNCH_BUTTON_INITIAL}
-                animate={LAUNCH_BUTTON_ANIMATE}
-                exit={LAUNCH_BUTTON_EXIT}
-                transition={LAUNCH_BUTTON_TRANSITION}
-                className="bg-primary/10 hover:bg-primary/20 border-primary/20 hover:border-primary/40 text-primary group flex items-center gap-2 rounded-lg border px-4 py-2 transition-all duration-300"
-              >
-                <span className="whitespace-nowrap text-[10px] sm:text-xs font-semibold uppercase tracking-wider">Launch App</span>
-                <ArrowRightIcon className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-              </motion.a>
-            )}
-          </AnimatePresence>
+          <a
+            href={appUrl}
+            onClick={handleLaunchClick}
+            className="bg-primary/10 hover:bg-primary/20 border-primary/20 hover:border-primary/40 text-primary group flex items-center gap-2 rounded-lg border px-4 py-2 transition-colors duration-300 motion-reduce:transition-none"
+          >
+            <span className="whitespace-nowrap text-[10px] sm:text-xs font-semibold uppercase tracking-wider">Launch App</span>
+            <ArrowRightIcon className="size-3.5 transition-transform motion-safe:group-hover:translate-x-0.5 motion-reduce:transition-none" />
+          </a>
         </div>
       </div>
     </div>
