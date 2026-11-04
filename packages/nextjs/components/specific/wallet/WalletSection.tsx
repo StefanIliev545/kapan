@@ -29,6 +29,7 @@ export function WalletSection({ chainId, defaultExpanded = false }: WalletSectio
   const {
     tokens,
     isLoading,
+    isRefreshing = false,
     isError,
     isDiscoveryIncomplete = isError,
     refetch,
@@ -50,13 +51,14 @@ export function WalletSection({ chainId, defaultExpanded = false }: WalletSectio
   const shownValue = valuedTokens.reduce((sum, token) => sum + token.usdValue, 0);
   const unpricedCount = mainTokens.length - valuedTokens.length;
   const hasHoldings = tokens.length + unresolvedHoldings.length > 0;
+  const showInitialLoading = isLoading && !hasHoldings;
   const failedEmpty = isError && !hasHoldings;
   const hasLoadFailure = isDiscoveryIncomplete || failedEmpty;
   const isFiltered = otherHoldings.length > 0 || hiddenHoldings.length > 0;
   const isPartialValue = isError || isDiscoveryIncomplete || unpricedCount > 0 || !valuationAvailable;
   const valueLabel = isFiltered ? "Shown value" : isPartialValue ? "Known value" : "Balance";
   const hasSubtotal = valuedTokens.length > 0 || (!hasHoldings && !hasLoadFailure && valuationAvailable);
-  const valueText = isLoading || !hasSubtotal ? "—" : formatWalletValue(shownValue);
+  const valueText = showInitialLoading || !hasSubtotal ? "—" : formatWalletValue(shownValue);
   const effectiveChainId = chainId ?? 1;
 
   const [swapToken, setSwapToken] = useState<WalletToken | null>(null);
@@ -85,11 +87,11 @@ export function WalletSection({ chainId, defaultExpanded = false }: WalletSectio
 
   const setProtocolTotals = useGlobalState(state => state.setProtocolTotals);
   useEffect(() => {
-    if (isLoading || isError || !valuationAvailable) {
+    if (isLoading || isRefreshing || isError || !valuationAvailable) {
       return;
     }
     setProtocolTotals("Wallet", shownValue, 0);
-  }, [isLoading, isError, valuationAvailable, shownValue, setProtocolTotals, chainId]);
+  }, [isLoading, isRefreshing, isError, valuationAvailable, shownValue, setProtocolTotals, chainId]);
 
   useTxCompletedListenerDelayed(
     useCallback(() => {
@@ -108,7 +110,11 @@ export function WalletSection({ chainId, defaultExpanded = false }: WalletSectio
 
   return (
     <>
-      <section className="overflow-hidden rounded-2xl border border-base-content/10 bg-base-200/20" aria-label="Wallet">
+      <section
+        className="overflow-hidden rounded-2xl border border-base-content/10 bg-base-200/20"
+        aria-label="Wallet"
+        aria-busy={isLoading || isRefreshing}
+      >
         <button
           type="button"
           aria-label="Toggle wallet holdings"
@@ -146,7 +152,7 @@ export function WalletSection({ chainId, defaultExpanded = false }: WalletSectio
 
         {isExpanded && (
           <div className="border-t border-base-content/10">
-            {isLoading ? (
+            {showInitialLoading ? (
               <div className="flex justify-center py-6">
                 <LoadingSpinner size="sm" />
               </div>

@@ -108,6 +108,36 @@ it("shows the known balance and reports a complete portfolio contribution", () =
   expect(screen.queryByRole("button", { name: "Hide USDai" })).toBeNull();
 });
 
+it("preserves the list, subtotal and expanded token details during enrichment", () => {
+  const { rerender } = render(<WalletSection chainId={42161} defaultExpanded />);
+  openDetails("USDai");
+  mocks.setProtocolTotals.mockClear();
+  mocks.wallet.mockReturnValue(walletResult({ isLoading: true }));
+  rerender(<WalletSection chainId={42161} defaultExpanded />);
+
+  expect(screen.getByText("USDai")).toBeTruthy();
+  expect(walletHeader().textContent).toContain("$25.00");
+  expect(screen.getByRole("button", { name: "Details for USDai" }).getAttribute("aria-expanded")).toBe("true");
+  expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
+});
+
+it("waits for refreshed balances before publishing a changed subtotal", () => {
+  const { rerender } = render(<WalletSection chainId={42161} defaultExpanded />);
+  mocks.setProtocolTotals.mockClear();
+  const refreshedToken = {
+    ...token,
+    usdValue: 30,
+  };
+  mocks.wallet.mockReturnValue(walletResult({ tokens: [refreshedToken], isRefreshing: true }));
+  rerender(<WalletSection chainId={42161} defaultExpanded />);
+  expect(screen.getByText("USDai")).toBeTruthy();
+  expect(mocks.setProtocolTotals).not.toHaveBeenCalled();
+
+  mocks.wallet.mockReturnValue(walletResult({ tokens: [refreshedToken], isRefreshing: false }));
+  rerender(<WalletSection chainId={42161} defaultExpanded />);
+  expect(mocks.setProtocolTotals).toHaveBeenCalledWith("Wallet", 30, 0);
+});
+
 it.each([false, true])("shows partial balances with a compact retry status when expanded=%s", expanded => {
   mocks.wallet.mockReturnValue(
     walletResult({

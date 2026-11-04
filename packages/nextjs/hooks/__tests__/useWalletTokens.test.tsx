@@ -231,6 +231,88 @@ function indexedHolding(address = state.held, overrides: Partial<Holding> = {}):
     ...overrides,
   };
 }
+
+function pendingNativeBalance() {
+  let finish!: (balance: bigint) => void;
+  const promise = new Promise<bigint>((resolve) => {
+    finish = resolve;
+  });
+  state.getBalance.mockImplementation(() => promise);
+  return finish;
+}
+
+it("keeps loaded holdings visible through successive price refreshes", async () => {
+  state.indexed = [indexedHolding()];
+  state.prices = { [state.held]: 1 };
+  const { client, result, rerender } = setup();
+  await waitFor(() => {
+    expect(result.current.totalValue).toBe(2);
+    expect(client.isFetching()).toBe(0);
+  });
+
+  for (const price of [2, 3]) {
+    const previousTokens = result.current.tokens;
+    const finish = pendingNativeBalance();
+    state.prices = { [state.held]: price };
+    rerender({ chain: 42161 });
+
+    expect(result.current.tokens).toEqual(previousTokens);
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isRefreshing).toBe(true);
+
+    await act(async () => finish(0n));
+    await waitFor(() => expect(result.current.totalValue).toBe(price * 2));
+    await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+  }
+});
+
+it("retains holdings during late receipt discovery, then applies the exclusion", async () => {
+  state.indexed = [indexedHolding()];
+  const { client, result } = setup();
+  await waitFor(() => {
+    expect(result.current.tokenCount).toBe(1);
+    expect(client.isFetching()).toBe(0);
+  });
+  const finish = pendingNativeBalance();
+  act(() => {
+    client.setQueryData(["wallet-aave-receipt-tokens", 42161], [state.held]);
+  });
+  await waitFor(() => expect(client.isFetching()).toBe(1));
+  expect(result.current.tokenCount).toBe(1);
+  expect(result.current.isLoading).toBe(false);
+
+  await act(async () => finish(0n));
+  await waitFor(() => expect(result.current.tokenCount).toBe(0));
+});
+
+it.each(["account", "chain", "disconnect"])("never carries refresh placeholders across a %s change", async (change) => {
+  state.indexed = [indexedHolding()];
+  const { client, result, rerender } = setup();
+  await waitFor(() => {
+    expect(result.current.tokenCount).toBe(1);
+    expect(client.isFetching()).toBe(0);
+  });
+  const finish = pendingNativeBalance();
+  state.prices = { [state.held]: 2 };
+  rerender({ chain: 42161 });
+  if (change === "account") {
+    state.account = "0x0000000000000000000000000000000000000020";
+  }
+  if (change === "disconnect") {
+    state.account = undefined;
+  }
+  state.indexed = [];
+  state.multicall.mockImplementation(async ({ contracts }) => {
+    return contracts.map(() => ({ status: "success", result: 0n }));
+  });
+  rerender({ chain: change === "chain" ? 8453 : 42161 });
+
+  expect(result.current.tokens).toEqual([]);
+  expect(result.current.unresolvedHoldings).toEqual([]);
+  await act(async () => finish(0n));
+  await waitFor(() => expect(client.isFetching()).toBe(0));
+  expect(result.current.tokens).toEqual([]);
+});
 function canonicalPt(chainId = 42161): PendleToken {
   return {
     address: state.held as PendleToken["address"],

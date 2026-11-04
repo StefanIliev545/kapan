@@ -737,17 +737,26 @@ export function useWalletTokens(chainId?: number) {
     },
   );
   // Protocol metadata enriches indexed holdings without restricting membership.
-  const query = useQuery({
+  const query = useQuery<BalanceState>({
     queryKey: [
       "wallet-tokens",
       effectiveChainId,
-      userAddress,
+      userAddress?.toLowerCase(),
       Array.from(tokenWhitelist.values()),
       fetchedPricesByAddress,
       globalEthPrice,
       pendlePTTokens,
       Array.from(portfolioByPt.entries()),
     ],
+    placeholderData: (previousData, previousQuery) => {
+      const previousKey = previousQuery?.queryKey;
+      const sameChain = previousKey?.[1] === effectiveChainId;
+      const sameAccount = !!userAddress && previousKey?.[2] === userAddress.toLowerCase();
+      if (sameChain && sameAccount) {
+        return previousData;
+      }
+      return undefined;
+    },
     queryFn: async ({ signal }) => {
       if (!userAddress || !publicClient) {
         return {
@@ -819,6 +828,8 @@ export function useWalletTokens(chainId?: number) {
       ...(query.data?.issues ?? []),
     ],
     isLoading: !!userAddress && (query.isLoading || discovery.isLoading || holdings.isLoading),
+    isRefreshing:
+      !!query.data && (query.isPlaceholderData || query.isFetching || discovery.isFetching || holdings.isFetching),
     isDiscoveryIncomplete:
       !!userAddress &&
       !holdings.isLoading &&
