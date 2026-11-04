@@ -1,30 +1,38 @@
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
   coinbaseWallet,
+  injectedWallet,
   ledgerWallet,
   metaMaskWallet,
+  phantomWallet,
+  rabbyWallet,
   rainbowWallet,
   safeWallet,
+  trustWallet,
   walletConnectWallet,
+  zerionWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import { rainbowkitBurnerWallet } from "burner-connector";
 import { type Chain, hardhat } from "viem/chains";
-import scaffoldConfig from "~~/scaffold.config";
 import { type CreateConnectorFn } from "wagmi";
 import { safe } from "wagmi/connectors";
+import scaffoldConfig from "~~/scaffold.config";
 
 const { onlyLocalBurnerWallet, targetEVMNetworks: targetNetworks } = scaffoldConfig;
 
-const wallets = [
-  metaMaskWallet,
-  walletConnectWallet,
-  ledgerWallet,
-  coinbaseWallet,
-  rainbowWallet,
-  safeWallet,
-  ...(!targetNetworks.some(network => network.id !== (hardhat as Chain).id) || !onlyLocalBurnerWallet
-    ? [rainbowkitBurnerWallet]
-    : []),
+const showBurnerWallet =
+  !onlyLocalBurnerWallet || targetNetworks.every(network => network.id === (hardhat as Chain).id);
+
+const walletGroups = [
+  {
+    groupName: "Popular wallets",
+    wallets: [rabbyWallet, metaMaskWallet, coinbaseWallet, rainbowWallet, phantomWallet],
+  },
+  {
+    groupName: "More wallets",
+    wallets: [trustWallet, zerionWallet, ledgerWallet, safeWallet, walletConnectWallet, injectedWallet],
+  },
+  ...(showBurnerWallet ? [{ groupName: "Development", wallets: [rainbowkitBurnerWallet] }] : []),
 ];
 
 declare global {
@@ -41,15 +49,12 @@ export function getWagmiConnectors() {
   }
 
   if (!globalThis.wagmiConnectors) {
-    globalThis.wagmiConnectors = connectorsForWallets(
-      [
-        {
-          groupName: "Supported Wallets",
-          wallets,
-        },
-      ],
-      { appName: "scaffold-eth-2", projectId: scaffoldConfig.walletConnectProjectId },
-    );
+    globalThis.wagmiConnectors = connectorsForWallets(walletGroups, {
+      appName: "Kapan Finance",
+      appDescription: "Compare lending markets and manage your DeFi positions.",
+      appUrl: "https://kapan.finance",
+      projectId: scaffoldConfig.walletConnectProjectId,
+    });
   }
 
   const safeConnector: CreateConnectorFn = safe({

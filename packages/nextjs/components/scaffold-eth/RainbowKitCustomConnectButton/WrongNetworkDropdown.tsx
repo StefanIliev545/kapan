@@ -1,10 +1,10 @@
 import { useCallback } from "react";
 import { NetworkOptions } from "./NetworkOptions";
-import { useDisconnect } from "wagmi";
 import { ArrowLeftOnRectangleIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
+import { useEvmDisconnect } from "~~/components/wallet/useEvmDisconnect";
 
 export const WrongNetworkDropdown = () => {
-  const { disconnect } = useDisconnect();
+  const { disconnect, pending } = useEvmDisconnect();
 
   const handleDisconnect = useCallback(() => {
     disconnect();
@@ -26,6 +26,7 @@ export const WrongNetworkDropdown = () => {
             className="menu-item text-error btn-sm flex gap-3 !rounded-xl py-3"
             type="button"
             onClick={handleDisconnect}
+            disabled={pending}
           >
             <ArrowLeftOnRectangleIcon className="ml-2 h-6 w-4 sm:ml-0" />
             <span>Disconnect</span>
