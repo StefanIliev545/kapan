@@ -1,30 +1,24 @@
 import { useMemo } from "react";
 
-/**
- * Hook to construct the app subdomain URL based on current location.
- * Maps landing pages (e.g., kapan.finance) to app.kapan.finance.
- * Handles localhost development and www. prefixes.
- *
- * @returns The app URL string (e.g., "https://app.kapan.finance")
- */
-export const useAppUrl = (): string => {
-  return useMemo(() => {
-    if (typeof window === "undefined") return "/app";
+export const resolveAppUrl = (location?: Pick<Location, "protocol" | "hostname" | "host">): string => {
+  if (!location) {
+    return "/app";
+  }
 
-    const { protocol, hostname, host } = window.location;
-    const baseHost = hostname.replace(/^www\./, "");
+  const { protocol, hostname, host } = location;
 
-    // Local dev: map anything *.localhost:3000 to app.localhost:3000
-    if (host.endsWith("localhost:3000")) {
-      return `${protocol}//app.localhost:3000`;
-    }
+  if (hostname === "kapan.finance" || hostname === "www.kapan.finance") {
+    return "https://app.kapan.finance";
+  }
 
-    // If already on app.<host>, keep it
-    if (hostname.startsWith("app.")) {
-      return `${protocol}//${host}`;
-    }
+  if (hostname === "app.kapan.finance") {
+    return `${protocol}//${host}`;
+  }
 
-    // Default: prefix with app.
-    return `${protocol}//app.${baseHost}`;
-  }, []);
+  // Preview and local hosts serve the dashboard directly at /app.
+  return "/app";
 };
+
+/** Use the production app subdomain or the current deployment's /app route. */
+export const useAppUrl = (): string =>
+  useMemo(() => resolveAppUrl(typeof window === "undefined" ? undefined : window.location), []);

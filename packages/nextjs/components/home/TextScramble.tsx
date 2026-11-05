@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useReducedMotion } from "framer-motion";
 
 interface TextScrambleProps {
   phrases: string[];
@@ -28,6 +29,7 @@ export const TextScramble = ({
 }: TextScrambleProps) => {
   // Initialize to the first phrase so the SERVER renders real text (the <h1> isn't empty for
   // crawlers / no-JS). The client then decode-animates from this on mount via the effect below.
+  const reduceMotion = useReducedMotion();
   const [displayText, setDisplayText] = useState(phrases[0] ?? "");
   const [currentIndex, setCurrentIndex] = useState(0);
   const frameRef = useRef<number | null>(null);
@@ -107,7 +109,13 @@ export const TextScramble = ({
 
   // Trigger animation when currentIndex changes
   useEffect(() => {
-    if (phrases.length === 0) return;
+    if (phrases.length === 0) {
+      return;
+    }
+    if (reduceMotion) {
+      setDisplayText(phrases[phrases.length - 1]);
+      return;
+    }
     
     const currentPhrase = phrases[currentIndex];
     scrambleText(currentPhrase, currentIndex);
@@ -120,7 +128,7 @@ export const TextScramble = ({
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [currentIndex, phrases, scrambleText]);
+  }, [currentIndex, phrases, scrambleText, reduceMotion]);
 
   // Initialize with first phrase's length in scrambled chars
   useEffect(() => {
